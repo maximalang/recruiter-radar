@@ -59,7 +59,7 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
         </div>
         <div style={{ fontSize: "0.76rem", color: "var(--c-text-muted, #667085)", display: "grid", gap: "2px", marginTop: "4px" }}>
           <span>
-            Workspace: {user.workspace ? `${user.workspace.name} В· ${user.workspace.role}` : "РЅРµС‚"}
+            Workspace: {user.workspace ? `${user.workspace.name} · ${user.workspace.role}` : "нет"}
           </span>
           <span>
             Профиль:{" "}

@@ -9,6 +9,7 @@
     "dev": "npm run dev --workspace @recruiter-radar/web",
     "clean": "node scripts/clean.mjs",
     "guard:router": "node scripts/guard-no-src-app.mjs",
+    "guard:encoding": "node scripts/guard-encoding.mjs",
     "db:migrate": "node packages/db/scripts/migrate.mjs",
     "db:validate": "npm run validate --workspace @recruiter-radar/db",
     "auth:cleanup-challenges": "node packages/db/scripts/cleanup-auth-v2-challenges.mjs",

@@ -25,6 +25,8 @@ jobs:
         run: npm run guard:router
       - name: Type check application
         run: npm run web:check
+      - name: Guard source encoding
+        run: npm run guard:encoding
       - name: Type check tests
         run: npm run test:types --workspace @recruiter-radar/web
 

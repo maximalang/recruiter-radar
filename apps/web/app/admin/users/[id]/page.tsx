@@ -52,11 +52,11 @@ export default async function AdminUserPage({ params, searchParams }: {
     return (
       <InternalPageFrame navItems={NAV}>
         <InternalPageHeader
-          title="Р’С‹Р±РµСЂРёС‚Рµ workspace"
-          subtitle={`User Control Center В· #${id}`}
+          title="Выберите workspace"
+          subtitle={`User Control Center \u00b7 #${id}`}
         />
         <p className={internalPageClasses.bodyTextMutedBlock}>
-          РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃРѕСЃС‚РѕРёС‚ РІ РЅРµСЃРєРѕР»СЊРєРёС… workspace. Р”РёР°РіРЅРѕСЃС‚РёРєР° Рё РѕРїРµСЂР°С†РёРё С‚СЂРµР±СѓСЋС‚ СЏРІРЅРѕРіРѕ РІС‹Р±РѕСЂР°.
+          Пользователь состоит в нескольких workspace. Для диагностики и операций нужно явно выбрать workspace.
         </p>
         <WorkspaceSelector userId={id} memberships={memberships} selectedId={null} />
       </InternalPageFrame>
