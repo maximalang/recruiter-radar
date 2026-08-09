@@ -1,12 +1,26 @@
 :root {
-  --c-text-primary: #0f172a;
-  --c-text-secondary: #475569;
-  --c-text-muted: #667085;
-  --c-bg-page: #f7faff;
-  --c-bg-card: rgba(255, 255, 255, 0.94);
-  --c-border: rgba(15, 23, 42, 0.08);
-  --c-brand: #1d4ed8;
-  --c-accent: #1e40af;
+  --surface-app: #ecebe5;
+  --surface-panel: #f7f6f1;
+  --surface-raised: #fffef9;
+  --ink-primary: #101412;
+  --ink-secondary: #48534d;
+  --ink-muted: #68736d;
+  --border-subtle: rgba(16, 20, 18, 0.12);
+  --signal-primary: #9cc84b;
+  --signal-support: #23806f;
+  --action-primary: #153f35;
+  --status-success: #39713b;
+  --status-warning: #9a6700;
+  --status-danger: #b42318;
+  --focus-ring: #b5dd63;
+  --c-text-primary: var(--ink-primary);
+  --c-text-secondary: var(--ink-secondary);
+  --c-text-muted: var(--ink-muted);
+  --c-bg-page: var(--surface-app);
+  --c-bg-card: var(--surface-raised);
+  --c-border: var(--border-subtle);
+  --c-brand: var(--action-primary);
+  --c-accent: var(--signal-support);
   --font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --fs-display: clamp(2.1rem, 4.6vw, 3.5rem);
   --lh-display: 1.06;
@@ -45,8 +59,8 @@
   --radius-pill: 999px;
   --gate-a-color: #065f46;
   --gate-a-bg: #d1fae5;
-  --gate-b-color: #1e40af;
-  --gate-b-bg: #dbeafe;
+  --gate-b-color: #155e52;
+  --gate-b-bg: #d8eee8;
   --gate-c-color: #92400e;
   --gate-c-bg: #fef3c7;
   --gate-d-color: #4b5563;
@@ -61,7 +75,7 @@
 
 html {
   color-scheme: light;
-  background: #f7faff;
+  background: var(--surface-app);
 }
 
 body {

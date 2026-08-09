@@ -5,7 +5,7 @@ export type AccountNavigationKey = "dashboard" | "leads" | "review" | "profile" 
 const ACCOUNT_ROUTES: ReadonlyArray<{ key: AccountNavigationKey; href: string; label: string }> = [
   { key: "dashboard", href: "/dashboard", label: "Дашборд" },
   { key: "leads", href: "/leads", label: "Лиды" },
-  { key: "review", href: "/review", label: "Ревью" },
+  { key: "review", href: "/review", label: "Проверка" },
   { key: "profile", href: "/profile", label: "Профиль" },
   { key: "settings", href: "/settings", label: "Настройки" },
 ];

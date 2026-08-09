@@ -9,9 +9,9 @@
   justify-content: space-between;
   gap: 20px;
   padding: 26px;
-  border: 1px solid rgba(29, 78, 216, 0.16);
+  border: 1px solid rgba(35, 128, 111, 0.16);
   border-radius: 20px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(235, 242, 255, 0.92));
+  background: var(--surface-panel);
 }
 
 .eyebrow,
@@ -42,8 +42,8 @@
   flex: 0 0 auto;
   padding: 9px 13px;
   border-radius: 999px;
-  background: #dbeafe;
-  color: #1e40af;
+  background: rgba(35, 128, 111, 0.12);
+  color: var(--action-primary);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -95,7 +95,7 @@
   margin-top: auto;
   padding: 0 14px;
   border-radius: 11px;
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(35, 128, 111, 0.08);
   color: var(--c-brand);
   font-size: 0.82rem;
   font-weight: 700;

@@ -69,4 +69,31 @@ describe("landing visual and login reliability polish", () => {
     expect(verifyClient).not.toContain("window.location.reload()");
     expect(verifyClient).toContain('window.history.replaceState(null, "", "/auth/verify")');
   });
+
+  test("uses the Evidence Compass identity and a calm functional auth message", () => {
+    const authShell = source("app/login/auth-shell.tsx");
+    const authStyles = source("app/login/login.module.css");
+
+    expect(authShell).toContain('data-auth-compass="true"');
+    expect(authShell).toContain('data-signal-cluster="primary"');
+    expect(authShell).toContain("Рабочее пространство Recruiter Radar");
+    expect(authShell).toContain("Сигналы, доказательства и история работы агентства в одном месте.");
+    expect(authShell).not.toContain("radarCore");
+    expect(authShell).not.toContain("radarSweep");
+    expect(authStyles).not.toContain(".radarCore");
+    expect(authStyles).not.toContain(".radarSweep");
+    expect(authStyles).not.toContain("@keyframes");
+    expect(authStyles).toMatch(/@media \(max-width: 820px\)[\s\S]*?\.compass\s*\{[\s\S]*?display:\s*block;/);
+  });
+
+  test("keeps onboarding in the current product system without serif or copper branding", () => {
+    const onboarding = source("app/onboarding/onboarding-page-content.tsx");
+    const onboardingStyles = source("app/onboarding/onboarding.module.css");
+
+    expect(onboarding).toContain('data-ui-system="recruiter-radar-v7"');
+    expect(onboardingStyles).toContain("var(--surface-app)");
+    expect(onboardingStyles).toContain("var(--action-primary)");
+    expect(onboardingStyles).not.toMatch(/Georgia|Times New Roman|serif/);
+    expect(onboardingStyles).not.toMatch(/#(?:a85924|b8662e|ca7c38|bd7138)/i);
+  });
 });

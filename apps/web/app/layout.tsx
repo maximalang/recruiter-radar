@@ -5,13 +5,9 @@ import { Inter } from "next/font/google";
 import { PushReadinessBoot } from "./push-readiness-boot";
 import { shouldRunAuthV2SessionRefresh } from "@/lib/auth-v2/config";
 import { AuthSessionRefresh } from "./auth-session-refresh";
-import { PremiumUiEffects } from "./premium-ui-effects";
 import "./globals.css";
-import "./premium-ui.css";
-import "./premium-ui-refinements.css";
-import "./site-finish.css";
-import "./site-interactions.css";
 import "./product-visual-system.css";
+import "./site-interactions.css";
 
 const inter = Inter({
   subsets: ["cyrillic", "latin"],
@@ -63,7 +59,6 @@ export default function RootLayout({ children }: RootLayoutProps) {
           color: "var(--c-text-primary, #0f172a)",
         }}
       >
-        <PremiumUiEffects />
         <PushReadinessBoot />
         {shouldRunAuthV2SessionRefresh() ? <AuthSessionRefresh /> : null}
         {children}

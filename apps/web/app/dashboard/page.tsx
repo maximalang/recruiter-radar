@@ -11,7 +11,6 @@ import DashboardAccountOverview from "./dashboard-account-overview";
 import DashboardTodayRadar from "./dashboard-today-radar";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import {
-  ContentCard,
   EmptyState,
   ErrorState,
 } from "../ui/internal-page";
@@ -19,7 +18,6 @@ import {
   ProductWorkspaceFrame,
   ProductWorkspaceHeader,
 } from "../ui/product-workspace";
-import { SiteFooter } from "../ui/site-footer";
 import dashStyles from "./dashboard-workspace.module.css";
 
 export const metadata: Metadata = {
@@ -44,19 +42,17 @@ export default async function DashboardPage() {
 
   if (!authorization || !account) {
     return (
-      <ProductWorkspaceFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+      <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader
           eyebrow="Защищённое рабочее пространство"
           title="Личный кабинет"
           subtitle="Войдите, чтобы видеть только свой профиль, лиды и историю работы."
         />
-        <ContentCard variant="hero">
-          <EmptyState
-            title="Нужен вход в аккаунт"
-            text="Сессия этого браузера не связана с аккаунтом. Восстановите доступ по данным заказа или активируйте новый радар."
-            action={{ href: "/login", label: "Войти в аккаунт" }}
-          />
-        </ContentCard>
+        <EmptyState
+          title="Нужен вход в аккаунт"
+          text="Сессия этого браузера не связана с аккаунтом. Восстановите доступ по данным заказа или активируйте новый радар."
+          action={{ href: "/login", label: "Войти в аккаунт" }}
+        />
       </ProductWorkspaceFrame>
     );
   }
@@ -69,19 +65,17 @@ export default async function DashboardPage() {
 
   if (!profile) {
     return (
-      <ProductWorkspaceFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+      <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader
           eyebrow="Активация"
           title="Завершите настройку радара"
           subtitle="Аккаунт найден, но рабочий профиль ещё не создан."
         />
-        <ContentCard variant="hero">
-          <EmptyState
-            title="Радар ещё не настроен"
-            text="Активируйте тариф и укажите специализацию агентства — после этого здесь появятся компании и очередь работы."
-            action={{ href: "/checkout", label: "Активировать радар" }}
-          />
-        </ContentCard>
+        <EmptyState
+          title="Радар ещё не настроен"
+          text="Активируйте тариф и укажите специализацию агентства — после этого здесь появятся компании и очередь работы."
+          action={{ href: "/checkout", label: "Активировать радар" }}
+        />
       </ProductWorkspaceFrame>
     );
   }
@@ -91,7 +85,7 @@ export default async function DashboardPage() {
   const completionPercent = Math.round(completion.ratio * 100);
 
   return (
-    <ProductWorkspaceFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+    <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
       <ProductWorkspaceHeader
         eyebrow="Утренний обзор"
         title="Командный центр"

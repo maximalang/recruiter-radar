@@ -509,9 +509,16 @@ try {
   })
   const authenticatorId = virtual.authenticatorId
 
+  const clientSessionReady = page.waitForResponse((response) => {
+    const responseUrl = new URL(response.url())
+    return responseUrl.pathname === '/api/auth/session/refresh'
+      && response.request().method() === 'POST'
+      && response.ok()
+  })
   await page.goto(`${baseUrl}/settings/security`, {
     waitUntil: 'domcontentloaded',
   })
+  await clientSessionReady
   const passkeySection = page.locator(
     'section[aria-labelledby="passkey-settings"]',
   )

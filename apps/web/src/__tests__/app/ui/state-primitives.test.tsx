@@ -23,12 +23,30 @@ import {
   EmptyState,
   NotFoundState,
   LoadingState,
+  MetricCard,
+  MetricGrid,
 } from '@/app/ui/internal-page';
 import { SearchIcon, CheckIcon } from '@/app/ui/icons';
 
 type IconCmp = (p: SVGProps<SVGSVGElement>) => ReactElement;
 
 describe('EmptyState (T0.2 — SVG icon API)', () => {
+  it('announces the state and keeps its next step discoverable', () => {
+    render(
+      <EmptyState
+        title="Настройте профиль"
+        text="Добавьте критерии поиска."
+        action={{ href: '/profile', label: 'Перейти к профилю' }}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Настройте профиль');
+    expect(screen.getByRole('link', { name: 'Перейти к профилю' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+  });
+
   it('renders the SVG icon component when `icon` is provided', () => {
     const { container } = render(
       <EmptyState icon={SearchIcon as IconCmp} title="Ничего не найдено" />,
@@ -67,6 +85,20 @@ describe('EmptyState (T0.2 — SVG icon API)', () => {
     expect(svgEl).not.toBeNull();
     // The icon container should not echo a literal string glyph.
     expect(container.textContent).not.toMatch(/✓|○/);
+  });
+});
+
+describe('MetricGrid', () => {
+  it('exposes the metric strip as a list of related values', () => {
+    render(
+      <MetricGrid>
+        <MetricCard label="Новые" value="3" />
+        <MetricCard label="На проверке" value="2" tone="info" />
+      </MetricGrid>,
+    );
+
+    expect(screen.getByRole('list')).toBeTruthy();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 });
 

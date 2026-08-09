@@ -19,7 +19,6 @@ import {
   InternalPageFrame,
   InternalPageHeader,
 } from '../../ui/internal-page'
-import { SiteFooter } from '../../ui/site-footer'
 import { buildOpportunityRadarNavigation } from '../navigation'
 import styles from './source-registry.module.css'
 
@@ -53,7 +52,7 @@ export default async function EvidenceSourceRegistryPage() {
 
   if (!authorization) {
     return (
-      <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
+      <InternalPageFrame navItems={NAVIGATION}>
         <InternalPageHeader title="Источники" subtitle="Управляемый реестр доказательных источников." />
         <ContentCard variant="hero">
           <EmptyState
@@ -71,7 +70,7 @@ export default async function EvidenceSourceRegistryPage() {
 
   if (!sources) {
     return (
-      <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
+      <InternalPageFrame navItems={NAVIGATION}>
         <InternalPageHeader
           title="Источники"
           subtitle="Source Registry и текущие legal review решения."
@@ -90,7 +89,7 @@ export default async function EvidenceSourceRegistryPage() {
   const pending = sources.filter((source) => source.operational.reviewStatus === 'pending').length
 
   return (
-    <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
+    <InternalPageFrame navItems={NAVIGATION}>
       <InternalPageHeader
         title="Источники"
         subtitle="Техническое подключение не означает разрешение на автоматический сбор. Evidence Radar работает fail-closed."

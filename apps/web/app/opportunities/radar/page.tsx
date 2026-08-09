@@ -17,7 +17,6 @@ import {
   InternalPageFrame,
   InternalPageHeader,
 } from '../../ui/internal-page'
-import { SiteFooter } from '../../ui/site-footer'
 import { EvidenceRadarMap } from '../evidence-radar-map'
 import { buildOpportunityRadarNavigation } from '../navigation'
 
@@ -37,7 +36,7 @@ export default async function EvidenceRadarPage() {
 
   if (!authorization) {
     return (
-      <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
+      <InternalPageFrame navItems={NAVIGATION}>
         <InternalPageHeader
           title="Карта спроса"
           subtitle="Подтверждённые организации, события и кадровый спрос по регионам."
@@ -66,7 +65,7 @@ export default async function EvidenceRadarPage() {
   ])
 
   return (
-    <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
+    <InternalPageFrame navItems={NAVIGATION}>
       <InternalPageHeader
         title="Карта спроса"
         subtitle="Только подтверждённые организации и объекты присутствия. География, источники и оценки не синтезируются."

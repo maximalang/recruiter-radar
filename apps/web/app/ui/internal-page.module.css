@@ -22,7 +22,7 @@
 /* ── Skip link (a11y) ── */
 .skipLink {
   position: absolute;
-  left: -9999px;
+  left: 0;
   top: 0;
   z-index: 100;
   padding: 8px 16px;
@@ -32,10 +32,11 @@
   font-weight: 600;
   text-decoration: none;
   border-radius: 0 0 6px 0;
+  transform: translateY(-100%);
 }
 
 .skipLink:focus {
-  left: 0;
+  transform: translateY(0);
   outline: 2px solid #ffffff;
   outline-offset: 2px;
 }
@@ -77,7 +78,7 @@
 }
 
 .topNavBrandAccent {
-  color: #315fc8;
+  color: var(--action-primary);
 }
 
 .topNavLinks {
@@ -107,7 +108,7 @@
 
 .topNavLink[data-active="true"] {
   color: var(--c-brand);
-  background-color: rgba(29, 78, 216, 0.06);
+  background-color: rgba(35, 128, 111, 0.06);
   font-weight: 600;
 }
 
@@ -177,11 +178,11 @@
 
 .internalPageTitle {
   max-width: 760px;
-  font-size: clamp(2.2rem, 4.1vw, 4.35rem);
+  font-size: clamp(2.35rem, 3.4vw, 3.25rem);
   font-weight: 735;
   color: #14201c;
   letter-spacing: -0.058em;
-  line-height: 0.96;
+  line-height: 1.02;
   margin: 0;
 }
 
@@ -204,6 +205,7 @@
 
 /* ── Back / nav link ── */
 .internalPageBackLink {
+  min-height: 44px;
   font-size: 0.875rem;
   color: var(--c-text-muted);
   text-decoration: none;
@@ -249,60 +251,47 @@
 /* ── Metric card ── */
 .metricGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
 }
 
 .metricCard {
-  background-color: var(--c-bg-card);
-  border-radius: var(--radius-card-sm);
-  padding: 16px;
-  border: 1px solid var(--c-border);
-  /* Shared default elevation with dashboard.module.css .metricCard so the two
-     surfaces (overview metric cards + lead-detail MetricCard primitive) speak
-     one visual language — same radius/border/shadow/padding, no component merge. */
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  transition: box-shadow 0.2s ease, transform 0.15s ease;
-}
-
-.metricCard:hover {
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-  transform: translateY(-1px);
+  background-color: var(--surface-panel);
+  border-radius: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--border-subtle);
 }
 
 .metricLabel {
-  font-size: 0.75rem;
-  color: var(--c-text-muted);
-  font-weight: 500;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--ink-muted);
+  font-weight: 600;
 }
 
 .metricValue {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--c-text-primary);
-  margin-top: 4px;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  font-weight: 720;
+  color: var(--ink-primary);
+  margin-top: 5px;
 }
 
 .metricValue[data-tone="success"] {
-  color: #10b981;
+  color: var(--status-success);
 }
 
 .metricValue[data-tone="info"] {
-  color: var(--c-brand);
+  color: var(--signal-primary);
 }
 
 /* ── Content card (detail sections, sidebar blocks) ── */
 .contentCard {
-  background-color: rgba(255, 255, 252, 0.88);
-  border-radius: 12px;
-  padding: 20px;
-  border: 1px solid rgba(24, 35, 31, 0.12);
-  transition: box-shadow 0.2s ease;
-}
-
-.contentCard:hover {
-  box-shadow: 0 12px 28px rgba(20, 32, 28, 0.07);
+  background-color: var(--surface-panel);
+  border-radius: 10px;
+  padding: 18px;
+  border: 1px solid var(--border-subtle);
 }
 
 .contentCard[data-tone="danger"] {
@@ -314,12 +303,12 @@
    evidence/action cards without shouting. */
 .contentCard[data-variant="hero"] {
   border-color: rgba(35, 128, 111, 0.24);
-  border-left: 3px solid #23806f;
+  border-left: 3px solid var(--signal-primary);
   background-color: rgba(35, 128, 111, 0.035);
 }
 
 .contentCard[data-variant="hero"] .contentCardTitle {
-  color: #1a6f60;
+  color: var(--action-primary);
 }
 
 /* Muted: advisory blocks (AI hint) recede — they inform but never drive the
@@ -577,9 +566,9 @@
 }
 
 .scoreBandChip[data-tone="danger"] {
-  background-color: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background-color: rgba(35, 128, 111, 0.08);
+  color: var(--action-primary);
+  border: 1px solid rgba(35, 128, 111, 0.24);
 }
 
 /* ── Signal freshness chip ── */
@@ -613,9 +602,9 @@
   border-radius: var(--radius-pill);
   font-size: 0.72rem;
   font-weight: 600;
-  background-color: #faf5ff;
-  color: #7c3aed;
-  border: 1px solid #e9d5ff;
+  background-color: var(--gate-b-bg);
+  color: var(--gate-b-color);
+  border: 1px solid rgba(35, 128, 111, 0.2);
   white-space: nowrap;
 }
 
@@ -650,9 +639,9 @@
 }
 
 .reviewBadge[data-tone="info"] {
-  background-color: rgba(59, 130, 246, 0.1);
-  color: #1d4ed8;
-  border-color: rgba(59, 130, 246, 0.3);
+  background-color: rgba(35, 128, 111, 0.1);
+  color: var(--action-primary);
+  border-color: rgba(35, 128, 111, 0.3);
 }
 
 .reviewBadge[data-tone="success"] {
@@ -704,9 +693,9 @@
 }
 
 .urgencyCueChip[data-tone="info"] {
-  background-color: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background-color: rgba(35, 128, 111, 0.08);
+  color: var(--action-primary);
+  border: 1px solid rgba(35, 128, 111, 0.24);
 }
 
 .urgencyCueChip[data-tone="danger"] {
@@ -736,8 +725,8 @@
 }
 
 .gateBadgeInline[data-gate="B"] {
-  background: var(--gate-b-bg, #dbeafe);
-  color: var(--gate-b-color, #1e40af);
+  background: var(--gate-b-bg, rgba(35, 128, 111, 0.12));
+  color: var(--gate-b-color, var(--action-primary));
 }
 
 .gateBadgeInline[data-gate="C"] {
@@ -767,9 +756,9 @@
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 0.8rem;
-  background-color: #f0f9ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  background-color: rgba(35, 128, 111, 0.06);
+  color: var(--action-primary);
+  border: 1px solid rgba(35, 128, 111, 0.24);
   display: inline-block;
 }
 
@@ -930,16 +919,16 @@
 
 /* ── Empty / not-found states ── */
 .emptyState {
-  min-height: 260px;
+  min-height: 190px;
   box-sizing: border-box;
   display: grid;
   place-content: center;
   text-align: center;
-  padding: clamp(42px, 7vw, 76px) 24px;
+  padding: clamp(30px, 5vw, 48px) 24px;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #65706a;
+  color: var(--ink-secondary);
 }
 
 .emptyStateIcon {
@@ -948,7 +937,7 @@
   display: flex;
   justify-content: center;
   margin-bottom: 12px;
-  color: #23806f;
+  color: var(--signal-primary);
 }
 
 .emptyStateIcon svg {
@@ -957,7 +946,7 @@
 }
 
 .emptyStateTitle {
-  color: #14201c;
+  color: var(--ink-primary);
   font-size: 1.02rem;
   font-weight: 720;
   margin-bottom: 7px;
@@ -974,11 +963,12 @@
   align-items: center;
   justify-content: center;
   justify-self: center;
-  min-width: 240px;
+  min-width: min(240px, 100%);
+  min-height: 44px;
   margin-top: 16px;
   padding: 9px 18px;
   border-radius: 10px;
-  background-color: #183d34;
+  background-color: var(--action-primary);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -1019,7 +1009,7 @@
   margin-top: 16px;
   padding: 9px 18px;
   border-radius: 10px;
-  background-color: var(--c-brand);
+  background-color: var(--action-primary);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -1032,7 +1022,7 @@
 }
 
 .emptyStateAction:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -1133,7 +1123,7 @@
 .signalCardList {
   gap: 12px;
   padding: 12px;
-  background: #f5f7fb;
+  background: var(--surface-panel);
 }
 
 .leadCard {
@@ -1171,7 +1161,7 @@
   gap: 16px;
   overflow: hidden;
   padding: 20px 22px;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--border-subtle);
   border-radius: 16px;
   background: linear-gradient(145deg, #ffffff 0%, #fbfcff 100%);
   box-shadow: 0 10px 28px rgba(15, 35, 68, 0.06);
@@ -1190,7 +1180,7 @@
 .signalLeadCard[data-tone="danger"]::before { background: #64748b; }
 
 .signalLeadCard:last-child {
-  border-bottom: 1px solid #dbe3ef;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .signalLeadCard:hover {
@@ -1265,7 +1255,7 @@
   height: 4px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e8edf4;
+  background: var(--border-subtle);
 }
 
 .signalLeadScoreTrack > span {
@@ -1296,8 +1286,8 @@
 }
 
 .signalLeadSectionPrimary {
-  border-color: #d6e2f5;
-  background: #f3f7fd;
+  border-color: var(--border-subtle);
+  background: var(--surface-panel);
 }
 
 .signalLeadSection strong {
@@ -1530,7 +1520,7 @@
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--c-brand);
-  background-color: rgba(29, 78, 216, 0.06);
+  background-color: rgba(35, 128, 111, 0.06);
   border: 1px solid transparent;
   text-decoration: none;
   white-space: nowrap;
@@ -1538,8 +1528,8 @@
 }
 
 .leadOpenBtn:hover {
-  background-color: rgba(29, 78, 216, 0.1);
-  border-color: rgba(29, 78, 216, 0.2);
+  background-color: rgba(35, 128, 111, 0.1);
+  border-color: rgba(35, 128, 111, 0.2);
 }
 
 .leadOpenBtn:focus-visible {
@@ -1627,7 +1617,28 @@
 /* ── Responsive: mobile ── */
 @media (max-width: 640px) {
   .metricGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .metricCard {
+    min-width: 0;
+    padding: 10px 8px;
+  }
+
+  .metricLabel {
+    font-size: 0.63rem;
+    overflow-wrap: anywhere;
+  }
+
+  .metricValue {
+    font-size: 1.2rem;
+  }
+
+  .emptyState {
+    min-height: 168px;
+    padding: 28px 16px;
   }
 
   /* Tap-target floor: interactive controls must be ≥44px tall for comfortable
@@ -1873,7 +1884,7 @@
 
 .contactValue {
   font-weight: 500;
-  color: var(--c-brand, #1d4ed8);
+  color: var(--c-brand, var(--action-primary));
   word-break: break-all;
 }
 
@@ -1983,7 +1994,7 @@
   flex-direction: column;
   gap: 8px;
   padding-top: 14px;
-  border-top: 1px solid rgba(29, 78, 216, 0.12);
+  border-top: 1px solid rgba(35, 128, 111, 0.12);
 }
 
 .leadVerdictRolesLabel {

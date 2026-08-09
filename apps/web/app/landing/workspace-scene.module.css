@@ -27,9 +27,9 @@
 .productFrame {
   overflow: hidden;
   border: 1px solid rgba(23, 35, 45, .14);
-  border-radius: 10px;
+  border-radius: 6px;
   background: #fbfaf6;
-  box-shadow: 0 26px 65px rgba(23, 35, 45, .075);
+  box-shadow: 0 18px 48px rgba(8, 12, 10, .07);
 }
 
 .productRail {
@@ -39,7 +39,7 @@
   justify-content: space-between;
   gap: 1rem;
   padding: .62rem .9rem;
-  background: #17232d;
+  background: var(--slate-900);
   color: #f2efe7;
 }
 
@@ -129,7 +129,7 @@
   min-height: 2.75rem;
   overflow: hidden;
   border-radius: 6px;
-  background: #17232d;
+  background: var(--slate-900);
   color: #f7f4ed;
 }
 
@@ -159,7 +159,7 @@
 }
 
 .results {
-  min-height: 20rem;
+  min-height: 24rem;
   padding: 0 .9rem .9rem;
   transition: opacity .2s ease;
 }

@@ -10,11 +10,11 @@ const responsiveAudit = readFileSync(
 );
 
 describe('cross-route interaction hardening', () => {
-  it('loads the interaction layer after the visual finish layer', () => {
-    expect(layout).toContain('import "./site-finish.css";');
+  it('loads interaction safety after the scoped product visual layer', () => {
+    expect(layout).toContain('import "./product-visual-system.css";');
     expect(layout).toContain('import "./site-interactions.css";');
     expect(layout.indexOf('site-interactions.css')).toBeGreaterThan(
-      layout.indexOf('site-finish.css'),
+      layout.indexOf('product-visual-system.css'),
     );
   });
 

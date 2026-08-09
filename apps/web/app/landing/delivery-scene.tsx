@@ -85,6 +85,8 @@ function DeliveryChannelGlyph({ channel }: { channel: DeliveryChannelKey }) {
 }
 
 export default function DeliveryScene() {
+  const coreChannel = DELIVERY_CHANNELS[0];
+
   return (
     <section
       id="scene-delivery"
@@ -121,18 +123,33 @@ export default function DeliveryScene() {
             </div>
             <p>Веб-кабинет доступен всегда. Остальные каналы включаются после настройки и проверки соответствующего подключения.</p>
           </div>
-          <div className={sceneStyles.channelGrid}>
-            {DELIVERY_CHANNELS.map((channel) => (
-              <article key={channel.key} className={sceneStyles.channelCard} data-channel={channel.key}>
-                <div className={sceneStyles.channelTopline}>
+          <div className={sceneStyles.channelHierarchy}>
+            <article className={sceneStyles.coreChannel} data-channel={coreChannel.key} data-delivery-core="workspace">
+              <div className={sceneStyles.channelTopline}>
+                <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel={coreChannel.key} /></span>
+                <span className={sceneStyles.channelStatus}>{coreChannel.status}</span>
+              </div>
+              <span className={sceneStyles.groupLabel}>Core / Radar workspace</span>
+              <h3>{coreChannel.title}</h3>
+              <p>{coreChannel.text}</p>
+              <small>{coreChannel.note}</small>
+            </article>
+            <div className={sceneStyles.deliveryRoutes} data-delivery-routes="connected">
+              <span className={sceneStyles.groupLabel}>Delivery / подключаемые маршруты</span>
+              {DELIVERY_CHANNELS.slice(1).map((channel) => (
+                <article key={channel.key} className={sceneStyles.channelRoute} data-channel={channel.key}>
                   <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel={channel.key} /></span>
-                  <span className={sceneStyles.channelStatus}>{channel.status}</span>
-                </div>
-                <h3>{channel.title}</h3>
-                <p>{channel.text}</p>
-                <small>{channel.note}</small>
-              </article>
-            ))}
+                  <div>
+                    <div className={sceneStyles.routeHeading}>
+                      <h3>{channel.title}</h3>
+                      <span className={sceneStyles.channelStatus}>{channel.status}</span>
+                    </div>
+                    <p>{channel.text}</p>
+                  </div>
+                  <small>{channel.note}</small>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
 

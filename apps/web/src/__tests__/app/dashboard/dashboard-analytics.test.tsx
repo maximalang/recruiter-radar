@@ -193,7 +193,7 @@ describe('DashboardAnalytics — T5.2 funnel enum DB-legal keys', () => {
     const item = container.querySelector('.funnelItem');
     expect(item?.getAttribute('data-status')).toBe('contacted');
     const fill = container.querySelector('.funnelBarFill') as HTMLElement | null;
-    expect(fill?.style.backgroundColor).toBe('rgb(59, 130, 246)'); // #3b82f6
+    expect(fill?.style.backgroundColor).toBe('rgb(35, 128, 111)'); // evidence teal
   });
 });
 

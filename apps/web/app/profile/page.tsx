@@ -7,7 +7,6 @@ import {
   EmptyState,
 } from "../ui/internal-page";
 import { buildAccountNavigation } from "../ui/account-navigation";
-import { SiteFooter } from "../ui/site-footer";
 import { getClientProfileByOwnerId, resolveHiringMode } from "../../lib/clientProfiles";
 import { getDeliveryPreferencesByOwnerId } from "../../lib/deliveryPreferences";
 import { countMatchingCandidatesForProfile } from "../../lib/digest";
@@ -92,7 +91,7 @@ export default async function ProfilePage() {
       : [[], []];
 
   return (
-    <InternalPageFrame navItems={PROFILE_NAV} footer={<SiteFooter />}>
+    <InternalPageFrame navItems={PROFILE_NAV}>
       <InternalPageHeader
         title="Кто ваши идеальные клиенты?"
         subtitle="Чем точнее профиль, тем релевантнее ежедневная подборка. Заполните сверху вниз — основные блоки идут раньше, точная настройка в конце."
