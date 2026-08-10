@@ -97,7 +97,7 @@ file_deploy_sha="$(read_env_value RR_DEPLOY_SHA "$env_source")"
 
 mcp_enabled="${RR_MCP_ENABLED:-${file_mcp_enabled:-false}}"
 mcp_token="${RR_MCP_TOKEN:-$file_mcp_token}"
-deploy_sha="${RR_DEPLOY_SHA:-$file_deploy_sha}"
+deploy_sha="${RR_DEPLOY_SHA:-${DEPLOY_SHA:-$file_deploy_sha}}"
 
 case "$mcp_enabled" in
   true | false) ;;
