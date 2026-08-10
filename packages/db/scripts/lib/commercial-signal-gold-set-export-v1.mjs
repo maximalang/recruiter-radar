@@ -77,6 +77,7 @@ export async function loadCommercialSignalGoldSetRows(client, scope) {
     JOIN client_profiles profile
       ON profile.id = quality.client_profile_id
      AND profile.owner_id = candidate.owner_id
+     AND profile.workspace_id = quality.workspace_id
     LEFT JOIN LATERAL (
       SELECT JSONB_AGG(JSONB_BUILD_OBJECT(
         'evidenceId', item.evidence_id::TEXT,
