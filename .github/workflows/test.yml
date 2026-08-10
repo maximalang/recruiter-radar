@@ -319,7 +319,7 @@ jobs:
         if: always()
         run: node scripts/verify-production-server-log.mjs /tmp/landing-server.log
       - name: Upload Playwright screenshots and traces
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: landing-playwright-artifacts
