@@ -3,13 +3,16 @@ import path from 'node:path'
 import pg from 'pg'
 import {
   SAMPLING_POLICY,
-  buildBlindReviewPackage,
   buildGoldSetDataset,
   renderLabelTemplateCsv,
   renderReviewCsv,
   renderReviewHtml,
   serializeDatasetJsonl,
 } from './lib/commercial-signal-gold-set-v1.mjs'
+import {
+  attachManifestContractFingerprint,
+  buildStrictBlindReviewPackage,
+} from './lib/commercial-signal-gold-review-v1.mjs'
 import {
   GOLD_SET_EXPORT_MAX_ELIGIBLE_ROWS,
   loadCommercialSignalGoldSetRows,
@@ -57,11 +60,11 @@ try {
   if (rawRows.length > GOLD_SET_EXPORT_MAX_ELIGIBLE_ROWS) {
     throw new Error(`Gold-set export exceeds the ${GOLD_SET_EXPORT_MAX_ELIGIBLE_ROWS.toLocaleString('en-US')}-row safety limit.`)
   }
-  const dataset = buildGoldSetDataset(rawRows, {
+  const dataset = attachManifestContractFingerprint(buildGoldSetDataset(rawRows, {
     workspaceId, profileId, from, to, datasetVersion, samplingPolicy, seed,
     anonymizationKey, createdAt: to,
-  })
-  const review = buildBlindReviewPackage(dataset)
+  }))
+  const review = buildStrictBlindReviewPackage(dataset)
   await Promise.all([
     fs.writeFile(path.join(outputDir, 'frozen.jsonl'), serializeDatasetJsonl(dataset), { flag: 'wx' }),
     fs.writeFile(path.join(outputDir, 'manifest.json'), `${JSON.stringify(dataset.manifest, null, 2)}\n`, { flag: 'wx' }),
@@ -77,6 +80,7 @@ try {
     datasetVersion,
     sampleCount:dataset.rows.length,
     frozenFingerprint:dataset.manifest.frozenFingerprint,
+    contractFingerprint:dataset.manifest.contractFingerprint,
     reviewerFile:'review.html',
     labelFile:'labels.csv',
     productionWrites:false,
