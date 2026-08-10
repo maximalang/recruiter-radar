@@ -83,11 +83,9 @@ export async function loadCommercialSignalGoldSetRows(client, scope) {
         'decisionRole', item.decision_role,
         'sourceKind', item.source_kind,
         'sourceFamily', item.source_family,
-        'sourceDomain', item.source_domain,
         'observedAt', item.observed_at::TEXT,
         'independenceGroup', item.evidence_independence_group,
-        'correlationReasonCode', item.correlation_reason_code,
-        'canonicalUrl', item.canonical_url
+        'correlationReasonCode', item.correlation_reason_code
       ) ORDER BY item.observed_at, item.evidence_id) AS rows
       FROM commercial_signal_quality_evidence item
       WHERE item.quality_snapshot_id = quality.id
