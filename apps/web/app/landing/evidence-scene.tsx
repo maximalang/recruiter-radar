@@ -33,6 +33,7 @@ export default function EvidenceScene() {
       className={`${styles.scene} ${styles.darkScene} ${styles.evidenceScene}`}
       aria-labelledby="evidence-title"
       data-header-tone="dark"
+      data-motion-reveal="section"
     >
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.top}>
