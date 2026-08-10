@@ -108,7 +108,7 @@ export default function HeroRadar() {
           <g transform="translate(355 521)"><circle r="2.7" /><circle cx="19" cy="-14" r="1.6" /><circle cx="37" cy="4" r="2" /><circle cx="56" cy="15" r="1.4" className={styles.copperDot} /></g>
           <g transform="translate(579 438)"><circle r="2.8" /><circle cx="20" cy="-13" r="1.5" /><circle cx="38" cy="9" r="2.1" /><circle cx="56" cy="21" r="1.5" /></g>
         </g>
-        <g className={styles.activeLayer} transform="translate(530 223)">
+        <g className={styles.activeLayer}>
           <circle className={styles.activeHalo} r="46" />
           <circle className={styles.activeCore} r="4.6" />
           <circle cx="15" cy="-12" r="2.1" /><circle cx="31" cy="3" r="1.8" /><circle cx="40" cy="19" r="2.4" />
