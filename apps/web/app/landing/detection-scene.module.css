@@ -65,7 +65,7 @@
 .serviceLabel { margin: 0 0 1rem; color: rgba(191, 220, 145, .92); font-size: .76rem; font-weight: 560; }
 .title { max-width: 12ch; margin: 0; color: #f4f3ee; font-size: clamp(3.45rem, 5.25vw, 5.25rem); font-weight: 520; letter-spacing: -.058em; line-height: .95; }
 .description { max-width: 35rem; margin: 1.35rem 0 0; color: rgba(242, 241, 235, .68); font-size: clamp(.98rem, 1.05vw, 1.08rem); line-height: 1.58; }
-.actions { display: flex; flex-wrap: wrap; align-items: center; gap: .8rem 1.15rem; margin-top: 1.45rem; }
+.actions { display: flex; min-width: 44px; min-height: 46px; flex-wrap: wrap; align-items: center; gap: .8rem 1.15rem; margin-top: 1.45rem; }
 
 .primaryButton {
   display: inline-flex;
