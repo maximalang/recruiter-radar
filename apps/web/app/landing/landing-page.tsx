@@ -8,6 +8,8 @@ import EvidenceScene from "./evidence-scene";
 import frameStyles from "./landing-frame.module.css";
 import LandingHashNavigation from "./landing-hash-navigation";
 import LandingHeader from "./landing-header";
+import LandingMotion from "./landing-motion";
+import motionStyles from "./landing-motion.module.css";
 import styles from "./landing.module.css";
 import visualStyles from "./landing-visual-system.module.css";
 import WorkspaceScene from "./workspace-scene";
@@ -25,9 +27,10 @@ export default function LandingPage(props: {
 }) {
   return (
     <div
-      className={`${styles.landingPage} ${frameStyles.frame} ${visualStyles.visualSystem}`}
+      className={`${styles.landingPage} ${frameStyles.frame} ${visualStyles.visualSystem} ${motionStyles.motionRoot}`}
       data-landing-experience="signal-lock"
     >
+      <LandingMotion />
       <LandingHashNavigation />
       <LandingHeader previewHref="#preview-configurator" />
       <main id="main-content">
