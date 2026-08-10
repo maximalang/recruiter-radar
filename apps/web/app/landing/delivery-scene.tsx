@@ -68,6 +68,7 @@ export default function DeliveryScene() {
     <section
       id="scene-delivery"
       className={`${styles.scene} ${styles.lightScene} ${styles.deliveryScene}`}
+      style={{ scrollMarginTop: "calc(72px + 32px)" }}
       aria-labelledby="delivery-title"
       data-header-tone="light"
       data-motion-reveal="section"
