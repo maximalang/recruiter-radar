@@ -26,10 +26,10 @@
 
 .productFrame {
   overflow: hidden;
-  border: 1px solid rgba(23, 35, 45, .14);
+  border: 1px solid rgba(23, 35, 45, .13);
   border-radius: 6px;
   background: #fbfaf6;
-  box-shadow: 0 18px 48px rgba(8, 12, 10, .07);
+  box-shadow: 0 16px 42px rgba(8, 12, 10, .055);
 }
 
 .productRail {
@@ -101,11 +101,18 @@
   border-bottom: 1px solid transparent;
   background: transparent;
   font-size: .68rem;
+  transition: color .18s ease, border-color .18s ease, background-color .18s ease;
 }
 
 .presets a[data-selected] {
   border-bottom-color: #4e8e7c;
   background: transparent;
+  color: #315f52;
+}
+
+.presets a:hover {
+  border-bottom-color: rgba(78, 142, 124, .44);
+  color: #315f52;
 }
 
 .commandForm {
@@ -122,6 +129,12 @@
   border-radius: 6px;
   background: #fffefa;
   font-size: .82rem;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.commandForm input:focus {
+  border-color: rgba(78, 142, 124, .7);
+  box-shadow: 0 0 0 3px rgba(78, 142, 124, .07);
 }
 
 .commandForm button {
@@ -131,7 +144,11 @@
   border-radius: 6px;
   background: var(--slate-900);
   color: #f7f4ed;
+  transition: transform .16s ease, background-color .18s ease;
 }
+
+.commandForm button:hover { background: #1e3028; }
+.commandForm button:active { transform: translateY(1px); }
 
 .commandForm button::after {
   position: absolute;
@@ -174,27 +191,34 @@
 }
 
 .results :global([data-primary-lead]) {
-  margin: .25rem -.35rem 0;
+  margin: .2rem 0 0;
   padding: 0 .35rem;
-  border: 1px solid rgba(17, 22, 18, .18);
-  border-right: 0;
-  border-left: 0;
-  border-bottom-color: rgba(23, 35, 45, .18);
-  background: #fffdf7;
-  box-shadow: 0 1.35rem 3.8rem rgba(8, 12, 10, .055);
+  border-top: 1px solid rgba(78, 142, 124, .28);
+  border-bottom: 1px solid rgba(23, 35, 45, .17);
+  background: linear-gradient(90deg, rgba(120, 183, 165, .065), rgba(255, 253, 247, .78) 34%, #fffdf7 100%);
+  box-shadow: none;
+}
+
+.lead {
+  transition: background-color .18s ease, border-color .18s ease;
 }
 
 .lead summary {
   min-height: 4.65rem;
+  transition: color .18s ease, background-color .18s ease;
+}
+
+.lead:not(.leadPrimary) summary:hover {
+  background: rgba(78, 142, 124, .035);
 }
 
 .leadPrimary summary {
-  min-height: 5.6rem;
+  min-height: 5.35rem;
   grid-template-columns: 2rem minmax(13rem, 1.05fr) minmax(15rem, 1.4fr) minmax(5.3rem, .48fr) 1rem;
 }
 
 .leadPrimary :global([data-lead-company] strong) {
-  font-size: 1.1rem;
+  font-size: 1.06rem;
 }
 
 .leadPrimary :global([data-lead-score]) {
@@ -205,7 +229,7 @@
 
 .leadPrimary :global([data-lead-score] strong) {
   color: var(--signal-deep, #315f52);
-  font-size: clamp(2.2rem, 4vw, 3.3rem);
+  font-size: clamp(2rem, 3.5vw, 3rem);
   font-weight: 520;
   line-height: .82;
   letter-spacing: -.075em;
@@ -219,7 +243,7 @@
 .confidence {
   color: #315f52;
   font-family: var(--mono);
-  font-size: .56rem;
+  font-size: .54rem;
   font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -232,6 +256,10 @@
   grid-template-columns: minmax(0, 1.35fr) minmax(14rem, .65fr);
   gap: 1rem 1.4rem;
   padding: .25rem 0 1rem 3rem;
+}
+
+.lead:global([open]) .leadBody {
+  animation: leadReveal .22s cubic-bezier(.2, .75, .25, 1) both;
 }
 
 .proofStack {
@@ -354,6 +382,11 @@
   to { transform: translateX(90%); }
 }
 
+@keyframes leadReveal {
+  from { opacity: 0; transform: translate3d(0, -4px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
 @media (max-width: 1080px) {
   .intro {
     grid-template-columns: 1fr;
@@ -378,13 +411,14 @@
   .controls { padding: .75rem; }
   .commandForm { grid-template-columns: 1fr; }
   .results { min-height: 17rem; padding-inline: .75rem; }
+  .results :global([data-primary-lead]) { padding-inline: .2rem; }
   .leadPrimary summary,
   .lead summary {
     grid-template-columns: 1.6rem minmax(0, 1fr) 4.6rem 1rem;
     gap: .55rem .7rem;
   }
   .leadPrimary :global([data-lead-company] strong) { font-size: 1rem; }
-  .leadPrimary :global([data-lead-score] strong) { font-size: 2.4rem; }
+  .leadPrimary :global([data-lead-score] strong) { font-size: 2.25rem; }
   .leadSignal {
     grid-column: 2 / 5;
     grid-row: 2;
@@ -411,10 +445,16 @@
     grid-template-columns: 1.45rem minmax(0, 1fr) 4.2rem .8rem;
     padding-inline: .15rem;
   }
-  .confidence { font-size: .58rem; }
+  .confidence { font-size: .56rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .commandForm button::after { animation: none !important; opacity: 0 !important; }
-  .results { transition: none; }
+  .results,
+  .presets a,
+  .commandForm input,
+  .commandForm button,
+  .lead,
+  .lead summary { transition: none; }
+  .lead:global([open]) .leadBody { animation: none !important; }
 }
