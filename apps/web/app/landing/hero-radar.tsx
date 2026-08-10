@@ -123,7 +123,7 @@ export default function HeroRadar() {
             type="button"
             className={styles.clusterTarget}
             style={{ left: `${cluster.x}%`, top: `${cluster.y}%` }}
-            data-active={cluster.active || undefined}
+            data-active={("active" in cluster && cluster.active) || undefined}
             aria-label={`${cluster.label}: ${cluster.meta}`}
           >
             <span className={styles.targetDot} aria-hidden="true" />
