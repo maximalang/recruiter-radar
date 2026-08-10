@@ -26,12 +26,22 @@ describe("landing runtime truth contract", () => {
     expect(aggregateChannels).toContain("web_push_enabled");
     expect(aggregateChannels).toContain("email_digest_enabled");
 
-    for (const label of ['title: "Web"', 'title: "Telegram"', 'title: "Email"', 'title: "+ интеграции"']) {
+    for (const label of [
+      'title: "Web"',
+      'title: "Telegram"',
+      'title: "Email"',
+      'title: "VK"',
+      'title: "Push в браузере"',
+      'title: "HTTPS webhook"',
+    ]) {
       expect(delivery).toContain(label);
     }
-    expect(delivery).not.toContain('title: "VK"');
-    expect(delivery).not.toContain('title: "Push в браузере"');
-    expect(delivery).not.toContain('title: "HTTPS webhook"');
+    expect(delivery).toContain('status: "подключаемый"');
+    expect(delivery).toContain('status: "после настройки"');
+    expect(delivery).toContain('status: "интеграция"');
+    expect(delivery).toContain("при включённой активной push-подписке");
+    expect(delivery).toContain("signed endpoint настраивается отдельно");
+    expect(delivery).toContain("Обращение компаниям всегда отправляете вы");
 
     for (const label of ["Telegram", "VK", "email-дайджесте", "браузерных уведомлениях", "защищённый HTTPS-webhook"]) {
       expect(faq).toContain(label);
