@@ -16,6 +16,7 @@ import {
   isExternalAgencyPropensityV1Enabled,
   isAgencyDnaMatchV2Enabled,
   isOpportunityScoringV3Enabled,
+  isCommercialSignalQualityV2Enabled,
   isOpportunityEngineV1Enabled,
 } from '@/lib/opportunities/config'
 import {
@@ -46,6 +47,11 @@ import {
   buildOpportunityScoringV3Job,
   type OpportunityScoringV3JobOptions,
 } from '@/lib/opportunities/opportunity-scoring-v3-job'
+import {
+  COMMERCIAL_SIGNAL_QUALITY_V2_SHADOW_LIMITS,
+  runCommercialSignalQualityV2ShadowPipeline,
+  type CommercialSignalQualityV2ShadowOptions,
+} from '@/lib/opportunities/commercial-signal-quality-v2-job'
 import {
   QUERY_PLANNER_V2_LIMITS,
   isQueryPlannerV2Enabled,
@@ -90,6 +96,7 @@ const JOBS = new Set([
   'build-external-agency-propensity',
   'build-agency-dna-matches',
   'build-opportunity-candidates-v3',
+  'build-commercial-signal-quality-v2',
   'build-query-plans-v2',
   'execute-query-plans-v2',
   'write-commercial-signal-opportunities',
@@ -103,6 +110,7 @@ const COMMERCIAL_THESIS_JOB = 'build-commercial-theses'
 const EXTERNAL_AGENCY_PROPENSITY_JOB = 'build-external-agency-propensity'
 const AGENCY_DNA_MATCH_JOB = 'build-agency-dna-matches'
 const OPPORTUNITY_SCORING_V3_JOB = 'build-opportunity-candidates-v3'
+const COMMERCIAL_SIGNAL_QUALITY_V2_JOB = 'build-commercial-signal-quality-v2'
 const QUERY_PLANNER_V2_JOB = 'build-query-plans-v2'
 const QUERY_PLANNER_V2_EXECUTION_JOB = 'execute-query-plans-v2'
 const COMMERCIAL_SIGNAL_WRITER_JOB = 'write-commercial-signal-opportunities'
@@ -143,12 +151,14 @@ export async function POST(
   const workspaceValue = params.get('workspace')
   const profileValue = params.get('profile')
   const batchSizeValue = params.get('batchSize')
+  const afterValue = params.get('after')
   const dryRunValue = params.get('dryRun')
   const applyValue = params.get('apply')
   const organizationId = positiveId(organizationValue)
   const workspaceId = positiveId(workspaceValue)
   const clientProfileId = positiveId(profileValue)
   const batchSize = positiveInteger(batchSizeValue)
+  const afterLineageId = positiveId(afterValue)
   const maximumBatchSize = job === COMPANY_EVENTS_JOB
     ? COMPANY_EVENTS_V1_LIMITS.maximumJobBatchSize
     : job === COMPANY_STATE_JOB
@@ -163,6 +173,8 @@ export async function POST(
               ? AGENCY_DNA_MATCH_V2_LIMITS.maximumJobBatchSize
               : job === OPPORTUNITY_SCORING_V3_JOB
                 ? OPPORTUNITY_SCORING_V3_LIMITS.maximumJobBatchSize
+                : job === COMMERCIAL_SIGNAL_QUALITY_V2_JOB
+                  ? COMMERCIAL_SIGNAL_QUALITY_V2_SHADOW_LIMITS.maximumBatchSize
                 : job === QUERY_PLANNER_V2_JOB
                   ? QUERY_PLANNER_V2_LIMITS.maximumProfileBatchSize
                   : job === QUERY_PLANNER_V2_EXECUTION_JOB ||
@@ -174,6 +186,7 @@ export async function POST(
     (organizationValue !== null && organizationId === null) ||
     (workspaceValue !== null && workspaceId === null) ||
     (profileValue !== null && clientProfileId === null) ||
+    (afterValue !== null && afterLineageId === null) ||
     (batchSizeValue !== null && (
       batchSize === null ||
       batchSize > maximumBatchSize
@@ -221,6 +234,23 @@ export async function POST(
         error: workspaceId === null
           ? 'workspace_required_for_apply'
           : 'apply_true_required',
+      },
+      { status: 400 },
+    )
+  }
+  if (
+    job === COMMERCIAL_SIGNAL_QUALITY_V2_JOB &&
+    (
+      workspaceId === null ||
+      clientProfileId === null ||
+      (applyValue === 'true' && organizationId === null)
+    )
+  ) {
+    return NextResponse.json(
+      {
+        error: applyValue === 'true'
+          ? 'workspace_profile_and_organization_required_for_apply'
+          : 'workspace_and_profile_required_for_shadow',
       },
       { status: 400 },
     )
@@ -297,6 +327,14 @@ export async function POST(
     dryRun: applyValue !== 'true',
     rolloutMode: commercialSignalCandidateRolloutMode(workspaceId),
   }
+  const commercialSignalQualityV2Options: CommercialSignalQualityV2ShadowOptions = {
+    workspaceId,
+    clientProfileId,
+    organizationId,
+    afterLineageId,
+    batchSize: batchSize ?? undefined,
+    dryRun: applyValue !== 'true',
+  }
   const queryPlannerV2Options: QueryPlannerV2JobOptions = {
     enabled: true,
     workspaceId,
@@ -312,6 +350,10 @@ export async function POST(
       })
       : job === QUERY_PLANNER_V2_JOB
         ? await buildQueryPlansV2Job(queryPlannerV2Options)
+        : job === COMMERCIAL_SIGNAL_QUALITY_V2_JOB
+          ? await runCommercialSignalQualityV2ShadowPipeline(
+            commercialSignalQualityV2Options,
+          )
         : job === QUERY_PLANNER_V2_EXECUTION_JOB
           ? await executeQueryPlannerV2Sources({
             workspaceId: workspaceId!,
@@ -364,6 +406,8 @@ export async function POST(
 function isJobEnabled(job: string): boolean {
   return job === COMMERCIAL_SIGNAL_CANARY_JOB
     ? isQueryPlannerV2Enabled() && isOpportunityScoringV3Enabled()
+    : job === COMMERCIAL_SIGNAL_QUALITY_V2_JOB
+      ? isCommercialSignalQualityV2Enabled()
     : job === QUERY_PLANNER_V2_JOB || job === QUERY_PLANNER_V2_EXECUTION_JOB
       ? isQueryPlannerV2Enabled()
       : job === COMMERCIAL_SIGNAL_WRITER_JOB

@@ -24,6 +24,8 @@ export const COMPANY_EVENT_TYPES = [
   'hiring_slowdown',
 ] as const
 
+export const VACANCY_REPOST_PAYLOAD_VERSION = 'vacancy-repost-v2' as const
+
 export type CompanyEventType = typeof COMPANY_EVENT_TYPES[number]
 
 export interface CompanyEventSourceRecord extends HiringSignalInput {
@@ -143,6 +145,11 @@ export function normalizeJobPostingCompanyEvents(
       }
       const gapDays = daysBetween(previous.occurredAt, current.occurredAt)
       if (gapDays >= REPOST_MIN_GAP_DAYS) {
+        const salaryChanged = observedSalaryChanged(previousRecords, currentRecords)
+        const lifecycleClassification = classifyRepostLifecycle(
+          gapDays,
+          salaryChanged,
+        )
         const repost = buildDerivedEvent({
           eventType: 'vacancy_repost',
           vacancy: current,
@@ -152,8 +159,15 @@ export function normalizeJobPostingCompanyEvents(
           lastSeenAt: latestTimestamp(currentRecords.map((record) => record.lastSeenAt)),
           identityParts: [previous.vacancyFingerprint, current.vacancyFingerprint],
           payload: {
+            payloadVersion: VACANCY_REPOST_PAYLOAD_VERSION,
             previousVacancyFingerprint: previous.vacancyFingerprint,
             currentVacancyFingerprint: current.vacancyFingerprint,
+            intervalDays: round(gapDays),
+            lifecycleClassification,
+            salaryChanged,
+            requirementsChanged: null,
+            sourcePublicationChanged: true,
+            reasonCodes: ['SAME_ROLE_REAPPEARED_WITH_NEW_SOURCE_ID'],
             repostGapDays: round(gapDays),
             reasonCode: 'SAME_ROLE_REAPPEARED_WITH_NEW_SOURCE_ID',
           },
@@ -182,6 +196,26 @@ export function normalizeJobPostingCompanyEvents(
     rejections: rejections.sort((left, right) =>
       left.sourceRecordIds.join(':').localeCompare(right.sourceRecordIds.join(':'))),
   }
+}
+
+function classifyRepostLifecycle(
+  gapDays: number,
+  salaryChanged: boolean | null,
+): 'meaningful' | 'routine_republication' {
+  if (salaryChanged === true) return 'meaningful'
+  return gapDays >= 25 && gapDays <= 35
+    ? 'routine_republication'
+    : 'meaningful'
+}
+
+function observedSalaryChanged(
+  previousRecords: CompanyEventSourceRecord[],
+  currentRecords: CompanyEventSourceRecord[],
+): boolean | null {
+  const previous = bestSalary(previousRecords)
+  const current = bestSalary(currentRecords)
+  if (!previous || !current || previous.currency !== current.currency) return null
+  return previous.min !== current.min || previous.max !== current.max
 }
 
 function buildVacancyEvent(
