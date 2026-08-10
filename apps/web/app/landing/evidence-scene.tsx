@@ -31,6 +31,7 @@ export default function EvidenceScene() {
     <section
       id="scene-evidence"
       className={`${styles.scene} ${styles.darkScene} ${styles.evidenceScene}`}
+      style={{ scrollMarginTop: "calc(72px + 20px)" }}
       aria-labelledby="evidence-title"
       data-header-tone="dark"
       data-motion-reveal="section"
