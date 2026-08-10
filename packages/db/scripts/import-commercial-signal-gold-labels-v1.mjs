@@ -7,6 +7,11 @@ import {
   serializeDatasetJsonl,
   summarizeReviews,
 } from './lib/commercial-signal-gold-set-v1.mjs'
+import {
+  summarizeIndependentReviewerAgreement,
+  validateHumanReviewHistory,
+  validateManifestContractFingerprint,
+} from './lib/commercial-signal-gold-review-v1.mjs'
 
 const args = process.argv.slice(2)
 const datasetPath = path.resolve(required('--dataset'))
@@ -15,12 +20,15 @@ const outputPath = path.resolve(required('--output'))
 if (outputPath === datasetPath) {
   throw new Error('Gold-set revisions must be written to a new file; in-place mutation is forbidden.')
 }
-const dataset = parseDatasetJsonl(await fs.readFile(datasetPath, 'utf8'))
+const dataset = validateManifestContractFingerprint(
+  parseDatasetJsonl(await fs.readFile(datasetPath, 'utf8')),
+)
 const reviews = parseReviewCsv(await fs.readFile(labelsPath, 'utf8'))
 if (!reviews.length) throw new Error('No completed human labels found in the label file.')
-const output = applyHumanReviews(dataset, reviews, {
+const output = validateHumanReviewHistory(applyHumanReviews(dataset, reviews, {
   importedAt: option('--imported-at') ?? new Date().toISOString(),
-})
+}))
+validateManifestContractFingerprint(output)
 await fs.writeFile(outputPath, serializeDatasetJsonl(output), { flag: 'wx' })
 process.stdout.write(`${JSON.stringify({
   ok:true,
@@ -30,6 +38,7 @@ process.stdout.write(`${JSON.stringify({
   labelRevision:output.manifest.labelRevision,
   status:output.manifest.status,
   review:summarizeReviews([output]),
+  reviewerAgreement:summarizeIndependentReviewerAgreement([output]),
   qualityValidated:false,
 })}\n`)
 
