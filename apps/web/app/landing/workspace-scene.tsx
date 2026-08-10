@@ -37,6 +37,7 @@ export default function WorkspaceScene(props: WorkspaceProps) {
       className={`${styles.scene} ${styles.lightScene} ${styles.workspaceScene} ${sceneStyles.section}`}
       aria-labelledby="workspace-title"
       data-header-tone="light"
+      data-motion-reveal="section"
     >
       <div className={styles.workspaceLayout} data-preview-section-content>
         <LandingPreviewInteractions />
@@ -144,6 +145,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
   try {
     const previewState = await getPublicSampleDigestState(props.previewInput);
     const appliedProfile = [props.previewInput.specialization, props.previewInput.targetCity].filter(Boolean);
+    const visibleItems = previewState.items.slice(0, 5);
 
     return (
       <div
@@ -191,8 +193,12 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
             {previewState.isPersonalized && !previewState.hasExactMatches ? (
               <p className={styles.workspaceMatchNote}>Точных совпадений пока нет — показаны ближайшие по релевантности.</p>
             ) : null}
-            {previewState.items.slice(0, 5).map((item, index) => (
-              <WorkspaceLead key={`${item.org_id}-${item.rank}`} item={item} defaultOpen={index === 0} />
+            {visibleItems.map((item, index) => (
+              <WorkspaceLead
+                key={`${item.org_id}-${item.rank}`}
+                item={item}
+                defaultOpen={index === visibleItems.length - 1}
+              />
             ))}
           </div>
         )}
