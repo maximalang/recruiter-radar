@@ -138,7 +138,14 @@ requireText("legalDocuments", "paymentAndRefundRevision", "payment/refund accept
 if ((sources.pricing.match(/isRecurring: false,/g) ?? []).length !== 3) {
   fail("pricing: every public plan must be a one-off purchase without recurring charges");
 }
-for (const token of ["299000", "999000", "2499000", "durationDays: 7", "durationDays: 30", "durationDays: 90"]) {
+for (const token of [
+  "amountMinor: 99000",
+  "amountMinor: 299000",
+  "amountMinor: 699000",
+  "durationDays: 7",
+  "durationDays: 30",
+  "durationDays: 90",
+]) {
   requireText("pricing", token, `pricing contract ${token}`);
 }
 
@@ -232,7 +239,7 @@ async function verifyDeployedOrigin() {
   }
 
   const checkout = await fetch(new URL("/checkout?plan=monthly", base)).then((response) => response.text()).catch(() => "");
-  for (const token of ["9 990", "ИНН покупателя", "Robokassa", "Автопродления"]) {
+  for (const token of ["2 990", "ИНН покупателя", "Robokassa", "Автопродления"]) {
     if (!checkout.includes(token)) fail(`network: checkout does not expose ${token}`);
   }
 }
