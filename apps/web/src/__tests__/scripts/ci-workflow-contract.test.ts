@@ -40,7 +40,7 @@ describe('pull request CI workflow contract', () => {
     expect(workflow).toContain("WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED: 'true'")
   })
 
-  it('runs landing and responsive browser audits and retains failure artifacts', () => {
+  it('runs landing and responsive browser audits and retains evidence artifacts', () => {
     expect(workflow).toContain('npm run test:types --workspace @recruiter-radar/web')
     expect(workflow).toContain('npm run test:landing:e2e')
     expect(workflow).toContain('npm run test:responsive-surfaces')
@@ -64,8 +64,7 @@ describe('pull request CI workflow contract', () => {
     expect(workflow.indexOf('- name: Verify production server log')).toBeLessThan(
       workflow.indexOf('- name: Upload Playwright screenshots and traces'),
     )
-    expect(workflow).toContain('if: always()')
-    expect(workflow).toMatch(/Upload Playwright screenshots and traces\s+if: failure\(\)/)
+    expect(workflow).toMatch(/Upload Playwright screenshots and traces\s+if: always\(\)/)
     expect(workflow).toContain('playwright-report')
     expect(workflow).toContain('test-results')
   })

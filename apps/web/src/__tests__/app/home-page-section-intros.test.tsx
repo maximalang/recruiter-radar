@@ -310,7 +310,7 @@ describe("final unified evidence-first landing contract", () => {
     const text = readVisibleText(panel);
     const links = collectElements(panel, Link);
 
-    expect(text).toContain("Оставьте заявку на пилот");
+    expect(text).toContain("Оставьте заявку на 7-дневный пилот");
     expect(text).toContain("Оставить заявку на пилот");
     expect(text).toContain("Перед запуском — короткие ответы");
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted)).toBe(true);

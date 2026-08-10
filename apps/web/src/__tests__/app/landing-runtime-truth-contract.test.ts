@@ -37,7 +37,8 @@ describe("landing runtime truth contract", () => {
       expect(faq).toContain(label);
     }
     expect(faq).not.toContain("остальные способы доставки не входят");
-    expect(pricing).toContain("Telegram / VK / email / browser push / signed webhook");
+    expect(pricing).not.toContain("Telegram / VK / email / browser push / signed webhook");
+    expect(pricing).toContain("рабочие каналы агентства");
   });
 
   test("compact source copy stays truthful while the FAQ explains runtime roles", () => {
