@@ -28,10 +28,36 @@ Opportunity-пути не переключаются на него этой фа
 `office_opening`, `product_launch`, `funding_or_investment`, `major_contract`,
 `career_page_change`, `hiring_restart`, `hiring_slowdown`.
 
-В Phase 1 нормализатор создаёт только доказанные `job_posting`. Остальные типы
-зарезервированы контрактом и не синтезируются без отдельного источника и тестов.
-Запись без evidence отклоняется с reason code
-`COMPANY_EVENT_EVIDENCE_MISSING`.
+Production-нормализатор создаёт только типы, явно разрешённые operational
+support registry и подтверждённые persisted evidence: `job_posting`,
+`vacancy_repost`, `vacancy_salary_change`, `vacancy_cluster`,
+`recruiter_vacancy`, `new_region`, `hiring_restart`. Типы `context_only` не имеют
+production producer/source и не могут самостоятельно запускать Commercial
+Episode. `career_page_change` и `hiring_slowdown` не эмитятся production Company
+Event normalizer; slowdown обрабатывается семантикой Company State. Запись без
+evidence отклоняется с reason code `COMPANY_EVENT_EVIDENCE_MISSING`.
+
+## Operational support matrix
+
+<!-- COMPANY_EVENT_SUPPORT_MATRIX:START -->
+| Event type | Producer | Source | Status | Payload version | Trigger | Strengthen | Consumer | Production tested |
+|---|---|---|---|---|---:|---:|---|---:|
+| job_posting | company-event-normalization | approved vacancy source observation | production | company-event-normalizer-v1 | no | no | Company State | yes |
+| vacancy_repost | company-event-normalization | deterministic comparison of evidenced vacancy observations | production | vacancy-repost-v2 | no | yes | Company State, Signal Episode, Quality v2 | yes |
+| vacancy_salary_change | company-event-normalization | deterministic comparison of evidenced vacancy salary snapshots | production | company-event-normalizer-v1 | no | yes | Company State, Signal Episode, Quality v2 | yes |
+| vacancy_cluster | company-event-normalization | deterministic cluster of evidenced vacancy observations | production | company-event-normalizer-v1 | no | yes | Company State, Signal Episode, Quality v2 | yes |
+| recruiter_vacancy | company-event-normalization | evidenced vacancy observation for a recruiting role | production | company-event-normalizer-v1 | no | yes | Company State, Signal Episode, Quality v2 | yes |
+| leadership_change | none | none | context_only | none | no | no | none | no |
+| new_business_unit | none | none | context_only | none | no | no | none | no |
+| new_region | company-event-normalization | evidenced vacancy history plus recent regional observations | production | company-event-normalizer-v1 | no | yes | Company State, Signal Episode, Quality v2 | yes |
+| office_opening | none | none | context_only | none | no | no | none | no |
+| product_launch | none | none | context_only | none | no | no | none | no |
+| funding_or_investment | none | none | context_only | none | no | no | none | no |
+| major_contract | none | none | context_only | none | no | no | none | no |
+| career_page_change | none | none | unsupported | none | no | no | none | no |
+| hiring_restart | company-event-normalization | deterministic evidenced vacancy history | production | company-event-normalizer-v1 | no | yes | Company State, Signal Episode, Quality v2 | yes |
+| hiring_slowdown | none | none | unsupported | none | no | no | Company State Change, Quality v2 | yes |
+<!-- COMPANY_EVENT_SUPPORT_MATRIX:END -->
 
 ## Runtime и безопасный запуск
 
@@ -88,8 +114,9 @@ Down migration удаляет схему только если `company_events` 
 
 ## Ограничения Phase 1
 
-- Нормализуются только вакансии из существующих `signals`.
-- Baseline, state changes, episode v2, thesis, Agency DNA match и Scoring v3 не
-  входят в эту фазу.
-- Существующие lead/digest/opportunity readers не используют Company Events.
+- Нормализуются только evidence-backed vacancy-derived Company Events,
+  разрешённые operational support registry.
+- Типы без production producer/source не синтезируются из текста или LLM-вывода.
+- Существующие lead/digest/opportunity readers не используют Company Events как
+  самостоятельное основание для лида.
 - Ни флаг, ни production cron этой поставкой не включаются.
