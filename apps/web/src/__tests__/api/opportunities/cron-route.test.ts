@@ -37,6 +37,14 @@ jest.mock('@/lib/opportunities/opportunity-scoring-v3-job', () => ({
   buildOpportunityScoringV3Job: jest.fn(),
 }))
 
+jest.mock('@/lib/opportunities/commercial-signal-quality-v2-job', () => ({
+  runCommercialSignalQualityV2ShadowPipeline: jest.fn(),
+  COMMERCIAL_SIGNAL_QUALITY_V2_SHADOW_LIMITS: {
+    defaultBatchSize: 25,
+    maximumBatchSize: 100,
+  },
+}))
+
 jest.mock('@/lib/lead-discovery/query-planner-v2-job', () => ({
   buildQueryPlansV2Job: jest.fn(),
 }))
@@ -49,6 +57,8 @@ import { buildCommercialThesesJob } from '@/lib/opportunities/commercial-thesis-
 import { buildExternalAgencyPropensityJob } from '@/lib/opportunities/external-agency-propensity-job'
 import { buildAgencyDnaMatchJob } from '@/lib/opportunities/agency-dna-match-job'
 import { buildOpportunityScoringV3Job } from '@/lib/opportunities/opportunity-scoring-v3-job'
+import { runCommercialSignalQualityV2ShadowPipeline } from '@/lib/opportunities/commercial-signal-quality-v2-job'
+import { emptyCommercialSignalFeatureCoverageReport } from '@/lib/opportunities/commercial-signal-feature-coverage'
 import { buildQueryPlansV2Job } from '@/lib/lead-discovery/query-planner-v2-job'
 import { GET, POST } from '@/app/api/cron/opportunities/[job]/route'
 
@@ -63,6 +73,9 @@ const mockedBuildExternalAgencyPropensity = jest.mocked(
 const mockedBuildAgencyDnaMatch = jest.mocked(buildAgencyDnaMatchJob)
 const mockedBuildOpportunityScoringV3 = jest.mocked(
   buildOpportunityScoringV3Job,
+)
+const mockedRunCommercialSignalQualityV2 = jest.mocked(
+  runCommercialSignalQualityV2ShadowPipeline,
 )
 const mockedBuildQueryPlansV2 = jest.mocked(buildQueryPlansV2Job)
 
@@ -92,6 +105,8 @@ describe('opportunity cron API', () => {
   const originalAgencyDnaMatchFlag = process.env.AGENCY_DNA_MATCH_V2_ENABLED
   const originalOpportunityScoringV3Flag =
     process.env.OPPORTUNITY_SCORING_V3_ENABLED
+  const originalCommercialSignalQualityV2Flag =
+    process.env.COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED
   const originalQueryPlannerV2Flag = process.env.QUERY_PLANNER_V2_ENABLED
 
   beforeEach(() => {
@@ -104,6 +119,7 @@ describe('opportunity cron API', () => {
     process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED = 'false'
     process.env.AGENCY_DNA_MATCH_V2_ENABLED = 'false'
     process.env.OPPORTUNITY_SCORING_V3_ENABLED = 'false'
+    process.env.COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED = 'false'
     process.env.QUERY_PLANNER_V2_ENABLED = 'false'
     jest.clearAllMocks()
   })
@@ -136,6 +152,12 @@ describe('opportunity cron API', () => {
       delete process.env.OPPORTUNITY_SCORING_V3_ENABLED
     } else {
       process.env.OPPORTUNITY_SCORING_V3_ENABLED = originalOpportunityScoringV3Flag
+    }
+    if (originalCommercialSignalQualityV2Flag === undefined) {
+      delete process.env.COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED
+    } else {
+      process.env.COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED =
+        originalCommercialSignalQualityV2Flag
     }
     if (originalQueryPlannerV2Flag === undefined) {
       delete process.env.QUERY_PLANNER_V2_ENABLED
@@ -599,6 +621,64 @@ describe('opportunity cron API', () => {
       )).status).toBe(400)
     }
     expect(mockedBuildOpportunityScoringV3).not.toHaveBeenCalled()
+  })
+
+  it('keeps Quality v2 dark and runs the operator entrypoint dry by default', async () => {
+    expect((await POST(
+      request('/api/cron/opportunities/build-commercial-signal-quality-v2', testKey),
+      { params: Promise.resolve({ job: 'build-commercial-signal-quality-v2' }) },
+    )).status).toBe(404)
+
+    process.env.COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED = 'true'
+    mockedRunCommercialSignalQualityV2.mockResolvedValue({
+      enabled: true, dryRun: true, scanned: 0, built: 0,
+      qualifiedActionable: 0, qualifiedNeedsEnrichment: 0, review: 0,
+      blocked: 0, expired: 0, dismissed: 0, persisted: 0, replayed: 0,
+      failed: 0,
+      nextCursor: null,
+      telemetry: {
+        v3ToV2: { promoted: 0, demoted: 0, unchanged: 0 },
+        qualityCoverage: { low: 0, medium: 0, high: 0 },
+        qualityConfidence: { low: 0, medium: 0, high: 0 },
+        missingCriticalDimensions: {}, frictionLevels: {}, archetypes: {},
+        convergenceStatuses: {}, negativeActions: {},
+        independentOriginRatio: { low: 0, medium: 0, high: 0 },
+        featureCoverage: emptyCommercialSignalFeatureCoverageReport(),
+      },
+    })
+    const response = await POST(
+      request(
+        '/api/cron/opportunities/build-commercial-signal-quality-v2' +
+        '?workspace=20&profile=40&after=500',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'build-commercial-signal-quality-v2' }) },
+    )
+    expect(response.status).toBe(200)
+    expect(mockedRunCommercialSignalQualityV2).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: '20', clientProfileId: '40', organizationId: null,
+        afterLineageId: '500',
+        dryRun: true,
+      }),
+    )
+  })
+
+  it('requires exact Quality v2 apply scope and enforces its batch limit', async () => {
+    process.env.COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED = 'true'
+    for (const path of [
+      '/api/cron/opportunities/build-commercial-signal-quality-v2?apply=true&workspace=20&profile=40',
+      '/api/cron/opportunities/build-commercial-signal-quality-v2?apply=true&workspace=20&organization=10',
+      '/api/cron/opportunities/build-commercial-signal-quality-v2?apply=true&profile=40&organization=10',
+      '/api/cron/opportunities/build-commercial-signal-quality-v2?batchSize=101',
+      '/api/cron/opportunities/build-commercial-signal-quality-v2?workspace=20&profile=40&after=0',
+    ]) {
+      expect((await POST(
+        request(path, testKey),
+        { params: Promise.resolve({ job: 'build-commercial-signal-quality-v2' }) },
+      )).status).toBe(400)
+    }
+    expect(mockedRunCommercialSignalQualityV2).not.toHaveBeenCalled()
   })
 
   it('keeps Query Planner v2 separately dark and dry-run by default', async () => {
