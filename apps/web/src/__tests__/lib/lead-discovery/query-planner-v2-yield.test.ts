@@ -14,9 +14,12 @@ const emptyYield: QueryPlanOperationalYield = {
   uniqueEvents: null,
   uniqueCompanies: null,
   newCompanyEvents: null,
+  independentEvents: null,
   episodes: null,
   qualifiedEpisodes: null,
   qualifiedOpportunities: null,
+  strongReviewedOpportunities: null,
+  ordinaryHiringOpportunities: null,
   actionableOpportunities: null,
   staleOpportunities: null,
   accepted: null,
@@ -109,6 +112,78 @@ describe('Query Planner v2 downstream yield tuning', () => {
       pageBudget: 7,
       reasonCode: 'YIELD_BUDGET_EXPANDED_COMMERCIAL_OUTCOME',
     })
+  })
+
+  it('preserves a small plan with high reviewed commercial yield', () => {
+    expect(resolveYieldAdjustedPageBudget(3, {
+      ...emptyYield,
+      executionCount: 3,
+      fetchedRecords: 18,
+      uniqueEvents: 8,
+      independentEvents: 5,
+      episodes: 4,
+      qualifiedOpportunities: 3,
+      actionableOpportunities: 2,
+      strongReviewedOpportunities: 2,
+      replied: 1,
+      meetings: 1,
+    }, { qualityFeedbackEnabled: true })).toEqual({
+      pageBudget: 4,
+      reasonCode: 'YIELD_BUDGET_EXPANDED_REVIEWED_COMMERCIAL_YIELD',
+    })
+  })
+
+  it('keeps quality-v2 feedback dark unless its exact flag is enabled', () => {
+    expect(resolveYieldAdjustedPageBudget(3, {
+      ...emptyYield,
+      executionCount: 3,
+      fetchedRecords: 18,
+      strongReviewedOpportunities: 2,
+      replied: 1,
+    })).toEqual({
+      pageBudget: 3,
+      reasonCode: 'YIELD_BUDGET_UNCHANGED',
+    })
+  })
+
+  it('reduces plans dominated by reviewed ordinary hiring', () => {
+    expect(resolveYieldAdjustedPageBudget(5, {
+      ...emptyYield,
+      executionCount: 8,
+      fetchedRecords: 80,
+      uniqueEvents: 55,
+      independentEvents: 20,
+      episodes: 15,
+      qualifiedOpportunities: 10,
+      actionableOpportunities: 4,
+      strongReviewedOpportunities: 1,
+      ordinaryHiringOpportunities: 8,
+    }, { qualityFeedbackEnabled: true })).toEqual({
+      pageBudget: 4,
+      reasonCode: 'YIELD_BUDGET_REDUCED_ORDINARY_HIRING',
+    })
+  })
+
+  it('keeps quality-specific diagnostics dark with the flag disabled', () => {
+    const snapshot = {
+      ...emptyYield,
+      executionCount: 8,
+      fetchedRecords: 80,
+      uniqueEvents: 55,
+      episodes: 15,
+      qualifiedEpisodes: 8,
+      qualifiedOpportunities: 10,
+      actionableOpportunities: 4,
+      strongReviewedOpportunities: 1,
+      ordinaryHiringOpportunities: 8,
+    }
+
+    expect(diagnoseQueryPlanSupply(snapshot)).not.toContain(
+      'SUPPLY_ORDINARY_HIRING_HEAVY',
+    )
+    expect(diagnoseQueryPlanSupply(snapshot, {
+      qualityFeedbackEnabled: true,
+    })).toContain('SUPPLY_ORDINARY_HIRING_HEAVY')
   })
 
   it('explains under-supply using persisted role/region/source yield only', () => {

@@ -16,6 +16,8 @@ import {
   isExternalAgencyPropensityV1Enabled,
   isAgencyDnaMatchV2Enabled,
   isOpportunityScoringV3Enabled,
+  isCommercialSignalQualityV2Enabled,
+  isCommercialSignalQualityV2PlannerFeedbackEnabled,
   isOpportunityCommercialSignalUiEnabledForContext,
   isAgencyDnaV1Enabled,
   isAgencyDnaV1EnabledForContext,
@@ -44,6 +46,31 @@ import {
 } from '@/lib/opportunities/config'
 
 describe('opportunity engine config', () => {
+  it('keeps Commercial Signal Quality v2 independently dark', () => {
+    expect(isCommercialSignalQualityV2Enabled({})).toBe(false)
+    expect(isCommercialSignalQualityV2Enabled({
+      COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: '1',
+    })).toBe(false)
+    expect(isCommercialSignalQualityV2Enabled({
+      COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true',
+    })).toBe(true)
+    expect(isCommercialSignalQualityV2Enabled({
+      COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: ' TRUE ',
+    })).toBe(false)
+  })
+
+  it('keeps quality planner feedback separately and exactly dark', () => {
+    expect(isCommercialSignalQualityV2PlannerFeedbackEnabled({
+      COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true',
+    })).toBe(false)
+    expect(isCommercialSignalQualityV2PlannerFeedbackEnabled({
+      COMMERCIAL_SIGNAL_QUALITY_V2_PLANNER_FEEDBACK_ENABLED: '1',
+    })).toBe(false)
+    expect(isCommercialSignalQualityV2PlannerFeedbackEnabled({
+      COMMERCIAL_SIGNAL_QUALITY_V2_PLANNER_FEEDBACK_ENABLED: 'true',
+    })).toBe(true)
+  })
+
   it('keeps Opportunity Scoring v3 independently dark and tightly bounded', () => {
     expect(isOpportunityScoringV3Enabled({})).toBe(false)
     expect(isOpportunityScoringV3Enabled({

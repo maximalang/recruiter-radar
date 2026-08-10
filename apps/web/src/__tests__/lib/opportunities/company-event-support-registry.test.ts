@@ -3,7 +3,10 @@ import {
   COMPANY_EVENT_SUPPORT_REGISTRY,
   getCompanyEventSupport,
   isProductionCompanyEvent,
+  renderCompanyEventSupportMatrixMarkdown,
 } from '@/lib/opportunities/company-event-support-registry'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 describe('Company Event support registry', () => {
   it('classifies every schema event type explicitly', () => {
@@ -24,6 +27,9 @@ describe('Company Event support registry', () => {
     ] as const) {
       expect(isProductionCompanyEvent(eventType)).toBe(true)
       expect(getCompanyEventSupport(eventType).realSource).not.toBeNull()
+      expect(getCompanyEventSupport(eventType).producer).not.toBeNull()
+      expect(getCompanyEventSupport(eventType).payloadVersion).not.toBeNull()
+      expect(getCompanyEventSupport(eventType).productionTested).toBe(true)
     }
   })
 
@@ -41,5 +47,17 @@ describe('Company Event support registry', () => {
       expect(isProductionCompanyEvent(eventType)).toBe(false)
       expect(getCompanyEventSupport(eventType).canTriggerCommercialEpisode).toBe(false)
     }
+  })
+
+  it('keeps the documentation matrix checked against the registry', () => {
+    const docs = readFileSync(
+      resolve(process.cwd(), '..', '..', 'docs', 'company-events-v1.md'),
+      'utf8',
+    )
+    expect(docs).toContain([
+      '<!-- COMPANY_EVENT_SUPPORT_MATRIX:START -->',
+      renderCompanyEventSupportMatrixMarkdown(),
+      '<!-- COMPANY_EVENT_SUPPORT_MATRIX:END -->',
+    ].join('\n'))
   })
 })

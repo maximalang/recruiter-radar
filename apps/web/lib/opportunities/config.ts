@@ -41,6 +41,10 @@ export const AGENCY_DNA_MATCH_V2_FEATURE_FLAG =
   'AGENCY_DNA_MATCH_V2_ENABLED'
 export const OPPORTUNITY_SCORING_V3_FEATURE_FLAG =
   'OPPORTUNITY_SCORING_V3_ENABLED'
+export const COMMERCIAL_SIGNAL_QUALITY_V2_FEATURE_FLAG =
+  'COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED'
+export const COMMERCIAL_SIGNAL_QUALITY_V2_PLANNER_FEEDBACK_FEATURE_FLAG =
+  'COMMERCIAL_SIGNAL_QUALITY_V2_PLANNER_FEEDBACK_ENABLED'
 export const OPPORTUNITY_COMMERCIAL_SIGNAL_UI_FEATURE_FLAG =
   'OPPORTUNITY_COMMERCIAL_SIGNAL_UI_ENABLED'
 
@@ -156,6 +160,18 @@ export function isOpportunityScoringV3Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   return env[OPPORTUNITY_SCORING_V3_FEATURE_FLAG] === 'true'
+}
+
+export function isCommercialSignalQualityV2Enabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[COMMERCIAL_SIGNAL_QUALITY_V2_FEATURE_FLAG] === 'true'
+}
+
+export function isCommercialSignalQualityV2PlannerFeedbackEnabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[COMMERCIAL_SIGNAL_QUALITY_V2_PLANNER_FEEDBACK_FEATURE_FLAG] === 'true'
 }
 
 export function isOpportunityCommercialSignalUiEnabledForContext(
