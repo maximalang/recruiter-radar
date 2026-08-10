@@ -4,15 +4,18 @@
  * One email per profile per day. Dedupe is atomic against
  * `lead_channel_deliveries` keyed `(email, profile, day:<YYYY-MM-DD>)`, the same
  * spam-guard pattern as web-push (`notifyNewLeadsForRun`): the INSERT ... ON
- * CONFLICT DO NOTHING is the commit point — if it inserts we own delivery, if it
- * does not another worker already sent today's email and we bail.
+ * CONFLICT DO NOTHING is the claim point — if it inserts we own delivery, if it
+ * does not another worker already owns or completed today's email and we bail.
+ * The claim starts as `processing`; only a successful provider send receives a
+ * real `delivered_at`. Provider failures are finalized as `failed` so operator
+ * surfaces never treat an attempted email as a successful delivery.
  *
  * This module does NOT decide which leads are worth sending — it reuses the
  * digest candidates the pipeline already produced (`getLeadsForAllProfiles`,
  * scoped to THIS run via `digestRunId`) and keeps only the auto-deliverable
  * gates (A/B), matching the confidence-gate contract. C/D never auto-deliver by
  * email. Run-scoping is what makes the digest "companies worth contacting today"
- * rather than every candidate ever scored — it mirrors web-push's per-run set.
+ * rather than every candidate ever scored for the profile — it mirrors web-push's per-run set.
  */
 
 import { getPool } from "../db-pool";
@@ -127,8 +130,9 @@ function resolveAppBaseUrl(): string {
  *
  * Order is deliberate: cheap preference/dedupe checks first, render+send last.
  * The dedupe row is claimed BEFORE sending so two concurrent runs cannot both
- * send; if the send then fails we leave the claim in place (at-most-once — we do
- * not retry the same day to avoid duplicate inboxing on flaky SMTP).
+ * send. A failed send keeps the failed claim in place (at-most-once — we do not
+ * retry the same day to avoid duplicate inboxing on an ambiguous SMTP failure),
+ * but `delivered_at` remains NULL and `delivery_status` becomes `failed`.
  */
 export async function sendDigestEmailForProfile(input: {
   clientProfileId: string;
@@ -185,8 +189,10 @@ export async function sendDigestEmailForProfile(input: {
   const dedupeKey = `day:${moscowDayKey(input.now ?? new Date())}`;
   const claim = await pool.query<{ id: number }>(
     `
-    INSERT INTO lead_channel_deliveries (channel, client_profile_id, dedupe_key, lead_count)
-    VALUES ('email', $1, $2, $3)
+    INSERT INTO lead_channel_deliveries (
+      channel, client_profile_id, dedupe_key, lead_count, delivery_status, delivered_at
+    )
+    VALUES ('email', $1, $2, $3, 'processing', NULL)
     ON CONFLICT (channel, client_profile_id, dedupe_key) DO NOTHING
     RETURNING id
     `,
@@ -194,6 +200,10 @@ export async function sendDigestEmailForProfile(input: {
   );
   if (claim.rowCount !== 1) {
     return { delivered: false, reason: "already_sent" };
+  }
+  const claimId = claim.rows[0]?.id;
+  if (!claimId) {
+    return { delivered: false, reason: "send_failed" };
   }
 
   const rendered = renderDigestEmail(deliverable, {
@@ -210,10 +220,28 @@ export async function sendDigestEmailForProfile(input: {
   });
 
   if (!sendResult.ok) {
+    await pool.query(
+      `UPDATE lead_channel_deliveries
+       SET delivery_status = 'failed', delivered_at = NULL
+       WHERE id = $1 AND delivery_status = 'processing'`,
+      [claimId],
+    ).catch((error) => logError("email.digest_claim_finalize_failed", error, {
+      clientProfileId: input.clientProfileId,
+    }));
     logError("email.digest_send_failed", new Error(sendResult.reason), {
       clientProfileId: input.clientProfileId,
     });
     return { delivered: false, reason: "send_failed" };
+  }
+
+  const finalized = await pool.query(
+    `UPDATE lead_channel_deliveries
+     SET delivery_status = 'sent', delivered_at = NOW()
+     WHERE id = $1 AND delivery_status = 'processing'`,
+    [claimId],
+  );
+  if (finalized.rowCount !== 1) {
+    throw new Error("Email was sent but aggregate delivery state could not be finalized.");
   }
 
   logEvent("email.digest_sent", {
