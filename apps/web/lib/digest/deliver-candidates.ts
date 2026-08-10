@@ -247,31 +247,31 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
         digestRunId: runId,
         count: row.candidate_count,
       })
-      if (pushResult.delivered && pushResult.result.sent > 0) {
-        await recordChannelSuccess({
-          runId,
-          clientProfileId,
-          provider: 'web_push',
-          metadata: {
-            sent: pushResult.result.sent,
-            failed: pushResult.result.failed,
-            pruned: pushResult.result.pruned,
-          },
-        })
-        counters.sent += 1
-      } else if (pushResult.delivered && pushResult.result.failed > 0) {
-        await recordChannelFailure({
-          runId,
-          clientProfileId,
-          provider: 'web_push',
-          reason: 'send_failed',
-          metadata: {
-            sent: pushResult.result.sent,
-            failed: pushResult.result.failed,
-            pruned: pushResult.result.pruned,
-          },
-        })
-        recordDeliveryFailure(counters, clientProfileId, 'web_push')
+      if (pushResult.delivered) {
+        const metadata = {
+          sent: pushResult.result.sent,
+          failed: pushResult.result.failed,
+          pruned: pushResult.result.pruned,
+        }
+        if (pushResult.result.sent > 0) {
+          await recordChannelSuccess({
+            runId,
+            clientProfileId,
+            provider: 'web_push',
+            metadata,
+          })
+          counters.sent += 1
+        }
+        if (pushResult.result.failed > 0 || pushResult.result.sent === 0) {
+          await recordChannelFailure({
+            runId,
+            clientProfileId,
+            provider: 'web_push',
+            reason: pushResult.result.sent > 0 ? 'partial_failure' : 'send_failed',
+            metadata,
+          })
+          recordDeliveryFailure(counters, clientProfileId, 'web_push')
+        }
       }
     } catch (error) {
       logError('webpush.notify_run_failed', error, { runId, clientProfileId })
