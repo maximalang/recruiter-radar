@@ -1,22 +1,8 @@
 .capabilityPanel {
   position: relative;
-  overflow: hidden;
-  padding: clamp(1.25rem, 2.4vw, 2rem);
-  border: 1px solid rgba(18, 35, 31, .12);
-  background:
-    radial-gradient(circle at 86% 12%, rgba(127, 216, 189, .08), transparent 26%),
-    rgba(255, 255, 255, .52);
-}
-
-.capabilityPanel::before {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(77, 139, 120, .42), transparent);
-  content: "";
-  opacity: .55;
+  padding: clamp(.25rem, 1vw, .75rem) 0 0;
+  border-top: 1px solid rgba(18, 35, 31, .12);
+  background: transparent;
 }
 
 .capabilityHeader {
@@ -24,7 +10,8 @@
   align-items: end;
   justify-content: space-between;
   gap: 1.5rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.35rem;
+  padding-top: 1rem;
 }
 
 .capabilityHeader > div {
@@ -63,8 +50,8 @@
 
 .channelHierarchy {
   display: grid;
-  grid-template-columns: minmax(16rem, .72fr) minmax(28rem, 1.28fr);
-  gap: 1rem;
+  grid-template-columns: minmax(16rem, .68fr) minmax(28rem, 1.32fr);
+  gap: clamp(1.25rem, 3vw, 2.4rem);
 }
 
 .coreChannel {
@@ -72,8 +59,9 @@
   display: grid;
   align-content: start;
   min-height: 100%;
-  padding: 1.25rem;
-  border: 1px solid rgba(191, 220, 145, .16);
+  padding: 1.35rem;
+  border: 0;
+  border-top: 1px solid rgba(191, 220, 145, .3);
   background: var(--slate-900);
   color: var(--paper);
 }
@@ -119,30 +107,28 @@
 
 .deliveryRoutes {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   align-content: start;
   border-top: 1px solid var(--line-light);
 }
 
 .deliveryRoutes > .groupLabel {
-  grid-column: 1 / -1;
-  padding: .75rem 0;
+  padding: .8rem 0;
   border-bottom: 1px solid var(--line-light);
 }
 
 .channelRoute {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-content: start;
-  gap: .7rem .8rem;
-  padding: 1rem 1rem 1rem 0;
+  grid-template-columns: auto minmax(0, 1fr) minmax(8rem, auto);
+  align-items: center;
+  gap: .7rem 1rem;
+  padding: .95rem 0;
   border-bottom: 1px solid var(--line-light);
+  transition: color .18s ease, background-color .18s ease;
 }
 
-.channelRoute:nth-of-type(even) {
-  padding-right: 0;
-  padding-left: 1rem;
-  border-left: 1px solid var(--line-light);
+.channelRoute:hover {
+  background: linear-gradient(90deg, rgba(78, 142, 124, .045), transparent 72%);
 }
 
 .channelTopline {
@@ -155,11 +141,11 @@
 
 .channelIcon {
   display: grid;
-  width: 2.65rem;
-  height: 2.65rem;
-  flex: 0 0 2.65rem;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 2.35rem;
   place-items: center;
-  border: 1px solid rgba(39, 108, 88, .19);
+  border: 0;
   border-radius: 50%;
   background: rgba(127, 216, 189, .07);
   color: #397966;
@@ -167,8 +153,8 @@
 
 .channelIcon svg {
   display: block;
-  width: 1.28rem;
-  height: 1.28rem;
+  width: 1.18rem;
+  height: 1.18rem;
   overflow: visible;
 }
 
@@ -180,8 +166,8 @@
 }
 
 .channelStatus::before {
-  width: .34rem;
-  height: .34rem;
+  width: .32rem;
+  height: .32rem;
   border-radius: 50%;
   background: currentColor;
   content: "";
@@ -203,7 +189,6 @@
 }
 
 .channelRoute p {
-  grid-column: 2;
   margin: .35rem 0 0;
   color: rgba(23, 35, 45, .69);
   font-size: .74rem;
@@ -211,16 +196,11 @@
 }
 
 .channelRoute > small {
-  grid-column: 2;
   color: rgba(23, 35, 45, .58);
   font-family: var(--mono);
   font-size: .56rem;
   line-height: 1.35;
-}
-
-.channelRoute[data-channel="webhook"] .channelIcon,
-.channelRoute[data-channel="vk"] .channelIcon {
-  border-style: dashed;
+  text-align: right;
 }
 
 @media (max-width: 960px) {
@@ -228,12 +208,12 @@
     grid-template-columns: 1fr;
   }
 
-  .coreChannel { min-height: 17rem; }
+  .coreChannel { min-height: 15rem; }
 }
 
 @media (max-width: 620px) {
   .capabilityPanel {
-    padding: .95rem;
+    padding-top: 0;
   }
 
   .capabilityHeader {
@@ -243,27 +223,23 @@
     margin-bottom: 1rem;
   }
 
-  .deliveryRoutes {
-    grid-template-columns: 1fr;
+  .channelRoute {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    padding: .9rem 0;
   }
 
-  .channelRoute,
-  .channelRoute:nth-of-type(even) {
-    padding: .9rem 0;
-    border-left: 0;
+  .channelRoute > small {
+    grid-column: 2;
+    text-align: left;
   }
 
   .channelTopline { margin-bottom: .7rem; }
 
   .channelIcon {
-    width: 2.4rem;
-    height: 2.4rem;
-    flex-basis: 2.4rem;
-  }
-
-  .channelIcon svg {
-    width: 1.18rem;
-    height: 1.18rem;
+    width: 2.3rem;
+    height: 2.3rem;
+    flex-basis: 2.3rem;
   }
 
   .channelRoute p { padding-bottom: 0; }
