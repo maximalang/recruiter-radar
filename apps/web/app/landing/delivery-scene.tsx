@@ -9,22 +9,25 @@ const DELIVERY_STEPS = [
   { title: "Получили возможности", text: "Короткая выдача объясняет, кому стоит написать и почему." },
 ] as const;
 
-type DeliveryChannelKey = "cabinet" | "telegram" | "email" | "integration";
+type DeliveryChannelKey = "cabinet" | "telegram" | "email" | "vk" | "push" | "webhook";
 
-const DELIVERY_CHANNELS: ReadonlyArray<{
+type DeliveryChannel = {
   key: DeliveryChannelKey;
   title: string;
   status: string;
   text: string;
   note: string;
-}> = [
-  {
-    key: "cabinet",
-    title: "Web",
-    status: "базовый",
-    text: "Карточки возможностей и доказательства остаются в рабочем кабинете.",
-    note: "основная поверхность",
-  },
+};
+
+const CORE_CHANNEL: DeliveryChannel = {
+  key: "cabinet",
+  title: "Web",
+  status: "базовый",
+  text: "Карточки возможностей и доказательства остаются в рабочем кабинете.",
+  note: "основная поверхность",
+};
+
+const PRIMARY_ROUTES: ReadonlyArray<DeliveryChannel> = [
   {
     key: "telegram",
     title: "Telegram",
@@ -39,14 +42,31 @@ const DELIVERY_CHANNELS: ReadonlyArray<{
     text: "Агрегированная выдача приходит на рабочий адрес профиля.",
     note: "после согласия в профиле",
   },
+];
+
+const EXTRA_ROUTES: ReadonlyArray<DeliveryChannel> = [
   {
-    key: "integration",
-    title: "+ интеграции",
-    status: "интеграция",
-    text: "Подключаемые маршруты передают события в ваш рабочий процесс.",
-    note: "настраиваются отдельно",
+    key: "vk",
+    title: "VK",
+    status: "подключаемый",
+    text: "События радара можно доставлять через настроенное VK-сообщество.",
+    note: "после настройки сообщества",
   },
-] as const;
+  {
+    key: "push",
+    title: "Push в браузере",
+    status: "после настройки",
+    text: "Браузерное уведомление доступно при включённой активной push-подписке.",
+    note: "активная подписка / VAPID",
+  },
+  {
+    key: "webhook",
+    title: "HTTPS webhook",
+    status: "интеграция",
+    text: "Подписанный HTTPS webhook передаёт события в n8n, CRM или внутренний процесс.",
+    note: "signed endpoint настраивается отдельно",
+  },
+];
 
 function DeliveryChannelGlyph({ channel }: { channel: DeliveryChannelKey }) {
   if (channel === "cabinet") {
@@ -58,16 +78,36 @@ function DeliveryChannelGlyph({ channel }: { channel: DeliveryChannelKey }) {
   if (channel === "email") {
     return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.35" /><path d="m5 8 7 5 7-5" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   }
+  if (channel === "vk") {
+    return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7.5c.4 5.9 3.4 9 8.2 9h.7v-3.4c2.2.2 3.8 1.8 4.4 3.4H21c-.8-2.4-2.9-4.1-4.2-4.8 1.3-.8 3.2-2.8 3.7-4.2H18c-.7 1.7-2.4 3.6-4.1 3.8V7.5h-2.5v6.6c-1.8-.5-4-2.6-4.1-6.6z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" /></svg>;
+  }
+  if (channel === "push") {
+    return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7.5 16.5h9l-1.1-1.8v-4a3.4 3.4 0 0 0-6.8 0v4z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" /><path d="M10 18.5a2.2 2.2 0 0 0 4 0M18.5 7.5c.7.8 1 1.7 1 2.7M5.5 7.5c-.7.8-1 1.7-1 2.7" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" /></svg>;
+  }
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5M13.5 5l-3 14" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
-export default function DeliveryScene() {
-  const coreChannel = DELIVERY_CHANNELS[0];
+function ChannelRoute({ channel }: { channel: DeliveryChannel }) {
+  return (
+    <article className={sceneStyles.channelRoute} data-channel={channel.key} tabIndex={0}>
+      <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel={channel.key} /></span>
+      <div>
+        <div className={sceneStyles.routeHeading}>
+          <h3>{channel.title}</h3>
+          <span className={sceneStyles.channelStatus}>{channel.status}</span>
+        </div>
+        <p>{channel.text}</p>
+      </div>
+      <small>{channel.note}</small>
+    </article>
+  );
+}
 
+export default function DeliveryScene() {
   return (
     <section
       id="scene-delivery"
-      className={`${styles.scene} ${styles.lightScene} ${styles.deliveryScene}`}
+      className={`${styles.scene} ${styles.lightScene} ${styles.deliveryScene} ${sceneStyles.section}`}
       style={{ scrollMarginTop: "calc(72px + 32px)" }}
       aria-labelledby="delivery-title"
       data-header-tone="light"
@@ -100,54 +140,53 @@ export default function DeliveryScene() {
               <span>Доставка</span>
               <strong>Возможности приходят туда, где вы работаете.</strong>
             </div>
-            <p>Web доступен всегда. Остальные каналы включаются после настройки и проверки подключения.</p>
+            <p>Web доступен всегда. Остальные маршруты включаются только после соответствующей настройки.</p>
           </div>
           <div className={sceneStyles.channelHierarchy}>
-            <article className={sceneStyles.coreChannel} data-channel={coreChannel.key} data-delivery-core="workspace">
+            <article className={sceneStyles.coreChannel} data-channel={CORE_CHANNEL.key} data-delivery-core="workspace">
               <div className={sceneStyles.channelTopline}>
-                <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel={coreChannel.key} /></span>
-                <span className={sceneStyles.channelStatus}>{coreChannel.status}</span>
+                <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel={CORE_CHANNEL.key} /></span>
+                <span className={sceneStyles.channelStatus}>{CORE_CHANNEL.status}</span>
               </div>
-              <span className={sceneStyles.groupLabel}>Core / Radar workspace</span>
-              <h3>{coreChannel.title}</h3>
-              <p>{coreChannel.text}</p>
-              <small>{coreChannel.note}</small>
+              <span className={sceneStyles.groupLabel}>Radar workspace</span>
+              <h3>{CORE_CHANNEL.title}</h3>
+              <p>{CORE_CHANNEL.text}</p>
+              <small>{CORE_CHANNEL.note}</small>
             </article>
             <div className={sceneStyles.deliveryRoutes} data-delivery-routes="connected">
-              <span className={sceneStyles.groupLabel}>Delivery / подключаемые маршруты</span>
-              {DELIVERY_CHANNELS.slice(1).map((channel) => (
-                <article key={channel.key} className={sceneStyles.channelRoute} data-channel={channel.key}>
-                  <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel={channel.key} /></span>
-                  <div>
-                    <div className={sceneStyles.routeHeading}>
-                      <h3>{channel.title}</h3>
-                      <span className={sceneStyles.channelStatus}>{channel.status}</span>
-                    </div>
-                    <p>{channel.text}</p>
-                  </div>
-                  <small>{channel.note}</small>
-                </article>
-              ))}
+              <span className={sceneStyles.groupLabel}>Подключаемые маршруты</span>
+              {PRIMARY_ROUTES.map((channel) => <ChannelRoute key={channel.key} channel={channel} />)}
+              <details className={sceneStyles.moreRoutes}>
+                <summary><span>+ ещё маршруты</span><small>VK · Push · Webhook</small></summary>
+                <div className={sceneStyles.extraRoutes}>
+                  {EXTRA_ROUTES.map((channel) => <ChannelRoute key={channel.key} channel={channel} />)}
+                </div>
+              </details>
             </div>
           </div>
         </div>
 
-        <div className={styles.deliveryDemo}>
-          <div className={styles.deliveryChannel}>
-            <div><SignalGlyph size={48} /><span>Пример канала / утренняя выдача</span></div>
+        <div className={sceneStyles.outreachSequence} data-manual-outreach-boundary="true">
+          <div className={sceneStyles.outreachFacts}>
+            <span className={sceneStyles.groupLabel}>Сильная возможность найдена</span>
             <strong>{DEMO_COMPANY.name}</strong>
-            <p>{DEMO_COMPANY.signal}</p>
             <dl>
               <div><dt>Почему сейчас</dt><dd>{DEMO_COMPANY.whyNow}</dd></div>
-              <div><dt>Достоверность</dt><dd>{DEMO_COMPANY.confidence}</dd></div>
-              <div><dt>Следующий шаг</dt><dd>Открыть журнал доказательств и выбрать корпоративный путь контакта.</dd></div>
+              <div><dt>Угол разговора</dt><dd>Точечный подбор по сложным инженерным ролям и руководителям направления.</dd></div>
+              <div><dt>Корпоративный маршрут</dt><dd>Карьерная страница → контакты работодателя → рабочий канал компании.</dd></div>
             </dl>
           </div>
-          <aside className={styles.deliveryBoundary}>
-            <span>Граница автоматизации</span>
-            <strong>Обращение компаниям всегда отправляете вы.</strong>
-          </aside>
+          <div className={sceneStyles.outreachDraft}>
+            <div><SignalGlyph size={30} /><span>ЧЕРНОВИК / НЕ ОТПРАВЛЕНО</span></div>
+            <p>«Вижу, что вы расширяете инженерную функцию и повторно открыли несколько сложных ролей. Можем подключиться точечно к позициям, где внутренней команде нужен дополнительный поиск.»</p>
+            <strong>Вы проверяете факты и отправляете сами.</strong>
+          </div>
         </div>
+
+        <aside className={styles.deliveryBoundary}>
+          <span>Граница автоматизации</span>
+          <strong>Обращение компаниям всегда отправляете вы.</strong>
+        </aside>
       </div>
     </section>
   );
