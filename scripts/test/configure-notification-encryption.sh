@@ -65,6 +65,8 @@ grep -q '^PUBLIC_APP_ORIGIN=https://recruiter-radar.ru$' "$app_dir/.env"
 : > "$docker_log"
 run_configurator
 grep -q '^PUBLIC_APP_ORIGIN=https://recruiter-radar.ru$' "$app_dir/.env"
+grep -q '^RR_MCP_ENABLED=false$' "$app_dir/.env"
+grep -q '^RR_MCP_TOKEN=$' "$app_dir/.env"
 config_line="$(grep -n ' config$' "$docker_log" | cut -d: -f1)"
 up_line="$(grep -n ' up -d --force-recreate web$' "$docker_log" | cut -d: -f1)"
 port_line="$(grep -n ' port web 3000$' "$docker_log" | cut -d: -f1)"
@@ -153,5 +155,29 @@ if run_configurator --preflight; then
 fi
 test ! -s "$docker_log"
 
+write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru"
+: > "$docker_log"
+if RR_MCP_ENABLED=true run_configurator --preflight; then
+  echo "Enabled MCP without a token unexpectedly passed" >&2
+  exit 1
+fi
+test ! -s "$docker_log"
+
+write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru"
+: > "$docker_log"
+RR_MCP_ENABLED=true \
+RR_MCP_TOKEN="0123456789abcdef0123456789abcdef0123456789abcdef" \
+  run_configurator --preflight
+grep -q ' config$' "$docker_log"
+
+write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru"
+: > "$docker_log"
+if RR_MCP_ENABLED=yes RR_MCP_TOKEN="0123456789abcdef0123456789abcdef" \
+  run_configurator --preflight; then
+  echo "Non-boolean RR_MCP_ENABLED unexpectedly passed" >&2
+  exit 1
+fi
+test ! -s "$docker_log"
+
 printf '%s\n' \
-  '{"ok":true,"composeOrder":["config","up","runtime-validation"],"preflightFailureMutatedContainer":false,"prerequisites":["LANDING_ANALYTICS_RATE_LIMIT_SALT","PUBLIC_APP_ORIGIN","NOTIFICATION_ENCRYPTION_KEY"]}'
+  '{"ok":true,"composeOrder":["config","up","runtime-validation"],"preflightFailureMutatedContainer":false,"prerequisites":["LANDING_ANALYTICS_RATE_LIMIT_SALT","PUBLIC_APP_ORIGIN","NOTIFICATION_ENCRYPTION_KEY"],"operatorMcp":{"default":"disabled","enabledRequiresToken":true}}'
