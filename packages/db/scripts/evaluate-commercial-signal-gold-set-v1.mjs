@@ -12,19 +12,27 @@ import {
   summarizeReviews,
   toEvaluationV2Rows,
 } from './lib/commercial-signal-gold-set-v1.mjs'
+import {
+  summarizeIndependentReviewerAgreement,
+  validateHumanReviewHistory,
+  validateManifestContractFingerprint,
+} from './lib/commercial-signal-gold-review-v1.mjs'
 
 const args = process.argv.slice(2)
 const datasetPaths = multi('--dataset')
 if (!datasetPaths.length) throw new TypeError('At least one --dataset is required.')
 const evaluationAt = timestamp(required('--evaluation-at'))
 const datasets = await Promise.all(datasetPaths.map(async (file) =>
-  parseDatasetJsonl(await fs.readFile(file, 'utf8'))))
+  validateHumanReviewHistory(validateManifestContractFingerprint(
+    parseDatasetJsonl(await fs.readFile(file, 'utf8')),
+  ))))
 const rows = datasets.flatMap(toEvaluationV2Rows)
 const sampleIds = rows.map((row) => row.sampleKey)
 if (new Set(sampleIds).size !== sampleIds.length) {
   throw new Error('The same frozen sample cannot appear in more than one evaluated dataset revision.')
 }
 const review = summarizeReviews(datasets)
+const reviewerAgreement = summarizeIndependentReviewerAgreement(datasets)
 const evaluator = evaluateCommercialSignalV2(rows, {
   provenance: 'anonymized_real',
   evaluationAt,
@@ -53,10 +61,12 @@ const report = {
     datasetRevision:dataset.manifest.datasetRevision,
     labelRevision:dataset.manifest.labelRevision,
     frozenFingerprint:dataset.manifest.frozenFingerprint,
+    contractFingerprint:dataset.manifest.contractFingerprint,
     sampleCount:dataset.manifest.sampleCount,
     agencyProfileKey:dataset.manifest.agencyProfileKey,
   })),
   review,
+  reviewerAgreement,
   rankingQuality: {
     opportunityV3: evaluator.models.opportunity_v3,
     qualityEngineV2: evaluator.models.quality_engine_v2,
