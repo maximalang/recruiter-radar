@@ -113,14 +113,9 @@ const TOOL_DEFINITIONS = [
   },
 ] as const
 
-type JsonRpcId = string | number | null
+const TOOL_NAMES = new Set(TOOL_DEFINITIONS.map((tool) => tool.name))
 
-type JsonRpcRequest = {
-  jsonrpc?: unknown
-  id?: JsonRpcId
-  method?: unknown
-  params?: unknown
-}
+type JsonRpcId = string | number | null
 
 type RpcOutcome = {
   status: number
@@ -175,7 +170,7 @@ export function validateModernMcpHeaders(
   protocolVersion: string | null,
   methodHeader: string | null,
   nameHeader: string | null,
-  body: JsonRpcRequest,
+  body: Record<string, unknown>,
 ): string | null {
   if (protocolVersion !== OPERATOR_MCP_PROTOCOL_VERSION) return null
   if (typeof body.method !== 'string') return 'JSON-RPC method is required'
@@ -193,18 +188,23 @@ export function validateModernMcpHeaders(
 }
 
 export async function handleOperatorMcpRequest(
-  request: JsonRpcRequest,
+  request: Record<string, unknown>,
   protocolHeader: string | null,
 ): Promise<RpcOutcome> {
+  const id = jsonRpcId(request.id)
   if (request.jsonrpc !== '2.0' || typeof request.method !== 'string') {
-    return rpcError(request.id ?? null, -32600, 'Invalid Request', 400)
+    return rpcError(id, -32600, 'Invalid Request', 400)
   }
 
   const currentProtocol = protocolHeader === OPERATOR_MCP_PROTOCOL_VERSION
 
+  if (currentProtocol && request.method === 'initialize') {
+    return rpcError(id, -32601, 'Method not found', 404)
+  }
+
   switch (request.method) {
     case 'server/discover':
-      return rpcResult(request.id ?? null, {
+      return rpcResult(id, {
         resultType: 'complete',
         supportedVersions: [OPERATOR_MCP_PROTOCOL_VERSION, OPERATOR_MCP_LEGACY_PROTOCOL_VERSION],
         capabilities: { tools: {} },
@@ -229,7 +229,7 @@ export async function handleOperatorMcpRequest(
           ? requestedVersion
           : OPERATOR_MCP_LEGACY_PROTOCOL_VERSION
 
-      return rpcResult(request.id ?? null, {
+      return rpcResult(id, {
         protocolVersion: negotiatedVersion,
         capabilities: { tools: { listChanged: false } },
         serverInfo: {
@@ -246,10 +246,10 @@ export async function handleOperatorMcpRequest(
       return { status: 202, body: null }
 
     case 'ping':
-      return rpcResult(request.id ?? null, {})
+      return rpcResult(id, {})
 
     case 'tools/list':
-      return rpcResult(request.id ?? null, {
+      return rpcResult(id, {
         tools: getOperatorMcpTools(),
         ...(currentProtocol ? { ttlMs: 300_000, cacheScope: 'private' } : {}),
       })
@@ -257,20 +257,20 @@ export async function handleOperatorMcpRequest(
     case 'tools/call': {
       const params = asObject(request.params)
       const name = typeof params.name === 'string' ? params.name : ''
-      const args = asObject(params.arguments)
-      if (!name) return rpcError(request.id ?? null, -32602, 'Tool name is required', 400)
+      if (!name) return rpcError(id, -32602, 'Tool name is required', 400)
+      if (!TOOL_NAMES.has(name as (typeof TOOL_DEFINITIONS)[number]['name'])) {
+        return rpcError(id, -32602, 'Unknown tool', 400)
+      }
+      if (params.arguments !== undefined && !isObject(params.arguments)) {
+        return rpcError(id, -32602, 'Tool arguments must be an object', 400)
+      }
 
-      const toolResult = await callOperatorTool(name, args)
-      return rpcResult(request.id ?? null, toolResult)
+      const toolResult = await callOperatorTool(name, asObject(params.arguments))
+      return rpcResult(id, toolResult)
     }
 
     default:
-      return rpcError(
-        request.id ?? null,
-        -32601,
-        'Method not found',
-        currentProtocol ? 404 : 200,
-      )
+      return rpcError(id, -32601, 'Method not found', currentProtocol ? 404 : 200)
   }
 }
 
@@ -292,7 +292,7 @@ async function callOperatorTool(
       case 'list_quality_review_targets':
         return toolSuccess(await listQualityReviewTargets(args))
       default:
-        return toolFailure('Unknown tool')
+        return toolFailure('unknown_tool')
     }
   } catch (error) {
     const code = error instanceof OperatorInputError ? 'invalid_arguments' : 'operator_query_failed'
@@ -347,34 +347,40 @@ async function getDatabaseState() {
         NOW()::TEXT AS "serverTime"
     `)
 
-    const migrations = await client.query<{
-      migrationTablePresent: boolean
-      migrationCount: string
-      latestMigration: string | null
-      latestAppliedAt: string | null
-    }>(`
-      SELECT
-        TO_REGCLASS('public.schema_migrations') IS NOT NULL AS "migrationTablePresent",
-        CASE
-          WHEN TO_REGCLASS('public.schema_migrations') IS NULL THEN '0'
-          ELSE (SELECT COUNT(*)::TEXT FROM schema_migrations)
-        END AS "migrationCount",
-        CASE
-          WHEN TO_REGCLASS('public.schema_migrations') IS NULL THEN NULL
-          ELSE (SELECT MAX(version) FROM schema_migrations)
-        END AS "latestMigration",
-        CASE
-          WHEN TO_REGCLASS('public.schema_migrations') IS NULL THEN NULL
-          ELSE (SELECT MAX(applied_at)::TEXT FROM schema_migrations)
-        END AS "latestAppliedAt"
+    const migrationPresence = await client.query<{ present: boolean }>(`
+      SELECT TO_REGCLASS('public.schema_migrations') IS NOT NULL AS present
     `)
+
+    let migrationCount = 0
+    let latestMigration: string | null = null
+    let latestAppliedAt: string | null = null
+    const migrationTablePresent = migrationPresence.rows[0]?.present === true
+
+    if (migrationTablePresent) {
+      const migrationState = await client.query<{
+        migrationCount: string
+        latestMigration: string | null
+        latestAppliedAt: string | null
+      }>(`
+        SELECT
+          COUNT(*)::TEXT AS "migrationCount",
+          MAX(version) AS "latestMigration",
+          MAX(applied_at)::TEXT AS "latestAppliedAt"
+        FROM schema_migrations
+      `)
+      migrationCount = Number(migrationState.rows[0]?.migrationCount ?? 0)
+      latestMigration = migrationState.rows[0]?.latestMigration ?? null
+      latestAppliedAt = migrationState.rows[0]?.latestAppliedAt ?? null
+    }
 
     return {
       connectivity: 'ok',
       transactionMode: 'read_only',
       ...database.rows[0],
-      ...migrations.rows[0],
-      migrationCount: Number(migrations.rows[0]?.migrationCount ?? 0),
+      migrationTablePresent,
+      migrationCount,
+      latestMigration,
+      latestAppliedAt,
     }
   })
 }
@@ -396,7 +402,7 @@ async function getQualityValidationState() {
     if (!tables?.snapshots || !tables.evidence || !tables.lineage) {
       return {
         qualitySchemaPresent: false,
-        tables,
+        tables: tables ?? { snapshots: false, evidence: false, lineage: false },
         contractTested: true,
         readyForHumanLabeling: false,
         humanReviewed: false,
@@ -456,9 +462,12 @@ async function getQualityValidationState() {
 }
 
 async function listQualityReviewTargets(args: Record<string, unknown>) {
-  const days = boundedInteger(args.days, 30, 1, 90, 'days')
-  const minSamples = boundedInteger(args.minSamples, 5, 1, 500, 'minSamples')
-  const limit = boundedInteger(args.limit, 20, 1, 50, 'limit')
+  const days = boundedInteger(args.days, 30, 1, 90)
+  const minSamples = boundedInteger(args.minSamples, 5, 1, 500)
+  const limit = boundedInteger(args.limit, 20, 1, 50)
+
+  const allowed = new Set(['days', 'minSamples', 'limit'])
+  if (Object.keys(args).some((key) => !allowed.has(key))) throw new OperatorInputError()
 
   return withReadOnlyClient(async (client) => {
     const result = await client.query<{
@@ -554,10 +563,18 @@ function rpcError(id: JsonRpcId, code: number, message: string, status: number):
   return { status, body: { jsonrpc: '2.0', id, error: { code, message } } }
 }
 
+function jsonRpcId(value: unknown): JsonRpcId {
+  return typeof value === 'string' || typeof value === 'number' || value === null
+    ? value
+    : null
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
 function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
+  return isObject(value) ? value : {}
 }
 
 function assertNoArguments(args: Record<string, unknown>) {
@@ -569,10 +586,14 @@ function boundedInteger(
   fallback: number,
   minimum: number,
   maximum: number,
-  _name: string,
 ): number {
   if (value === undefined) return fallback
-  if (!Number.isInteger(value) || typeof value !== 'number' || value < minimum || value > maximum) {
+  if (
+    typeof value !== 'number' ||
+    !Number.isInteger(value) ||
+    value < minimum ||
+    value > maximum
+  ) {
     throw new OperatorInputError()
   }
   return value
