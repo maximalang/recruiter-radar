@@ -202,6 +202,11 @@
   to { opacity: .42; }
 }
 
+@keyframes fieldRevealTablet {
+  from { opacity: 0; }
+  to { opacity: .26; }
+}
+
 @keyframes ambientPulse {
   0%, 100% { opacity: .72; box-shadow: 0 0 0 7px rgba(191, 220, 145, .07), 0 0 28px rgba(191, 220, 145, .2); }
   50% { opacity: 1; box-shadow: 0 0 0 9px rgba(191, 220, 145, .09), 0 0 42px rgba(191, 220, 145, .32); }
@@ -229,6 +234,7 @@
     height: auto;
     overflow: hidden;
     opacity: .26;
+    animation-name: fieldRevealTablet;
   }
 }
 
