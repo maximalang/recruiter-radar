@@ -128,7 +128,7 @@ async function assertRequiredSurface(page, label) {
   assert.match(pricingText, /2 990 ₽/);
   assert.match(pricingText, /6 990 ₽/);
   assert.match(await page.locator("#faq").innerText(), /Перед запуском — короткие ответы/i);
-  await page.getByRole("heading", { name: /Соберите радар под специализацию агентства/ }).waitFor();
+  await page.getByRole("heading", { name: /Проверьте, кому стоит написать сейчас/ }).waitFor();
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor();
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor();
 }
@@ -631,7 +631,7 @@ async function assertNoJs(browser) {
   assert.match(noJsPricingText, /Начните с недели\. Продолжайте только если радар полезен/i);
   assert.match(noJsPricingText, /990 ₽/);
   assert.ok(await page.locator("#faq summary").count() >= 1, "no-JS FAQ question missing");
-  await page.getByRole("heading", { name: /Соберите радар под специализацию агентства/ }).waitFor({ state: "attached" });
+  await page.getByRole("heading", { name: /Проверьте, кому стоит написать сейчас/ }).waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor({ state: "attached" });
   const followsResults = await page.evaluate(() => {
