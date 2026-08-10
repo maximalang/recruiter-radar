@@ -12,6 +12,7 @@ import LandingMotion from "./landing-motion";
 import motionStyles from "./landing-motion.module.css";
 import styles from "./landing.module.css";
 import visualStyles from "./landing-visual-system.module.css";
+import SignalTimelineScene from "./signal-timeline-scene";
 import WorkspaceScene from "./workspace-scene";
 
 export function LandingSkipLink() {
@@ -35,6 +36,7 @@ export default function LandingPage(props: {
       <LandingHeader previewHref="#preview-configurator" />
       <main id="main-content">
         <DetectionScene previewHref="#preview-configurator" paymentConfigured={props.paymentConfigured} />
+        <SignalTimelineScene />
         <WorkspaceScene
           previewInput={props.previewInput}
           hasPreview={props.hasPreview}
