@@ -53,24 +53,24 @@
 
 - PR #176 (`d67f2e32a4ca5ad823a700e11d8388e89af4ef10`) безопасно интегрировал Quality v2 correctness на актуальный `main`: exact evidence/model lineage, negative evidence, friction, archetypes, convergence, propensity, outcome learning, feature capabilities/coverage, Company Events semantics, Query Planner feedback contracts и Opportunity Scoring correctness из старых веток.
 - PR #177 (`01f459ee31d1a58d15c29a98fd956a900dc1e11e`) изолировал `user_search_preferences` по `(workspace_id, user_id, source)`, ввёл namespace `planner:<source>` и отделил tenant planner preferences от shared ingestion.
+- PR #178 (`f3d8868b9f186330e06df001234c4e130a8dac91`) добавил Stage 2 human-validation contour: frozen `commercial-signal-gold-set-v1`, deterministic scoped sampling/export, strict model-blind review package, append-only human review revisions/adjudication, manifest tamper protection и адаптер в существующий evaluation-v2.
 - `COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED` и `COMMERCIAL_SIGNAL_QUALITY_V2_PLANNER_FEEDBACK_ENABLED` остаются exact-`true`, default-dark. Наличие кода не означает включение reader, production-wide Quality writes или canary.
-- Evaluation v2 уже проверяет P@5, P@10, NDCG@10, exact model lineage, temporal cutoffs, future-evidence/outcome rejection, feature coverage/unknowns, ranking changes и false-positive/false-negative taxonomy. Synthetic fixtures подтверждают contracts, а не рыночное качество.
-- Stage 2 добавляет offline/read-only `commercial-signal-gold-set-v1`: deterministic scoped sampling, frozen v3+Quality outputs, model-blind review package, append-only human review revisions и адаптер в существующий evaluation-v2. Runtime DB schema ради этого не изменяется.
-- Human labels не создаются моделью и не выводятся из model output. Без реального independent human review нельзя заявлять `QUALITY_VALIDATED`.
+- Evaluation v2 проверяет P@5, P@10, NDCG@10, exact model lineage, temporal cutoffs, future-evidence/outcome rejection, feature coverage/unknowns, ranking changes и false-positive/false-negative taxonomy. Synthetic fixtures подтверждают contracts, а не рыночное качество.
+- Stage 2 tooling offline/read-only и не меняет runtime DB schema. Human labels не создаются моделью и не выводятся из model output.
 
 ### Quality evidence state
 
-- `CODE_VERIFIED`: Quality v2 integration и Search Preferences Isolation находятся в `main`; Stage 2 contract/tooling должен пройти свой CI перед merge.
-- `QUALITY_VALIDATED`: **нет** — достаточного frozen human-reviewed gold set пока не подтверждено.
+- `CODE_VERIFIED`: **да** — #176, #177 и #178 находятся в `main`; exact-head CI #178 прошёл, включая Tests, Commercial Signal/Evidence Radar contracts, full Jest, PostgreSQL runtime/rollback, production acceptance, web build, responsive Playwright и Docker/Caddy smoke.
+- `QUALITY_VALIDATED`: **нет** — достаточного frozen human-reviewed validation/temporal holdout пока не подтверждено.
 - `DEPLOYED`: **не подтверждено** — deployed SHA и production flags в рамках этого snapshot не проверялись.
 - `LIVE_VERIFIED`: **нет подтверждения** — real production source/provider/runtime behavior требует отдельной live проверки.
 
-Stage 2 operational states намеренно разделены:
+Stage 2 operational states:
 
-- `CONTRACT_TESTED` — synthetic/contract tests прошли;
-- `READY_FOR_HUMAN_LABELING` — exporter/reviewer/import/evaluator готовы;
-- `HUMAN_REVIEWED` — существуют реальные human labels;
-- `QUALITY_VALIDATED` — есть достаточный frozen human-reviewed validation/temporal holdout и отдельное evidence-backed решение.
+- `CONTRACT_TESTED`: **да** — exact-head Stage 2 contracts прошли CI;
+- `READY_FOR_HUMAN_LABELING`: **да** — exporter/reviewer/import/evaluator готовы;
+- `HUMAN_REVIEWED`: **нет подтверждения** — реальные human labels не создавались текущей реализацией;
+- `QUALITY_VALIDATED`: **нет** — нужен достаточный frozen human-reviewed validation/temporal holdout и отдельное evidence-backed решение.
 
 Ни один arbitrary sample count не является автоматическим production gate. Подробный workflow: `docs/commercial-signal-human-validation-v1.md`.
 
@@ -105,7 +105,8 @@ Promotion разрешается только registry policy и live verifier. 
 
 - Production-readiness изменения PR #174 объединены в `main`: merge SHA `9e1231521c80a78687d17d49278a9d15a78fb6ad`.
 - Quality v2 correctness PR #176 объединён: merge SHA `d67f2e32a4ca5ad823a700e11d8388e89af4ef10`.
-- Search Preferences Isolation PR #177 объединён и является подтверждённым HEAD на начало Stage 2: `01f459ee31d1a58d15c29a98fd956a900dc1e11e`.
+- Search Preferences Isolation PR #177 объединён: merge SHA `01f459ee31d1a58d15c29a98fd956a900dc1e11e`.
+- Human-reviewed quality validation infrastructure PR #178 объединён: merge SHA `f3d8868b9f186330e06df001234c4e130a8dac91`.
 - Текущий deployed SHA, production env flags, credentials, provider availability, migrations и live health в рамках этого snapshot не проверены.
 - Поэтому текущая production формулировка: **code merged/verified where stated; production rollout not authorized; real Commercial Signal quality not validated by human-reviewed data**.
 
@@ -127,7 +128,7 @@ npm run test:types --workspace @recruiter-radar/web
 npm test --workspace @recruiter-radar/web -- --runInBand
 npm run db:validate
 npm run test:commercial-signal:evaluation-v2
-node --test packages/db/scripts/lib/commercial-signal-gold-set-v1.test.mjs
+node --test packages/db/scripts/lib/commercial-signal-gold-set-v1.test.mjs packages/db/scripts/lib/commercial-signal-gold-set-export-v1.test.mjs
 npm run test:production:acceptance
 npm run test:workspace-billing:db
 npm run test:landing:e2e
