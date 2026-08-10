@@ -75,6 +75,7 @@ jobs:
           npm run test:commercial-signal:evaluation
           npm run test:commercial-signal:evaluation-v2
           node --test packages/db/scripts/lib/commercial-signal-baseline-metrics.test.mjs
+          node --test packages/db/scripts/lib/commercial-signal-gold-set-v1.test.mjs
           npm run test:commercial-signal:canary
           npm run test:commercial-signal:evaluation:db
           npm run test:commercial-signal:contracts
