@@ -79,6 +79,18 @@ async function recordChannelFailure(input: {
   })
 }
 
+function recordDeliveryFailure(
+  counters: DeliveryCounters,
+  clientProfileId: string,
+  channel: string,
+): void {
+  counters.failed += 1
+  counters.failures.push({
+    digestCandidateId: 0,
+    error: `${clientProfileId}: ${channel} delivery failed`,
+  })
+}
+
 /**
  * Deliver all A/B-gated candidates for a digest run.
  *
@@ -86,7 +98,9 @@ async function recordChannelFailure(input: {
  * The legacy shared bot is used when there is no active customer endpoint, or when
  * a custom dispatch fails before sending anything. A partial custom delivery never
  * falls back because that would duplicate messages for already-successful endpoints.
- * VK and signed webhook delivery are additive and best-effort, like email and push.
+ * VK and signed webhook delivery are additive and best-effort. Their failures do not
+ * abort the remaining channels, but they are reflected in the returned counters so
+ * callers cannot report a fully successful daily run when an enabled channel failed.
  *
  * AI enrichment runs FIRST, before any delivery: it populates
  * `digest_candidates.ai_enrichment` for weak career pages so the
@@ -244,6 +258,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
             pruned: pushResult.result.pruned,
           },
         })
+        counters.sent += 1
       } else if (pushResult.delivered && pushResult.result.failed > 0) {
         await recordChannelFailure({
           runId,
@@ -256,10 +271,12 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
             pruned: pushResult.result.pruned,
           },
         })
+        recordDeliveryFailure(counters, clientProfileId, 'web_push')
       }
     } catch (error) {
       logError('webpush.notify_run_failed', error, { runId, clientProfileId })
       await recordChannelFailure({ runId, clientProfileId, provider: 'web_push', reason: 'exception' })
+      recordDeliveryFailure(counters, clientProfileId, 'web_push')
     }
 
     try {
@@ -271,12 +288,15 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
           provider: 'email',
           metadata: { leadCount: emailResult.leadCount },
         })
+        counters.sent += 1
       } else if (emailResult.reason === 'send_failed') {
         await recordChannelFailure({ runId, clientProfileId, provider: 'email', reason: emailResult.reason })
+        recordDeliveryFailure(counters, clientProfileId, 'email')
       }
     } catch (error) {
       logError('email.digest_send_exception', error, { runId, clientProfileId })
       await recordChannelFailure({ runId, clientProfileId, provider: 'email', reason: 'exception' })
+      recordDeliveryFailure(counters, clientProfileId, 'email')
     }
 
     try {
@@ -285,7 +305,14 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
         clientProfileId,
         providers: ['vk', 'webhook'],
       })
+      counters.sent += additional.sent
+      counters.skipped += additional.skipped
       if (additional.failed > 0) {
+        counters.failed += additional.failed
+        counters.failures.push({
+          digestCandidateId: 0,
+          error: `${clientProfileId}: additional notification delivery failed (${additional.failed})`,
+        })
         logError('notifications.additional_delivery_failed', new Error(additional.errors.join('; ')), {
           runId,
           clientProfileId,
@@ -293,6 +320,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
         })
       }
     } catch (error) {
+      recordDeliveryFailure(counters, clientProfileId, 'additional notification')
       logError('notifications.additional_delivery_exception', error, { runId, clientProfileId })
     }
   }
