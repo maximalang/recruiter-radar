@@ -70,6 +70,7 @@ export default function DeliveryScene() {
       className={`${styles.scene} ${styles.lightScene} ${styles.deliveryScene}`}
       aria-labelledby="delivery-title"
       data-header-tone="light"
+      data-motion-reveal="section"
     >
       <div className={styles.deliveryLayout}>
         <div className={styles.deliveryIntro}>
