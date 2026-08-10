@@ -150,7 +150,7 @@ describe('deliverCandidatesForRun (batch)', () => {
     expect(result).toMatchObject({ ok: true, sent: 0, failed: 0, skipped: 1 })
   })
 
-  it('records email and web-push telemetry only after an actual provider success', async () => {
+  it('records email and web-push telemetry and counts actual provider successes', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
     pool.query.mockResolvedValueOnce({
@@ -172,8 +172,9 @@ describe('deliverCandidatesForRun (batch)', () => {
     })
     mockEmail.mockResolvedValueOnce({ delivered: true, leadCount: 2 })
 
-    await deliverCandidatesForRun('run-multi')
+    const result = await deliverCandidatesForRun('run-multi')
 
+    expect(result).toMatchObject({ ok: true, sent: 2, failed: 0, skipped: 1 })
     expect(mockTelemetry).toHaveBeenCalledWith(expect.objectContaining({
       eventName: 'digest_delivered',
       provider: 'web_push',
@@ -187,7 +188,7 @@ describe('deliverCandidatesForRun (batch)', () => {
     expect(mockTelemetry).toHaveBeenCalledTimes(4)
   })
 
-  it('records a failed additive provider without exposing its raw error', async () => {
+  it('makes the run partial when an enabled additive provider fails without exposing its raw error', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
     pool.query.mockResolvedValueOnce({
@@ -205,14 +206,51 @@ describe('deliverCandidatesForRun (batch)', () => {
     pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
     mockEmail.mockResolvedValueOnce({ delivered: false, reason: 'send_failed' })
 
-    await deliverCandidatesForRun('run-email-fail')
+    const result = await deliverCandidatesForRun('run-email-fail')
 
+    expect(result).toMatchObject({ ok: false, failed: 1, skipped: 1 })
+    expect(result.failures).toEqual([{
+      digestCandidateId: 0,
+      error: 'cp-email: email delivery failed',
+    }])
     expect(mockTelemetry).toHaveBeenCalledWith(expect.objectContaining({
       eventName: 'delivery_failed',
       provider: 'email',
       outcome: 'send_failed',
     }))
     expect(JSON.stringify(mockTelemetry.mock.calls)).not.toContain('SMTP')
+  })
+
+  it('makes the run partial when a configured VK/webhook endpoint fails', async () => {
+    const pool = makeMockPool()
+    mockGetPool.mockReturnValue(pool)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ client_profile_id: 'cp-webhook', candidate_count: 1, anchor_candidate_id: '575' }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 574, status: 'processing', ownsClaim: true }],
+      rowCount: 1,
+    } as never)
+    mockSendBatch.mockResolvedValueOnce({
+      ok: false,
+      error: 'Client profile has no linked Telegram chat.',
+    })
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
+    mockDispatch.mockResolvedValueOnce({
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+      errors: ['provider secret should stay internal'],
+    })
+
+    const result = await deliverCandidatesForRun('run-webhook-fail')
+
+    expect(result).toMatchObject({ ok: false, sent: 0, failed: 1, skipped: 1 })
+    expect(result.failures[0]?.error).toBe(
+      'cp-webhook: additional notification delivery failed (1)',
+    )
+    expect(JSON.stringify(result.failures)).not.toContain('provider secret')
   })
 
   it('produces no batch when there are no A/B candidates', async () => {
