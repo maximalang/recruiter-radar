@@ -11,6 +11,7 @@ import {
 } from "../../lib/publicProduct";
 import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
 import panelStyles from "./conversion-panel.module.css";
+import finalStyles from "./final-radar.module.css";
 import styles from "./landing.module.css";
 
 export default function ConversionPanel(props: {
@@ -138,14 +139,14 @@ export default function ConversionPanel(props: {
           <li>Доказательства по каждой возможности</li>
           <li>Обращения отправляете только вы</li>
         </ul>
-        <div className={panelStyles.finalRadar} data-final-radar-composition="signal-lock" aria-hidden="true">
-          <i className={panelStyles.finalArc} />
-          <i className={panelStyles.finalArc} />
-          <span className={panelStyles.finalCluster}><i /><i /><i /></span>
-          <span className={panelStyles.finalCluster}><i /><i /></span>
-          <span className={panelStyles.finalCluster}><i /><i /><i /></span>
-          <span className={panelStyles.finalActiveCluster}><i /><i /><i /><i /></span>
-          <span className={panelStyles.finalAnnotation}><strong>сильный повод</strong><small>3 подтверждения · сегодня</small></span>
+        <div className={finalStyles.radar} data-final-radar-composition="signal-lock" aria-hidden="true">
+          <i className={finalStyles.arc} />
+          <i className={finalStyles.arc} />
+          <span className={finalStyles.cluster}><i /><i /><i /></span>
+          <span className={finalStyles.cluster}><i /><i /></span>
+          <span className={finalStyles.cluster}><i /><i /><i /></span>
+          <span className={finalStyles.activeCluster}><i /><i /><i /><i /></span>
+          <span className={finalStyles.annotation}><strong>сильный повод</strong><small>3 подтверждения · сегодня</small></span>
         </div>
         <div className={styles.finalActions}>
           <Link
