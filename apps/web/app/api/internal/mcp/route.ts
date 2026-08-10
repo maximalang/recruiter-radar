@@ -12,6 +12,7 @@ import {
 } from '../../../../lib/operator-mcp'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 const JSON_HEADERS = {
   'Cache-Control': 'no-store',
@@ -142,6 +143,14 @@ export async function POST(request: Request) {
       status: outcome.status,
       headers: JSON_HEADERS,
     })
+  }
+
+  if (protocolHeader === OPERATOR_MCP_PROTOCOL_VERSION) {
+    const result = outcome.body.result
+    if (result && typeof result === 'object' && !Array.isArray(result)) {
+      const resultRecord = result as Record<string, unknown>
+      if (typeof resultRecord.resultType !== 'string') resultRecord.resultType = 'complete'
+    }
   }
 
   return NextResponse.json(outcome.body, {
