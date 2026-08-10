@@ -13,6 +13,13 @@ import {
   summarizeReviews,
   toEvaluationV2Rows,
 } from './commercial-signal-gold-set-v1.mjs'
+import {
+  attachManifestContractFingerprint,
+  buildStrictBlindReviewPackage,
+  summarizeIndependentReviewerAgreement,
+  validateHumanReviewHistory,
+  validateManifestContractFingerprint,
+} from './commercial-signal-gold-review-v1.mjs'
 
 const KEY = 'gold-set-contract-key-'.padEnd(40, 'x')
 const OPTIONS = {
@@ -106,6 +113,19 @@ test('blind package hides scores, ranks, statuses and sampling buckets', () => {
   assertNoPii(blind)
 })
 
+test('strict blind package removes company-revealing URL/domain and exposes neutral why-now facts', () => {
+  const blind = buildStrictBlindReviewPackage(dataset())
+  const text = JSON.stringify(blind)
+  assert.equal(text.includes('canonicalUrl'), false)
+  assert.equal(text.includes('sourceDomain'), false)
+  assert.equal(text.includes('qualityObservationStates'), false)
+  assert.equal(blind.rows[0].facts.whyNowFacts.latestEvidenceAt, '2026-08-04T00:00:00.000Z')
+  assert.deepEqual(blind.rows[0].facts.observationStates, {
+    hiringFriction: 'observed', marketDifficulty: 'unknown',
+  })
+  assertNoPii(blind)
+})
+
 test('tenant/profile isolation fails closed', () => {
   assert.throws(() => dataset([raw(1), raw(2, { profileId: '21' })]), /outside requested tenant\/profile scope/)
 })
@@ -144,6 +164,19 @@ test('review revisions are append-only and corrections require reason', () => {
   )
 })
 
+test('review revisions cannot move their audit timestamp backwards', () => {
+  const base = dataset(); const id = base.rows[0].sampleId
+  const r1 = applyHumanReviews(base, [review(id, 'reviewer-a', {
+    reviewedAt: '2026-08-10T12:00:00.000Z',
+  })])
+  const r2 = applyHumanReviews(r1, [review(id, 'reviewer-a', {
+    revision: 2,
+    revisionReason: 'rechecked evidence',
+    reviewedAt: '2026-08-10T11:00:00.000Z',
+  })])
+  assert.throws(() => validateHumanReviewHistory(r2), /timestamp moves backwards/)
+})
+
 test('double-review disagreement requires adjudication', () => {
   const base = dataset(); const id = base.rows[0].sampleId
   const a = applyHumanReviews(base, [review(id, 'reviewer-a')])
@@ -156,6 +189,24 @@ test('double-review disagreement requires adjudication', () => {
     reviewLabel: 'acceptable', adjudication: true,
   })])
   assert.equal(resolveGoldReviewState(c.rows.find((row) => row.sampleId === id)).resolution, 'adjudicated')
+  validateHumanReviewHistory(c)
+  assert.deepEqual(summarizeIndependentReviewerAgreement([c]), {
+    doubleReviewedCount: 1,
+    agreementCount: 0,
+    disagreementCount: 1,
+    adjudicatedDisagreementCount: 1,
+    unresolvedDisagreementCount: 0,
+    invalidAdjudicationCount: 0,
+    agreementRate: 0,
+  })
+})
+
+test('adjudication without independent disagreement is rejected', () => {
+  const base = dataset(); const id = base.rows[0].sampleId
+  const invalid = applyHumanReviews(base, [review(id, 'adjudicator', {
+    adjudication: true,
+  })])
+  assert.throws(() => validateHumanReviewHistory(invalid), /adjudication requires an actual independent reviewer disagreement/)
 })
 
 test('evaluation adapter preserves exact model lineage and only human label', () => {
@@ -176,6 +227,14 @@ test('JSONL remains frozen and label template has stable columns', () => {
   const reviewPackage = buildBlindReviewPackage(base)
   const lines = renderLabelTemplateCsv(reviewPackage).trimEnd().split('\n')
   assert.equal(lines[0].split(',').length, lines[1].split(',').length)
+})
+
+test('manifest contract fingerprint catches frozen scope/version tampering', () => {
+  const base = attachManifestContractFingerprint(dataset())
+  validateManifestContractFingerprint(base)
+  const tampered = structuredClone(base)
+  tampered.manifest.timeWindow.from = '2026-07-01T00:00:00.000Z'
+  assert.throws(() => validateManifestContractFingerprint(tampered), /contract fingerprint mismatch/)
 })
 
 test('small human-reviewed population stays insufficient_data', () => {
