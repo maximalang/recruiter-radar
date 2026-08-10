@@ -35,11 +35,12 @@ describe("landing final production contract", () => {
     expect(conversion).toContain('data-conversion-scenes="continuous"');
     expect(conversion).toContain('data-pricing-layout="unified-grid"');
     expect(conversion).toContain('data-faq-layout="editorial"');
-    expect(conversion).toContain("Проверьте радар на своих нишах за 7 дней.");
-    expect(conversion).toContain("Запустить пилот на 7 дней");
-    expect(conversion).toContain("После пилота — месяц или квартал");
-    expect(conversion).toContain("Без автопродления.");
-    expect(conversion).toContain("Продолжить на месяц");
+    expect(conversion).toContain("Начните с недели. Продолжайте только если радар полезен.");
+    expect(conversion).toContain("Проверьте на своих нишах не интерфейс, а сам результат");
+    expect(conversion).toContain("Запустить на 7 дней");
+    expect(conversion).toContain("Если радар подходит — продолжение дешевле");
+    expect(conversion).toContain("Разовая оплата · без автопродления");
+    expect(conversion).toContain("Подключить месяц");
     expect(conversion).toContain("Подключить квартал");
     expect(conversion).not.toContain("<span>{pilotPlan.cadence}</span>");
     expect(conversion).toContain("Перед запуском — короткие ответы.");
