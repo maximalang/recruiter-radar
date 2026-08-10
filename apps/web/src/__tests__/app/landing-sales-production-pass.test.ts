@@ -4,9 +4,14 @@ import { resolve } from "node:path";
 const WEB_ROOT = existsSync(resolve(process.cwd(), "app"))
   ? process.cwd()
   : resolve(process.cwd(), "apps/web");
+const REPO_ROOT = resolve(WEB_ROOT, "../..");
 
 function source(path: string) {
   return readFileSync(resolve(WEB_ROOT, path), "utf8");
+}
+
+function repoSource(path: string) {
+  return readFileSync(resolve(REPO_ROOT, path), "utf8");
 }
 
 describe("landing sales production pass", () => {
@@ -20,6 +25,15 @@ describe("landing sales production pass", () => {
     expect(pricing).toContain("amountMinor: 699000");
     expect(pricing.match(/isPrimary: true/g)).toHaveLength(1);
     expect(pricing.match(/isRecurring: false/g)).toHaveLength(4);
+  });
+
+  it("keeps the merchant runbook on the same public prices", () => {
+    const runbook = repoSource("docs/robokassa-production-checklist.md");
+    expect(runbook).toContain("| Неделя | 7 дней | 990 ₽ | Нет |");
+    expect(runbook).toContain("| Месяц | 30 дней | 2 990 ₽ | Нет |");
+    expect(runbook).toContain("| Квартал | 90 дней | 6 990 ₽ | Нет |");
+    expect(runbook).not.toContain("| Неделя | 7 дней | 2 990 ₽ | Нет |");
+    expect(runbook).not.toContain("| Месяц | 30 дней | 9 990 ₽ | Нет |");
   });
 
   it("focuses the preview on the latest visible lead instead of the first", () => {
