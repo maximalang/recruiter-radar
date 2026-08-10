@@ -254,9 +254,11 @@ export type NotifyNewLeadsResult =
  *
  * Run-level, not per-lead. Dedupe is atomic: a single
  * `lead_channel_deliveries` row keyed `(web_push, profile, run:<runId>)` is the
- * commit point — if INSERT ... ON CONFLICT DO NOTHING inserts, we own delivery;
- * if it does not, another worker already notified this run, so we bail. This is
- * the spam-guard: at most one push per run.
+ * claim point. The claim starts as `processing`; after provider delivery it is
+ * finalized as `sent`, `partial`, or `failed`. Only sent/partial rows receive a
+ * real `delivered_at`, so operator readiness cannot confuse a claim or failure
+ * with successful delivery. The unique claim remains the at-most-once spam
+ * guard for the run.
  *
  * Does NOT decide which leads count — the caller passes `count` (the A/B
  * candidates the digest pipeline already selected), so selection rules are not
@@ -298,8 +300,11 @@ export async function notifyNewLeadsForRun(input: {
   const dedupeKey = `run:${input.digestRunId}`;
   const claim = await pool.query<{ id: number }>(
     `
-    INSERT INTO lead_channel_deliveries (channel, client_profile_id, digest_run_id, dedupe_key, lead_count)
-    VALUES ('web_push', $1, $2, $3, $4)
+    INSERT INTO lead_channel_deliveries (
+      channel, client_profile_id, digest_run_id, dedupe_key, lead_count,
+      delivery_status, delivered_at
+    )
+    VALUES ('web_push', $1, $2, $3, $4, 'processing', NULL)
     ON CONFLICT (channel, client_profile_id, dedupe_key) DO NOTHING
     RETURNING id
     `,
@@ -309,8 +314,25 @@ export async function notifyNewLeadsForRun(input: {
   if (claim.rowCount !== 1) {
     return { delivered: false, reason: "already_sent" };
   }
+  const claimId = claim.rows[0]?.id;
+  if (!claimId) {
+    return { delivered: false, reason: "already_sent" };
+  }
 
   const payload = buildNewLeadsPushPayload({ count: input.count, url: input.url });
   const result = await sendWebPushToProfile({ clientProfileId: input.clientProfileId, payload });
+  const status = result.sent > 0
+    ? result.failed > 0 ? "partial" : "sent"
+    : "failed";
+  const finalized = await pool.query(
+    `UPDATE lead_channel_deliveries
+     SET delivery_status = $2,
+         delivered_at = CASE WHEN $3::BOOLEAN THEN NOW() ELSE NULL END
+     WHERE id = $1 AND delivery_status = 'processing'`,
+    [claimId, status, result.sent > 0],
+  );
+  if (finalized.rowCount !== 1) {
+    throw new Error("Web Push aggregate delivery state could not be finalized.");
+  }
   return { delivered: true, result };
 }

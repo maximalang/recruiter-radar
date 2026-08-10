@@ -40,6 +40,10 @@ describe("admin user detail", () => {
     const detail = await getAdminUserDetail("42", "9");
 
     expect(query).toHaveBeenCalledWith(expect.stringContaining("ws.id = $2::BIGINT"), ["42", "9"]);
+    const detailSql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(detailSql).toContain("delivery_status IN ('failed', 'partial')");
+    expect(detailSql).toContain("attempted_at AS error_at");
+    expect(detailSql).toContain("MAX(delivered_at)");
     expect(getEffectiveEntitlement).toHaveBeenCalledWith("7", { workspaceId: "9" });
     expect(listCheckoutOrdersForAccess).toHaveBeenCalledWith({ workspaceId: "9", entitlementOwnerId: "7", limit: 50 });
     expect(detail?.account.id).toBe("42");

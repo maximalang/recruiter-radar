@@ -373,16 +373,30 @@ const ADMIN_USER_DETAIL_SQL = `
         (SELECT MAX(delivered_at) FROM lead_channel_deliveries WHERE client_profile_id = profile.id),
         (SELECT MAX(last_delivery_at) FROM notification_endpoints WHERE client_profile_id = profile.id)
       )::TEXT AS "lastDeliveryAt",
-      endpoint.last_error_at::TEXT AS "lastDeliveryErrorAt",
-      endpoint.last_error_code AS "lastDeliveryErrorCode"
+      delivery_error.error_at::TEXT AS "lastDeliveryErrorAt",
+      delivery_error.error_code AS "lastDeliveryErrorCode"
     FROM (SELECT 1) AS seed
     LEFT JOIN LATERAL (
-      SELECT last_error_at, last_error_code
-      FROM notification_endpoints
-      WHERE client_profile_id = profile.id AND last_error_at IS NOT NULL
-      ORDER BY last_error_at DESC
+      SELECT error_at, error_code
+      FROM (
+        SELECT
+          attempted_at AS error_at,
+          channel || '_' || delivery_status AS error_code
+        FROM lead_channel_deliveries
+        WHERE client_profile_id = profile.id
+          AND delivery_status IN ('failed', 'partial')
+        UNION ALL
+        SELECT
+          last_error_at AS error_at,
+          last_error_code AS error_code
+        FROM notification_endpoints
+        WHERE client_profile_id = profile.id
+          AND last_error_at IS NOT NULL
+      ) AS delivery_errors
+      WHERE error_at IS NOT NULL
+      ORDER BY error_at DESC
       LIMIT 1
-    ) AS endpoint ON TRUE
+    ) AS delivery_error ON TRUE
   ) AS delivery ON profile.id IS NOT NULL
   LEFT JOIN LATERAL (
     SELECT

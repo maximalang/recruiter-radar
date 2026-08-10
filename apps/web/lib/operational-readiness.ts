@@ -94,7 +94,7 @@ export async function getOperationalReadinessReport(
             CASE WHEN cp.email_digest_enabled = true AND cp.digest_email IS NOT NULL THEN 'email' END,
             CASE WHEN cp.web_push_enabled = true AND EXISTS (
               SELECT 1 FROM web_push_subscriptions wps
-              WHERE wps.client_profile_id = cp.id AND wps.is_active = true
+              WHERE wps.client_profile_id = cp.id AND wps.revoked_at IS NULL
             ) THEN 'web_push' END,
             CASE WHEN EXISTS (
               SELECT 1
@@ -150,7 +150,7 @@ export async function getOperationalReadinessReport(
               cp.web_push_enabled = true
               AND EXISTS (
                 SELECT 1 FROM web_push_subscriptions wps
-                WHERE wps.client_profile_id = cp.id AND wps.is_active = true
+                WHERE wps.client_profile_id = cp.id AND wps.revoked_at IS NULL
               )
             )
             OR EXISTS (

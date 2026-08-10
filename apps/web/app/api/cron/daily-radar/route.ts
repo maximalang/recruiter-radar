@@ -158,7 +158,7 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
             SELECT 1
             FROM web_push_subscriptions wps
             WHERE wps.client_profile_id = client_profiles.id
-              AND wps.is_active = true
+              AND wps.revoked_at IS NULL
           )
         )
         OR EXISTS (

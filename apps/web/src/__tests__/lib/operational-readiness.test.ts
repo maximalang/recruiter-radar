@@ -36,6 +36,8 @@ describe('readiness SQL contract', () => {
     expect(source).toContain('telegram_chat_id IS NOT NULL')
     expect(source).toContain('email_digest_enabled = true')
     expect(source).toContain('web_push_subscriptions')
+    expect(source).toContain('wps.revoked_at IS NULL')
+    expect(source).not.toContain('wps.is_active')
     expect(source).toContain("npa.provider = 'telegram'")
     expect(source).toContain("npa.provider = 'vk'")
     expect(source).toContain("npa.provider = 'webhook'")
