@@ -122,10 +122,11 @@ describe('sendDigestEmailForProfile', () => {
     expect(mockSendEmail).not.toHaveBeenCalled()
   })
 
-  it('claims dedupe BEFORE sending, then sends, on the happy path', async () => {
+  it('claims before sending and records delivered_at only after provider success', async () => {
     const { pool, query } = makeMockPool([
       { rows: [PREFS_ROW], rowCount: 1 }, // prefs
       { rows: [{ id: 1 }], rowCount: 1 }, // dedupe claim wins
+      { rows: [], rowCount: 1 }, // finalize sent
     ])
     mockGetPool.mockReturnValue(pool)
     mockGetLeads.mockResolvedValue({ leads: [makeLead(), makeLead({ id: 'l2' })], total: 2 })
@@ -138,11 +139,12 @@ describe('sendDigestEmailForProfile', () => {
 
     expect(res).toEqual({ delivered: true, leadCount: 2 })
 
-    // Claim is the 2nd query; it must run before sendEmail.
     const claimCall = query.mock.calls[1]
     const claimSql = String(claimCall[0])
     expect(claimSql).toContain('lead_channel_deliveries')
     expect(claimSql).toContain('ON CONFLICT')
+    expect(claimSql).toContain("'processing'")
+    expect(claimSql).toContain('NULL')
     const claimParams = claimCall[1] as unknown[]
     expect(claimParams[0]).toBe('7')
     expect(claimParams[1]).toBe('day:2026-06-27') // Moscow day key
@@ -151,17 +153,20 @@ describe('sendDigestEmailForProfile', () => {
     expect(query.mock.invocationCallOrder[1]).toBeLessThan(
       mockSendEmail.mock.invocationCallOrder[0],
     )
+    expect(String(query.mock.calls[2][0])).toContain("delivery_status = 'sent'")
+    expect(String(query.mock.calls[2][0])).toContain('delivered_at = NOW()')
+    expect(query.mock.invocationCallOrder[2]).toBeGreaterThan(
+      mockSendEmail.mock.invocationCallOrder[0],
+    )
     expect(mockSendEmail).toHaveBeenCalledTimes(1)
     expect(mockSendEmail.mock.calls[0][0].to).toBe('agency@example.com')
   })
 
   it('scopes leads to THIS run, not the profile history', async () => {
-    // Regression guard: the email must reflect this run's fresh batch
-    // ("companies worth contacting today"), mirroring Telegram/web-push — never
-    // every candidate ever scored for the profile.
     const { pool } = makeMockPool([
       { rows: [PREFS_ROW], rowCount: 1 }, // prefs
       { rows: [{ id: 1 }], rowCount: 1 }, // dedupe claim wins
+      { rows: [], rowCount: 1 }, // finalize sent
     ])
     mockGetPool.mockReturnValue(pool)
     mockGetLeads.mockResolvedValue({ leads: [makeLead()], total: 1 })
@@ -177,8 +182,6 @@ describe('sendDigestEmailForProfile', () => {
   })
 
   it('bails (disabled) when the profile has no owner, never reading leads', async () => {
-    // Legacy profile without owner attribution: passing ownerId=null would
-    // over-broaden the lead scope, so we refuse rather than leak across tenants.
     const { pool } = makeMockPool([
       { rows: [{ ...PREFS_ROW, owner_id: null }], rowCount: 1 },
     ])
@@ -205,10 +208,11 @@ describe('sendDigestEmailForProfile', () => {
     expect(mockSendEmail).not.toHaveBeenCalled()
   })
 
-  it('returns send_failed when the transport fails after claiming', async () => {
-    const { pool } = makeMockPool([
+  it('marks the aggregate claim failed without fabricating delivered_at when transport fails', async () => {
+    const { pool, query } = makeMockPool([
       { rows: [PREFS_ROW], rowCount: 1 },
       { rows: [{ id: 1 }], rowCount: 1 },
+      { rows: [], rowCount: 1 },
     ])
     mockGetPool.mockReturnValue(pool)
     mockGetLeads.mockResolvedValue({ leads: [makeLead()], total: 1 })
@@ -218,5 +222,7 @@ describe('sendDigestEmailForProfile', () => {
 
     expect(res).toEqual({ delivered: false, reason: 'send_failed' })
     expect(mockSendEmail).toHaveBeenCalledTimes(1)
+    expect(String(query.mock.calls[2][0])).toContain("delivery_status = 'failed'")
+    expect(String(query.mock.calls[2][0])).toContain('delivered_at = NULL')
   })
 })
