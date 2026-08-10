@@ -30,6 +30,7 @@ test('export query is exact workspace/profile/time scoped and PII-minimized', as
   assert.match(captured.sql, /quality\.client_profile_id = \$2::BIGINT/)
   assert.match(captured.sql, /quality\.decision_at >= \$3::TIMESTAMPTZ/)
   assert.match(captured.sql, /quality\.decision_at < \$4::TIMESTAMPTZ/)
+  assert.match(captured.sql, /profile\.workspace_id = quality\.workspace_id/)
   assert.match(captured.sql, /item\.workspace_id = quality\.workspace_id/)
   assert.match(captured.sql, /item\.client_profile_id = quality\.client_profile_id/)
   assert.match(captured.sql, new RegExp(`LIMIT ${GOLD_SET_EXPORT_MAX_ELIGIBLE_ROWS + 1}`))
