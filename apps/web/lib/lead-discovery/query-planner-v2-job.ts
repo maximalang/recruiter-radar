@@ -225,13 +225,15 @@ async function loadProfiles(
        ), '[]'::JSONB) AS "feedbackEvents",
        COALESCE((
          SELECT JSONB_OBJECT_AGG(
-           preference.source,
+           SUBSTRING(preference.source FROM 9),
            preference.params
            ORDER BY preference.source
          )
          FROM user_search_preferences preference
-         WHERE preference.user_id = profile.owner_id
-           AND preference.source = ANY($3::TEXT[])
+         WHERE preference.workspace_id = profile.workspace_id
+           AND preference.user_id = profile.owner_id
+           AND preference.source LIKE 'planner:%'
+           AND SUBSTRING(preference.source FROM 9) = ANY($3::TEXT[])
        ), '{}'::JSONB) AS "operatorSearchParams",
        COALESCE((
          SELECT JSONB_AGG(
