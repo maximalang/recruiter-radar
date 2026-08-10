@@ -20,7 +20,7 @@ export default function DetectionScene({
       data-header-tone="dark"
       data-hero-layout="ambient-radar"
     >
-      <div className={sceneStyles.fieldFigure} data-hero-visual>
+      <div className={sceneStyles.fieldFigure} data-hero-visual data-mobile-hero-signal>
         <HeroRadar />
       </div>
 
