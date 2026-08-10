@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import sceneStyles from "./signal-timeline-scene.module.css";
 import styles from "./landing.module.css";
 
@@ -38,7 +40,7 @@ export default function SignalTimelineScene() {
                 className={sceneStyles.event}
                 tabIndex={0}
                 data-timeline-event
-                style={{ "--event-index": index } as React.CSSProperties}
+                style={{ "--event-index": index } as CSSProperties}
               >
                 <time>{event.date}</time>
                 <span className={sceneStyles.node} aria-hidden="true"><i /></span>
