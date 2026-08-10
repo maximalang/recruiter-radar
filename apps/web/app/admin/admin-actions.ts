@@ -254,7 +254,7 @@ async function withOperatorDataOwnerSession<T extends UserActionState>(
   return withOperatorSession(formData, async (userId) => {
     const workspaceIdValue = String(formData.get("workspaceId") ?? "").trim();
     if (!/^\d+$/.test(workspaceIdValue) || workspaceIdValue === "0") {
-      return { ok: false, message: "Workspace РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІС‹Р±СЂР°РЅ СЏРІРЅРѕ." } as T;
+      return { ok: false, message: "Workspace должен быть выбран явно." } as T;
     }
     const dataOwnerId = await resolveAdminDataOwnerId(userId, workspaceIdValue);
     if (!dataOwnerId) {
