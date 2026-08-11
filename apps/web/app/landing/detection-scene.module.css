@@ -49,7 +49,7 @@
   font-size: .61rem;
   letter-spacing: .08em;
   text-transform: uppercase;
-  animation: heroReveal .68s .02s cubic-bezier(.2, .75, .25, 1) both;
+  animation: heroReveal .62s .02s cubic-bezier(.2, .75, .25, 1) both;
 }
 
 .kickerRule { display: inline-block; width: 2.3rem; height: 1px; background: var(--signal); }
@@ -58,35 +58,50 @@
 .copy {
   position: relative;
   z-index: 3;
-  width: min(100%, 38rem);
+  width: min(100%, 36rem);
   isolation: isolate;
-  animation: heroReveal .76s .08s cubic-bezier(.2, .75, .25, 1) both;
 }
-.serviceLabel { margin: 0 0 1rem; color: rgba(191, 220, 145, .92); font-size: .76rem; font-weight: 560; }
-.title { max-width: 12ch; margin: 0; color: #f4f3ee; font-size: clamp(3.45rem, 5.25vw, 5.25rem); font-weight: 520; letter-spacing: -.058em; line-height: .95; }
-.description { max-width: 35rem; margin: 1.35rem 0 0; color: rgba(242, 241, 235, .68); font-size: clamp(.98rem, 1.05vw, 1.08rem); line-height: 1.58; }
-.actions { display: flex; min-width: 44px; min-height: 46px; flex-wrap: wrap; align-items: center; gap: .8rem 1.15rem; margin-top: 1.45rem; }
+
+.serviceLabel,
+.title,
+.description,
+.actions,
+.loginLink,
+.microcopy {
+  animation: heroItem .62s cubic-bezier(.2, .75, .25, 1) both;
+}
+
+.serviceLabel { margin: 0 0 1rem; color: rgba(191, 220, 145, .92); font-size: .76rem; font-weight: 560; animation-delay: .08s; }
+.title { max-width: 10.6ch; margin: 0; color: #f4f3ee; font-size: clamp(3.55rem, 5.4vw, 5.45rem); font-weight: 520; letter-spacing: -.06em; line-height: .94; text-wrap: balance; animation-delay: .13s; }
+.description { max-width: 31rem; margin: 1.35rem 0 0; color: rgba(242, 241, 235, .7); font-size: clamp(.98rem, 1.04vw, 1.07rem); line-height: 1.58; text-wrap: pretty; animation-delay: .2s; }
+.actions { display: flex; min-width: 44px; min-height: 46px; flex-wrap: wrap; align-items: center; gap: .7rem 1rem; margin-top: 1.55rem; animation-delay: .28s; }
 
 .primaryButton {
+  position: relative;
   display: inline-flex;
-  min-height: 46px;
+  min-height: 48px;
   align-items: center;
-  gap: .7rem;
-  padding: .74rem .92rem;
-  border: 1px solid rgba(191, 220, 145, .42);
-  background: rgba(191, 220, 145, .09);
+  gap: .75rem;
+  padding: .78rem 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(191, 220, 145, .46);
+  background: rgba(191, 220, 145, .1);
   color: var(--paper);
   font-size: .82rem;
-  font-weight: 590;
+  font-weight: 600;
   letter-spacing: -.01em;
   text-decoration: none;
-  transition: border-color .18s ease, background-color .18s ease, color .18s ease;
+  transition: border-color .18s ease, background-color .18s ease, color .18s ease, transform .18s ease;
 }
-.primaryButton:hover, .primaryButton:focus-visible { border-color: rgba(191, 220, 145, .72); background: rgba(191, 220, 145, .145); color: var(--signal-strong); }
+.primaryButton::after { position: absolute; right: -30%; bottom: 0; left: -30%; height: 1px; background: linear-gradient(90deg, transparent, rgba(181,234,216,.8), transparent); content: ""; opacity: .6; transform: translateX(-60%); transition: transform .35s ease; }
+.primaryButton:hover, .primaryButton:focus-visible { border-color: rgba(191, 220, 145, .76); background: rgba(191, 220, 145, .15); color: var(--signal-strong); transform: translateY(-1px); }
+.primaryButton:hover::after, .primaryButton:focus-visible::after { transform: translateX(60%); }
 .primaryButton :global(svg) { flex: 0 0 auto; transition: transform .18s ease; }
 .primaryButton:hover :global(svg), .primaryButton:focus-visible :global(svg) { transform: translateX(3px); }
+.primaryButton:active { transform: translateY(0); }
 
-.microcopy { max-width: 30rem; margin: .65rem 0 0; color: rgba(242, 241, 235, .44); font-size: .67rem; line-height: 1.45; }
+.actionHint { max-width: 13rem; color: rgba(242,239,231,.46); font-family: var(--mono); font-size: .56rem; line-height: 1.4; text-transform: uppercase; }
+.microcopy { max-width: 31rem; margin: .65rem 0 0; color: rgba(242, 241, 235, .44); font-size: .67rem; line-height: 1.45; animation-delay: .4s; }
 
 .fieldFigure {
   position: absolute;
@@ -102,23 +117,24 @@
   animation: fieldReveal 1s .12s ease-out both;
 }
 
-.loginLink { display: inline-flex; min-height: 44px; align-items: center; margin-top: .35rem; color: rgba(242, 239, 231, .62); font-size: .72rem; text-underline-offset: 3px; transition: color .18s ease; }
-.loginLink:hover, .loginLink:focus-visible { color: rgba(242, 239, 231, .9); }
+.loginLink { display: inline-flex; min-height: 44px; align-items: center; margin-top: .35rem; color: rgba(242, 239, 231, .62); font-size: .72rem; text-underline-offset: 3px; transition: color .18s ease; animation-delay: .34s; }
+.loginLink:hover, .loginLink:focus-visible { color: rgba(242, 239, 231, .92); }
 
-@keyframes heroReveal { from { opacity: 0; transform: translate3d(0, 10px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes heroReveal { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes heroItem { from { opacity: 0; transform: translate3d(0, 9px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
 @keyframes fieldReveal { from { opacity: 0; transform: translateY(-47%) scale(.985); } to { opacity: .66; transform: translateY(-47%) scale(1); } }
 @keyframes fieldRevealTablet { from { opacity: 0; } to { opacity: .36; } }
 
 @media (max-width: 1279px) {
-  .title { font-size: clamp(3.1rem, 5.8vw, 4.5rem); }
+  .title { font-size: clamp(3.15rem, 5.8vw, 4.6rem); }
   .fieldFigure { right: -13rem; width: min(72vw, 47rem); }
 }
 
 @media (max-width: 959px) {
   .section { min-height: auto; grid-template-columns: minmax(0, 1fr); padding: 7rem var(--page-gutter) 3.5rem; }
   .kicker { top: 5.8rem; left: var(--page-gutter); }
-  .copy { width: min(100%, 44rem); margin-top: 2rem; }
-  .title { max-width: 11ch; font-size: clamp(3.1rem, 8.5vw, 4.7rem); }
+  .copy { width: min(100%, 42rem); margin-top: 2rem; }
+  .title { max-width: 10.5ch; font-size: clamp(3.1rem, 8.5vw, 4.7rem); }
   .fieldFigure { top: 45%; right: -15rem; width: min(88vw, 42rem); opacity: .36; animation-name: fieldRevealTablet; pointer-events: none; }
 }
 
@@ -128,9 +144,10 @@
   .kickerRule { width: 1.5rem; }
   .kickerMeta { margin-left: auto; }
   .copy { margin-top: 1.5rem; }
-  .title { font-size: clamp(3rem, 13vw, 4rem); }
-  .description { max-width: 31rem; font-size: .93rem; line-height: 1.55; }
-  .actions { align-items: flex-start; flex-direction: column; gap: .45rem; }
+  .title { max-width: 9.8ch; font-size: clamp(3rem, 13vw, 4rem); }
+  .description { max-width: 29rem; font-size: .93rem; line-height: 1.55; }
+  .actions { align-items: flex-start; flex-direction: column; gap: .55rem; }
+  .actionHint { max-width: 20rem; }
   .fieldFigure { top: 7.2rem; right: -8.7rem; width: 21rem; opacity: .3; transform: none; animation: none; }
 }
 
@@ -139,4 +156,5 @@
 @media (prefers-reduced-motion: reduce) {
   .section *, .section *::before, .section *::after { animation: none !important; transition: none !important; }
   .fieldFigure { opacity: .58; }
+  .primaryButton::after { display: none; }
 }
