@@ -167,14 +167,18 @@ describe('MultiSourceLeadGenerator', () => {
   })
 
   describe('getActiveSources', () => {
-    it('should filter out non-eligible sources', () => {
+    it('uses only canonical digest-allowed sources plus entity enrichment by default', () => {
       const activeSources = generator['activeSources']
 
-      expect(activeSources).toContain('hh')
-      expect(activeSources).toContain('career-pages')
-      expect(activeSources).toContain('linkedin-company-pages') // P2 secondary source
-      expect(activeSources).toContain('egrul-fns') // enrichment runs by default for lead quality
-      expect(activeSources).not.toContain('company-site') // no generator step owns generic company-site crawling
+      expect(activeSources).toEqual([
+        'hh',
+        'career-pages',
+        'egrul-fns',
+        'rabota-rossii',
+      ])
+      expect(activeSources).not.toContain('superjob')
+      expect(activeSources).not.toContain('linkedin-company-pages')
+      expect(activeSources).not.toContain('funding-business-signals')
     })
   })
 
@@ -232,6 +236,31 @@ describe('MultiSourceLeadGenerator', () => {
       })
 
       expect(leads).toEqual([])
+    })
+
+    it.each([
+      ['funding-business-signals'],
+      ['fedresurs'],
+      ['company-newsrooms'],
+      ['industry-media'],
+      ['unregistered-source'],
+    ])('does not promote a context-only or unknown source %s into an actionable lead', async (source) => {
+      mockGetHhDigestItems.mockResolvedValue([{
+        ...SAMPLE_DIGEST_ITEMS[0],
+        source_families: [source],
+      }])
+
+      await expect(generator.generateLeads({ sources: [source] })).resolves.toEqual([])
+    })
+
+    it.each([
+      ['superjob'],
+      ['habr-career'],
+      ['linkedin-company-pages'],
+      ['tech-job-boards'],
+      ['regional-job-boards'],
+    ])('does not enable provider-gated source %s in the canonical default set', (source) => {
+      expect(generator['activeSources']).not.toContain(source)
     })
 
     it('keeps supporting evidence when a selected job-board source originated the candidate', async () => {

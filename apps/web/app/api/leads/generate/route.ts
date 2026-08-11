@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       industries = [],
       regions = [],
       minScore = 1.0,
-      sources = [],
+      sources,
       enableRealTime = false,
       maxResults = 100,
       clientProfileId,
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       industries,
       regions,
       minScore,
-      sources,
+      ...(sources === undefined ? {} : { sources }),
       enableRealTime,
       clientProfileId
     })
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       const scoringService = getLeadScoringService()
       scoredLeads = await scoringService.scoreExistingLeads(rawLeads, {
         agencyProfile,
-        sources,
+        ...(sources === undefined ? {} : { sources }),
         minScore,
         enableRealTime,
         clientProfileId,
@@ -119,7 +119,9 @@ export async function POST(request: NextRequest) {
         analytics,
         summary: {
           totalLeads: limitedLeads.length,
-          avgScore: limitedLeads.reduce((sum: number, lead) => sum + ('finalScore' in lead ? lead.finalScore : lead.score), 0) / limitedLeads.length,
+          avgScore: limitedLeads.length === 0
+            ? 0
+            : limitedLeads.reduce((sum: number, lead) => sum + ('finalScore' in lead ? lead.finalScore : lead.score), 0) / limitedLeads.length,
           confidenceBreakdown: {
             A: limitedLeads.filter(lead => lead.confidence === 'A').length,
             B: limitedLeads.filter(lead => lead.confidence === 'B').length,
