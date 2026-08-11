@@ -1,7 +1,8 @@
 /**
  * ICP-relevance scoring for the public landing preview.
  *
- * WHY this is NOT computeFiur(): the public preview operates on aggregated,
+ * This is not an output of the production FIUR engine. The public preview
+ * operates on aggregated,
  * already-scored `HhDigestItem`s — they carry no structured vacancy roles,
  * per-vacancy publish dates, evidence tiers, or company industry/size. Running
  * the real FIUR engine here would require fabricating those inputs, producing
