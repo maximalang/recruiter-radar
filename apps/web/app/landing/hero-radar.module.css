@@ -82,6 +82,7 @@
 .clusterTargets { position: absolute; inset: 0; }
 .clusterTarget {
   position: absolute;
+  display: block;
   width: 3.5rem;
   height: 3.5rem;
   margin: -1.75rem 0 0 -1.75rem;
@@ -89,7 +90,7 @@
   border: 0;
   background: transparent;
   color: #b5ead8;
-  cursor: default;
+  cursor: help;
 }
 .targetDot {
   position: absolute;
