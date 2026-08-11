@@ -31,7 +31,19 @@ import {
 } from '../ui/internal-page';
 import { buildAccountNavigation } from '../ui/account-navigation';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
-import { ShieldIcon, PinIcon, BriefcaseIcon, AlertIcon, SearchIcon, TargetIcon, ClockIcon, CheckIcon } from '../ui/icons';
+import {
+  AlertIcon,
+  BriefcaseIcon,
+  CheckIcon,
+  ClockIcon,
+  LayersIcon,
+  LinkIcon,
+  MotionIcon,
+  PinIcon,
+  SearchIcon,
+  ShieldIcon,
+  TargetIcon,
+} from '../ui/icons';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,14 +91,17 @@ export function LeadCard({
     : 'Роли уточняются';
   const vacanciesSummary = [vacancies, freshness].filter(Boolean).join(' · ') || 'Свежесть проверяется';
   const signalSummary = lead.whyNow || urgency.label;
+  const evidenceTitles = lead.evidenceTitles.slice(0, 4);
+  const sourceFamilies = lead.sourceFamilies.slice(0, 4);
+  const scoreReasons = lead.reasons.slice(0, 3);
 
   return (
-    <Link
-      href={`/leads/${lead.id}`}
-      className={ipStyles.signalLeadCardLink}
-      aria-label={`Открыть полную карточку компании ${lead.orgName}`}
+    <article
+      className={`${ipStyles.leadCard} ${ipStyles.signalLeadCard}`}
+      data-signal-card="true"
+      data-tone={tone}
+      data-motion-item
     >
-    <article className={`${ipStyles.leadCard} ${ipStyles.signalLeadCard}`} data-signal-card="true" data-tone={tone}>
       <div className={ipStyles.signalLeadTopbar}>
         <div className={ipStyles.leadCardTags}>
           <GateBadgeInline gate={lead.confidenceGate} />
@@ -152,12 +167,64 @@ export function LeadCard({
         </div>
       )}
 
-      <div className={ipStyles.signalLeadFooter} aria-hidden="true">
+      <details className={ipStyles.signalLeadDisclosure} data-motion-disclosure>
+        <summary data-motion-interactive>
+          <MotionIcon kind="disclosure" className={ipStyles.signalLeadDisclosureIcon}>
+            <LayersIcon />
+          </MotionIcon>
+          <span>Доказательства и расчёт</span>
+          <small>
+            {lead.sourceFamilies.length} семейств источников · {lead.evidenceTitles.length} доказательств
+          </small>
+        </summary>
+        <div className={ipStyles.signalLeadDisclosureBody}>
+          <div className={ipStyles.signalLeadDisclosureInner}>
+            <section>
+              <span>Provenance</span>
+              {sourceFamilies.length > 0 ? (
+                <ul data-motion-list>
+                  {sourceFamilies.map((source) => (
+                    <li key={source} data-motion-item>{source}</li>
+                  ))}
+                </ul>
+              ) : <p>Семейство источника не указано.</p>}
+              {evidenceTitles.length > 0 ? (
+                <ul data-motion-list>
+                  {evidenceTitles.map((title, index) => (
+                    <li key={`${title}:${index}`} data-motion-item>{title}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+            <section>
+              <span>Почему этот балл</span>
+              {scoreReasons.length > 0 ? (
+                <ul data-motion-list>
+                  {scoreReasons.map((reason, index) => (
+                    <li key={`${reason}:${index}`} data-motion-item>{reason}</li>
+                  ))}
+                </ul>
+              ) : <p>Подробная декомпозиция доступна в полной карточке.</p>}
+            </section>
+          </div>
+        </div>
+      </details>
+
+      <div className={ipStyles.signalLeadFooter}>
         <span>Полная информация о компании</span>
-        <strong>Открыть →</strong>
+        <Link
+          href={`/leads/${lead.id}`}
+          className={ipStyles.signalLeadCardLink}
+          aria-label={`Открыть полную карточку компании ${lead.orgName}`}
+          data-motion-interactive
+        >
+          Открыть
+          <MotionIcon kind="navigation" className={ipStyles.signalLeadLinkIcon}>
+            <LinkIcon />
+          </MotionIcon>
+        </Link>
       </div>
     </article>
-    </Link>
   );
 }
 
@@ -297,7 +364,7 @@ export function LeadsList({
         </div>
         <LeadsListLegend />
       </div>
-      <div className={`${ipStyles.leadsList} ${ipStyles.signalCardList}`}>
+      <div className={`${ipStyles.leadsList} ${ipStyles.signalCardList}`} data-motion-list>
         {leads.map((lead) => (
           <LeadCard
             key={lead.id}

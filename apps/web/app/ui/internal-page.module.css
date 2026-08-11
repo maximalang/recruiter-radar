@@ -1137,10 +1137,16 @@
 }
 
 .signalLeadCardLink {
-  display: block;
-  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 10px;
+  color: var(--c-brand);
+  font-size: 0.82rem;
+  font-weight: 700;
   text-decoration: none;
-  border-radius: 16px;
+  border-radius: 8px;
 }
 
 .signalLeadCardLink:focus-visible {
@@ -1182,8 +1188,8 @@
   box-shadow: 0 16px 38px rgba(15, 35, 68, 0.1);
 }
 
-.signalLeadCardLink:hover .signalLeadCard {
-  transform: translateY(-2px);
+.signalLeadCardLink:hover {
+  background: rgba(35, 128, 111, 0.08);
 }
 
 .signalLeadTopbar,
@@ -1584,6 +1590,123 @@
   .leadOpenBtn {
     transition: none;
   }
+  .signalLeadDisclosureBody {
+    transition: none;
+  }
+}
+
+.signalLeadLinkIcon,
+.signalLeadDisclosureIcon {
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+}
+
+.signalLeadDisclosure {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.signalLeadDisclosure > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--c-text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.signalLeadDisclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.signalLeadDisclosure > summary:focus-visible {
+  border-radius: 6px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.signalLeadDisclosure > summary small {
+  color: var(--c-text-muted);
+  font-size: 0.7rem;
+}
+
+.signalLeadDisclosure[open] .signalLeadDisclosureIcon {
+  transform: rotate(90deg);
+}
+
+.signalLeadDisclosureBody,
+.signalLeadDisclosure:not([open]) > .signalLeadDisclosureBody {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter),
+    opacity var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter),
+    visibility var(--rr-motion-duration-disclosure) allow-discrete;
+}
+
+.signalLeadDisclosure[open] > .signalLeadDisclosureBody {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+}
+
+.signalLeadDisclosureInner {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.signalLeadDisclosure[open] .signalLeadDisclosureInner {
+  padding: 4px 0 12px;
+}
+
+.signalLeadDisclosureInner section {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-panel);
+}
+
+.signalLeadDisclosureInner section > span {
+  color: var(--c-text-muted);
+  font-size: 0.67rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.signalLeadDisclosureInner ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.signalLeadDisclosureInner li {
+  padding: 3px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  color: var(--c-text-secondary);
+  font-size: 0.7rem;
+}
+
+.signalLeadDisclosureInner p {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
 }
 
 /* ── Responsive: tablet and below ── */
@@ -1723,6 +1846,18 @@
   }
 
   .signalLeadSections {
+    grid-template-columns: 1fr;
+  }
+
+  .signalLeadDisclosure > summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .signalLeadDisclosure > summary small {
+    grid-column: 2;
+  }
+
+  .signalLeadDisclosureInner {
     grid-template-columns: 1fr;
   }
 
