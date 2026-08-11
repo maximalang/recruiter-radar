@@ -200,7 +200,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
               <WorkspaceLead
                 key={`${item.org_id}-${item.rank}`}
                 item={item}
-                defaultOpen={index === visibleItems.length - 1}
+                defaultOpen={index === 0}
               />
             ))}
           </div>

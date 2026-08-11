@@ -422,8 +422,9 @@
 .deliveryIntro .sceneHeading { grid-area: title; }
 .deliveryIntro .sceneHeading em { color: #4e8e7c; }
 .deliveryIntro .sceneLead { grid-area: lead; align-self: end; margin: 0; }
-.deliveryFlow { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; padding: 0; border-top: 1px solid var(--line-light); border-left: 1px solid var(--line-light); list-style: none; }
-.deliveryFlow li { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: .8rem; min-height: 10rem; padding: 1rem; border-right: 1px solid var(--line-light); border-bottom: 1px solid var(--line-light); }
+.deliveryFlow { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(1.4rem,3vw,3rem); margin: 0; padding: 1.35rem 0 0; border-top: 1px solid var(--line-light); list-style: none; }
+.deliveryFlow::before { position: absolute; top: 2.05rem; right: 3rem; left: .3rem; height: 1px; background: linear-gradient(90deg,rgba(78,142,124,.64),rgba(78,142,124,.08)); content: ""; }
+.deliveryFlow li { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: .8rem; min-height: 7.4rem; padding: 0 0 1rem; }
 .deliveryFlow li > span { color: var(--copper); font-family: var(--mono); font-size: .56rem; }
 .deliveryFlow li div { display: grid; gap: .5rem; }
 .deliveryFlow li strong { font-size: .96rem; font-weight: 620; }
@@ -439,7 +440,7 @@
 .deliveryChannel dl div { display: grid; grid-template-columns: 8.5rem 1fr; gap: 1rem; padding: .8rem 0; border-top: 1px solid var(--line-dark); }
 .deliveryChannel dt { color: var(--muted-dark); font-family: var(--mono); font-size: .55rem; text-transform: uppercase; }
 .deliveryChannel dd { margin: 0; color: rgba(242, 239, 231, .78); font-size: .78rem; line-height: 1.48; }
-.deliveryBoundary { display: grid; align-content: start; gap: .8rem; padding: 1.3rem; border: 1px solid var(--line-light); background: var(--paper-soft); }
+.deliveryBoundary { display: grid; align-content: start; gap: .8rem; padding: 1.3rem 0; border: 0; border-top: 1px solid var(--line-light); border-bottom: 1px solid var(--line-light); background: transparent; }
 .deliveryBoundary span { color: var(--copper); font-family: var(--mono); font-size: .57rem; text-transform: uppercase; }
 .deliveryBoundary strong { font-size: 1.35rem; font-weight: 580; line-height: 1.18; }
 .deliveryBoundary p { margin: 0; color: var(--muted-light); font-size: .82rem; line-height: 1.55; }
@@ -597,7 +598,8 @@
   .workspaceLeadFooter { align-items: flex-start; flex-direction: column; }
 
   .deliveryFlow { grid-template-columns: 1fr; }
-  .deliveryFlow li { min-height: auto; }
+  .deliveryFlow::before { top: 1.35rem; right: auto; bottom: 1rem; left: .22rem; width: 1px; height: auto; background: linear-gradient(180deg,rgba(78,142,124,.64),rgba(78,142,124,.08)); }
+  .deliveryFlow li { grid-template-columns: 1.2rem 1fr auto; min-height: auto; padding-bottom: 1.4rem; }
   .deliveryChannel dl div { grid-template-columns: 1fr; gap: .35rem; }
 
   .conversionPanel { gap: 4.2rem; padding: 5rem 1rem; }

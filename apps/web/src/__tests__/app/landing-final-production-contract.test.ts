@@ -29,6 +29,7 @@ describe("landing final production contract", () => {
 
   test("renders pricing and FAQ as continuous editorial scenes with explicit structure", () => {
     const conversion = source("app/landing/conversion-panel.tsx");
+    const browserAudit = source("scripts/verify-landing-production.mjs");
     const landing = source("app/landing/landing.module.css");
     const visual = source("app/landing/landing-visual-system.module.css");
 
@@ -36,7 +37,9 @@ describe("landing final production contract", () => {
     expect(conversion).toContain('data-pricing-layout="unified-grid"');
     expect(conversion).toContain('data-faq-layout="editorial"');
     expect(conversion).toContain("Попробуйте на своей нише");
-    expect(conversion).toContain("7 дней за 990 ₽ — проверьте качество клиентских возможностей на своей нише.");
+    expect(conversion).toContain("Проверьте радар на своей нише за 7 дней.");
+    expect(browserAudit).toContain("Проверьте радар на своей нише за 7 дней");
+    expect(browserAudit).not.toContain("7 дней за 990 ₽ — проверьте качество клиентских возможностей");
     expect(conversion).toContain("Запустить на 7 дней");
     expect(conversion).toContain("Разовая оплата · без автопродления");
     expect(conversion).toContain("Подключить месяц");
@@ -88,6 +91,8 @@ describe("landing final production contract", () => {
     expect(delivery).toContain("EXTRA_ROUTES.map");
     expect(delivery).toContain('data-manual-outreach-boundary="true"');
     expect(evidence).toContain("Почему сейчас");
+    expect(evidence).toContain('data-evidence-conclusion="source-fact-conclusion"');
+    expect(evidence).toContain("Источник</span><i aria-hidden=\"true\">→</i><span>Факт");
     expect(evidence).not.toContain("открыть факт");
     expect(evidence).not.toContain("SOURCE_ROLES");
   });

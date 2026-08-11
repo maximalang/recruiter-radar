@@ -124,7 +124,7 @@ async function assertRequiredSurface(page, label) {
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const pricingText = await page.locator("#pricing").innerText();
-  assert.match(pricingText, /7 дней за 990 ₽ — проверьте качество клиентских возможностей/i);
+  assert.match(pricingText, /Проверьте радар на своей нише за 7 дней/i);
   assert.match(pricingText, /990 ₽/);
   assert.match(pricingText, /2 990 ₽/);
   assert.match(pricingText, /6 990 ₽/);
@@ -312,18 +312,18 @@ async function assertLeadExpansion(page, label) {
   const leads = page.locator("details[data-lead-card]");
   const count = await leads.count();
   assert.ok(count >= 2, `${label}: expected at least two recommendations, received ${count}`);
-  const first = leads.nth(0);
-  const active = leads.nth(count - 1);
-  assert.equal(await active.getAttribute("open"), "", `${label}: latest recommendation must be expanded by default`);
-  assert.equal(await active.getAttribute("data-primary-lead"), "true", `${label}: latest recommendation must be the primary lead`);
+  const active = leads.nth(0);
+  const secondary = leads.nth(count - 1);
+  assert.equal(await active.getAttribute("open"), "", `${label}: top-ranked recommendation must be expanded by default`);
+  assert.equal(await active.getAttribute("data-primary-lead"), "true", `${label}: top-ranked recommendation must be the primary lead`);
   await active.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
-  assert.equal(await first.getAttribute("open"), null, `${label}: first recommendation must not be expanded by default`);
-  await first.locator("summary").click();
-  assert.equal(await first.getAttribute("open"), "", `${label}: first recommendation did not expand`);
-  await first.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
+  assert.equal(await secondary.getAttribute("open"), null, `${label}: secondary recommendation must not be expanded by default`);
+  await secondary.locator("summary").click();
+  assert.equal(await secondary.getAttribute("open"), "", `${label}: secondary recommendation did not expand`);
+  await secondary.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
   assert.equal(await active.getAttribute("open"), null, `${label}: named details did not collapse the previous active recommendation`);
   await active.locator("summary").click();
-  assert.equal(await active.getAttribute("open"), "", `${label}: latest recommendation did not restore`);
+  assert.equal(await active.getAttribute("open"), "", `${label}: top-ranked recommendation did not restore`);
 }
 
 async function measurePageHeight(page, viewport) {
@@ -602,13 +602,13 @@ async function assertInteractionContracts(browser) {
   const leads = page.locator("details[data-lead-card]");
   const leadCount = await leads.count();
   assert.ok(leadCount >= 2, "interaction: expected at least two recommendations");
-  const firstLead = leads.nth(0);
-  const activeLead = leads.nth(leadCount - 1);
-  assert.equal(await activeLead.getAttribute("open"), "", "interaction: latest recommendation is not open by default");
-  assert.equal(await activeLead.getAttribute("data-primary-lead"), "true", "interaction: latest recommendation is not primary");
-  await firstLead.locator("summary").click();
-  assert.equal(await firstLead.getAttribute("open"), "", "interaction: first recommendation did not open");
-  await firstLead.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
+  const activeLead = leads.nth(0);
+  const secondaryLead = leads.nth(leadCount - 1);
+  assert.equal(await activeLead.getAttribute("open"), "", "interaction: top-ranked recommendation is not open by default");
+  assert.equal(await activeLead.getAttribute("data-primary-lead"), "true", "interaction: top-ranked recommendation is not primary");
+  await secondaryLead.locator("summary").click();
+  assert.equal(await secondaryLead.getAttribute("open"), "", "interaction: secondary recommendation did not open");
+  await secondaryLead.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
 
   const companyNames = (await page.locator("[data-lead-company] strong").allTextContents())
     .map((value) => value.trim())
@@ -666,7 +666,7 @@ async function assertNoJs(browser) {
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const noJsPricingText = await page.locator("#pricing").innerText();
-  assert.match(noJsPricingText, /7 дней за 990 ₽ — проверьте качество клиентских возможностей/i);
+  assert.match(noJsPricingText, /Проверьте радар на своей нише за 7 дней/i);
   assert.match(noJsPricingText, /990 ₽/);
   assert.ok(await page.locator("#faq summary").count() >= 1, "no-JS FAQ question missing");
   await page.getByRole("heading", { name: /Посмотрите, кому стоит написать сейчас/ }).waitFor({ state: "attached" });
