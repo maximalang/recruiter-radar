@@ -36,10 +36,10 @@ export default function ConversionPanel(props: {
           <span>Пилот без обязательств</span>
           <h2>7 дней, чтобы проверить не интерфейс — результат.</h2>
           <p>
-            Смотрите на своей нише: появляются ли новые компании, понятен ли «почему сейчас», хватает ли доказательств для уверенного выхода.{" "}
+            Начните с недели. Продолжайте только если радар полезен. Смотрите на своей нише: появляются ли новые компании, понятен ли «почему сейчас», хватает ли доказательств для уверенного выхода.{" "}
             {props.paymentConfigured
               ? "990 ₽ за неделю, разово, без автопродления. Если радар полезен — месяц и квартал дешевле в пересчёте на неделю."
-              : "Оставьте заявку без списания. Профиль сохранится — оплату можно завершить после подключения платежей."}
+              : "Оставьте заявку на 7-дневный пилот без списания. Профиль сохранится — оплату можно завершить после подключения платежей."}
           </p>
         </div>
 
@@ -51,7 +51,7 @@ export default function ConversionPanel(props: {
           <div className={styles.pilotPrice}>
             <strong>{pilotPlan.price}</strong>
           </div>
-          <p>Проверяйте качество сигнала на своих нишах: кому писать, почему сейчас и чем это подтверждено.</p>
+          <p>Проверьте на своих нишах не интерфейс, а сам результат: кому писать, почему сейчас и чем это подтверждено.</p>
           <ul>
             {pilotPlan.bullets.slice(0, 3).map((bullet) => <li key={bullet}><ArrowGlyph size={14} />{bullet}</li>)}
           </ul>
@@ -60,7 +60,7 @@ export default function ConversionPanel(props: {
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricingPilot}
           >
-            {props.paymentConfigured ? "Запустить радар на 7 дней" : "Оставить заявку на пилот"} <ArrowGlyph />
+            {props.paymentConfigured ? "Запустить на 7 дней" : "Оставить заявку на пилот"} <ArrowGlyph />
           </Link>
           <small data-consent-safe-copy>{props.paymentConfigured
             ? "Разовая оплата · без автопродления"
@@ -68,7 +68,7 @@ export default function ConversionPanel(props: {
         </div>
 
         <div className={`${styles.secondaryOffers} ${panelStyles.secondaryOffers}`} aria-label="Продолжение после пилота" data-pricing-secondary="true">
-          <span className={styles.secondaryOfferLabel}>Если подходит — продолжение выгоднее</span>
+          <span className={styles.secondaryOfferLabel}>Если радар подходит — продолжение дешевле</span>
           {secondaryPlans.map((plan) => {
             const quarterly = plan.code === "quarterly";
             return (
@@ -109,7 +109,7 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <div className={styles.faqHeading} data-faq-heading>
-          <span>Коротко о важном</span>
+          <span>Перед запуском — короткие ответы</span>
           <h2>Вопросы, которые стоит закрыть до запуска.</h2>
           <p>Источники, приоритет, доставка, контроль и оплата — без мелкого шрифта.</p>
           <small data-faq-trust>Интерактивный пример — без регистрации. Данные в нём обезличены.</small>
