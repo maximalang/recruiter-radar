@@ -136,8 +136,8 @@ export default function ConversionPanel(props: {
         <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
           <li>990 ₽ · 7 дней</li>
           <li>Без автопродления</li>
-          <li>Факты по каждой возможности</li>
-          <li>Никакой авторассылки</li>
+          <li>Доказательства по каждой возможности</li>
+          <li>Обращения отправляете только вы</li>
         </ul>
         <div className={finalStyles.radar} data-final-radar-composition="signal-lock" aria-hidden="true">
           <i className={finalStyles.arc} />
