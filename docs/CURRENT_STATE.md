@@ -1,6 +1,6 @@
 # Recruiter Radar — текущее состояние
 
-**Обновлено:** 2026-08-10
+**Обновлено:** 2026-08-11
 **Назначение:** единая runtime-grounded точка входа для архитектуры, доступа, платежей, доставки, Commercial Signal quality и production readiness.
 
 При конфликте применяются `AGENTS.md` и `CLAUDE.md`, затем фактический runtime-код и миграции. Датированные планы, отчёты и rollout notes являются историческими. Этот документ не подтверждает состояние production без отдельной проверки deployed SHA и окружения.
@@ -48,6 +48,17 @@
 - `/admin/users/[id]` — workspace-aware User Control Center: account, workspace, sessions, Radar profile, effective entitlement, payments, delivery, radar state и диагностическая цепочка.
 - Admin может выдать/продлить/отозвать доступ, включить/выключить профиль, изменить настройки, unlink Telegram, revoke sessions и повторить onboarding/login flow.
 - Data-owner mutations требуют явный `workspaceId`; destructive actions подтверждаются и пишутся в audit trail.
+
+## Product UI и motion
+
+- Единый opt-in контракт движения находится в `apps/web/app/product-motion-system.css`. Компоненты объявляют смысл через `data-motion-*`; idle-состояния остаются статичными, а `prefers-reduced-motion: reduce` выключает анимации и пространственные transform.
+- Базовые интервалы ограничены 120–220 ms. Hover поднимает только интерактивный control на 1 px, press использует короткий 0.99 scale, disclosure и status получают одноразовый вход. Постоянное движение разрешено только для явного pending/progress состояния.
+- Semantic icon state централизован в `MotionIcon` из `apps/web/app/ui/icons.tsx`. Navigation, filter/reset, feedback, disclosure и status не дублируют собственные keyframes по страницам.
+- Product workspace сохраняет одинаковую desktop/mobile иерархию и native navigation semantics. Mobile «Ещё» остаётся `<details>`, имеет keyboard focus и не заменяется JS-only popover.
+- Lead card показывает company/contact/signals/risks/score/status до раскрытия; persisted provenance и причины расчёта находятся в native disclosure. Вся карточка больше не является оборачивающей ссылкой, поэтому feedback/disclosure controls не создают вложенные interactive элементы.
+- Evidence Radar использует 44×44 marker hit area, единый hover/focus/selected contour, видимый selected status и детерминированный одноразовый reveal source dots. На mobile подписи маркеров скрываются, но выбранная компания остаётся доступна текстом; reduced motion оставляет выбор полностью статичным.
+- `npm run test:responsive-surfaces` проверяет 31 route на шести viewport: overflow/clipping, touch targets, labels, forms, duplicate IDs, console/page errors, keyboard focus indicator, dialogs, native disclosure, reduced-motion violations и continuous animations. Отчёт отдельно маркирует `rendered`, `authentication-required` и `feature-flagged`; semantic 404 считается ошибкой, кроме явно перечисленных default-dark Opportunity surfaces.
+- Успешный unauthenticated responsive audit не доказывает содержимое защищённой workspace-сессии. Opportunity/Radar browser evidence при default-dark flags фиксируется как недоступное, а не как проверенная рабочая поверхность; включение flags и authenticated fixture требуют отдельного scoped audit.
 
 ## Commercial Signal Quality v2
 

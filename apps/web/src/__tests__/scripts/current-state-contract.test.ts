@@ -48,4 +48,12 @@ describe('runtime documentation contract', () => {
     expect(currentState).toContain('RF payment provider')
     expect(currentState).toContain('gold set')
   })
+
+  test('documents the shared product motion and honest browser-evidence boundary', () => {
+    expect(currentState).toContain('## Product UI и motion')
+    expect(currentState).toContain('product-motion-system.css')
+    expect(currentState).toContain('data-motion-*')
+    expect(currentState).toContain('feature-flagged')
+    expect(currentState).toContain('semantic 404')
+  })
 })
