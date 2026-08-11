@@ -1114,9 +1114,11 @@
 }
 
 .signalCardList {
-  gap: 12px;
-  padding: 12px;
-  background: var(--surface-panel);
+  gap: 0;
+  padding: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
 }
 
 .leadCard {
@@ -1159,18 +1161,20 @@
   display: grid;
   gap: 16px;
   overflow: hidden;
-  padding: 20px 22px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  background: linear-gradient(145deg, #ffffff 0%, #fbfcff 100%);
-  box-shadow: 0 10px 28px rgba(15, 35, 68, 0.06);
+  padding: 20px 8px 20px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .signalLeadCard::before {
   content: "";
   position: absolute;
-  inset: 0 0 auto;
-  height: 3px;
+  inset: 0 auto 0 0;
+  width: 2px;
+  height: auto;
   background: #94a3b8;
 }
 
@@ -1179,13 +1183,12 @@
 .signalLeadCard[data-tone="danger"]::before { background: #64748b; }
 
 .signalLeadCard:last-child {
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 0;
 }
 
 .signalLeadCard:hover {
-  background: #ffffff;
-  border-color: #c8d5e7;
-  box-shadow: 0 16px 38px rgba(15, 35, 68, 0.1);
+  background: rgba(255, 254, 249, .64);
+  box-shadow: none;
 }
 
 .signalLeadCardLink:hover {
@@ -1270,7 +1273,9 @@
 .signalLeadSections {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .signalLeadSection {
@@ -1278,15 +1283,17 @@
   align-content: start;
   gap: 7px;
   min-width: 0;
-  padding: 14px;
-  border: 1px solid #e2e8f1;
-  border-radius: 12px;
-  background: #f8fafc;
+  padding: 14px 16px;
+  border: 0;
+  border-right: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
 }
 
+.signalLeadSection:last-child { border-right: 0; }
+
 .signalLeadSectionPrimary {
-  border-color: var(--border-subtle);
-  background: var(--surface-panel);
+  background: rgba(35, 128, 111, .035);
 }
 
 .signalLeadSection strong {
@@ -2135,4 +2142,72 @@
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* Core decision surfaces read as one workspace, not a stack of nested cards. */
+.leadDetailContainer {
+  max-width: 1180px;
+}
+
+.leadDetailContainer .detailLayout {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  gap: clamp(28px, 4vw, 52px);
+}
+
+.leadDetailContainer .detailMain {
+  gap: 0;
+}
+
+.leadDetailContainer .detailMain > .contentCard {
+  padding: 22px 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+.leadDetailContainer .detailMain > .contentCard:first-child {
+  margin-bottom: 10px;
+  padding: 20px;
+  border: 1px solid rgba(35, 128, 111, .24);
+  border-left: 3px solid var(--signal-primary);
+  border-radius: 14px;
+  background: rgba(35, 128, 111, .035);
+}
+
+.leadDetailContainer .detailSidebar {
+  align-self: start;
+  gap: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.leadDetailContainer .detailSidebar > .contentCard {
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+.leadDetailContainer .detailSidebar > .contentCard:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .leadDetailContainer .detailLayout {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+
+  .leadDetailContainer .detailSidebar { margin-top: 4px; }
+}
+
+@media (max-width: 640px) {
+  .signalLeadSection {
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .signalLeadSection:last-child { border-bottom: 0; }
 }

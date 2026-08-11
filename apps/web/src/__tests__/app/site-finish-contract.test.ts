@@ -74,4 +74,19 @@ describe("cross-route visual layer contract", () => {
     expect(workspaceStyles).toContain("grid-template-columns: repeat(4, minmax(0, 1fr))");
     expect(workspaceStyles).toContain("padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom))");
   });
+
+  it("uses continuous decision rails instead of nested card stacks on core product surfaces", () => {
+    const internalPage = readAppFile("ui/internal-page.module.css");
+    const opportunities = readAppFile("opportunities/opportunities.module.css");
+    const radar = readAppFile("opportunities/evidence-radar-map.module.css");
+
+    expect(internalPage).toContain(".leadDetailContainer .detailMain > .contentCard");
+    expect(internalPage).toContain(".leadDetailContainer .detailSidebar > .contentCard");
+    expect(internalPage).toMatch(/\.signalCardList \{[\s\S]*?gap: 0;[\s\S]*?background: transparent;/);
+    expect(internalPage).toMatch(/\.signalLeadSections \{[\s\S]*?gap: 0;/);
+    expect(opportunities).toMatch(/\.cardList \{[\s\S]*?gap: 0;/);
+    expect(opportunities).toMatch(/\.decisionGrid \{[\s\S]*?border-radius: 0;/);
+    expect(radar).toMatch(/\.layout \{[\s\S]*?gap: 0;[\s\S]*?background: #080d0c;/);
+    expect(radar).toContain("border-left: 1px solid rgba(255, 255, 255, .09)");
+  });
 });
