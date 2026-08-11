@@ -88,6 +88,8 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
   const [failedStatus, setFailedStatus] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const noteInputRef = useRef<HTMLInputElement>(null);
+  const draftStatusRef = useRef<string | null>(null);
+  const mutationLockRef = useRef(false);
   const feedbackPending = pendingStatus !== null;
 
   useEffect(() => {
@@ -96,18 +98,18 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
     }
   }, [noteOpen]);
 
-  function handleClick(status: string, noteAllowed?: boolean) {
+  function clearOutcomeState() {
     setError(null);
     setAnnouncement('');
     setConfirmedStatus(null);
     setFailedStatus(null);
-    // For note-allowed statuses, open the note input first instead of committing
-    // immediately — the recruiter can add a one-line "почему мимо" or skip it.
-    if (noteAllowed && !noteOpen) {
-      setNoteOpen(true);
-      setActiveStatus(status);
-      return;
-    }
+  }
+
+  function commitFeedback(status: string, noteValue: string | null) {
+    if (mutationLockRef.current) return;
+
+    mutationLockRef.current = true;
+    clearOutcomeState();
     setPendingStatus(status);
     startTransition(async () => {
       try {
@@ -115,32 +117,56 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
           orgId,
           clientProfileId,
           status,
-          note.trim() || null,
+          noteValue,
         );
+        const savedButton = BUTTONS.find(
+          (button) => button.status === result.feedbackStatus,
+        );
+        if (!savedButton) {
+          throw new Error('Сервер вернул неизвестный статус обратной связи');
+        }
         setActiveStatus(result.feedbackStatus);
+        draftStatusRef.current = null;
         setNoteOpen(false);
         setNote('');
         setConfirmedStatus(result.feedbackStatus);
-        const savedLabel = BUTTONS.find(
-          (button) => button.status === result.feedbackStatus,
-        )?.label;
-        setAnnouncement(`Статус сохранён: ${savedLabel ?? result.feedbackStatus}`);
+        setAnnouncement(`Статус сохранён: ${savedButton.label}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Ошибка обновления');
         setFailedStatus(status);
       } finally {
         setPendingStatus(null);
+        mutationLockRef.current = false;
       }
     });
   }
 
-  function handleSkipNote() {
-    setNoteOpen(false);
-    setNote('');
-    // Commit the pending park status without a note.
-    if (activeStatus) {
-      handleClick(activeStatus);
+  function handleClick(status: string, noteAllowed?: boolean) {
+    if (mutationLockRef.current || draftStatusRef.current) return;
+
+    // For note-allowed statuses, open the note input first instead of committing
+    // immediately — the recruiter can add a one-line "почему мимо" or skip it.
+    if (noteAllowed) {
+      clearOutcomeState();
+      draftStatusRef.current = status;
+      setNoteOpen(true);
+      return;
     }
+    commitFeedback(status, null);
+  }
+
+  function handleSkipNote() {
+    if (mutationLockRef.current) return;
+    const draftStatus = draftStatusRef.current;
+    if (!draftStatus) return;
+    commitFeedback(draftStatus, null);
+  }
+
+  function handleSaveNote() {
+    if (mutationLockRef.current) return;
+    const draftStatus = draftStatusRef.current;
+    if (!draftStatus) return;
+    commitFeedback(draftStatus, note.trim() || null);
   }
 
   return (
@@ -157,7 +183,7 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
                   <button
                     key={btn.status}
                     onClick={() => handleClick(btn.status, btn.noteAllowed)}
-                    disabled={feedbackPending}
+                    disabled={feedbackPending || noteOpen}
                     className={s.feedbackBtn}
                     data-motion-interactive
                     data-active={isActive ? 'true' : undefined}
@@ -196,6 +222,7 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
             ref={noteInputRef}
             type="text"
             value={note}
+            disabled={feedbackPending}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Почему не подходит (необязательно)"
             maxLength={200}
@@ -204,7 +231,7 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
           />
           <button
             type="button"
-            onClick={() => activeStatus && handleClick(activeStatus)}
+            onClick={handleSaveNote}
             disabled={feedbackPending}
             className={s.noteSave}
           >
