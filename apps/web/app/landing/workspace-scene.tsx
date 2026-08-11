@@ -89,7 +89,7 @@ function PreviewConfigurator(props: Pick<WorkspaceProps, "previewInput" | "hasPr
   return (
     <div id="preview-configurator" className={`${styles.workspaceControls} ${sceneStyles.anchor} ${sceneStyles.controls}`}>
       <p className={sceneStyles.controlHint}>
-        <strong>Быстрый старт:</strong> выберите готовый профиль или введите свой — после пересчёта откройте первую карточку и посмотрите «почему сейчас».
+        <strong>Быстрый старт:</strong> выберите готовый профиль или введите свой — затем посмотрите раскрытую рекомендацию и «почему сейчас».
       </p>
       <div className={`${styles.presetStrip} ${sceneStyles.presets}`} aria-label="Готовые профили радара">
         <span>Готовые профили</span>
@@ -200,7 +200,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
               <WorkspaceLead
                 key={`${item.org_id}-${item.rank}`}
                 item={item}
-                defaultOpen={index === 0}
+                defaultOpen={index === visibleItems.length - 1}
               />
             ))}
           </div>
