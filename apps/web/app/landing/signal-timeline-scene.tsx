@@ -4,10 +4,10 @@ import sceneStyles from "./signal-timeline-scene.module.css";
 import styles from "./landing.module.css";
 
 const TIMELINE_EVENTS = [
-  { date: "4 авг", fact: "Открыты 8 инженерных позиций", source: "карьерная страница", state: "событие" },
-  { date: "6 авг", fact: "Появилась роль руководителя направления", source: "публичные вакансии", state: "подтверждение" },
-  { date: "9 авг", fact: "Три роли опубликованы повторно", source: "повторная публикация", state: "усиление" },
-  { date: "сегодня", fact: "Изменения подтверждены повторной проверкой", source: "3 типа источников", state: "signal lock" },
+  { date: "4 авг", fact: "Открыты 8 инженерных ролей", source: "карьерная страница", state: "новый сигнал" },
+  { date: "6 авг", fact: "Добавлена роль руководителя направления", source: "публичные вакансии", state: "усиление" },
+  { date: "9 авг", fact: "Три позиции опубликованы повторно", source: "повторная публикация", state: "повтор" },
+  { date: "сегодня", fact: "Изменения подтверждены повторной проверкой", source: "3 подтверждающих факта", state: "подтверждено" },
 ] as const;
 
 export default function SignalTimelineScene() {
@@ -22,12 +22,12 @@ export default function SignalTimelineScene() {
     >
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.intro} data-motion-primitive="editorialReveal">
-          <p className={styles.sceneLabel}>Почему сейчас</p>
+          <p className={styles.sceneLabel}>Сигнал во времени</p>
           <h2 id="timeline-title" className={styles.sceneHeading}>
-            Один сигнал — шум. <em>Последовательность — повод.</em>
+            Один сигнал — шум. <em>Несколько подряд — повод.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Радар связывает независимые изменения во времени и отмечает момент, когда они начинают подтверждать друг друга.
+            Радар смотрит на динамику: что открылось, что повторилось и что подтвердилось при следующей проверке.
           </p>
         </div>
 
@@ -53,9 +53,9 @@ export default function SignalTimelineScene() {
             ))}
           </ol>
           <div className={sceneStyles.lock} data-opportunity-lock="true">
-            <span>СИЛЬНАЯ ВОЗМОЖНОСТЬ</span>
-            <strong>Сигналы подтверждают друг друга.</strong>
-            <small>проверяемый повод для первого контакта</small>
+            <span>ПОВОД СОБРАН</span>
+            <strong>Можно писать не наугад.</strong>
+            <small>все ключевые факты — в одной карточке</small>
           </div>
         </div>
       </div>

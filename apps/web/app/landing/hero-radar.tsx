@@ -5,10 +5,10 @@ import { useEffect, useRef } from "react";
 import styles from "./hero-radar.module.css";
 
 const CLUSTERS = [
-  { id: "career", x: 69, y: 30, label: "3 подтверждения", meta: "карьерная страница", active: true },
-  { id: "vacancies", x: 38, y: 35, label: "сегодня", meta: "публичные вакансии" },
-  { id: "repeat", x: 48, y: 68, label: "повторная публикация", meta: "3 роли обновлены" },
-  { id: "leadership", x: 78, y: 58, label: "новая роль", meta: "руководитель направления" },
+  { id: "career", x: 69, y: 30, label: "повод собран", meta: "3 подтверждения", active: true },
+  { id: "vacancies", x: 38, y: 35, label: "новые роли", meta: "8 позиций" },
+  { id: "repeat", x: 48, y: 68, label: "повтор", meta: "3 роли снова открыты" },
+  { id: "leadership", x: 78, y: 58, label: "усиление", meta: "руководитель направления" },
 ] as const;
 
 export default function HeroRadar() {
@@ -118,9 +118,10 @@ export default function HeroRadar() {
 
       <div className={styles.clusterTargets} aria-label="Примеры сигналов радара">
         {CLUSTERS.map((cluster) => (
-          <button
+          <span
             key={cluster.id}
-            type="button"
+            role="note"
+            tabIndex={0}
             className={styles.clusterTarget}
             style={{ left: `${cluster.x}%`, top: `${cluster.y}%` }}
             data-active={("active" in cluster && cluster.active) || undefined}
@@ -131,7 +132,7 @@ export default function HeroRadar() {
               <strong>{cluster.label}</strong>
               <small>{cluster.meta}</small>
             </span>
-          </button>
+          </span>
         ))}
       </div>
     </div>

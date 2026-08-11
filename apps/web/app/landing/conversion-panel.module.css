@@ -21,18 +21,31 @@
 }
 
 .pricing [data-pricing-primary="true"] {
+  position: relative;
   align-self: start;
   border: 0;
-  border-top: 1px solid rgba(141, 217, 193, .48);
-  background: rgba(255, 255, 255, .025);
+  border-top: 1px solid rgba(141, 217, 193, .52);
+  background: linear-gradient(145deg, rgba(255,255,255,.035), rgba(141,217,193,.025));
+}
+
+.pricing [data-pricing-primary="true"]::before {
+  position: absolute;
+  top: -1px;
+  right: 54%;
+  left: 0;
+  height: 1px;
+  background: #8dd9c1;
+  content: "";
+  opacity: .75;
 }
 
 .pilotOffer {
-  transition: background-color .22s ease, border-color .22s ease;
+  transition: background-color .22s ease, border-color .22s ease, transform .22s ease;
 }
 
 .pilotOffer:hover {
-  background: rgba(255, 255, 255, .035);
+  background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(141,217,193,.04));
+  transform: translateY(-2px);
 }
 
 .pricing [data-pricing-primary="true"] > :global(a) {
@@ -58,7 +71,11 @@
   position: relative;
   align-content: start;
   min-height: 0;
-  transition: background-color .2s ease, border-color .2s ease;
+  transition: background-color .2s ease, border-color .2s ease, opacity .2s ease;
+}
+
+.secondaryOffers:has(:global(article:hover)) :global(article:not(:hover)) {
+  opacity: .68;
 }
 
 .secondaryOffers :global(article[data-recommended="true"]) {
@@ -154,29 +171,38 @@
 
 .faq :global(details) {
   border-color: rgba(221, 233, 227, .12);
+  transition: background-color .18s ease, border-color .18s ease;
+}
+
+.faq :global(details:hover),
+.faq :global(details[open]) {
+  background: rgba(255, 255, 255, .018);
 }
 
 .faq :global(details[open]) {
-  background: rgba(255, 255, 255, .014);
+  border-color: rgba(141,217,193,.22);
 }
 
 .faq :global(summary) {
   min-height: 56px;
+  transition: color .18s ease;
 }
 
 .faq :global(details[open] summary) {
-  color: rgba(242, 239, 231, .96);
+  color: rgba(242, 239, 231, .98);
 }
 
 .faq :global(details p) {
-  max-width: 58rem;
+  max-width: 54rem;
+  color: rgba(242,239,231,.7);
 }
 
 .final {
   border: 0;
-  border-top: 1px solid rgba(141, 217, 193, .26);
+  border-top: 1px solid rgba(141, 217, 193, .28);
   background:
-    radial-gradient(circle at 82% 18%, rgba(141, 217, 193, .085), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgba(141, 217, 193, .1), transparent 32%),
+    radial-gradient(circle at 18% 110%, rgba(180,124,92,.04), transparent 30%),
     linear-gradient(135deg, rgba(255,255,255,.018), transparent 48%),
     var(--slate-900);
   color: #f2efe7;
@@ -192,12 +218,14 @@
 }
 
 .final h2 {
-  max-width: 11ch;
+  max-width: 13ch;
+  text-wrap: balance;
 }
 
 .final p {
-  max-width: 44rem;
+  max-width: 40rem;
   color: rgba(242, 239, 231, .7);
+  text-wrap: pretty;
 }
 
 .final a {
@@ -212,7 +240,8 @@
   transition: transform .18s ease, border-color .18s ease, background-color .18s ease;
 }
 
-.final a:first-child:hover {
+.final a:first-child:hover,
+.final a:first-child:focus-visible {
   border-color: #b5ead8;
   background: #b5ead8;
   transform: translateY(-1px);
@@ -224,7 +253,10 @@
 
 .final a:last-child {
   color: rgba(242, 239, 231, .66);
+  transition: color .18s ease;
 }
+.final a:last-child:hover,
+.final a:last-child:focus-visible { color: rgba(242,239,231,.92); }
 
 .finalTrust {
   position: relative;
@@ -257,100 +289,15 @@
   opacity: .8;
 }
 
-.finalSignal {
-  position: absolute;
-  z-index: 0;
-  top: 50%;
-  right: clamp(1.5rem, 5vw, 5rem);
-  width: clamp(15rem, 24vw, 23rem);
-  height: clamp(10rem, 16vw, 15rem);
-  margin: 0;
-  color: var(--signal-strong);
-  opacity: .74;
-  transform: translateY(-50%);
-  pointer-events: none;
-  animation: finalDrift 9s ease-in-out infinite;
-}
-
-.finalSignal::before,
-.finalSignal::after {
-  position: absolute;
-  border: 1px solid rgba(191, 220, 145, .15);
-  border-radius: 50%;
-  content: "";
-}
-
-.finalSignal::before { inset: 8% 2% -32% 24%; }
-.finalSignal::after { inset: 28% 18% -12% 40%; border-style: dashed; }
-
-.profileNode,
-.signalField {
-  position: absolute;
-  z-index: 1;
-  padding: .35rem .45rem;
-  border: 1px solid rgba(191, 220, 145, .19);
-  background: rgba(8, 12, 10, .76);
-  font-family: var(--mono);
-  font-size: .5rem;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-}
-
-.profileNode { top: 22%; left: 0; }
-.signalField { right: 2%; bottom: 18%; color: var(--paper); }
-
-.signalRoute {
-  position: absolute;
-  top: 45%;
-  right: 22%;
-  left: 28%;
-  height: 1px;
-  background: linear-gradient(90deg, var(--signal-strong), rgba(191, 220, 145, .08));
-  transform: rotate(18deg);
-  transform-origin: left;
-}
-
-.constellation {
-  position: absolute;
-  right: 12%;
-  bottom: 27%;
-  width: 7rem;
-  height: 5rem;
-}
-
-.constellation i {
-  position: absolute;
-  width: .32rem;
-  height: .32rem;
-  border-radius: 50%;
-  background: currentColor;
-  animation: signalPulse 4.8s ease-in-out infinite;
-}
-
-.constellation i:nth-child(1) { top: 8%; left: 12%; animation-delay: -.4s; }
-.constellation i:nth-child(2) { top: 42%; left: 34%; animation-delay: -1.4s; }
-.constellation i:nth-child(3) { top: 18%; left: 58%; animation-delay: -2.2s; }
-.constellation i:nth-child(4) { top: 68%; left: 74%; animation-delay: -3.1s; }
-.constellation i:nth-child(5) { top: 48%; left: 92%; animation-delay: -3.8s; }
-
-@keyframes finalDrift {
-  0%, 100% { transform: translateY(-50%) translate3d(0, 0, 0); }
-  50% { transform: translateY(-50%) translate3d(-5px, -4px, 0); }
-}
-
-@keyframes signalPulse {
-  0%, 100% { opacity: .36; transform: scale(.88); }
-  48% { opacity: .9; transform: scale(1); }
-}
-
 @media (min-width: 1180px) {
   .pricing > :first-child {
     padding-top: .35rem;
   }
 
   .pricing > :first-child :global(h2) {
-    max-width: 12ch;
+    max-width: 15ch;
     font-size: clamp(2.35rem, 3.2vw, 3.15rem);
+    text-wrap: balance;
   }
 }
 
@@ -366,6 +313,8 @@
     padding-block: 4.25rem;
   }
 
+  .pilotOffer:hover { transform: none; }
+
   .pricing [data-pricing-secondary="true"] {
     grid-template-rows: none;
   }
@@ -373,6 +322,8 @@
   .pricing [data-pricing-secondary="true"] :global(article) > :global(a) {
     margin-top: .35rem;
   }
+
+  .secondaryOffers:has(:global(article:hover)) :global(article:not(:hover)) { opacity: 1; }
 
   .secondaryOffers :global(article[data-recommended="true"]) {
     margin-inline: -.55rem;
@@ -400,38 +351,14 @@
     display: grid;
     gap: .5rem;
   }
-
-  .finalSignal {
-    top: auto;
-    right: .75rem;
-    bottom: .75rem;
-    width: min(18rem, calc(100% - 1.5rem));
-    height: 8.5rem;
-    opacity: .48;
-    transform: none;
-    animation-name: finalDriftMobile;
-  }
-
-  .profileNode { top: 18%; left: .25rem; }
-  .signalField { right: .25rem; bottom: 12%; }
-  .constellation { right: 8%; bottom: 18%; }
-}
-
-@keyframes finalDriftMobile {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(-4px, -3px, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .faq :global(summary i) {
-    transition: none !important;
-  }
-
+  .faq :global(summary i),
+  .faq :global(details),
   .pilotOffer,
   .secondaryOffers :global(article),
-  .final a:first-child,
-  .finalSignal,
-  .constellation i {
+  .final a {
     animation: none !important;
     transition: none !important;
   }

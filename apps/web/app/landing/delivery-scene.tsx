@@ -4,9 +4,9 @@ import { DEMO_COMPANY } from "./landing-copy";
 import styles from "./landing.module.css";
 
 const DELIVERY_STEPS = [
-  { title: "Настроили профиль", text: "Специализация и рынок задают границы поиска." },
-  { title: "Radar следит", text: "Сигналы связываются с компаниями и проверяемыми источниками." },
-  { title: "Получили возможности", text: "Короткая выдача объясняет, кому стоит написать и почему." },
+  { title: "Задали фокус", text: "Специализация и география задают, что считать релевантным." },
+  { title: "Radar следит", text: "Свежие изменения связываются с компаниями и проверяемыми источниками." },
+  { title: "Получили повод", text: "В выдаче — кому написать, почему сейчас и чем это подтверждается." },
 ] as const;
 
 type DeliveryChannelKey = "cabinet" | "telegram" | "email" | "vk" | "push" | "webhook";
@@ -22,9 +22,9 @@ type DeliveryChannel = {
 const CORE_CHANNEL: DeliveryChannel = {
   key: "cabinet",
   title: "Web",
-  status: "базовый",
-  text: "Карточки возможностей и доказательства остаются в рабочем кабинете.",
-  note: "основная поверхность",
+  status: "всегда",
+  text: "Полная карточка: приоритет, «почему сейчас», доказательства и история сигнала.",
+  note: "основной кабинет",
 };
 
 const PRIMARY_ROUTES: ReadonlyArray<DeliveryChannel> = [
@@ -32,14 +32,14 @@ const PRIMARY_ROUTES: ReadonlyArray<DeliveryChannel> = [
     key: "telegram",
     title: "Telegram",
     status: "подключаемый",
-    text: "Ежедневная выдача приходит через подключённого бота.",
-    note: "после проверки подключения",
+    text: "Короткая ежедневная выдача через подключённого бота.",
+    note: "после подключения",
   },
   {
     key: "email",
     title: "Email",
     status: "подключаемый",
-    text: "Агрегированная выдача приходит на рабочий адрес профиля.",
+    text: "Агрегированная выдача на рабочий адрес профиля.",
     note: "после согласия в профиле",
   },
 ];
@@ -49,14 +49,14 @@ const EXTRA_ROUTES: ReadonlyArray<DeliveryChannel> = [
     key: "vk",
     title: "VK",
     status: "подключаемый",
-    text: "События радара можно доставлять через настроенное VK-сообщество.",
+    text: "События радара через настроенное VK-сообщество.",
     note: "после настройки сообщества",
   },
   {
     key: "push",
     title: "Push в браузере",
     status: "после настройки",
-    text: "Браузерное уведомление доступно при включённой активной push-подписке.",
+    text: "Браузерное уведомление при включённой активной push-подписке.",
     note: "активная подписка / VAPID",
   },
   {
@@ -115,12 +115,12 @@ export default function DeliveryScene() {
     >
       <div className={styles.deliveryLayout}>
         <div className={styles.deliveryIntro}>
-          <p className={styles.sceneLabel}>Рабочий процесс</p>
+          <p className={styles.sceneLabel}>Доставка и outreach</p>
           <h2 id="delivery-title" className={styles.sceneHeading}>
-            Как радар попадает <em>в ваш рабочий процесс.</em>
+            Радар работает рядом с вами, <em>а не вместо вас.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Настройте профиль один раз: Radar следит за изменениями и приносит короткую выдачу с доказательствами.
+            Он собирает и доставляет возможности. Решение, финальная проверка и отправка сообщения остаются за вами.
           </p>
         </div>
 
@@ -138,9 +138,9 @@ export default function DeliveryScene() {
           <div className={sceneStyles.capabilityHeader}>
             <div>
               <span>Доставка</span>
-              <strong>Возможности приходят туда, где вы работаете.</strong>
+              <strong>Выдача — там, где удобнее работать.</strong>
             </div>
-            <p>Web доступен всегда. Остальные маршруты включаются только после соответствующей настройки.</p>
+            <p>Web доступен всегда. Остальные каналы появляются только после вашей настройки.</p>
           </div>
           <div className={sceneStyles.channelHierarchy}>
             <article className={sceneStyles.coreChannel} data-channel={CORE_CHANNEL.key} data-delivery-core="workspace">
@@ -148,16 +148,16 @@ export default function DeliveryScene() {
                 <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel={CORE_CHANNEL.key} /></span>
                 <span className={sceneStyles.channelStatus}>{CORE_CHANNEL.status}</span>
               </div>
-              <span className={sceneStyles.groupLabel}>Radar workspace</span>
+              <span className={sceneStyles.groupLabel}>Рабочий кабинет</span>
               <h3>{CORE_CHANNEL.title}</h3>
               <p>{CORE_CHANNEL.text}</p>
               <small>{CORE_CHANNEL.note}</small>
             </article>
             <div className={sceneStyles.deliveryRoutes} data-delivery-routes="connected">
-              <span className={sceneStyles.groupLabel}>Подключаемые маршруты</span>
+              <span className={sceneStyles.groupLabel}>Дополнительные каналы</span>
               {PRIMARY_ROUTES.map((channel) => <ChannelRoute key={channel.key} channel={channel} />)}
               <details className={sceneStyles.moreRoutes}>
-                <summary><span>+ ещё маршруты</span><small>VK · Push · Webhook</small></summary>
+                <summary><span>+ ещё 3 канала</span><small>VK · Push · Webhook</small></summary>
                 <div className={sceneStyles.extraRoutes}>
                   {EXTRA_ROUTES.map((channel) => <ChannelRoute key={channel.key} channel={channel} />)}
                 </div>
@@ -168,23 +168,23 @@ export default function DeliveryScene() {
 
         <div className={sceneStyles.outreachSequence} data-manual-outreach-boundary="true">
           <div className={sceneStyles.outreachFacts}>
-            <span className={sceneStyles.groupLabel}>Сильная возможность найдена</span>
+            <span className={sceneStyles.groupLabel}>Готовый контекст для первого контакта</span>
             <strong>{DEMO_COMPANY.name}</strong>
             <dl>
-              <div><dt>Почему сейчас</dt><dd>{DEMO_COMPANY.whyNow}</dd></div>
-              <div><dt>Угол разговора</dt><dd>Точечный подбор по сложным инженерным ролям и руководителям направления.</dd></div>
-              <div><dt>Корпоративный маршрут</dt><dd>Карьерная страница → контакты работодателя → рабочий канал компании.</dd></div>
+              <div><dt>Что изменилось</dt><dd>{DEMO_COMPANY.whyNow}</dd></div>
+              <div><dt>С чем выходить</dt><dd>Точечный подбор по сложным инженерным ролям и руководителям направления.</dd></div>
+              <div><dt>Куда писать</dt><dd>Карьерная страница → контакты работодателя → рабочий канал компании.</dd></div>
             </dl>
           </div>
           <div className={sceneStyles.outreachDraft}>
-            <div><SignalGlyph size={30} /><span>ЧЕРНОВИК / НЕ ОТПРАВЛЕНО</span></div>
-            <p>«Вижу, что вы расширяете инженерную функцию и повторно открыли несколько сложных ролей. Можем подключиться точечно к позициям, где внутренней команде нужен дополнительный поиск.»</p>
-            <strong>Вы проверяете факты и отправляете сами.</strong>
+            <div><SignalGlyph size={30} /><span>ЧЕРНОВИК / НЕ ОТПРАВЛЕН</span></div>
+            <p>«Вижу, что вы расширяете инженерную команду: открыли 8 позиций и повторно опубликовали 3 сложные роли. Если часть из них требует внешнего поиска, можем подключиться точечно.»</p>
+            <strong>Проверьте факты. Отправьте своим голосом.</strong>
           </div>
         </div>
 
         <aside className={styles.deliveryBoundary}>
-          <span>Граница автоматизации</span>
+          <span>Никакой авторассылки</span>
           <strong>Обращение компаниям всегда отправляете вы.</strong>
         </aside>
       </div>

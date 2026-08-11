@@ -9,6 +9,7 @@
   opacity: .66;
   transform: translateY(-50%);
   pointer-events: none;
+  animation: radarDrift 13s ease-in-out infinite alternate;
 }
 
 .arc { position: absolute; border: 1px solid rgba(181,234,216,.17); border-radius: 50%; }
@@ -24,24 +25,25 @@
 .cluster:nth-of-type(4) { top: 61%; left: 8%; }
 .cluster:nth-of-type(5) { top: 18%; right: 5%; }
 .activeCluster { right: 20%; bottom: 24%; }
-.activeCluster::before { position: absolute; top: 47%; left: 43%; width: 3.7rem; height: 3.7rem; border: 1px solid rgba(181,234,216,.12); border-radius: 50%; content: ""; transform: translate(-50%,-50%); transition: border-color .2s ease, transform .2s ease; }
-.activeCluster > i { opacity: .72; }
+.activeCluster::before { position: absolute; top: 47%; left: 43%; width: 3.7rem; height: 3.7rem; border: 1px solid rgba(181,234,216,.12); border-radius: 50%; content: ""; transform: translate(-50%,-50%); transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease; }
+.activeCluster > i { opacity: .72; transition: opacity .2s ease, transform .2s ease; }
 .activeCluster > i:first-child { width: .42rem; height: .42rem; opacity: 1; box-shadow: 0 0 0 8px rgba(181,234,216,.055); }
 .annotation { position: absolute; right: 8%; bottom: 4%; display: grid; gap: .2rem; font-family: var(--mono); text-transform: uppercase; }
-.annotation strong { color: #b5ead8; font-size: .55rem; letter-spacing: .06em; }
+.annotation strong { color: #b5ead8; font-size: .55rem; letter-spacing: .06em; transition: color .2s ease; }
 .annotation small { color: rgba(242,239,231,.46); font-size: .5rem; letter-spacing: .04em; }
 
 :global(#conversion-final):has(:global([data-analytics-context="closing"]:hover)) .activeCluster::before,
-:global(#conversion-final):has(:global([data-analytics-context="closing"]:focus-visible)) .activeCluster::before { border-color: rgba(181,234,216,.36); transform: translate(-50%,-50%) scale(1.08); }
+:global(#conversion-final):has(:global([data-analytics-context="closing"]:focus-visible)) .activeCluster::before { border-color: rgba(181,234,216,.38); box-shadow: 0 0 0 10px rgba(181,234,216,.035); transform: translate(-50%,-50%) scale(1.08); }
 :global(#conversion-final):has(:global([data-analytics-context="closing"]:hover)) .activeCluster > i,
 :global(#conversion-final):has(:global([data-analytics-context="closing"]:focus-visible)) .activeCluster > i { animation: resolveDot .42s ease both; }
 :global(#conversion-final):has(:global([data-analytics-context="closing"]:hover)) .annotation strong,
 :global(#conversion-final):has(:global([data-analytics-context="closing"]:focus-visible)) .annotation strong { color: #d8f3ea; }
 
+@keyframes radarDrift { from { transform: translateY(-50%) translate3d(0,2px,0); } to { transform: translateY(-50%) translate3d(-5px,-4px,0); } }
 @keyframes resolveDot { 0% { opacity: .34; transform: translate3d(3px,-2px,0); } 100% { opacity: 1; transform: none; } }
 
 @media (max-width: 900px) {
-  .radar { top: auto; right: -.75rem; bottom: -.8rem; width: 18rem; height: 10rem; opacity: .42; transform: none; }
+  .radar { top: auto; right: -.75rem; bottom: -.8rem; width: 18rem; height: 10rem; opacity: .42; transform: none; animation-name: radarDriftMobile; }
   .arc:first-child { inset: -60% -18% -70% 8%; }
   .arc:nth-child(2) { inset: -5% 5% -50% 36%; }
   .cluster { display: none; }
@@ -49,7 +51,12 @@
   .annotation { right: 4%; bottom: 2%; }
 }
 
+@keyframes radarDriftMobile { from { transform: translate3d(0,1px,0); } to { transform: translate3d(-3px,-2px,0); } }
+
 @media (prefers-reduced-motion: reduce) {
-  .activeCluster::before { transition: none !important; }
-  .activeCluster > i { animation: none !important; }
+  .radar,
+  .activeCluster::before,
+  .activeCluster > i,
+  .annotation strong { animation: none !important; transition: none !important; }
+  .radar { transform: translateY(-50%); }
 }

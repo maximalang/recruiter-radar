@@ -33,13 +33,13 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <div className={styles.pricingIntro} data-pricing-intro>
-          <span>Тарифы</span>
-          <h2>Проверьте радар за 7 дней.</h2>
+          <span>Пилот без обязательств</span>
+          <h2>7 дней, чтобы проверить не интерфейс — результат.</h2>
           <p>
-            Начните с недели. Продолжайте только если радар полезен.{" "}
+            Начните с недели. Продолжайте только если радар полезен. Смотрите на своей нише: появляются ли новые компании, понятен ли «почему сейчас», хватает ли доказательств для уверенного выхода.{" "}
             {props.paymentConfigured
-              ? "990 ₽ за 7 дней без автопродления. Если выдача помогает находить компании для выхода, месяц и квартал стоят заметно дешевле в пересчёте на неделю."
-              : "Оставьте заявку на 7-дневный пилот. Профиль сохранится — оплату можно завершить после подключения платежей."}
+              ? "990 ₽ за неделю, разово, без автопродления. Если радар полезен — месяц и квартал дешевле в пересчёте на неделю."
+              : "Оставьте заявку на 7-дневный пилот без списания. Профиль сохранится — оплату можно завершить после подключения платежей."}
           </p>
         </div>
 
@@ -51,7 +51,7 @@ export default function ConversionPanel(props: {
           <div className={styles.pilotPrice}>
             <strong>{pilotPlan.price}</strong>
           </div>
-          <p>Проверьте на своих нишах не интерфейс, а сам результат: компании, «почему сейчас» и доказательства.</p>
+          <p>Проверьте на своих нишах не интерфейс, а сам результат: кому писать, почему сейчас и чем это подтверждено.</p>
           <ul>
             {pilotPlan.bullets.slice(0, 3).map((bullet) => <li key={bullet}><ArrowGlyph size={14} />{bullet}</li>)}
           </ul>
@@ -109,10 +109,10 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <div className={styles.faqHeading} data-faq-heading>
-          <span>Перед запуском</span>
-          <h2>Перед запуском — короткие ответы.</h2>
-          <p>Откуда берутся сигналы, как формируется приоритет, куда приходит выдача и что остаётся под вашим контролем.</p>
-          <small data-faq-trust>Интерактивный пример доступен без регистрации. Публичные данные в нём обезличены.</small>
+          <span>Перед запуском — короткие ответы.</span>
+          <h2>Вопросы, которые стоит закрыть до запуска.</h2>
+          <p>Источники, приоритет, доставка, контроль и оплата — без мелкого шрифта.</p>
+          <small data-faq-trust>Интерактивный пример — без регистрации. Данные в нём обезличены.</small>
         </div>
         <div className={styles.faqList} data-faq-list>
           {props.faqItems.map((item, index) => (
@@ -130,9 +130,9 @@ export default function ConversionPanel(props: {
         data-header-tone="dark"
         data-motion-reveal="section"
       >
-        <span>ПЕРВАЯ ВЫДАЧА / 7 ДНЕЙ</span>
-        <h2>Проверьте, кому стоит написать сейчас.</h2>
-        <p>Настройте специализацию агентства и проверьте за неделю, появляются ли новые компании с достаточными фактами для первого контакта.</p>
+        <span>7 ДНЕЙ / СВОЯ НИША</span>
+        <h2>Проверьте, кому стоит написать сейчас — и почему.</h2>
+        <p>За неделю станет видно, даёт ли радар новые компании и достаточно ли фактов для уверенного первого контакта.</p>
         <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
           <li>990 ₽ / 7 дней</li>
           <li>Без автопродления</li>
@@ -154,9 +154,9 @@ export default function ConversionPanel(props: {
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.closing}
           >
-            {props.paymentConfigured ? `Запустить радар — ${pilotPlan.price}` : "Оставить заявку на пилот"} <ArrowGlyph />
+            {props.paymentConfigured ? `Запустить на 7 дней — ${pilotPlan.price}` : "Оставить заявку на пилот"} <ArrowGlyph />
           </Link>
-          <a href="#preview-configurator">Сначала настроить пример <ArrowGlyph /></a>
+          <a href="#preview-configurator">Сначала посмотреть пример <ArrowGlyph /></a>
         </div>
       </div>
     </section>
