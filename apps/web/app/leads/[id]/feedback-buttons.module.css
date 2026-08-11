@@ -35,7 +35,11 @@
   background-color: var(--c-bg-card);
   color: var(--c-text-secondary);
   cursor: pointer;
-  transition: all 0.15s;
+  transition:
+    color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
+    background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
+    border-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
+    box-shadow var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
 }
 
 /* Inline-SVG triage icon — inherits the button tone via currentColor. */
@@ -43,6 +47,11 @@
   flex: 0 0 auto;
   width: 1em;
   height: 1em;
+}
+
+.btnIcon > svg {
+  width: 100%;
+  height: 100%;
 }
 
 .feedbackBtn:focus-visible {
@@ -56,31 +65,36 @@
 }
 
 .feedbackBtn[data-active="true"][data-tone="success"] {
-  border: 2px solid #10b981;
+  border-color: #10b981;
+  box-shadow: inset 0 0 0 1px #10b981;
   background-color: rgba(16, 185, 129, 0.1);
   color: #10b981;
 }
 
 .feedbackBtn[data-active="true"][data-tone="neutral"] {
-  border: 2px solid #6b7280;
+  border-color: #6b7280;
+  box-shadow: inset 0 0 0 1px #6b7280;
   background-color: rgba(107, 114, 128, 0.1);
   color: #6b7280;
 }
 
 .feedbackBtn[data-active="true"][data-tone="warning"] {
-  border: 2px solid #f59e0b;
+  border-color: #f59e0b;
+  box-shadow: inset 0 0 0 1px #f59e0b;
   background-color: rgba(245, 158, 11, 0.1);
   color: #f59e0b;
 }
 
 .feedbackBtn[data-active="true"][data-tone="info"] {
-  border: 2px solid var(--signal-support);
+  border-color: var(--signal-support);
+  box-shadow: inset 0 0 0 1px var(--signal-support);
   background-color: rgba(35, 128, 111, 0.1);
   color: var(--signal-support);
 }
 
 .feedbackBtn[data-active="true"][data-tone="danger"] {
-  border: 2px solid #ef4444;
+  border-color: #ef4444;
+  box-shadow: inset 0 0 0 1px #ef4444;
   background-color: rgba(239, 68, 68, 0.1);
   color: #ef4444;
 }
@@ -154,6 +168,18 @@
   font-size: 0.75rem;
   color: #ef4444;
   margin-top: 6px;
+}
+
+.statusText {
+  min-height: 1.05rem;
+  margin: 6px 0 0;
+  color: var(--c-text-muted);
+  font-size: 0.75rem;
+}
+
+.statusText:empty {
+  min-height: 0;
+  margin: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

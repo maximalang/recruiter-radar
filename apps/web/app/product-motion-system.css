@@ -14,6 +14,7 @@
   --rr-motion-ease-standard: cubic-bezier(0.2, 0.75, 0.25, 1);
   --rr-motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
   --rr-motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --rr-motion-distance-hover: 1px;
   --rr-motion-distance-short: 4px;
   --rr-motion-press-scale: 0.99;
 }
@@ -29,7 +30,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   [data-motion-interactive]:where(:hover, :focus-visible) {
-    transform: translateY(calc(-1 * var(--rr-motion-distance-short)));
+    transform: translateY(calc(-1 * var(--rr-motion-distance-hover)));
   }
 }
 
@@ -75,6 +76,52 @@
     content-visibility var(--rr-motion-duration-disclosure) allow-discrete;
 }
 
+[data-motion-icon] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(0) rotate(0deg) scale(1);
+  transform-origin: center;
+  transition: transform var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+}
+
+[data-motion-icon] > svg {
+  width: 100%;
+  height: 100%;
+}
+
+[data-motion-icon][data-motion-state="active"] {
+  transform: translateY(-1px);
+}
+
+[data-motion-icon][data-motion-state="pending"] {
+  animation: rr-motion-icon-progress 720ms linear infinite;
+}
+
+[data-motion-icon][data-motion-state="success"] {
+  animation: rr-motion-icon-confirm var(--rr-motion-duration-emphasis) var(--rr-motion-ease-enter) both;
+}
+
+[data-motion-icon][data-motion-state="error"] {
+  animation: rr-motion-icon-error var(--rr-motion-duration-emphasis) var(--rr-motion-ease-standard) both;
+}
+
+@keyframes rr-motion-icon-progress {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes rr-motion-icon-confirm {
+  0% { transform: scale(0.88); }
+  70% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes rr-motion-icon-error {
+  0%, 100% { transform: translateX(0); }
+  35% { transform: translateX(-2px); }
+  70% { transform: translateX(2px); }
+}
+
 @starting-style {
   [data-motion-disclosure] {
     opacity: 0;
@@ -85,7 +132,9 @@
   [data-motion-interactive],
   [data-motion-list] [data-motion-item],
   [data-motion-status],
-  [data-motion-disclosure] {
+  [data-motion-disclosure],
+  [data-motion-icon] {
+    animation: none;
     transform: none;
     transition-duration: 0.01ms;
   }

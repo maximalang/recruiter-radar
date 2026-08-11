@@ -1,8 +1,8 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback } from 'react';
-import { CheckIcon, XIcon } from '../ui/icons';
+import { useCallback, useTransition } from 'react';
+import { CheckIcon, MotionIcon, XIcon } from '../ui/icons';
 import s from './leads-filters.module.css';
 
 const GATE_OPTIONS = [
@@ -36,11 +36,22 @@ const EPHEMERAL_FILTER_KEYS = ['gate', 'feedback', 'today'] as const;
 export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOption[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   const currentGate = searchParams.get('gate') ?? '';
   const currentFeedback = searchParams.get('feedback') ?? '';
   const currentProfile = searchParams.get('profile') ?? '';
   const currentToday = searchParams.get('today') === '1';
+
+  const navigate = useCallback(
+    (params: URLSearchParams) => {
+      const qs = params.toString();
+      startTransition(() => {
+        router.push(`/leads${qs ? `?${qs}` : ''}`, { scroll: false });
+      });
+    },
+    [router],
+  );
 
   const updateFilter = useCallback(
     (key: string, value: string) => {
@@ -52,10 +63,9 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
       }
       // Reset to page 1 when filter changes
       params.delete('page');
-      const qs = params.toString();
-      router.push(`/leads${qs ? `?${qs}` : ''}`, { scroll: false });
+      navigate(params);
     },
-    [router, searchParams],
+    [navigate, searchParams],
   );
 
   const toggleToday = useCallback(() => {
@@ -69,9 +79,8 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
       params.delete('feedback');
     }
     params.delete('page');
-    const qs = params.toString();
-    router.push(`/leads${qs ? `?${qs}` : ''}`, { scroll: false });
-  }, [router, searchParams, currentToday]);
+    navigate(params);
+  }, [navigate, searchParams, currentToday]);
 
   const resetEphemeral = useCallback(() => {
     // Keep the profile (durable), wipe only the review filters.
@@ -80,15 +89,14 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
       params.delete(key);
     }
     params.delete('page');
-    const qs = params.toString();
-    router.push(`/leads${qs ? `?${qs}` : ''}`, { scroll: false });
-  }, [router, searchParams]);
+    navigate(params);
+  }, [navigate, searchParams]);
 
   const hasEphemeralFilters =
     currentGate !== '' || currentFeedback !== '' || currentToday;
 
   return (
-    <div className={s.filterBar}>
+    <div className={s.filterBar} aria-busy={isPending}>
       {/* Durable profile choice — survives "Сбросить". Visually separated from
           the ephemeral review filters below so the agency sees profile setup as
           a persistent context, not a today-filter. */}
@@ -145,22 +153,52 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
       </div>
 
       <button
+        type="button"
         onClick={toggleToday}
+        disabled={isPending}
         className={s.todayToggle}
+        data-motion-interactive
         data-active={currentToday ? 'true' : undefined}
         aria-pressed={currentToday ? 'true' : 'false'}
         title="Лиды, которые вы взяли в работу или по которым уже ответили"
       >
-        <CheckIcon className={s.todayToggleIcon} aria-hidden="true" />
+        <MotionIcon
+          kind="filter"
+          state={isPending ? 'pending' : currentToday ? 'active' : 'idle'}
+          className={s.todayToggleIcon}
+        >
+          <CheckIcon />
+        </MotionIcon>
         Сегодня в работе
       </button>
 
       {hasEphemeralFilters && (
-        <button onClick={resetEphemeral} className={s.filterReset}>
-          <XIcon className={s.filterResetIcon} aria-hidden="true" />
+        <button
+          type="button"
+          onClick={resetEphemeral}
+          disabled={isPending}
+          className={s.filterReset}
+          data-motion-interactive
+        >
+          <MotionIcon
+            kind="reset"
+            state={isPending ? 'pending' : 'idle'}
+            className={s.filterResetIcon}
+          >
+            <XIcon />
+          </MotionIcon>
           Сбросить фильтры
         </button>
       )}
+
+      <span
+        className={s.filterStatus}
+        role="status"
+        aria-live="polite"
+        data-motion-status
+      >
+        {isPending ? 'Обновляем список…' : ''}
+      </span>
     </div>
   );
 }

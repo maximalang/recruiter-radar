@@ -28,11 +28,14 @@ describe('product motion system', () => {
       '--rr-motion-duration-emphasis: 220ms',
       '--rr-motion-ease-standard:',
       '--rr-motion-ease-enter:',
+      '--rr-motion-distance-hover: 1px',
       '--rr-motion-distance-short: 4px',
       '[data-motion-interactive]',
       '[data-motion-list]',
       '[data-motion-status]',
       '[data-motion-disclosure]',
+      '[data-motion-icon]',
+      '@keyframes rr-motion-icon-confirm',
     ]) {
       expect(motion).toContain(contract);
     }
@@ -42,6 +45,7 @@ describe('product motion system', () => {
     expect(motion).toContain('@media (prefers-reduced-motion: reduce)');
     expect(motion).toContain('transition-duration: 0.01ms');
     expect(motion).toContain('transform: none');
+    expect(motion).toContain('animation: none');
     expect(motion).not.toContain('animation-iteration-count: infinite');
     expect(internalPage).not.toContain('@keyframes pageFadeIn');
     expect(internalPage).not.toContain('animation: pageFadeIn');

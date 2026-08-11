@@ -49,4 +49,20 @@ describe('LeadsFilters (T3.1 — active filter state)', () => {
     const todayBtn = screen.getByRole('button', { name: /сегодня в работе/i });
     expect(todayBtn.querySelector('svg')).not.toBeNull();
   });
+
+  it('exposes navigation progress and semantic icon states', () => {
+    const { container } = render(<LeadsFilters profiles={[]} />);
+    const filterBar = container.querySelector('[aria-busy]');
+    const todayBtn = screen.getByRole('button', { name: /сегодня в работе/i });
+    const resetBtn = screen.getByRole('button', { name: /сбросить фильтры/i });
+
+    expect(filterBar).toHaveAttribute('aria-busy', 'false');
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(todayBtn).toHaveAttribute('data-motion-interactive');
+    expect(todayBtn.querySelector('[data-motion-icon="filter"]')).toHaveAttribute(
+      'data-motion-state',
+      'idle',
+    );
+    expect(resetBtn.querySelector('[data-motion-icon="reset"]')).not.toBeNull();
+  });
 });

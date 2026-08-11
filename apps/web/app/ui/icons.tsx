@@ -17,7 +17,7 @@
  * Consumers render `<Icon name="…" />` or a named export. Keep the set small:
  * add a glyph only when a real UI surface needs it.
  */
-import type { ReactNode, SVGProps } from 'react';
+import type { HTMLAttributes, ReactNode, SVGProps } from 'react';
 
 type IconProps = SVGProps<SVGSVGElement> & {
   /** Optional size in px; defaults to 1em so the icon tracks its font-size. */
@@ -41,6 +41,45 @@ function Svg({ size = '1em', children, ...rest }: IconProps & { children: ReactN
     >
       {children}
     </svg>
+  );
+}
+
+type MotionIconKind =
+  | 'disclosure'
+  | 'feedback'
+  | 'filter'
+  | 'navigation'
+  | 'reset'
+  | 'status';
+
+type MotionIconState = 'idle' | 'active' | 'pending' | 'success' | 'error';
+
+type MotionIconProps = HTMLAttributes<HTMLSpanElement> & {
+  children: ReactNode;
+  kind: MotionIconKind;
+  state?: MotionIconState;
+};
+
+/**
+ * Semantic state wrapper for the shared stroke icon set. The glyph remains
+ * unchanged; the Product Motion System may add a short state transition around
+ * it. Idle icons never animate, and the surrounding control owns the label.
+ */
+export function MotionIcon({
+  children,
+  kind,
+  state = 'idle',
+  ...rest
+}: MotionIconProps) {
+  return (
+    <span
+      {...rest}
+      aria-hidden="true"
+      data-motion-icon={kind}
+      data-motion-state={state}
+    >
+      {children}
+    </span>
   );
 }
 
