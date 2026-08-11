@@ -323,7 +323,10 @@ try {
       const disclosureAvailable = await firstDisclosure.count() > 0;
       let disclosureAudit = { available: false, opened: false, clippedControls: [] };
       if (disclosureAvailable) {
-        await firstDisclosure.click();
+        const disclosureWasOpen = await firstDisclosure.evaluate((summary) =>
+          Boolean(summary.closest('details')?.open),
+        );
+        if (!disclosureWasOpen) await firstDisclosure.click();
         disclosureAudit = await firstDisclosure.evaluate((summary) => {
           const details = summary.closest('details');
           const controls = details

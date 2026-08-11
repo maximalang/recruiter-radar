@@ -55,6 +55,8 @@ describe('cross-route interaction hardening', () => {
     expect(responsiveAudit).toContain('continuousAnimations');
     expect(responsiveAudit).toContain('unlabeledDialogs');
     expect(responsiveAudit).toContain('disclosureAudit');
+    expect(responsiveAudit).toContain('const disclosureWasOpen = await firstDisclosure.evaluate');
+    expect(responsiveAudit).toContain('if (!disclosureWasOpen) await firstDisclosure.click()');
     expect(responsiveAudit).toContain('navigationDurationMs');
     expect(responsiveAudit).toContain("waitForLoadState('networkidle'");
   });
