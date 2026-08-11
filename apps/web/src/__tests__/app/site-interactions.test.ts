@@ -29,6 +29,12 @@ describe('cross-route interaction hardening', () => {
   it('audits the complete public and product route families', () => {
     for (const route of [
       "'/opportunities'",
+      "'/opportunities/radar'",
+      "'/opportunities/sources'",
+      "'/admin/payments'",
+      "'/settings/access'",
+      "'/settings/delivery'",
+      "'/settings/radar'",
       "'/settings/security'",
       "'/settings/team'",
       "'/onboarding'",
@@ -43,6 +49,13 @@ describe('cross-route interaction hardening', () => {
     expect(responsiveAudit).toContain('formButtonsWithoutType');
     expect(responsiveAudit).toContain('duplicateIds');
     expect(responsiveAudit).toContain('keyboardFocus');
+    expect(responsiveAudit).toContain('focusIndicator');
+    expect(responsiveAudit).toContain('semanticNotFound');
+    expect(responsiveAudit).toContain('reducedMotionViolations');
+    expect(responsiveAudit).toContain('continuousAnimations');
+    expect(responsiveAudit).toContain('unlabeledDialogs');
+    expect(responsiveAudit).toContain('disclosureAudit');
+    expect(responsiveAudit).toContain('navigationDurationMs');
     expect(responsiveAudit).toContain("waitForLoadState('networkidle'");
   });
 });
