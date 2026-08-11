@@ -11,12 +11,13 @@
   grid-template-columns: minmax(20rem, .9fr) minmax(24rem, 1.1fr);
   grid-template-areas: "label label" "title lead";
   gap: .9rem clamp(2.5rem, 5vw, 5rem);
-  padding-bottom: 1.6rem;
+  padding-bottom: 1.8rem;
 }
 
 .intro :global(h2) {
-  max-width: 10ch;
+  max-width: 13ch;
   font-size: clamp(2.55rem, 4.1vw, 4.2rem);
+  text-wrap: balance;
 }
 
 .intro :global(h2 em) {
@@ -27,19 +28,23 @@
 .productFrame {
   overflow: hidden;
   border: 1px solid rgba(23, 35, 45, .13);
-  border-radius: 6px;
+  border-radius: 12px;
   background: #fbfaf6;
-  box-shadow: 0 16px 42px rgba(8, 12, 10, .055);
+  box-shadow: 0 18px 48px rgba(8, 12, 10, .065);
+}
+
+.section:global([data-motion-state="visible"]) .productFrame {
+  animation: frameResolve .62s .08s cubic-bezier(.2,.75,.25,1) both;
 }
 
 .productRail {
   display: flex;
-  min-height: 2.7rem;
+  min-height: 2.9rem;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: .62rem .9rem;
-  background: var(--slate-900);
+  padding: .66rem .95rem;
+  background: linear-gradient(90deg, #111b17, var(--slate-900));
   color: #f2efe7;
 }
 
@@ -73,15 +78,31 @@
   border-radius: 50%;
   background: #8dd9c1;
   content: "";
+  box-shadow: 0 0 0 0 rgba(141,217,193,0);
+}
+
+.section:global([data-motion-state="visible"]) .railStatus::before {
+  animation: statusResolve .7s .55s ease-out both;
 }
 
 .controls {
   display: grid;
   gap: .7rem;
-  padding: .85rem .9rem .95rem;
+  padding: .9rem .95rem 1rem;
   border-bottom: 1px solid rgba(23, 35, 45, .12);
-  background: #f5f2ea;
+  background: linear-gradient(180deg, #f5f2ea, #f7f4ed);
 }
+
+.controlHint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem .38rem;
+  margin: 0;
+  color: rgba(23,35,45,.58);
+  font-size: .66rem;
+  line-height: 1.45;
+}
+.controlHint strong { color: #315f52; font-weight: 650; }
 
 .presets {
   display: flex;
@@ -93,7 +114,7 @@
 }
 
 .presets::-webkit-scrollbar { display: none; }
-.presets > span { margin-right: .15rem; }
+.presets > span { margin-right: .15rem; color: rgba(23,35,45,.52); font-family: var(--mono); font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; }
 .presets a {
   min-height: 44px;
   padding: .42rem .58rem;
@@ -106,11 +127,12 @@
 
 .presets a[data-selected] {
   border-bottom-color: #4e8e7c;
-  background: transparent;
+  background: rgba(78,142,124,.035);
   color: #315f52;
 }
 
-.presets a:hover {
+.presets a:hover,
+.presets a:focus-visible {
   border-bottom-color: rgba(78, 142, 124, .44);
   color: #315f52;
 }
@@ -126,14 +148,16 @@
 .commandForm input {
   height: 2.75rem;
   border-color: rgba(23, 35, 45, .14);
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fffefa;
   font-size: .82rem;
-  transition: border-color .18s ease, box-shadow .18s ease;
+  transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
 }
 
+.commandForm input:hover { border-color: rgba(78,142,124,.3); }
 .commandForm input:focus {
   border-color: rgba(78, 142, 124, .7);
+  background: #fff;
   box-shadow: 0 0 0 3px rgba(78, 142, 124, .07);
 }
 
@@ -141,13 +165,13 @@
   position: relative;
   min-height: 2.75rem;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--slate-900);
   color: #f7f4ed;
-  transition: transform .16s ease, background-color .18s ease;
+  transition: transform .16s ease, background-color .18s ease, box-shadow .18s ease;
 }
 
-.commandForm button:hover { background: #1e3028; }
+.commandForm button:hover { background: #1e3028; box-shadow: 0 7px 18px rgba(23,35,45,.1); }
 .commandForm button:active { transform: translateY(1px); }
 
 .commandForm button::after {
@@ -177,12 +201,12 @@
 
 .results {
   min-height: 24rem;
-  padding: 0 .9rem .9rem;
+  padding: 0 .95rem .95rem;
   transition: opacity .2s ease;
 }
 
 .resultsHeader {
-  padding: .95rem 0 .8rem;
+  padding: 1rem 0 .82rem;
 }
 
 .resultsHeader strong {
@@ -193,14 +217,14 @@
 .results :global([data-primary-lead]) {
   margin: .2rem 0 0;
   padding: 0 .35rem;
-  border-top: 1px solid rgba(78, 142, 124, .28);
+  border-top: 1px solid rgba(78, 142, 124, .32);
   border-bottom: 1px solid rgba(23, 35, 45, .17);
-  background: linear-gradient(90deg, rgba(120, 183, 165, .065), rgba(255, 253, 247, .78) 34%, #fffdf7 100%);
-  box-shadow: none;
+  background: linear-gradient(90deg, rgba(120, 183, 165, .08), rgba(255, 253, 247, .86) 34%, #fffdf7 100%);
+  box-shadow: inset 3px 0 0 rgba(78,142,124,.26);
 }
 
 .lead {
-  transition: background-color .18s ease, border-color .18s ease;
+  transition: background-color .18s ease, border-color .18s ease, opacity .18s ease;
 }
 
 .lead summary {
@@ -348,8 +372,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin: .9rem -.9rem -.9rem;
-  padding: .7rem .9rem;
+  margin: .95rem -.95rem -.95rem;
+  padding: .72rem .95rem;
   border-top: 1px solid rgba(23, 35, 45, .12);
   background: #f5f2ea;
 }
@@ -375,6 +399,17 @@
   font-family: var(--mono);
   font-size: .56rem;
   text-transform: uppercase;
+}
+
+@keyframes frameResolve {
+  from { opacity: .9; transform: translate3d(0, 8px, 0); box-shadow: 0 8px 28px rgba(8,12,10,.035); }
+  to { opacity: 1; transform: none; box-shadow: 0 18px 48px rgba(8,12,10,.065); }
+}
+
+@keyframes statusResolve {
+  0% { box-shadow: 0 0 0 0 rgba(141,217,193,.26); }
+  70% { box-shadow: 0 0 0 7px rgba(141,217,193,0); }
+  100% { box-shadow: 0 0 0 0 rgba(141,217,193,0); }
 }
 
 @keyframes signalScan {
@@ -404,13 +439,14 @@
 
 @media (max-width: 768px) {
   .section { padding-block: 4.25rem; }
-  .productFrame { border-radius: 8px; }
+  .productFrame { border-radius: 10px; }
   .productRail { align-items: flex-start; flex-direction: column; gap: .3rem; }
   .railIdentity { font-size: .6rem; }
   .railStatus { font-size: .58rem; }
-  .controls { padding: .75rem; }
+  .controls { padding: .8rem; }
+  .controlHint { font-size: .68rem; }
   .commandForm { grid-template-columns: 1fr; }
-  .results { min-height: 17rem; padding-inline: .75rem; }
+  .results { min-height: 17rem; padding-inline: .8rem; }
   .results :global([data-primary-lead]) { padding-inline: .2rem; }
   .leadPrimary summary,
   .lead summary {
@@ -432,12 +468,13 @@
   .footerRail {
     align-items: flex-start;
     flex-direction: column;
-    margin-inline: -.75rem;
+    margin-inline: -.8rem;
   }
   .checkout { width: 100%; justify-content: space-between; }
 }
 
 @media (max-width: 480px) {
+  .intro :global(h2) { max-width: 11ch; }
   .presets a { min-height: 44px; white-space: nowrap; }
   .footerRail small { max-width: 18rem; line-height: 1.4; }
   .leadPrimary summary,
@@ -449,7 +486,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .commandForm button::after { animation: none !important; opacity: 0 !important; }
+  .productFrame,
+  .railStatus::before,
+  .commandForm button::after { animation: none !important; }
+  .commandForm button::after { opacity: 0 !important; }
   .results,
   .presets a,
   .commandForm input,
