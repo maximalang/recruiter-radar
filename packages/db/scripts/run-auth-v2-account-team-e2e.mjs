@@ -397,12 +397,19 @@ async function seedProductSurfaceFixtures(owner) {
     `INSERT INTO source_registry_reviews_v1 (
        source_registry_id, review_status, terms_reference,
        reviewer_reference, notes, reviewed_at
-     ) VALUES (
-       'official-company-news', 'approved',
-       'https://product-browser-fixture.example.invalid/terms',
-       'runtime:authenticated-browser-fixture',
-       'Isolated browser fixture only.', NOW()
-     )`,
+     ) VALUES
+       (
+         'official-company-news', 'approved',
+         'https://product-browser-fixture.example.invalid/terms',
+         'runtime:authenticated-browser-fixture',
+         'Isolated browser fixture only.', NOW()
+       ),
+       (
+         'headhunter-api', 'approved',
+         'https://api.hh.ru/openapi/redoc',
+         'runtime:authenticated-browser-fixture',
+         'Isolated browser fixture only.', NOW()
+       )`,
   )
   const radarEvent = await database.query(
     `INSERT INTO evidence_events_v1 (
@@ -413,12 +420,29 @@ async function seedProductSurfaceFixtures(owner) {
        verification_status, primary_source, content_fingerprint,
        event_fingerprint
      ) VALUES (
-       $1, $2, $3, 'hiring_growth', 'official-company-news',
+       $1, $2, $3, 'funding_received', 'official-company-news',
        'official-news',
-       'https://product-browser-fixture.example.invalid/news/hiring',
-       NOW() - INTERVAL '1 day', NOW(), '{"vacancies":3}'::JSONB,
+       'https://product-browser-fixture.example.invalid/news/funding',
+       NOW() - INTERVAL '1 day', NOW(), '{"funding":"confirmed"}'::JSONB,
        .92, 1, NOW() + INTERVAL '21 days', 'positive', 'verified', TRUE,
        repeat('e', 64), repeat('f', 64)
+     ) RETURNING id::TEXT AS id`,
+    [owner.workspaceId, organizationId, location.rows[0].id],
+  )
+  const radarHiringEvent = await database.query(
+    `INSERT INTO evidence_events_v1 (
+       workspace_id, organization_id, location_id, event_type,
+       source_registry_id, source_family, canonical_url,
+       occurred_at, detected_at, facts, confidence,
+       independent_confirmations, valid_until, polarity,
+       verification_status, primary_source, content_fingerprint,
+       event_fingerprint
+     ) VALUES (
+       $1, $2, $3, 'hiring_growth', 'headhunter-api', 'hh',
+       'https://hh.example.invalid/browser-fixture',
+       NOW() - INTERVAL '12 hours', NOW(), '{"vacancies":3}'::JSONB,
+       .9, 1, NOW() + INTERVAL '21 days', 'positive', 'verified', FALSE,
+       repeat('5', 64), repeat('6', 64)
      ) RETURNING id::TEXT AS id`,
     [owner.workspaceId, organizationId, location.rows[0].id],
   )
@@ -429,22 +453,58 @@ async function seedProductSurfaceFixtures(owner) {
        source_families, affected_functions, region_code, city,
        polarity, input_hash, signal_fingerprint
      ) VALUES (
-       $1, $2, 'hiring_growth', NOW() - INTERVAL '2 days', NOW(),
+       $1, $2, 'funding_received', NOW() - INTERVAL '2 days', NOW(),
        NOW() + INTERVAL '21 days', .92, .86, ARRAY['official-news'],
        ARRAY['product','engineering'], '77', 'Москва', 'positive',
        repeat('1', 64), repeat('2', 64)
      ) RETURNING id::TEXT AS id`,
     [owner.workspaceId, organizationId],
   )
+  const radarHiringSignal = await database.query(
+    `INSERT INTO normalized_signals_v1 (
+       workspace_id, organization_id, signal_type, started_at,
+       last_seen_at, valid_until, confidence, strength,
+       source_families, affected_functions, region_code, city,
+       polarity, input_hash, signal_fingerprint
+     ) VALUES (
+       $1, $2, 'hiring_growth', NOW() - INTERVAL '1 day', NOW(),
+       NOW() + INTERVAL '21 days', .9, .84, ARRAY['hh'],
+       ARRAY['product','engineering'], '77', 'Москва', 'positive',
+       repeat('7', 64), repeat('8', 64)
+     ) RETURNING id::TEXT AS id`,
+    [owner.workspaceId, organizationId],
+  )
   await database.query(
     `INSERT INTO normalized_signal_event_links_v1 (
        signal_id, evidence_event_id, workspace_id, organization_id
-     ) VALUES ($1, $2, $3, $4)`,
+     ) VALUES
+       ($1, $2, $5, $6),
+       ($3, $4, $5, $6)`,
     [
       radarSignal.rows[0].id,
       radarEvent.rows[0].id,
+      radarHiringSignal.rows[0].id,
+      radarHiringEvent.rows[0].id,
       owner.workspaceId,
       organizationId,
+    ],
+  )
+  const radarCorrelation = await database.query(
+    `INSERT INTO evidence_correlations_v1 (
+       workspace_id, organization_id, rule_id, signal_ids,
+       source_families, window_days, intent_boost, explanation,
+       input_hash, correlation_fingerprint, valid_until
+     ) VALUES (
+       $1, $2, 'funding-hiring-recruiter', ARRAY[$3::BIGINT,$4::BIGINT],
+       ARRAY['hh','official-news'], 60, .12,
+       'Funding is followed by direct hiring growth from an independent source.',
+       repeat('9', 64), repeat('a', 64), NOW() + INTERVAL '21 days'
+     ) RETURNING id::TEXT AS id`,
+    [
+      owner.workspaceId,
+      organizationId,
+      radarSignal.rows[0].id,
+      radarHiringSignal.rows[0].id,
     ],
   )
   const radarComponents = {
@@ -469,8 +529,9 @@ async function seedProductSurfaceFixtures(owner) {
        input_hash, valid_until
      ) VALUES (
        $1, $2, $3, $4, 90, 80, 80, 5, $5::JSONB, $6::JSONB,
-       ARRAY[$7::BIGINT], ARRAY[$8::BIGINT], ARRAY[]::BIGINT[],
-       ARRAY['official-news'], repeat('3', 64), NOW() + INTERVAL '21 days'
+       ARRAY[$7::BIGINT,$8::BIGINT], ARRAY[$9::BIGINT,$10::BIGINT],
+       ARRAY[$11::BIGINT], ARRAY['hh','official-news'],
+       repeat('3', 64), NOW() + INTERVAL '21 days'
      ) RETURNING id::TEXT AS id`,
     [
       owner.workspaceId,
@@ -482,10 +543,13 @@ async function seedProductSurfaceFixtures(owner) {
         eventId: radarEvent.rows[0].id,
         component: 'hiring_intent',
         delta: .2,
-        reason: 'verified company hiring growth',
+        reason: 'verified company funding evidence',
       }]),
       radarEvent.rows[0].id,
+      radarHiringEvent.rows[0].id,
       radarSignal.rows[0].id,
+      radarHiringSignal.rows[0].id,
+      radarCorrelation.rows[0].id,
     ],
   )
   await database.query(
@@ -500,7 +564,7 @@ async function seedProductSurfaceFixtures(owner) {
        '{"functions":["product","engineering"],"minHeadcount":3,"maxHeadcount":8,"mode":"targeted"}'::JSONB,
        'IT и продуктовый подбор', NOW() + INTERVAL '1 day',
        'Проверить карьерную страницу и подготовить точечный черновик.',
-       ARRAY[]::TEXT[], ARRAY[$5::BIGINT], ARRAY[]::BIGINT[],
+       ARRAY[]::TEXT[], ARRAY[$5::BIGINT,$6::BIGINT], ARRAY[]::BIGINT[],
        NOW() + INTERVAL '21 days', repeat('4', 64)
      )`,
     [
@@ -509,6 +573,7 @@ async function seedProductSurfaceFixtures(owner) {
       location.rows[0].id,
       radarScore.rows[0].id,
       radarEvent.rows[0].id,
+      radarHiringEvent.rows[0].id,
     ],
   )
   const episode = await database.query(

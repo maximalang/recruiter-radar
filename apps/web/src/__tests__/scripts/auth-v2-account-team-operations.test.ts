@@ -89,6 +89,9 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("/settings/team");
     expect(runner).toContain("verifyAuthenticatedProductSurfaces");
     expect(runner).toContain("seedProductSurfaceFixtures");
+    expect(runner).toContain("'funding-hiring-recruiter'");
+    expect(runner).toContain("ARRAY['hh','official-news']");
+    expect(runner).toContain("radarCorrelation.rows[0].id");
     expect(runner).toContain("/leads/${owner.productSurfaces.candidateId}");
     expect(runner).toContain("/opportunities/radar");
     expect(runner).toContain('[data-semantic-mode="v3"]');
