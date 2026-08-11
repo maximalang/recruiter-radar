@@ -109,7 +109,7 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <div className={styles.faqHeading} data-faq-heading>
-          <span>Перед запуском — короткие ответы</span>
+          <span>Перед запуском — короткие ответы.</span>
           <h2>Вопросы, которые стоит закрыть до запуска.</h2>
           <p>Источники, приоритет, доставка, контроль и оплата — без мелкого шрифта.</p>
           <small data-faq-trust>Интерактивный пример — без регистрации. Данные в нём обезличены.</small>
