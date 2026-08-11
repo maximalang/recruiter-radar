@@ -1,29 +1,33 @@
 # Source Registry — canonical state
 
-> **Single source of truth for "what feeds the radar, and how far each source is trusted."**
-> This document is a human-readable projection of the machine-readable registry in
-> `packages/db/scripts/source-registry.mjs`. When the two disagree, the `.mjs` wins —
-> update this doc to match, never the reverse. Per-source legal/robots reviews live in
+> **Human-readable projection of "what feeds the radar, and how far each source is trusted."**
+> `packages/db/source-policy.json` is the machine-readable source of truth for priority,
+> confidence, lead eligibility, and promotion status. `packages/db/scripts/source-registry.mjs`
+> projects that policy into runtime readiness and coverage reporting. When this document
+> disagrees with either runtime input, update the document to match the machine-readable
+> policy; never relax policy to preserve prose. Per-source legal/robots reviews live in
 > `docs/source-review/`; cross-cutting policy in `docs/source-priority-policy.md`.
 
-Last reconciled: **2026-06-30** against `source-registry.mjs`, `source-digest-evidence.sql`,
-and `docs/source-review/`.
+Last reconciled: **2026-08-11** against `source-policy.json`, `source-registry.mjs`,
+`source-digest-evidence.sql`, and `docs/source-review/`.
 
 ---
 
-## Live status snapshot (2026-06-30, endpoint-probed)
+## Policy and observed-runtime snapshot (2026-08-11 reconciliation)
 
-**Digest-delivering RF sources: 5** — `hh`, `career-pages`, `rabota-rossii`, `superjob`,
-`habr-career`. Of these, **4 verify healthy from this environment**; `hh` is policy-allowed but
-operationally geo-blocked in production.
+**Digest-allowed by canonical policy: 3** — `hh`, `career-pages`, and `rabota-rossii`.
+`superjob` and `habr-career` remain
+`blocked-from-digest-pending-confidence-tests`: runnable or historically healthy probes do not
+make either source digest-delivering. Operational health is separate from promotion status and
+must be verified against the current environment.
 
 | source | live probe | status | note |
 |---|---|---|---|
-| rabota-rossii | HTTP 200 | ✅ live, digest | trudvsem open-data; now multi-region + paged |
-| career-pages | HTTP 200 | ✅ live, digest | direct surface; daily-radar primary since today |
-| habr-career | HTTP 200 | ✅ live, digest | public listings scrape, robots-compliant |
-| superjob | HTTP 301 | ✅ live w/ app-id, digest | needs `SUPERJOB_API_APP_ID`; healthy with key |
-| hh | HTTP 403 (search) | ⚠️ blocked (geo/IP), digest-allowed | dict endpoints 200; needs RU-resident runner |
+| rabota-rossii | historical HTTP 200 | digest-allowed | trudvsem open-data; multi-region + paged |
+| career-pages | historical HTTP 200 | digest-allowed | direct company surface; daily-radar primary |
+| habr-career | historical HTTP 200 | blocked from digest | confidence and legal/robots gates remain open in policy |
+| superjob | historical HTTP 301 without app-id | blocked from digest | app-id/provider path still requires confidence promotion |
+| hh | historical HTTP 403 (search) | digest-allowed; operationally unverified | requires a currently verified compliant runner |
 | egrul-fns / transparent-business / fedresurs | n/a | enrichment/context only | never originate leads |
 | tech-job-boards / linkedin / regional / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set |
 
@@ -87,18 +91,17 @@ A source reaching the digest is gated in **two** independent places. Both must a
    it lets blocked sources accumulate evidence and dedupe-overlap data while the confidence
    gate decides whether they graduate.
 
-> **Known doc-vs-code nuance:** `exportSourceCoverageDetails()` in the registry derives
+> `exportSourceCoverageDetails()` in the registry derives
 > `inDigest` as `(source in PRIMARY_INGESTION_SOURCES) AND (promotionStatus === 'digest-allowed')`.
-> As of 2026-06-30 that set is `hh`, `career-pages`, `rabota-rossii`, `superjob`, `habr-career`
-> — the effective delivery set. The other whitelisted sources (`tech-job-boards`,
-> `linkedin-company-pages`, `regional-job-boards`) are present in SQL but
-> `blocked-from-digest-pending-confidence-tests`. Promote a source to digest by adding it to
-> `PRIMARY_INGESTION_SOURCES` *and* setting `promotionStatus: 'digest-allowed'`.
+> As of the 2026-08-11 policy reconciliation that set is `hh`, `career-pages`, and
+> `rabota-rossii`. `superjob`, `habr-career`, and the other whitelisted sources are present in
+> ingestion or SQL paths but remain `blocked-from-digest-pending-confidence-tests`. Promote a
+> source only by satisfying its gates and changing the canonical machine-readable policy; never
+> by editing this document alone.
 
-**Effective digest-delivering sources today: `hh`, `career-pages`, `rabota-rossii`, `superjob`,
-`habr-career`.** Everything else is either blocked-from-digest, supporting-evidence-only, or
-never-lead-originating. ⚠️ `hh` is digest-allowed in policy but **operationally geo-403 blocked**
-in production (see P1 note) — it ingests/delivers only from an RU-resident runner.
+**Policy-allowed digest sources today: `hh`, `career-pages`, and `rabota-rossii`.** Everything
+else is blocked-from-digest, supporting-evidence-only, or never-lead-originating. This policy
+statement does not prove that any source is currently configured or healthy in production.
 
 ---
 
@@ -179,21 +182,22 @@ originate leads. `egrul-fns`: 10-digit legal-entity INN only; skip 12-digit IP/p
 
 | id | class / evidence tier | leadEligibility | promotionStatus | live? |
 |---|---|---|---|---|
-| **superjob** | primary-platform / medium-signal (0.66) | confidence-gated-evidence | **digest-allowed** | live API (needs app-id) / provider |
-| **habr-career** | primary-platform / medium-signal (0.69) | confidence-gated-evidence | **digest-allowed** | live-public ✅ + provider |
+| **superjob** | primary-platform / medium-signal (0.66) | confidence-gated-evidence | **blocked-from-digest-pending-confidence-tests** | app-id / provider path |
+| **habr-career** | primary-platform / medium-signal (0.69) | confidence-gated-evidence | **blocked-from-digest-pending-confidence-tests** | public/provider path; legal and confidence gates open |
 | **tech-job-boards** | primary-platform / medium-signal (0.68) | confidence-gated-evidence | blocked-from-digest | live + provider |
 | **linkedin-company-pages** | primary-platform / medium-signal (0.72) | confidence-gated-evidence | blocked-from-digest | provider-token only |
 | **company-site** | company-surface / medium-signal (0.68) | enrichment-only | supporting-evidence-only | live-public |
 | **funding-business-signals** | market-signal / context-only (0.58) | context-only | never-lead-originating | live + provider |
 
-**superjob** — needs `SUPERJOB_API_APP_ID` (live API) or compliant provider snapshot; anonymous
-API is not a production path. **`digest-allowed` + primary** (daily-radar). Pagination is built
-in (5 pages × 100 = 500-result cap, the API's own ceiling). Live probe returns 301→needs app-id;
-healthy with a valid key (see memory `project_superjob_key_corrupt`, resolved 2026-06-24).
+**superjob** — needs `SUPERJOB_API_APP_ID` (live API) or a compliant provider snapshot;
+anonymous API is not a production path. It may participate in primary ingestion, but policy
+holds it out of digest delivery until confidence tests justify promotion. Pagination is built in
+(5 pages × 100 = 500-result cap, the API's own ceiling).
 
-**habr-career** — live HTML scraping path, **`digest-allowed` + primary** (daily-radar). robots
-review compliant (`source-review/habr-career-review.md`): only public `/vacancies` listings, no
-candidate/PII surfaces. Single-source platform aggregation → gated at C until corroborated.
+**habr-career** — public HTML/provider paths exist, but policy holds the source out of digest
+delivery until the outstanding legal/robots review and confidence tests are complete. Only
+public `/vacancies` listings are in scope; candidate/PII surfaces remain prohibited.
+Single-source platform aggregation → gated at C until corroborated.
 Keyword breadth is derived from active profiles' roles at ingest time
 (`deriveHabrKeywordsFromProfiles`); was a contributor to the leads=0 pipeline gap (see memory
 `project_leads_pipeline_gaps`). Live probe 200 as of 2026-06-30.
