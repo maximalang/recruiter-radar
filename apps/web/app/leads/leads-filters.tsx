@@ -105,6 +105,7 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
           <span className={s.filterGroupLabel}>Профиль</span>
           <select
             value={currentProfile}
+            disabled={isPending}
             onChange={(e) => updateFilter('profile', e.target.value)}
             className={s.filterSelect}
             aria-label="Фильтр по практике (постоянный профиль)"
@@ -126,6 +127,7 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
         <span className={s.filterGroupLabel}>Обзор</span>
         <select
           value={currentGate}
+          disabled={isPending}
           onChange={(e) => updateFilter('gate', e.target.value)}
           className={s.filterSelect}
           data-active={currentGate !== '' ? 'true' : undefined}
@@ -139,6 +141,7 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
         </select>
         <select
           value={currentFeedback}
+          disabled={isPending}
           onChange={(e) => updateFilter('feedback', e.target.value)}
           className={s.filterSelect}
           data-active={currentFeedback !== '' ? 'true' : undefined}

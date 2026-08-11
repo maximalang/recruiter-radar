@@ -409,7 +409,11 @@ try {
         route,
         surfaceState: result.semanticNotFound
           ? (routeSpec.allowNotFound ? routeSpec.unavailableReason : 'unexpected-not-found')
-          : (new URL(page.url()).pathname === '/login' ? 'authentication-required' : 'rendered'),
+          : (
+              route !== '/login' && new URL(page.url()).pathname === '/login'
+                ? 'authentication-required'
+                : 'rendered'
+            ),
         finalUrl: page.url(),
         status,
         ...result,
