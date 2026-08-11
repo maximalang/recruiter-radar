@@ -78,7 +78,7 @@ interface FeedbackButtonsProps {
 }
 
 export default function FeedbackButtons({ orgId, clientProfileId, currentStatus }: FeedbackButtonsProps) {
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [activeStatus, setActiveStatus] = useState(currentStatus);
   const [error, setError] = useState<string | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -88,6 +88,7 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
   const [failedStatus, setFailedStatus] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const noteInputRef = useRef<HTMLInputElement>(null);
+  const feedbackPending = pendingStatus !== null;
 
   useEffect(() => {
     if (noteOpen) {
@@ -143,7 +144,7 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
   }
 
   return (
-    <div aria-busy={isPending}>
+    <div aria-busy={feedbackPending}>
       {GROUP_ORDER.map((group) => {
         const groupButtons = BUTTONS.filter((b) => b.group === group);
         return (
@@ -156,7 +157,7 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
                   <button
                     key={btn.status}
                     onClick={() => handleClick(btn.status, btn.noteAllowed)}
-                    disabled={isPending}
+                    disabled={feedbackPending}
                     className={s.feedbackBtn}
                     data-motion-interactive
                     data-active={isActive ? 'true' : undefined}
@@ -204,19 +205,19 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
           <button
             type="button"
             onClick={() => activeStatus && handleClick(activeStatus)}
-            disabled={isPending}
+            disabled={feedbackPending}
             className={s.noteSave}
           >
             Сохранить
           </button>
-          <button type="button" onClick={handleSkipNote} disabled={isPending} className={s.noteSkip}>
+          <button type="button" onClick={handleSkipNote} disabled={feedbackPending} className={s.noteSkip}>
             Без заметки
           </button>
         </div>
       )}
 
       <p className={s.statusText} role="status" aria-live="polite" data-motion-status>
-        {isPending ? 'Сохраняем статус…' : announcement}
+        {feedbackPending ? 'Сохраняем статус…' : announcement}
       </p>
       {error && (
         <p className={s.errorText} role="alert" data-motion-status>
