@@ -96,6 +96,19 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("/opportunities/radar");
     expect(runner).toContain('[data-semantic-mode="v3"]');
     expect(runner).toContain("Evidence Radar marker selection did not become active");
+    expect(runner).toContain("const authenticatedProductViewports = [");
+    expect(runner).toMatch(/suffix:\s*'1440'[\s\S]{0,120}width:\s*1440[\s\S]{0,120}height:\s*1000/);
+    expect(runner).toMatch(/suffix:\s*'390'[\s\S]{0,120}width:\s*390[\s\S]{0,120}height:\s*844/);
+    expect(runner).toContain("await page.setViewportSize({ width, height })");
+    for (const surface of [
+      "leads-data",
+      "lead-detail-data",
+      "opportunities-data",
+      "evidence-radar-data",
+    ]) {
+      expect(runner).toContain(`${surface}-1440`);
+      expect(runner).toContain(`${surface}-390`);
+    }
     expect(runner).toContain("AUTH_V2_DISPOSABLE_DB_CONFIRMED");
     expect(runner).toContain("/auth/invite#");
     expect(runner).toContain("/auth/change-email#");

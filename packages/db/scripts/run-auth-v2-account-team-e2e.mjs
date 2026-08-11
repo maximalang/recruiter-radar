@@ -1216,12 +1216,41 @@ async function verifyOwnershipTransfer(owner, invited) {
   return { roles, auditCount: audit.rows[0].count }
 }
 
-async function verifyAuthenticatedProductSurfaces(page, owner) {
+const authenticatedProductViewports = [
+  {
+    suffix: '1440',
+    width: 1440,
+    height: 1000,
+    screenshots: {
+      leads: 'auth-v2-account-team-e2e-shot-leads-data-1440.png',
+      leadDetail: 'auth-v2-account-team-e2e-shot-lead-detail-data-1440.png',
+      opportunities: 'auth-v2-account-team-e2e-shot-opportunities-data-1440.png',
+      evidenceRadar: 'auth-v2-account-team-e2e-shot-evidence-radar-data-1440.png',
+    },
+  },
+  {
+    suffix: '390',
+    width: 390,
+    height: 844,
+    screenshots: {
+      leads: 'auth-v2-account-team-e2e-shot-leads-data-390.png',
+      leadDetail: 'auth-v2-account-team-e2e-shot-lead-detail-data-390.png',
+      opportunities: 'auth-v2-account-team-e2e-shot-opportunities-data-390.png',
+      evidenceRadar: 'auth-v2-account-team-e2e-shot-evidence-radar-data-390.png',
+    },
+  },
+]
+
+async function verifyAuthenticatedProductSurfacesAtViewport(
+  page,
+  owner,
+  { suffix, screenshots },
+) {
   await inspectSurface(
     page,
-    'leads-data-1440',
+    `leads-data-${suffix}`,
     '/leads',
-    'auth-v2-account-team-e2e-shot-leads-data-1440.png',
+    screenshots.leads,
   )
   const leadDisclosure = page.locator('details[data-motion-disclosure]').first()
   await leadDisclosure.waitFor({ state: 'visible' })
@@ -1242,9 +1271,9 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
 
   await inspectSurface(
     page,
-    'lead-detail-data-1440',
+    `lead-detail-data-${suffix}`,
     `/leads/${owner.productSurfaces.candidateId}`,
-    'auth-v2-account-team-e2e-shot-lead-detail-data-1440.png',
+    screenshots.leadDetail,
   )
   assert(
     await page.locator('[data-motion-disclosure]').count() >= 1,
@@ -1253,9 +1282,9 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
 
   await inspectSurface(
     page,
-    'opportunities-data-1440',
+    `opportunities-data-${suffix}`,
     '/opportunities',
-    'auth-v2-account-team-e2e-shot-opportunities-data-1440.png',
+    screenshots.opportunities,
   )
   const commercialCard = page.locator('article[data-semantic-mode="v3"]')
   await commercialCard.waitFor({ state: 'visible' })
@@ -1270,9 +1299,9 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
 
   await inspectSurface(
     page,
-    'evidence-radar-data-1440',
+    `evidence-radar-data-${suffix}`,
     '/opportunities/radar',
-    'auth-v2-account-team-e2e-shot-evidence-radar-data-1440.png',
+    screenshots.evidenceRadar,
   )
   await page.locator('[data-evidence-radar-map]').waitFor({ state: 'visible' })
   const marker = page.locator('[data-evidence-radar-map] button[data-motion-interactive]').first()
@@ -1286,7 +1315,25 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
     await page.locator('[data-motion-status]').filter({ hasText: 'Выбрано:' }).count() === 1,
     'Evidence Radar selected-marker status is missing.',
   )
+}
+
+async function verifyAuthenticatedProductSurfaces(page, owner) {
+  for (const {
+    suffix,
+    width,
+    height,
+    screenshots,
+  } of authenticatedProductViewports) {
+    await page.setViewportSize({ width, height })
+    await verifyAuthenticatedProductSurfacesAtViewport(
+      page,
+      owner,
+      { suffix, screenshots },
+    )
+  }
   report.flows.authenticatedProductSurfaces = {
+    desktop1440: true,
+    mobile390: true,
     leadsWithData: true,
     leadDetail: true,
     filterDisclosureStatusInteractions: true,
