@@ -129,7 +129,7 @@
 @keyframes clusterDrift { from { translate: -2px 2px; } to { translate: 3px -3px; } }
 @keyframes activeDrift { from { translate: 0 0; } to { translate: 3px -2px; } }
 
-@media (max-width: 959px) {
+@media (max-width: 1100px) {
   .clusterTargets { display: none; }
   .labelLayer text:nth-child(n+4), .linkLayer path:nth-child(n+3) { display: none; }
 }
