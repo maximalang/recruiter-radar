@@ -441,10 +441,10 @@
   .section { padding-block: 4.25rem; }
   .productFrame { border-radius: 10px; }
   .productRail { align-items: flex-start; flex-direction: column; gap: .3rem; }
-  .railIdentity { font-size: .6rem; }
-  .railStatus { font-size: .58rem; }
+  .railIdentity { font-size: .66rem; }
+  .railStatus { font-size: .64rem; }
   .controls { padding: .8rem; }
-  .controlHint { font-size: .68rem; }
+  .controlHint { font-size: .74rem; }
   .commandForm { grid-template-columns: 1fr; }
   .results { min-height: 17rem; padding-inline: .8rem; }
   .results :global([data-primary-lead]) { padding-inline: .2rem; }
@@ -455,16 +455,21 @@
   }
   .leadPrimary :global([data-lead-company] strong) { font-size: 1rem; }
   .leadPrimary :global([data-lead-score] strong) { font-size: 2.25rem; }
+  .lead :global([data-lead-company] small) { font-size: .72rem; }
+  .lead:not(.leadPrimary) summary { min-height: 4.5rem; }
   .leadSignal {
     grid-column: 2 / 5;
     grid-row: 2;
     padding-bottom: .55rem;
-    font-size: .75rem;
+    font-size: .82rem;
     line-height: 1.4;
   }
   .leadBody { padding-left: 0; }
-  .proofBlock p { font-size: .8rem; }
-  .evidenceBlock li { font-size: .7rem; }
+  .proofBlock p { font-size: .86rem; }
+  .proofBlock span,
+  .evidenceBlock > span,
+  .factors > span { font-size: .64rem; }
+  .evidenceBlock li { font-size: .77rem; }
   .footerRail {
     align-items: flex-start;
     flex-direction: column;
@@ -476,13 +481,20 @@
 @media (max-width: 480px) {
   .intro :global(h2) { max-width: 11ch; }
   .presets a { min-height: 44px; white-space: nowrap; }
-  .footerRail small { max-width: 18rem; line-height: 1.4; }
+  .footerRail small { max-width: 18rem; font-size: .7rem; line-height: 1.45; }
   .leadPrimary summary,
   .lead summary {
     grid-template-columns: 1.45rem minmax(0, 1fr) 4.2rem .8rem;
     padding-inline: .15rem;
   }
-  .confidence { font-size: .56rem; }
+  .confidence { font-size: .62rem; }
+  .lead:not(.leadPrimary) .leadSignal {
+    display: -webkit-box;
+    max-width: 34ch;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

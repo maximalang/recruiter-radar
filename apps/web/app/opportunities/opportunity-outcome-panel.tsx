@@ -168,6 +168,15 @@ const CONTACT_PATHS = [
   ['other', 'Другой безопасный путь'],
 ] as const
 
+function outcomeCycleOccurredAt(cycleId: string): string | null {
+  const date = cycleId.match(/(?:^|:)(\d{4}-\d{2}-\d{2})$/)?.[1]
+  if (!date) return null
+  const occurredAt = new Date(`${date}T00:00:00.000Z`)
+  if (!Number.isFinite(occurredAt.getTime())) return null
+  const canonical = occurredAt.toISOString()
+  return canonical.startsWith(`${date}T`) ? canonical : null
+}
+
 export function OpportunityOutcomeImpression(props: {
   opportunityId: string
   cycleId: string
@@ -175,10 +184,12 @@ export function OpportunityOutcomeImpression(props: {
   const sent = useRef(false)
   useEffect(() => {
     if (sent.current) return
+    const occurredAt = outcomeCycleOccurredAt(props.cycleId)
+    if (!occurredAt) return
     sent.current = true
     void postOutcome(props.opportunityId, {
       eventType: 'shown',
-      occurredAt: new Date().toISOString(),
+      occurredAt,
       metadata: { surface: 'morning_brief', cycleId: props.cycleId },
       idempotencyKey: `shown:${props.opportunityId}:${props.cycleId}`,
     }).catch(() => {

@@ -96,7 +96,9 @@ Stage 2 operational states:
 
 ## Source registry
 
-`status: active` означает runnable contract, а не одновременно live-configured, legally approved и digest-allowed. Точные policy и promotion gates задаёт `packages/db/scripts/source-registry.mjs`.
+`status: active` означает runnable contract, а не одновременно live-configured, legally approved и digest-allowed. Machine-readable source of truth для priority, confidence, lead eligibility и promotion status — `packages/db/source-policy.json`; `packages/db/scripts/source-registry.mjs` проецирует эту policy в runtime readiness и coverage report.
+
+На 2026-08-11 `superjob` и `habr-career` имеют `blocked-from-digest-pending-confidence-tests`. Наличие runnable ingestion path или исторически успешного live probe не делает их digest-delivering; документация не должна опережать canonical promotion status.
 
 Зарегистрированные source IDs:
 

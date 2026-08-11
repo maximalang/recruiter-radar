@@ -92,6 +92,14 @@ export default function EvidenceScene() {
               </li>
             ))}
           </ul>
+
+          <div className={sceneStyles.conclusion} data-evidence-conclusion="source-fact-conclusion">
+            <div>
+              <span>Источник</span><i aria-hidden="true">→</i><span>Факт</span><i aria-hidden="true">→</i><strong>Вывод</strong>
+            </div>
+            <p>Несколько независимых фактов подтверждают активное расширение команды и дают конкретный повод для разговора.</p>
+            <span className={sceneStyles.conclusionScore}><small>приоритет</small>{DEMO_COMPANY.score}<small>/100</small></span>
+          </div>
         </div>
       </div>
     </section>
