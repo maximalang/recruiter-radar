@@ -34,6 +34,29 @@ describe('opportunity outcome UI tracking', () => {
         body: expect.stringContaining('"eventType":"shown"'),
       }),
     )
+    const request = jest.mocked(global.fetch).mock.calls[0]?.[1]
+    expect(String(request?.body)).toContain(
+      '"occurredAt":"2026-07-27T00:00:00.000Z"',
+    )
+  })
+
+  it('reuses the exact shown payload when the same cycle remounts', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true }) as jest.Mock
+    const first = render(
+      <OpportunityOutcomeImpression opportunityId="10" cycleId="brief:2026-07-27" />,
+    )
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
+    first.unmount()
+
+    render(
+      <OpportunityOutcomeImpression opportunityId="10" cycleId="brief:2026-07-27" />,
+    )
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2))
+
+    const [firstBody, secondBody] = jest.mocked(global.fetch).mock.calls.map(
+      ([, options]) => String(options?.body),
+    )
+    expect(secondBody).toBe(firstBody)
   })
 
   it('records opened once per panel interaction and renders safe history', async () => {
