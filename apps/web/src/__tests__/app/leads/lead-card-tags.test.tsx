@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { LeadCard, LeadsListLegend } from '@/app/leads/leads-page-content';
 import type { LeadItem } from '@/lib/leads-data';
 
@@ -53,8 +53,38 @@ describe('LeadCard signal-card template', () => {
     expect(card?.textContent).not.toContain('02');
     expect(card?.textContent).not.toContain('03');
     expect(screen.getByRole('link', { name: /Открыть полную карточку компании/ })).toHaveAttribute('href', '/leads/lead-1');
+    expect(card?.closest('a')).toBeNull();
     expect(card?.textContent).not.toContain('Горячий');
     expect(card?.textContent).toContain('A');
+  });
+
+  it('keeps primary evidence visible and secondary provenance in an accessible disclosure', () => {
+    const { container } = render(
+      <LeadCard
+        lead={{
+          ...baseLead,
+          reasons: ['Карьерная страница обновлена'],
+        } as unknown as LeadItem}
+        fitPreview={{ icon: 'industry', text: 'Совпадает отрасль' }}
+        hiringMode="specialist"
+      />,
+    );
+
+    expect(screen.getByText('Hiring burst across 3 roles')).toBeInTheDocument();
+    expect(screen.getByText('Совпадает отрасль')).toBeInTheDocument();
+
+    const disclosure = container.querySelector('details[data-motion-disclosure]');
+    const summary = disclosure?.querySelector('summary');
+    expect(disclosure).not.toBeNull();
+    expect(summary).toHaveAttribute('data-motion-interactive');
+    expect(summary?.querySelector('[data-motion-icon="disclosure"]')).not.toBeNull();
+
+    fireEvent.click(summary as HTMLElement);
+    expect(disclosure).toHaveAttribute('open');
+    expect(screen.getByText('Backend')).toBeInTheDocument();
+    expect(screen.getByText('career-pages')).toBeInTheDocument();
+    expect(screen.getByText('Карьерная страница обновлена')).toBeInTheDocument();
+    expect(container.querySelector('[data-motion-list] [data-motion-item]')).not.toBeNull();
   });
 
   it('keeps workflow status separate from the score block', () => {

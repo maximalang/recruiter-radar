@@ -16,6 +16,7 @@
 .radarPanel { padding: clamp(.85rem, 2vw, 1.25rem); }
 .legend { display: flex; flex-wrap: wrap; gap: .55rem 1rem; margin-bottom: .85rem; color: rgba(244, 246, 242, .55); font-size: .68rem; }
 .legend span { display: inline-flex; align-items: center; gap: .4rem; }
+.selectedStatus { min-height: 1rem; margin: -.25rem 0 .75rem; color: rgba(244,246,242,.68); font-size: .66rem; }
 .legendSource,
 .legendOrganization { display: inline-block; width: 7px; height: 7px; background: #c8f36a; }
 .legendSource { border-radius: 50%; }
@@ -39,15 +40,25 @@
 
 .cluster { --intent: .5; --freshness: .5; --confidence: .5; --risk: 0; position: absolute; z-index: 2; width: 1px; height: 1px; opacity: calc(.35 + var(--confidence) * .65); }
 .cluster[data-selected="true"] { z-index: 8; }
-.sourceOrbit,
-.organizationMarker { position: absolute; left: 0; top: 0; }
+.sourceOrbit { position: absolute; left: 0; top: 0; pointer-events: none; }
 .sourceDot { position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 50%; background: color-mix(in srgb, #c8f36a calc(72% + var(--freshness) * 28%), #5e7759); box-shadow: 0 0 calc(5px + var(--freshness) * 9px) rgba(200, 243, 106, calc(.18 + var(--freshness) * .52)); }
-.organizationMarker { display: block; width: 1px; height: 1px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
-.organizationDiamond { position: absolute; left: calc((11px + var(--intent) * 10px) / -2); top: calc((11px + var(--intent) * 10px) / -2); width: calc(11px + var(--intent) * 10px); height: calc(11px + var(--intent) * 10px); transform: rotate(45deg); border: 1px solid rgba(230, 255, 247, .9); background: color-mix(in srgb, #9ddbc6 calc(88% - var(--risk) * 55%), #d59a6d); box-shadow: 0 0 calc(10px + var(--freshness) * 18px) rgba(157, 219, 198, calc(.18 + var(--freshness) * .48)); }
-.cluster[data-selected="true"] .organizationDiamond { outline: 1px solid #c8f36a; outline-offset: 5px; }
-.markerLabel { position: absolute; left: 16px; top: -15px; display: grid; min-width: 9rem; max-width: 14rem; text-align: left; pointer-events: none; }
+.cluster[data-selected="true"] .sourceDot { animation: evidenceSourceReveal var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter) both; animation-delay: calc(var(--source-index) * 18ms); }
+.organizationMarker { position: absolute; left: -22px; top: -22px; display: block; width: 44px; height: 44px; padding: 0; border: 0; outline: none; background: transparent; color: inherit; cursor: pointer; }
+.organizationDiamond { position: absolute; left: 50%; top: 50%; width: calc(11px + var(--intent) * 10px); height: calc(11px + var(--intent) * 10px); transform: translate(-50%, -50%) rotate(45deg) scale(1); border: 1px solid rgba(230, 255, 247, .9); outline: 1px solid transparent; outline-offset: 2px; background: color-mix(in srgb, #9ddbc6 calc(88% - var(--risk) * 55%), #d59a6d); box-shadow: 0 0 calc(10px + var(--freshness) * 18px) rgba(157, 219, 198, calc(.18 + var(--freshness) * .48)); transition: transform var(--rr-motion-duration-control) var(--rr-motion-ease-standard), outline-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard), outline-offset var(--rr-motion-duration-control) var(--rr-motion-ease-standard), box-shadow var(--rr-motion-duration-control) var(--rr-motion-ease-standard); }
+.organizationMarker:hover .organizationDiamond,
+.organizationMarker:focus-visible .organizationDiamond,
+.cluster[data-selected="true"] .organizationDiamond { transform: translate(-50%, -50%) rotate(45deg) scale(1.08); outline-color: #c8f36a; outline-offset: 5px; }
+.markerLabel { position: absolute; left: calc(50% + 16px); top: 50%; display: grid; min-width: 9rem; max-width: 14rem; opacity: .78; transform: translateY(-50%); text-align: left; pointer-events: none; transition: opacity var(--rr-motion-duration-control) var(--rr-motion-ease-standard); }
+.organizationMarker:hover .markerLabel,
+.organizationMarker:focus-visible .markerLabel,
+.cluster[data-selected="true"] .markerLabel { opacity: 1; }
 .markerLabel strong { overflow: hidden; color: rgba(244, 246, 242, .94); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
 .markerLabel small { color: rgba(244, 246, 242, .48); font-size: .6rem; }
+
+@keyframes evidenceSourceReveal {
+  from { opacity: .2; }
+  to { opacity: 1; }
+}
 
 .regionGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: .85rem; border-top: 1px solid rgba(255,255,255,.07); border-left: 1px solid rgba(255,255,255,.07); }
 .regionCard { display: grid; gap: .7rem; padding: .9rem; border-right: 1px solid rgba(255,255,255,.07); border-bottom: 1px solid rgba(255,255,255,.07); }
@@ -111,4 +122,4 @@
 
 @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } .detailPanel { position: static; max-height: none; } }
 @media (max-width: 720px) { .map { min-height: 32rem; } .markerLabel { display: none; } .regionGrid { grid-template-columns: 1fr; } .scoreGrid { grid-template-columns: repeat(2, 1fr); } .scoreItem { border-bottom: 1px solid rgba(255,255,255,.07); } .timeline li { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .sourceDot, .organizationDiamond { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .sourceDot, .organizationDiamond, .markerLabel { animation: none; transition: none; } }

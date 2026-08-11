@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   BriefcaseIcon,
   LayersIcon,
+  MotionIcon,
   SearchIcon,
   ShieldIcon,
   TargetIcon,
@@ -124,9 +125,16 @@ export function ProductWorkspaceFrame(props: {
                 href={item.href}
                 className={styles.navItem}
                 data-active={item.active ? "true" : undefined}
+                data-motion-interactive
                 aria-current={item.active ? "page" : undefined}
               >
-                <Icon className={styles.navIcon} aria-hidden="true" />
+                <MotionIcon
+                  className={styles.navIcon}
+                  kind="navigation"
+                  state={item.active ? "active" : "idle"}
+                >
+                  <Icon />
+                </MotionIcon>
                 <span>{item.label}</span>
               </Link>
             );
@@ -187,17 +195,30 @@ function MobileNavigation(props: { items: NavItem[] }) {
             href={item.href}
             className={styles.mobileNavItem}
             data-active={item.active ? "true" : undefined}
+            data-motion-interactive
             aria-current={item.active ? "page" : undefined}
           >
-            <Icon aria-hidden="true" />
+            <MotionIcon
+              className={styles.mobileNavIcon}
+              kind="navigation"
+              state={item.active ? "active" : "idle"}
+            >
+              <Icon />
+            </MotionIcon>
             <span>{item.href === "/review" ? "Проверка" : item.label}</span>
           </Link>
         );
       })}
       {moreLinks.length > 0 ? (
-        <details className={styles.mobileMore} data-active={moreActive ? "true" : undefined}>
-          <summary>
-            <LayersIcon aria-hidden="true" />
+        <details
+          className={styles.mobileMore}
+          data-active={moreActive ? "true" : undefined}
+          data-motion-disclosure
+        >
+          <summary data-motion-interactive>
+            <MotionIcon className={styles.mobileNavIcon} kind="disclosure">
+              <LayersIcon />
+            </MotionIcon>
             <span>Ещё</span>
           </summary>
           <div className={styles.mobileMoreMenu}>
@@ -205,6 +226,7 @@ function MobileNavigation(props: { items: NavItem[] }) {
               <Link
                 key={item.href}
                 href={item.href}
+                data-motion-interactive
                 aria-current={item.active ? "page" : undefined}
               >
                 {item.label}

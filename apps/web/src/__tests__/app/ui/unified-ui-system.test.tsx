@@ -72,4 +72,44 @@ describe("Recruiter Radar unified UI system", () => {
     );
     expect(screen.queryByRole("navigation", { name: "Продукт" })).not.toBeInTheDocument();
   });
+
+  it("exposes semantic motion state without changing navigation semantics", () => {
+    const { container } = render(
+      <ProductWorkspaceFrame
+        navItems={[
+          { href: "/dashboard", label: "Dashboard", active: true },
+          { href: "/leads", label: "Leads" },
+          { href: "/review", label: "Review" },
+          { href: "/profile", label: "Profile" },
+          { href: "/settings", label: "Settings" },
+        ]}
+      >
+        Workspace
+      </ProductWorkspaceFrame>,
+    );
+
+    const currentLinks = container.querySelectorAll('a[aria-current="page"]');
+    expect(currentLinks).toHaveLength(2);
+    currentLinks.forEach((link) => {
+      expect(link).toHaveAttribute("data-motion-interactive");
+      expect(link.querySelector('[data-motion-icon="navigation"]')).toHaveAttribute(
+        "data-motion-state",
+        "active",
+      );
+    });
+
+    const idleLinks = container.querySelectorAll('a[href="/leads"]');
+    expect(idleLinks).toHaveLength(2);
+    idleLinks.forEach((link) => {
+      expect(link.querySelector('[data-motion-icon="navigation"]')).toHaveAttribute(
+        "data-motion-state",
+        "idle",
+      );
+    });
+
+    const mobileMore = container.querySelector("details");
+    expect(mobileMore).toHaveAttribute("data-motion-disclosure");
+    expect(mobileMore?.querySelector("summary")).toHaveAttribute("data-motion-interactive");
+    expect(mobileMore?.querySelector('[data-motion-icon="disclosure"]')).not.toBeNull();
+  });
 });

@@ -89,7 +89,11 @@
   background-color: var(--surface-panel);
   color: var(--ink-secondary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
+    background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
+    border-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
+    box-shadow var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
 }
 
 .todayToggleIcon {
@@ -133,6 +137,16 @@
 .filterReset:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+.filterStatus {
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.filterStatus:empty {
+  display: none;
 }
 
 @media (max-width: 640px) {

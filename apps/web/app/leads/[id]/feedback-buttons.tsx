@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition, useState } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import type { ReactElement, SVGProps } from 'react';
 import { updateLeadFeedbackAction } from './actions';
 import {
@@ -10,6 +10,7 @@ import {
   ClockIcon,
   WaveIcon,
   XIcon,
+  MotionIcon,
 } from '../../ui/icons';
 import s from './feedback-buttons.module.css';
 
@@ -77,49 +78,99 @@ interface FeedbackButtonsProps {
 }
 
 export default function FeedbackButtons({ orgId, clientProfileId, currentStatus }: FeedbackButtonsProps) {
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [activeStatus, setActiveStatus] = useState(currentStatus);
   const [error, setError] = useState<string | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState('');
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+  const [confirmedStatus, setConfirmedStatus] = useState<string | null>(null);
+  const [failedStatus, setFailedStatus] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const noteInputRef = useRef<HTMLInputElement>(null);
+  const draftStatusRef = useRef<string | null>(null);
+  const mutationLockRef = useRef(false);
+  const feedbackPending = pendingStatus !== null;
 
-  function handleClick(status: string, noteAllowed?: boolean) {
-    setError(null);
-    // For note-allowed statuses, open the note input first instead of committing
-    // immediately — the recruiter can add a one-line "почему мимо" or skip it.
-    if (noteAllowed && !noteOpen) {
-      setNoteOpen(true);
-      setActiveStatus(status);
-      return;
+  useEffect(() => {
+    if (noteOpen) {
+      noteInputRef.current?.focus();
     }
+  }, [noteOpen]);
+
+  function clearOutcomeState() {
+    setError(null);
+    setAnnouncement('');
+    setConfirmedStatus(null);
+    setFailedStatus(null);
+  }
+
+  function commitFeedback(status: string, noteValue: string | null) {
+    if (mutationLockRef.current) return;
+
+    mutationLockRef.current = true;
+    clearOutcomeState();
+    setPendingStatus(status);
     startTransition(async () => {
       try {
         const result = await updateLeadFeedbackAction(
           orgId,
           clientProfileId,
           status,
-          note.trim() || null,
+          noteValue,
         );
+        const savedButton = BUTTONS.find(
+          (button) => button.status === result.feedbackStatus,
+        );
+        if (!savedButton) {
+          throw new Error('Сервер вернул неизвестный статус обратной связи');
+        }
         setActiveStatus(result.feedbackStatus);
+        draftStatusRef.current = null;
         setNoteOpen(false);
         setNote('');
+        setConfirmedStatus(result.feedbackStatus);
+        setAnnouncement(`Статус сохранён: ${savedButton.label}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Ошибка обновления');
+        setFailedStatus(status);
+      } finally {
+        setPendingStatus(null);
+        mutationLockRef.current = false;
       }
     });
   }
 
-  function handleSkipNote() {
-    setNoteOpen(false);
-    setNote('');
-    // Commit the pending park status without a note.
-    if (activeStatus) {
-      handleClick(activeStatus);
+  function handleClick(status: string, noteAllowed?: boolean) {
+    if (mutationLockRef.current || draftStatusRef.current) return;
+
+    // For note-allowed statuses, open the note input first instead of committing
+    // immediately — the recruiter can add a one-line "почему мимо" or skip it.
+    if (noteAllowed) {
+      clearOutcomeState();
+      draftStatusRef.current = status;
+      setNoteOpen(true);
+      return;
     }
+    commitFeedback(status, null);
+  }
+
+  function handleSkipNote() {
+    if (mutationLockRef.current) return;
+    const draftStatus = draftStatusRef.current;
+    if (!draftStatus) return;
+    commitFeedback(draftStatus, null);
+  }
+
+  function handleSaveNote() {
+    if (mutationLockRef.current) return;
+    const draftStatus = draftStatusRef.current;
+    if (!draftStatus) return;
+    commitFeedback(draftStatus, note.trim() || null);
   }
 
   return (
-    <div>
+    <div aria-busy={feedbackPending}>
       {GROUP_ORDER.map((group) => {
         const groupButtons = BUTTONS.filter((b) => b.group === group);
         return (
@@ -132,13 +183,31 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
                   <button
                     key={btn.status}
                     onClick={() => handleClick(btn.status, btn.noteAllowed)}
-                    disabled={isPending}
+                    disabled={feedbackPending || noteOpen}
                     className={s.feedbackBtn}
+                    data-motion-interactive
                     data-active={isActive ? 'true' : undefined}
                     data-tone={isActive ? btn.tone : undefined}
                     aria-pressed={isActive ? 'true' : 'false'}
                   >
-                    <btn.icon className={s.btnIcon} /> {btn.label}
+                    <MotionIcon
+                      kind="feedback"
+                      state={
+                        pendingStatus === btn.status
+                          ? 'pending'
+                          : failedStatus === btn.status
+                            ? 'error'
+                            : confirmedStatus === btn.status
+                              ? 'success'
+                          : isActive
+                            ? 'active'
+                            : 'idle'
+                      }
+                      className={s.btnIcon}
+                    >
+                      <btn.icon />
+                    </MotionIcon>{' '}
+                    {btn.label}
                   </button>
                 );
               })}
@@ -148,10 +217,12 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
       })}
 
       {noteOpen && (
-        <div className={s.noteRow}>
+        <div className={s.noteRow} data-motion-disclosure>
           <input
+            ref={noteInputRef}
             type="text"
             value={note}
+            disabled={feedbackPending}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Почему не подходит (необязательно)"
             maxLength={200}
@@ -160,19 +231,26 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
           />
           <button
             type="button"
-            onClick={() => activeStatus && handleClick(activeStatus)}
-            disabled={isPending}
+            onClick={handleSaveNote}
+            disabled={feedbackPending}
             className={s.noteSave}
           >
             Сохранить
           </button>
-          <button type="button" onClick={handleSkipNote} disabled={isPending} className={s.noteSkip}>
+          <button type="button" onClick={handleSkipNote} disabled={feedbackPending} className={s.noteSkip}>
             Без заметки
           </button>
         </div>
       )}
 
-      {error && <p className={s.errorText}>{error}</p>}
+      <p className={s.statusText} role="status" aria-live="polite" data-motion-status>
+        {feedbackPending ? 'Сохраняем статус…' : announcement}
+      </p>
+      {error && (
+        <p className={s.errorText} role="alert" data-motion-status>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
