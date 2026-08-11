@@ -915,6 +915,9 @@ async function inspectCurrentSurface(
   screenshotName,
   expectedSemantics = ['heading', 'button'],
 ) {
+  await page.waitForFunction(
+    () => document.querySelectorAll('main').length === 1,
+  )
   await page.locator('main').waitFor({ state: 'visible' })
   await page.locator('#__next-route-announcer__').waitFor({
     state: 'attached',
@@ -1003,7 +1006,7 @@ async function inspectCurrentSurface(
 }
 
 async function inspectSurface(page, key, pathname, screenshotName) {
-  await page.goto(`${baseUrl}${pathname}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${baseUrl}${pathname}`, { waitUntil: 'networkidle' })
   await inspectCurrentSurface(page, key, pathname, screenshotName)
 }
 
