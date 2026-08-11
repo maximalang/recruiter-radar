@@ -213,7 +213,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
           >
-            {previewState.items.length > 0 ? "Получать новые возможности каждое утро" : "Попробовать неделю"} <ArrowGlyph />
+            {previewState.items.length > 0 ? "Запустить радар на 7 дней" : "Попробовать неделю"} <ArrowGlyph />
           </Link>
           <small>7 дней · без автопродления</small>
         </div>
