@@ -53,7 +53,7 @@ describe('Company Event support registry', () => {
     const docs = readFileSync(
       resolve(process.cwd(), '..', '..', 'docs', 'company-events-v1.md'),
       'utf8',
-    )
+    ).replace(/\r\n/g, '\n')
     expect(docs).toContain([
       '<!-- COMPANY_EVENT_SUPPORT_MATRIX:START -->',
       renderCompanyEventSupportMatrixMarkdown(),
