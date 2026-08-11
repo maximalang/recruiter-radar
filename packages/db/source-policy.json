@@ -1,0 +1,17 @@
+{
+  "hh": { "priority": "P1", "defaultConfidence": 0.74, "leadEligibility": "digest-lead-originating", "promotionStatus": "digest-allowed" },
+  "career-pages": { "priority": "P1", "defaultConfidence": 0.92, "leadEligibility": "digest-lead-originating", "promotionStatus": "digest-allowed" },
+  "rabota-rossii": { "priority": "P1", "defaultConfidence": 0.7, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "digest-allowed" },
+  "egrul-fns": { "priority": "P1", "defaultConfidence": 0.9, "leadEligibility": "enrichment-only", "promotionStatus": "never-lead-originating" },
+  "transparent-business-fns": { "priority": "P1", "defaultConfidence": 0.86, "leadEligibility": "enrichment-only", "promotionStatus": "never-lead-originating" },
+  "fedresurs": { "priority": "P1", "defaultConfidence": 0.62, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "company-site": { "priority": "P2", "defaultConfidence": 0.68, "leadEligibility": "enrichment-only", "promotionStatus": "supporting-evidence-only" },
+  "funding-business-signals": { "priority": "P2", "defaultConfidence": 0.58, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "linkedin-company-pages": { "priority": "P2", "defaultConfidence": 0.72, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "tech-job-boards": { "priority": "P2", "defaultConfidence": 0.68, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "superjob": { "priority": "P2", "defaultConfidence": 0.66, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "habr-career": { "priority": "P2", "defaultConfidence": 0.69, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "company-newsrooms": { "priority": "P3", "defaultConfidence": 0.6, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "industry-media": { "priority": "P3", "defaultConfidence": 0.52, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "regional-job-boards": { "priority": "P3", "defaultConfidence": 0.58, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" }
+}

@@ -84,4 +84,15 @@ describe("landing runtime truth contract", () => {
     expect(homepage).toContain('import { buildLandingFaqItems } from "./landing/landing-faq";');
     expect(homepage).toContain("buildLandingFaqItems(paymentSetup.configured)");
   });
+
+  test("public preview names shared product signals without claiming production ranking equivalence", () => {
+    const workspace = webSource("app/landing/workspace-scene.tsx");
+    const previewRelevance = webSource("lib/preview-relevance.ts");
+
+    expect(previewRelevance).toContain("not an output of the production FIUR engine");
+    expect(workspace).toContain("те же продуктовые признаки");
+    expect(workspace).toContain("Это демонстрационная выдача, а не расчёт вашего рабочего радара");
+    expect(workspace).not.toContain("логика приоритета и структура карточек соответствуют рабочей выдаче");
+    expect(workspace).not.toContain("тот же алгоритм");
+  });
 });

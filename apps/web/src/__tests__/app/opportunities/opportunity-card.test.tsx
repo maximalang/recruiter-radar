@@ -80,7 +80,8 @@ describe('OpportunityCard', () => {
   it('renders evidence-backed brief copy and the evidence timeline', () => {
     render(<OpportunityCard opportunity={OPPORTUNITY} />)
 
-    expect(screen.getByRole('heading', { name: 'Пример ускорила найм' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Пример' })).toBeInTheDocument()
+    expect(screen.getByText(/Пример ускорила найм/)).toBeInTheDocument()
     expect(screen.getByText('За 14 дней открыто 8 вакансий.')).toBeInTheDocument()
     expect(screen.getByText('Почему подходит агентству')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Доказательства' })).toBeInTheDocument()
@@ -205,15 +206,15 @@ describe('OpportunityCard', () => {
 
     for (const heading of [
       'Что изменилось',
-      'Почему это не обычный найм',
+      'Почему это важно',
       'Почему может понадобиться агентство',
-      'Почему подходит именно это агентство',
+      'Почему подходит вашему агентству',
       'Почему сейчас',
-      'External Agency Propensity',
-      'Agency Fit',
-      'Opportunity Quality',
-      'Actionability',
-      'Рекомендуемое действие',
+      'Вероятность внешнего подбора',
+      'Соответствие вашему профилю',
+      'Сила возможности',
+      'Готовность к контакту',
+      'Что сделать сейчас',
       'Ограничения',
     ]) {
       expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
@@ -221,7 +222,10 @@ describe('OpportunityCard', () => {
     expect(screen.queryByLabelText(/Оценка возможности:/)).toBeNull()
     expect(screen.getAllByText('Высокая').length).toBeGreaterThan(0)
     expect(screen.getByText('Средняя')).toBeInTheDocument()
-    expect(screen.getByText('qualified actionable')).toBeInTheDocument()
+    expect(screen.getByText('Коммерческая возможность')).toBeInTheDocument()
+    expect(screen.queryByText('Commercial Signal v3')).toBeNull()
+    expect(screen.queryByText('qualified actionable')).toBeNull()
+    expect(screen.getByText('Как радар сделал вывод').closest('details')).not.toHaveAttribute('open')
     expect(screen.getByText('Подготовить проверяемый черновик обращения.'))
       .toBeInTheDocument()
   })
@@ -241,9 +245,25 @@ describe('OpportunityCard', () => {
     />)
 
     expect(screen.queryByLabelText(/Оценка возможности:/)).toBeNull()
-    expect(screen.getByText(/Точный Commercial Signal snapshot недоступен/))
+    expect(screen.getByText(/Данных для новой оценки коммерческой возможности пока недостаточно/))
       .toHaveAttribute('role', 'status')
     expect(screen.queryByText('Opportunity Quality')).toBeNull()
+    expect(screen.queryByText(/snapshot|legacy-score/i)).toBeNull()
+  })
+
+  it.each([
+    [1, 1, 1, '1 факт · 1 источник · 1 прямое подтверждение'],
+    [2, 2, 2, '2 факта · 2 источника · 2 прямых подтверждения'],
+    [5, 5, 5, '5 фактов · 5 источников · 5 прямых подтверждений'],
+  ])('pluralizes evidence counts for %i items', (factCount, sourceFamilyCount, directEvidenceCount, expected) => {
+    render(<OpportunityCard opportunity={{
+      ...OPPORTUNITY,
+      factCount,
+      sourceFamilyCount,
+      directEvidenceCount,
+    }} />)
+
+    expect(screen.getByText(expected)).toBeInTheDocument()
   })
 })
 

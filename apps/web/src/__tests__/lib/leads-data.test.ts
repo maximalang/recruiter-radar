@@ -82,6 +82,10 @@ describe('getLeadDetail', () => {
 
     const result = await getLeadDetail({ candidateId: '42', ownerId: 'owner-1' });
 
+    const detailQuery = String(mockQuery.mock.calls[0]?.[0] ?? '');
+    expect(detailQuery).not.toContain('dc.candidate_source_keys');
+    expect(detailQuery).toContain("dc.payload->'candidate_source_keys'");
+
     expect(result).not.toBeNull();
     expect(result!.id).toBe('42');
     expect(result!.clientProfileId).toBe('5');

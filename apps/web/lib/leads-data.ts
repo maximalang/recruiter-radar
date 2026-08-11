@@ -842,7 +842,11 @@ export async function getLeadDetail(input: {
       cdos.cooldown_until,
       dc.created_at::TEXT AS created_at,
       dc.source_families,
-      dc.candidate_source_keys,
+      COALESCE(
+        dc.payload->'candidateSourceKeys',
+        dc.payload->'candidate_source_keys',
+        '[]'::JSONB
+      ) AS candidate_source_keys,
       dc.payload,
       dc.ai_enrichment,
       dc.review_status::TEXT AS review_status

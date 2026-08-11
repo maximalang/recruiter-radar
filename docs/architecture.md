@@ -63,6 +63,47 @@ npm run verify:sources:live-config
 
 ## Основные части системы
 
+## Каноническая serving-семантика
+
+Все product readers и delivery adapters интерпретируют сущности в одном
+направлении:
+
+`COMPANY → EVIDENCE → SIGNAL → SCORE / QUALIFICATION → OPPORTUNITY → ACTION`
+
+- **Company** — каноническая организация. Это объект наблюдения, а не лид и не
+  оценка.
+- **Evidence** — проверяемая запись источника с provenance. `source count`
+  означает число независимых source families, а `evidence count` — число
+  конкретных подтверждающих записей; эти величины не взаимозаменяемы.
+- **Signal** — evidence-backed изменение или состояние компании. Сам по себе
+  сигнал ещё не является рекомендацией агентству.
+- **Score / Qualification** — детерминированная оценка конкретного контекста.
+  `fit` — соответствие профилю агентства, `urgency` — временная срочность,
+  `confidence` — достаточность и качество подтверждений. Ни одно из этих полей
+  не является probability продажи.
+- **Opportunity** — tenant-scoped квалифицированная коммерческая возможность,
+  привязанная к компании, evidence lineage и профилю агентства. `whyNow`
+  объясняет подтверждённое изменение и момент, но не заменяет evidence.
+- **Action** — рекомендуемый следующий human-controlled шаг. `actionability`
+  означает готовность безопасно выполнить такой шаг сейчас; это не Opportunity
+  Quality и не разрешение на автоматическую рассылку.
+
+Serving boundaries:
+
+- `/leads` и `/api/leads/*` читают `digest_candidates`: это операционная выдача
+  Radar и её feedback/suppression state;
+- `/opportunities` и Commercial Signal reader читают tenant-scoped
+  `opportunities` с exact evidence lineage;
+- daily digest выбирает из того же набора `digest_candidates`, но только для
+  конкретного `digest_run_id`; он не переопределяет score или `whyNow`;
+- compatibility adapters могут проецировать эти модели в общий UI-словарь, но
+  не должны выдавать lead score за Opportunity score, число источников за число
+  фактов или confidence за actionability;
+- полная консолидация legacy digest candidate и Opportunity в одну таблицу не
+  входит в текущий срез. Следующая миграция должна сначала определить persisted
+  lineage между этими read models, затем переключить readers под отдельным
+  fail-closed rollout.
+
 ### 1. Data layer
 
 PostgreSQL хранит product state:

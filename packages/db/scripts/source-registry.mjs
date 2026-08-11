@@ -12,6 +12,7 @@ import {
   SOURCE_COVERAGE_TIERS,
   validateSourceCoverage,
 } from './source-coverage-requirements.mjs';
+import sourcePolicyContract from '../source-policy.json' with { type: 'json' };
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '../../..');
@@ -604,14 +605,20 @@ function registerSource(source) {
   }
 
   const policy = sourceReadinessPolicy[source.id];
+  const canonicalPolicy = sourcePolicyContract[source.id];
 
   if (!policy) {
     throw new Error(`Missing source readiness policy metadata: ${source.id}`);
   }
 
+  if (!canonicalPolicy) {
+    throw new Error(`Missing canonical source policy metadata: ${source.id}`);
+  }
+
   registry.set(source.id, Object.freeze({
     ...source,
     ...policy,
+    ...canonicalPolicy,
   }));
 }
 

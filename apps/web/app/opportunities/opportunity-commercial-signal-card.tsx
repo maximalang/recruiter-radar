@@ -23,10 +23,9 @@ export function OpportunityCommercialSignalCard(props: {
     <div className={styles.commercialSignalBrief}>
       <div className={styles.commercialSignalHeading}>
         <div>
-          <span>Commercial Signal v3</span>
+          <span>Коммерческая возможность</span>
           <strong>{STATUS_LABELS[props.card.status]}</strong>
         </div>
-        <small>{props.card.status.replaceAll('_', ' ')}</small>
       </div>
 
       <div className={`${styles.decisionGrid} ${styles.commercialSignalContext}`}>
@@ -38,7 +37,7 @@ export function OpportunityCommercialSignalCard(props: {
         />
         <ConclusionSection
           id={`not-ordinary-${props.opportunityId}`}
-          heading="Почему это не обычный найм"
+          heading="Почему это важно"
           conclusion={props.card.whyNotOrdinaryHiring}
           opportunityId={props.opportunityId}
         />
@@ -50,7 +49,7 @@ export function OpportunityCommercialSignalCard(props: {
         />
         <ConclusionSection
           id={`why-this-agency-${props.opportunityId}`}
-          heading="Почему подходит именно это агентство"
+          heading="Почему подходит вашему агентству"
           conclusion={props.card.whyThisAgency}
           opportunityId={props.opportunityId}
         />
@@ -67,29 +66,30 @@ export function OpportunityCommercialSignalCard(props: {
         aria-labelledby={`signal-metrics-${props.opportunityId}`}
       >
         <h3 id={`signal-metrics-${props.opportunityId}`}>
-          Компоненты решения
+          Почему лид в приоритете
         </h3>
         <div className={styles.signalMetrics}>
           <Metric
-            heading="External Agency Propensity"
+            heading="Вероятность внешнего подбора"
             metric={props.card.metrics.externalAgencyPropensity}
           />
-          <Metric heading="Agency Fit" metric={props.card.metrics.agencyFit} />
+          <Metric heading="Соответствие вашему профилю" metric={props.card.metrics.agencyFit} />
           <Metric
-            heading="Opportunity Quality"
+            heading="Сила возможности"
             metric={props.card.metrics.opportunityQuality}
           />
           <Metric
-            heading="Actionability"
+            heading="Готовность к контакту"
             metric={props.card.metrics.actionability}
           />
         </div>
+        <SignalDiagnostics card={props.card} />
       </section>
 
       <div className={styles.decisionGrid}>
         <ConclusionSection
           id={`recommended-action-${props.opportunityId}`}
-          heading="Рекомендуемое действие"
+          heading="Что сделать сейчас"
           conclusion={props.card.recommendedAction}
           opportunityId={props.opportunityId}
         />
@@ -174,8 +174,30 @@ function Metric(props: {
       <h3>{props.heading}</h3>
       <strong>{level.label}</strong>
       <span className={styles.signalMetricBar} aria-hidden="true" />
-      <small>Причины: {props.metric.reasonCodes.join(', ')}</small>
     </section>
+  )
+}
+
+function SignalDiagnostics({ card }: { card: CommercialSignalCard }) {
+  const diagnostics = [
+    ['Вероятность внешнего подбора', card.metrics.externalAgencyPropensity.reasonCodes],
+    ['Соответствие вашему профилю', card.metrics.agencyFit.reasonCodes],
+    ['Сила возможности', card.metrics.opportunityQuality.reasonCodes],
+    ['Готовность к контакту', card.metrics.actionability.reasonCodes],
+  ] as const
+
+  return (
+    <details className={styles.signalDiagnostics}>
+      <summary>Как радар сделал вывод</summary>
+      <dl>
+        {diagnostics.map(([label, reasonCodes]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{reasonCodes.join(', ') || 'Код причины не указан'}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   )
 }
 

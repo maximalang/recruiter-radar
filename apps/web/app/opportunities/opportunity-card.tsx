@@ -21,6 +21,7 @@ import {
   OpportunityCommercialSignalCard,
 } from './opportunity-commercial-signal-card'
 import styles from './opportunities.module.css'
+import { pluralForm } from '@/lib/format/plural'
 
 const EPISODE_LABELS: Record<string, string> = {
   vacancy_spike: 'Всплеск найма',
@@ -95,9 +96,9 @@ export function OpportunityCard(props: {
             <span aria-hidden="true"> · </span>
             {STATUS_LABELS[displayStatus] ?? displayStatus}
           </div>
-          <h2 className={styles.cardTitle}>{opportunity.title}</h2>
+          <h2 className={styles.cardTitle}>{opportunity.organizationName}</h2>
           <p className={styles.organization}>
-            {opportunity.organizationName}
+            {opportunity.title}
             {opportunity.organizationDomain
               ? ` · ${opportunity.organizationDomain}`
               : ''}
@@ -116,8 +117,13 @@ export function OpportunityCard(props: {
           <GateBadgeInline gate={opportunity.confidenceGate} />
         ) : null}
         <EvidenceTag>
-          {opportunity.factCount} фактов · {opportunity.sourceFamilyCount} источника ·{' '}
-          {opportunity.directEvidenceCount} прямое подтверждение
+          {formatCount(opportunity.factCount, ['факт', 'факта', 'фактов'])} ·{' '}
+          {formatCount(opportunity.sourceFamilyCount, ['источник', 'источника', 'источников'])} ·{' '}
+          {formatCount(opportunity.directEvidenceCount, [
+            'прямое подтверждение',
+            'прямых подтверждения',
+            'прямых подтверждений',
+          ])}
         </EvidenceTag>
         <EvidenceTag>
           актуально до {formatDate(opportunity.validUntil)}
@@ -126,8 +132,8 @@ export function OpportunityCard(props: {
 
       {props.commercialSignalUiEnabled && !commercialSignalCard ? (
         <p className={styles.cardState} data-state="insufficient" role="status">
-          Точный Commercial Signal snapshot недоступен. Legacy-score не используется
-          как замена новой семантики.
+          Данных для новой оценки коммерческой возможности пока недостаточно.
+          Предыдущая оценка не подставляется вместо неё.
         </p>
       ) : contentState === 'insufficient' ? (
         <p className={styles.cardState} data-state="insufficient" role="status">
@@ -206,4 +212,8 @@ function isStale(value: string | null): boolean {
   if (!value) return false
   const timestamp = Date.parse(value)
   return Number.isFinite(timestamp) && timestamp < Date.now()
+}
+
+function formatCount(count: number, forms: readonly [string, string, string]): string {
+  return `${count} ${pluralForm(count, forms)}`
 }

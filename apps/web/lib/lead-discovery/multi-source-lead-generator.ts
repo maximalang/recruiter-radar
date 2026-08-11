@@ -18,6 +18,12 @@ import { evidenceTypeToTier } from '@/lib/db/evidence'
 import { getPool } from '@/lib/db'
 import { logError } from '@/lib/runtime'
 import { withRetry } from '@/lib/utils/retry'
+import { getSourceRegistry } from '@/lib/sources/source-registry'
+import {
+  canOriginateActionableLead,
+  getCanonicalSourcePolicy,
+  isDefaultGeneratorSource,
+} from '@/lib/sources/source-policy'
 
 // Extend the interface to include confidence_gate (now in base type, kept for compatibility)
 export type HhDigestItemWithConfidence = HhDigestItem
@@ -263,139 +269,26 @@ export class MultiSourceLeadGenerator {
    * Initialize all available data sources
    */
   private initializeSources(): DataSource[] {
-    return [
-      // Primary sources (P1)
-      {
-        id: 'hh',
-        name: 'HeadHunter',
-        kind: 'job-board',
-        confidence: 0.74,
-        priority: 'P1',
-        leadEligibility: 'digest-lead-originating',
-        description: 'Primary platform for hiring evidence'
-      },
-      {
-        id: 'career-pages',
-        name: 'Career Pages',
-        kind: 'career-page',
-        confidence: 0.92,
-        priority: 'P1',
-        leadEligibility: 'digest-lead-originating',
-        description: 'Direct company career pages'
-      },
-      {
-        id: 'rabota-rossii',
-        name: 'Rabota Rossii',
-        kind: 'job-board',
-        confidence: 0.7,
-        priority: 'P1',
-        leadEligibility: 'confidence-gated-evidence',
-        description: 'Official Russian job board'
-      },
+    return getSourceRegistry().map(source => {
+      const policy = getCanonicalSourcePolicy(source.id)
+      if (!policy) throw new Error(`Missing canonical source policy: ${source.id}`)
 
-      // Secondary sources (P2)
-      {
-        id: 'linkedin-company-pages',
-        name: 'LinkedIn Company Pages',
-        kind: 'company-site',
-        confidence: 0.72,
-        priority: 'P2',
-        leadEligibility: 'confidence-gated-evidence',
-        description: 'LinkedIn company pages'
-      },
-      {
-        id: 'tech-job-boards',
-        name: 'Tech Job Boards',
-        kind: 'job-board',
-        confidence: 0.68,
-        priority: 'P2',
-        leadEligibility: 'confidence-gated-evidence',
-        description: 'Specialized tech job boards'
-      },
-      {
-        id: 'superjob',
-        name: 'SuperJob',
-        kind: 'job-board',
-        confidence: 0.66,
-        priority: 'P2',
-        leadEligibility: 'confidence-gated-evidence',
-        description: 'Russian job board'
-      },
-      {
-        id: 'habr-career',
-        name: 'Habr Career',
-        kind: 'job-board',
-        confidence: 0.69,
-        priority: 'P2',
-        leadEligibility: 'confidence-gated-evidence',
-        description: 'IT-focused job board'
-      },
-      {
-        id: 'company-site',
-        name: 'Company Websites',
-        kind: 'company-site',
-        confidence: 0.68,
-        priority: 'P2',
-        leadEligibility: 'enrichment-only',
-        description: 'Direct company websites'
-      },
+      const kind: DataSource['kind'] = source.category === 'professional-network'
+        ? 'company-site'
+        : source.category === 'registry'
+          ? 'company-registry'
+          : source.category
 
-      // Enrichment sources (P3)
-      {
-        id: 'egrul-fns',
-        name: 'EGRUL/FNS Registry',
-        kind: 'company-registry',
-        confidence: 0.9,
-        priority: 'P3',
-        leadEligibility: 'enrichment-only',
-        description: 'Company registry data'
-      },
-      {
-        id: 'transparent-business-fns',
-        name: 'Transparent Business/FNS',
-        kind: 'company-registry',
-        confidence: 0.86,
-        priority: 'P3',
-        leadEligibility: 'enrichment-only',
-        description: 'FNS legal-entity enrichment data'
-      },
-      {
-        id: 'fedresurs',
-        name: 'Fedresurs',
-        kind: 'business-signal',
-        confidence: 0.62,
-        priority: 'P3',
-        leadEligibility: 'context-only',
-        description: 'Corporate-event context'
-      },
-      {
-        id: 'funding-business-signals',
-        name: 'Funding Signals',
-        kind: 'business-signal',
-        confidence: 0.58,
-        priority: 'P3',
-        leadEligibility: 'context-only',
-        description: 'Funding and growth signals'
-      },
-      {
-        id: 'company-newsrooms',
-        name: 'Company Newsrooms',
-        kind: 'company-site',
-        confidence: 0.6,
-        priority: 'P3',
-        leadEligibility: 'context-only',
-        description: 'Company news and announcements'
-      },
-      {
-        id: 'industry-media',
-        name: 'Industry Media',
-        kind: 'business-signal',
-        confidence: 0.52,
-        priority: 'P3',
-        leadEligibility: 'context-only',
-        description: 'Industry news and reports'
+      return {
+        id: source.id,
+        name: source.name,
+        kind,
+        confidence: policy.defaultConfidence,
+        priority: policy.priority,
+        leadEligibility: policy.leadEligibility,
+        description: source.description,
       }
-    ]
+    })
   }
 
   /**
@@ -403,7 +296,7 @@ export class MultiSourceLeadGenerator {
    */
   private getActiveSources(): string[] {
     return this.sources
-      .filter(source => source.leadEligibility !== 'enrichment-only' || source.id === 'egrul-fns')
+      .filter(source => isDefaultGeneratorSource(source.id))
       .map(source => source.id)
   }
 
@@ -594,8 +487,10 @@ export class MultiSourceLeadGenerator {
       const matchingItem = digestItems.find(item => item.org_id === candidate.companyId)
       const sourceFamilies = matchingItem?.source_families || ['hh']
       const permittedSourceFamilies = selectedSourceIds
-        ? sourceFamilies.filter(sourceId => selectedSourceIds.has(sourceId))
-        : sourceFamilies
+        ? sourceFamilies.filter(sourceId => (
+            selectedSourceIds.has(sourceId) && canOriginateActionableLead(sourceId)
+          ))
+        : sourceFamilies.filter(canOriginateActionableLead)
 
       // A digest candidate must retain at least one explicitly selected
       // originating source. Enrichment-only selections cannot leak job-board
@@ -616,23 +511,12 @@ export class MultiSourceLeadGenerator {
         relevanceScore: candidate.score / 4
       }))
 
-      // Blocked sources (provider-or-snapshot-only) get capped at confidence C
-      const blockedSources = new Set([
-        'superjob', 'habr-career', 'linkedin-company-pages',
-        'tech-job-boards', 'regional-job-boards'
-      ])
-      // If ALL sources are blocked, cap confidence at C (review required)
-      // If at least one P1 digest-allowed source is present, use the gate from SQL
-      const allBlocked = permittedSourceFamilies.every(s => blockedSources.has(s))
-
       return [{
         id: `multi-${candidate.id}`,
         companyId: candidate.companyId,
         companyName: candidate.companyName,
         score: candidate.score,
-        confidence: allBlocked
-          ? (candidate.confidence === 'A' || candidate.confidence === 'B' ? 'C' as const : candidate.confidence)
-          : candidate.confidence,
+        confidence: candidate.confidence,
         sources: evidenceSources,
         signals: candidate.signals,
         nextAction: candidate.nextAction,

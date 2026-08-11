@@ -180,6 +180,11 @@ describe("polished unified landing visual contract", () => {
     expect(productionAudit).toContain('LANDING_REQUIRE_ANALYTICS_CONSENT === "true"');
     expect(productionAudit).toContain("analytics consent control is required for this audit");
     expect(productionAudit).toContain('name: "mobile-320x700"');
+    expect(productionAudit).toContain('async function revealAllMotionSections');
+    expect(productionAudit).toContain('[data-motion-reveal="section"]');
+    expect(productionAudit).toContain('data-motion-state');
+    expect(productionAudit).toContain('#scene-signal-timeline');
+    expect(productionAudit).toContain('pending motion sections');
     expect(productionAudit).not.toContain("surfaceSpecs");
   });
 

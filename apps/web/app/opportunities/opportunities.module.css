@@ -469,6 +469,41 @@
   content: "";
 }
 
+.signalDiagnostics {
+  margin-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.75rem;
+}
+
+.signalDiagnostics > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.signalDiagnostics dl,
+.signalDiagnostics dl > div {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.signalDiagnostics dl {
+  margin: 0.75rem 0 0;
+}
+
+.signalDiagnostics dl > div {
+  grid-template-columns: minmax(10rem, 0.45fr) minmax(0, 1fr);
+}
+
+.signalDiagnostics dt {
+  font-weight: 700;
+}
+
+.signalDiagnostics dd {
+  margin: 0;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+
 .signalMetric[data-level="low"] .signalMetricBar::after {
   width: 33%;
 }
@@ -1024,6 +1059,7 @@
 .filterLink:focus-visible,
 .headerLink:focus-visible,
 .workflowEditor summary:focus-visible,
+.signalDiagnostics summary:focus-visible,
 .workflowForm select:focus-visible,
 .workflowForm input:focus-visible,
 .workflowForm textarea:focus-visible,
@@ -1086,6 +1122,10 @@
   }
 
   .signalMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .signalDiagnostics dl > div {
     grid-template-columns: 1fr;
   }
 

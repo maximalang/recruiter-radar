@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       agencyProfile,
-      sources = [],
+      sources,
       minScore = 1.0,
       enableRealTime = false,
       marketContext,
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     // Generate and score leads
     const scoredLeads = await scoringService.generateAndScoreLeads({
       agencyProfile,
-      sources,
+      ...(sources === undefined ? {} : { sources }),
       minScore,
       enableRealTime,
       marketContext,
@@ -80,7 +80,9 @@ export async function POST(request: NextRequest) {
         insights,
         summary: {
           totalLeads: limitedLeads.length,
-          avgScore: limitedLeads.reduce((sum, lead) => sum + lead.finalScore, 0) / limitedLeads.length,
+          avgScore: limitedLeads.length === 0
+            ? 0
+            : limitedLeads.reduce((sum, lead) => sum + lead.finalScore, 0) / limitedLeads.length,
           confidenceBreakdown: {
             A: limitedLeads.filter(lead => lead.confidence === 'A').length,
             B: limitedLeads.filter(lead => lead.confidence === 'B').length,

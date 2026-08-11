@@ -180,7 +180,7 @@ export function LeadCard({
         <div className={ipStyles.signalLeadDisclosureBody}>
           <div className={ipStyles.signalLeadDisclosureInner}>
             <section>
-              <span>Provenance</span>
+              <span>Источники и происхождение</span>
               {sourceFamilies.length > 0 ? (
                 <ul data-motion-list>
                   {sourceFamilies.map((source) => (

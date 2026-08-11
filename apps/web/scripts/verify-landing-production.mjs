@@ -27,6 +27,7 @@ const viewportMatrix = [
 
 const requiredSelectors = [
   "#scene-detection",
+  "#scene-signal-timeline",
   "#scene-workspace",
   "#preview-configurator",
   "#preview-results",
@@ -340,6 +341,51 @@ async function saveScreenshot(page, fileName, options = {}) {
   });
 }
 
+async function revealAllMotionSections(page, label) {
+  const selector = '[data-motion-reveal="section"]';
+  const sections = page.locator(selector);
+  const count = await sections.count();
+  assert.ok(count >= 1, `${label}: no motion sections found`);
+
+  for (let index = 0; index < count; index += 1) {
+    const section = sections.nth(index);
+    await section.scrollIntoViewIfNeeded();
+    await section.waitFor({ state: "visible" });
+    await page.waitForFunction(
+      ({ revealSelector, revealIndex }) => (
+        document.querySelectorAll(revealSelector)[revealIndex]?.getAttribute("data-motion-state") === "visible"
+      ),
+      { revealSelector: selector, revealIndex: index },
+    );
+  }
+
+  await page.waitForTimeout(1200);
+  const pending = await sections.evaluateAll((elements) => elements.flatMap((element, index) => (
+    element.getAttribute("data-motion-state") === "visible"
+      ? []
+      : [{ index, id: element.id || null, state: element.getAttribute("data-motion-state") }]
+  )));
+  assert.deepEqual(pending, [], `${label}: pending motion sections: ${JSON.stringify(pending)}`);
+
+  const invisible = await sections.evaluateAll((elements) => elements.flatMap((element, index) => {
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return rect.width > 0 && rect.height > 0 && style.display !== "none"
+      && style.visibility !== "hidden" && Number.parseFloat(style.opacity) > 0
+      ? []
+      : [{ index, id: element.id || null, rect: rect.toJSON(), opacity: style.opacity, visibility: style.visibility }];
+  }));
+  assert.deepEqual(invisible, [], `${label}: hidden motion sections: ${JSON.stringify(invisible)}`);
+
+  const timeline = page.locator("#scene-signal-timeline");
+  await timeline.waitFor({ state: "visible" });
+  const timelineBox = await timeline.boundingBox();
+  assert.ok(
+    timelineBox && timelineBox.width >= 44 && timelineBox.height >= 44,
+    `${label}: signal timeline is missing from the rendered page`,
+  );
+}
+
 async function assertResponsiveSurface(browser, viewport) {
   const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
   const { page, assertCleanConsole } = await preparePage(context, viewport.name);
@@ -348,19 +394,7 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertHeaderLayout(page, viewport);
   await assertHeroGeometry(page, viewport.name);
   await assertLeadExpansion(page, viewport.name);
-
-  for (const selector of [
-    "#scene-detection",
-    "#scene-workspace",
-    "#scene-evidence",
-    "#scene-delivery",
-    "#pricing",
-    "#faq",
-    "footer",
-  ]) {
-    await page.locator(selector).first().scrollIntoViewIfNeeded();
-    await page.waitForTimeout(20);
-  }
+  await revealAllMotionSections(page, viewport.name);
 
   await assertNoHorizontalOverflow(page, viewport.name);
   await assertAccessibleInteractiveNames(page, viewport.name);
@@ -373,9 +407,11 @@ async function assertResponsiveSurface(browser, viewport) {
   await page.evaluate(() => window.scrollTo(0, 0));
   if (viewport.name === "desktop-1440x900") {
     await saveScreenshot(page, `desktop-1440x900-full-${fullHeight}px.png`, { fullPage: true });
+    await revealAllMotionSections(page, `${viewport.name}-after-screenshot`);
   }
   if (viewport.name === "mobile-390x844") {
     await saveScreenshot(page, `mobile-390x844-full-${fullHeight}px.png`, { fullPage: true });
+    await revealAllMotionSections(page, `${viewport.name}-after-screenshot`);
   }
 
   assertCleanConsole();
