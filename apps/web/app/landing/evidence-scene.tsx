@@ -30,7 +30,7 @@ export default function EvidenceScene() {
   return (
     <section
       id="scene-evidence"
-      className={`${styles.scene} ${styles.darkScene} ${styles.evidenceScene}`}
+      className={`${styles.scene} ${styles.darkScene} ${styles.evidenceScene} ${sceneStyles.section}`}
       style={{ scrollMarginTop: "calc(72px + 32px)" }}
       aria-labelledby="evidence-title"
       data-header-tone="dark"
@@ -39,12 +39,12 @@ export default function EvidenceScene() {
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.top}>
           <div className={sceneStyles.intro}>
-            <p className={styles.sceneLabel}>От сигнала к возможности</p>
+            <p className={styles.sceneLabel}>Сигнал найма → доказательство</p>
             <h2 id="evidence-title" className={styles.sceneHeading}>
-              Сигнал найма → доказательство → <em>коммерческая возможность.</em>
+              Приоритет, который можно <em>объяснить.</em>
             </h2>
             <p className={styles.sceneLead}>
-              Радар показывает компании, которым стоит написать сейчас, и факты, на которые можно опереться.
+              У каждой рекомендации — источник, дата события и уровень подтверждения. Оценка строится на фактах, которые можно проверить до первого контакта.
             </p>
           </div>
 
@@ -71,7 +71,7 @@ export default function EvidenceScene() {
               <span>ДОКАЗАТЕЛЬНАЯ БАЗА</span>
               <strong>{DEMO_COMPANY.name}</strong>
             </div>
-            <p>Что произошло, когда сигнал появился и насколько прямой источник его подтверждает.</p>
+            <p>Наведите или сфокусируйте факт — увидите, как доказательства связаны с уверенностью радара.</p>
           </div>
 
           <ul className={sceneStyles.records}>
