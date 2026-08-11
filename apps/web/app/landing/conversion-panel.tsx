@@ -131,7 +131,7 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <span>7 ДНЕЙ / СВОЯ НИША</span>
-        <h2>Начните не со списка компаний, а с повода написать.</h2>
+        <h2>Проверьте, кому стоит написать сейчас — и почему.</h2>
         <p>За неделю станет видно, даёт ли радар новые компании и достаточно ли фактов для уверенного первого контакта.</p>
         <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
           <li>990 ₽ · 7 дней</li>
