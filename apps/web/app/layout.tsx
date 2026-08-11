@@ -7,6 +7,7 @@ import { shouldRunAuthV2SessionRefresh } from "@/lib/auth-v2/config";
 import { AuthSessionRefresh } from "./auth-session-refresh";
 import "./globals.css";
 import "./product-visual-system.css";
+import "./product-motion-system.css";
 import "./site-interactions.css";
 
 const inter = Inter({

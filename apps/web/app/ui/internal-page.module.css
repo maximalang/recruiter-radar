@@ -1,17 +1,6 @@
 /* Internal page primitives — shared styles for dashboard, leads, checkout.
    All colors reference :root tokens from page-primitives.module.css */
 
-/* ── Page fade-in ── */
-@keyframes pageFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.internalPageFrameInner {
-  animation: pageFadeIn 0.25s ease-out both;
-  will-change: opacity, transform;
-}
-
 :global([data-product-workspace="true"]) .internalPageFrameInner {
   width: 100%;
   max-width: none;
@@ -1594,9 +1583,6 @@
   .leadCard,
   .leadOpenBtn {
     transition: none;
-  }
-  .internalPageFrameInner {
-    animation: none;
   }
 }
 
