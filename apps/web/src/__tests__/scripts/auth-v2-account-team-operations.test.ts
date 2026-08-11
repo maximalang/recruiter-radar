@@ -87,6 +87,13 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("ariaSnapshot");
     expect(runner).toContain("/settings/security");
     expect(runner).toContain("/settings/team");
+    expect(runner).toContain("verifyAuthenticatedProductSurfaces");
+    expect(runner).toContain("seedProductSurfaceFixtures");
+    expect(runner).toContain("/leads/${owner.productSurfaces.candidateId}");
+    expect(runner).toContain("/opportunities/radar");
+    expect(runner).toContain('[data-semantic-mode="v3"]');
+    expect(runner).toContain("Evidence Radar marker selection did not become active");
+    expect(runner).toContain("AUTH_V2_DISPOSABLE_DB_CONFIRMED");
     expect(runner).toContain("/auth/invite#");
     expect(runner).toContain("/auth/change-email#");
     expect(runner).toContain("email_mismatch");

@@ -264,6 +264,337 @@ async function createSession(user, labels) {
   return { id, token }
 }
 
+async function seedProductSurfaceFixtures(owner) {
+  await database.query(
+    `UPDATE users
+     SET onboarding_status = 'completed', onboarding_step = 'complete',
+         onboarding_data = '{}'::JSONB, updated_at = NOW()
+     WHERE id = $1`,
+    [owner.userId],
+  )
+  await database.query(
+    `INSERT INTO entitlement_grants (
+       user_id, workspace_id, entitlement_owner_id, source, plan_code,
+       features, starts_at, ends_at
+     ) VALUES (
+       $1, $2, $1, 'promo', 'authenticated-browser-fixture',
+       ARRAY['dashboard','api','digest','delivery'],
+       NOW() - INTERVAL '1 day', NOW() + INTERVAL '1 day'
+     )`,
+    [owner.userId, owner.workspaceId],
+  )
+  const profile = await database.query(
+    `INSERT INTO client_profiles (
+       owner_id, agency_name, target_city, specialization, daily_digest_limit
+     )
+     VALUES ($1, 'Signal Bureau', 'Москва', 'IT и продуктовый подбор', 5)
+     RETURNING id::TEXT AS id`,
+    [owner.userId],
+  )
+  const organization = await database.query(
+    `INSERT INTO orgs (name, domain, website_url, career_page_url)
+     VALUES (
+       'Тестовая продуктовая компания',
+       'product-browser-fixture.example.invalid',
+       'https://product-browser-fixture.example.invalid',
+       'https://product-browser-fixture.example.invalid/careers'
+     )
+     RETURNING id::TEXT AS id`,
+  )
+  const profileId = profile.rows[0].id
+  const organizationId = organization.rows[0].id
+  const digestRun = await database.query(
+    `INSERT INTO digest_runs (
+       client_profile_id, source_key, status, requested_limit,
+       selected_count, cooldown_days, completed_at
+     )
+     VALUES ($1, 'authenticated-browser-fixture', 'completed', 5, 1, 3, NOW())
+     RETURNING id::TEXT AS id`,
+    [profileId],
+  )
+  const candidate = await database.query(
+    `INSERT INTO digest_candidates (
+       digest_run_id, client_profile_id, org_id, source_external_id,
+       source_display_name, source_families, vacancies_count,
+       distinct_vacancy_names_count, latest_published_at, total_score,
+       reasons, opener, payload, lead_confidence, next_action_kind,
+       next_action_hint
+     )
+     VALUES (
+       $1, $2, $3, 'browser-fixture-company',
+       'Тестовая продуктовая компания', '["career-pages","hh"]'::JSONB,
+       3, 2, NOW() - INTERVAL '2 hours', 87,
+       '["Рост продуктовой команды","Повторный найм"]'::JSONB,
+       'Предложить точечный подбор продуктовой команды.',
+       '{"confidenceGate":"A","locationNames":["Москва"],"evidenceTitles":["Открыты продуктовые вакансии"]}'::JSONB,
+       'high', 'outreach', 'Проверить корпоративную форму и подготовить черновик.'
+     )
+     RETURNING id::TEXT AS id`,
+    [digestRun.rows[0].id, profileId, organizationId],
+  )
+  await database.query(
+    `INSERT INTO client_digest_org_state (
+       client_profile_id, org_id, last_digest_run_id,
+       last_digest_candidate_id, last_digest_at, feedback_status,
+       last_source_external_id, last_source_display_name
+     )
+     VALUES ($1, $2, $3, $4, NOW(), 'none', $5, $6)`,
+    [
+      profileId,
+      organizationId,
+      digestRun.rows[0].id,
+      candidate.rows[0].id,
+      'browser-fixture-company',
+      'Тестовая продуктовая компания',
+    ],
+  )
+  const evidence = await database.query(
+    `INSERT INTO evidence_items (
+       org_id, source, url, fetched_at, content_hash, tier, payload_ref
+     )
+     VALUES (
+       $1, 'career-pages',
+       'https://product-browser-fixture.example.invalid/careers/product',
+       NOW() - INTERVAL '2 hours', repeat('7', 64), 'direct',
+       '{"title":"Открыты вакансии продуктовой команды"}'::JSONB
+     )
+     RETURNING id::TEXT AS id`,
+    [organizationId],
+  )
+  const identity = await database.query(
+    `INSERT INTO organization_identity_profiles_v1 (
+       workspace_id, organization_id, legal_name, brand, inn,
+       primary_domain, evidence_item_ids, resolution_confidence,
+       resolution_basis
+     ) VALUES (
+       $1, $2, 'ООО Тестовая продуктовая компания',
+       'Тестовая продуктовая компания', '7701234567',
+       'product-browser-fixture.example.invalid', ARRAY[$3::BIGINT], .98,
+       '{"method":"inn+domain"}'::JSONB
+     ) RETURNING id::TEXT AS id`,
+    [owner.workspaceId, organizationId, evidence.rows[0].id],
+  )
+  const location = await database.query(
+    `INSERT INTO organization_locations_v1 (
+       workspace_id, organization_id, location_type,
+       federal_subject_code, federal_subject_name, city, address,
+       latitude, longitude, geo_confidence, evidence_item_ids,
+       location_fingerprint
+     ) VALUES (
+       $1, $2, 'head_office', '77', 'Москва', 'Москва',
+       'Москва, тестовый адрес', 55.7558, 37.6173, .99,
+       ARRAY[$3::BIGINT], repeat('d', 64)
+     ) RETURNING id::TEXT AS id`,
+    [owner.workspaceId, organizationId, evidence.rows[0].id],
+  )
+  await database.query(
+    `UPDATE organization_identity_profiles_v1
+     SET head_office_location_id = $1
+     WHERE id = $2`,
+    [location.rows[0].id, identity.rows[0].id],
+  )
+  await database.query(
+    `INSERT INTO source_registry_reviews_v1 (
+       source_registry_id, review_status, terms_reference,
+       reviewer_reference, notes, reviewed_at
+     ) VALUES (
+       'official-company-news', 'approved',
+       'https://product-browser-fixture.example.invalid/terms',
+       'runtime:authenticated-browser-fixture',
+       'Isolated browser fixture only.', NOW()
+     )`,
+  )
+  const radarEvent = await database.query(
+    `INSERT INTO evidence_events_v1 (
+       workspace_id, organization_id, location_id, event_type,
+       source_registry_id, source_family, canonical_url,
+       occurred_at, detected_at, facts, confidence,
+       independent_confirmations, valid_until, polarity,
+       verification_status, primary_source, content_fingerprint,
+       event_fingerprint
+     ) VALUES (
+       $1, $2, $3, 'hiring_growth', 'official-company-news',
+       'official-news',
+       'https://product-browser-fixture.example.invalid/news/hiring',
+       NOW() - INTERVAL '1 day', NOW(), '{"vacancies":3}'::JSONB,
+       .92, 1, NOW() + INTERVAL '21 days', 'positive', 'verified', TRUE,
+       repeat('e', 64), repeat('f', 64)
+     ) RETURNING id::TEXT AS id`,
+    [owner.workspaceId, organizationId, location.rows[0].id],
+  )
+  const radarSignal = await database.query(
+    `INSERT INTO normalized_signals_v1 (
+       workspace_id, organization_id, signal_type, started_at,
+       last_seen_at, valid_until, confidence, strength,
+       source_families, affected_functions, region_code, city,
+       polarity, input_hash, signal_fingerprint
+     ) VALUES (
+       $1, $2, 'hiring_growth', NOW() - INTERVAL '2 days', NOW(),
+       NOW() + INTERVAL '21 days', .92, .86, ARRAY['official-news'],
+       ARRAY['product','engineering'], '77', 'Москва', 'positive',
+       repeat('1', 64), repeat('2', 64)
+     ) RETURNING id::TEXT AS id`,
+    [owner.workspaceId, organizationId],
+  )
+  await database.query(
+    `INSERT INTO normalized_signal_event_links_v1 (
+       signal_id, evidence_event_id, workspace_id, organization_id
+     ) VALUES ($1, $2, $3, $4)`,
+    [
+      radarSignal.rows[0].id,
+      radarEvent.rows[0].id,
+      owner.workspaceId,
+      organizationId,
+    ],
+  )
+  const radarComponents = {
+    hiringIntent: .9,
+    confidence: .9,
+    freshness: .9,
+    urgency: .8,
+    commercialFit: .9,
+    contactability: .8,
+    risk: .05,
+  }
+  const radarOpportunityScore = Object.values(radarComponents)
+    .slice(0, 6)
+    .reduce((value, component) => value * component, 100)
+  const radarLeadScore = radarOpportunityScore - radarComponents.risk * 35
+  const radarScore = await database.query(
+    `INSERT INTO evidence_lead_score_snapshots_v1 (
+       workspace_id, organization_id, lead_score, opportunity_score,
+       confidence_score, urgency_score, contactability_score, risk_score,
+       components, contributions, source_event_ids, source_signal_ids,
+       source_correlation_ids, independent_source_families,
+       input_hash, valid_until
+     ) VALUES (
+       $1, $2, $3, $4, 90, 80, 80, 5, $5::JSONB, $6::JSONB,
+       ARRAY[$7::BIGINT], ARRAY[$8::BIGINT], ARRAY[]::BIGINT[],
+       ARRAY['official-news'], repeat('3', 64), NOW() + INTERVAL '21 days'
+     ) RETURNING id::TEXT AS id`,
+    [
+      owner.workspaceId,
+      organizationId,
+      radarLeadScore,
+      radarOpportunityScore,
+      JSON.stringify(radarComponents),
+      JSON.stringify([{
+        eventId: radarEvent.rows[0].id,
+        component: 'hiring_intent',
+        delta: .2,
+        reason: 'verified company hiring growth',
+      }]),
+      radarEvent.rows[0].id,
+      radarSignal.rows[0].id,
+    ],
+  )
+  await database.query(
+    `INSERT INTO evidence_lead_cards_v1 (
+       workspace_id, organization_id, location_id, score_snapshot_id,
+       status, title, why_now, staffing_need, specialization,
+       recommended_contact_at, recommended_action, risk_reasons,
+       evidence_event_ids, contact_path_ids, valid_until, card_fingerprint
+     ) VALUES (
+       $1, $2, $3, $4, 'qualified', 'Подтверждённый рост найма',
+       'Свежий рост продуктовой команды подтверждён официальным источником.',
+       '{"functions":["product","engineering"],"minHeadcount":3,"maxHeadcount":8,"mode":"targeted"}'::JSONB,
+       'IT и продуктовый подбор', NOW() + INTERVAL '1 day',
+       'Проверить карьерную страницу и подготовить точечный черновик.',
+       ARRAY[]::TEXT[], ARRAY[$5::BIGINT], ARRAY[]::BIGINT[],
+       NOW() + INTERVAL '21 days', repeat('4', 64)
+     )`,
+    [
+      owner.workspaceId,
+      organizationId,
+      location.rows[0].id,
+      radarScore.rows[0].id,
+      radarEvent.rows[0].id,
+    ],
+  )
+  const episode = await database.query(
+    `INSERT INTO hiring_episodes (
+       organization_id, episode_type, episode_key, episode_identity,
+       episode_generation, title, summary, started_at, last_seen_at,
+       signal_count, vacancy_count, strength_score, freshness_score,
+       evidence_hash, engine_version
+     )
+     VALUES (
+       $1, 'role_cluster', 'authenticated-browser-fixture',
+       'authenticated-browser-fixture', 1,
+       'Рост продуктовой команды', 'Компания расширяет продуктовую команду.',
+       NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 hours',
+       1, 3, 0.86, 0.94, repeat('8', 64), 'browser-fixture-v1'
+     )
+     RETURNING id::TEXT AS id`,
+    [organizationId],
+  )
+  await database.query(
+    `INSERT INTO hiring_episode_evidence (
+       hiring_episode_id, organization_id, evidence_id, relation_type
+     ) VALUES ($1, $2, $3, 'source')`,
+    [episode.rows[0].id, organizationId, evidence.rows[0].id],
+  )
+  const evidenceId = evidence.rows[0].id
+  const conclusion = (text) => ({
+    text,
+    basis: 'evidence',
+    evidenceIds: [evidenceId],
+  })
+  const commercialSignalCard = {
+    version: 'commercial-signal-card-v1',
+    scoreVersion: 'opportunity-v3',
+    status: 'qualified_actionable',
+    whatChanged: conclusion('Компания одновременно открыла несколько продуктовых ролей.'),
+    whyNotOrdinaryHiring: conclusion('Набор охватывает несколько связанных ролей.'),
+    whyAgency: conclusion('Серия вакансий создаёт потребность в дополнительной мощности подбора.'),
+    whyThisAgency: conclusion('Профиль агентства совпадает с продуктовой специализацией.'),
+    whyNow: conclusion('Вакансии опубликованы недавно и подтверждены карьерной страницей.'),
+    metrics: {
+      externalAgencyPropensity: { value: 0.78, reasonCodes: ['agency.need.capacity'] },
+      agencyFit: { value: 0.91, reasonCodes: ['agency.fit.specialization'] },
+      opportunityQuality: { value: 0.88, reasonCodes: ['opportunity.evidence.direct'] },
+      actionability: { value: 0.84, reasonCodes: ['action.contact.corporate'] },
+    },
+    recommendedAction: conclusion('Открыть корпоративную форму и подготовить персональный черновик.'),
+    constraints: [conclusion('Перед контактом перепроверить актуальность вакансий.')],
+  }
+  const opportunity = await database.query(
+    `INSERT INTO opportunities (
+       owner_id, client_profile_id, organization_id, hiring_episode_id,
+       status, title, why_now, problem_hypothesis, recommended_angle,
+       recommended_persona, recommended_action, agency_fit_score,
+       hiring_intent_score, agency_propensity_score, timing_score,
+       reachability_score, confidence_score, opportunity_score,
+       confidence_gate, scoring_version, evidence_hash, valid_until,
+       episode_evidence_hash, profile_snapshot_hash, fiur_version,
+       scoring_config_hash, brief_builder_version, input_hash, metadata
+     )
+     VALUES (
+       $1, $2, $3, $4, 'new', 'Расширение продуктовой команды',
+       'Подтверждён свежий кластер вакансий.',
+       'Внутренней команде может не хватать мощности подбора.',
+       'Предложить точечную помощь по продуктовым ролям.',
+       'Руководитель подбора', 'Подготовить персональный черновик.',
+       0.91, 0.88, 0.78, 0.9, 0.82, 0.89, 0.87, 'A',
+       'browser-fixture-v1', repeat('9', 64), NOW() + INTERVAL '7 days',
+       repeat('9', 64), repeat('a', 64), 'fiur-v1', repeat('b', 64),
+       'opportunity-brief-v1', repeat('c', 64), $5::JSONB
+     )
+     RETURNING id::TEXT AS id`,
+    [
+      owner.userId,
+      profileId,
+      organizationId,
+      episode.rows[0].id,
+      JSON.stringify({ commercialSignalCard, morningBriefEligible: true }),
+    ],
+  )
+  return {
+    candidateId: candidate.rows[0].id,
+    opportunityId: opportunity.rows[0].id,
+  }
+}
+
 async function seedFixtures() {
   const owner = await createUser('owner')
   const invited = await createUser('invited')
@@ -311,6 +642,7 @@ async function seedFixtures() {
     browser: 'Chromium',
     environment: 'Windows 11',
   })
+  owner.productSurfaces = await seedProductSurfaceFixtures(owner)
   return { owner, invited, wrong, switcher, switchTarget }
 }
 
@@ -816,6 +1148,86 @@ async function verifyOwnershipTransfer(owner, invited) {
   return { roles, auditCount: audit.rows[0].count }
 }
 
+async function verifyAuthenticatedProductSurfaces(page, owner) {
+  await inspectSurface(
+    page,
+    'leads-data-1440',
+    '/leads',
+    'auth-v2-account-team-e2e-shot-leads-data-1440.png',
+  )
+  const leadDisclosure = page.locator('details[data-motion-disclosure]').first()
+  await leadDisclosure.waitFor({ state: 'visible' })
+  await leadDisclosure.locator('summary').click()
+  assert(
+    await leadDisclosure.getAttribute('open') === '',
+    'Authenticated lead disclosure did not open.',
+  )
+  const todayFilter = page.locator('button[data-motion-interactive]').filter({
+    hasText: 'Сегодня в работе',
+  })
+  await todayFilter.click()
+  await page.waitForURL((url) => url.pathname === '/leads' && url.searchParams.get('today') === '1')
+  assert(
+    await page.locator('[data-motion-status]').count() >= 1,
+    'Authenticated lead filter status surface is missing.',
+  )
+
+  await inspectSurface(
+    page,
+    'lead-detail-data-1440',
+    `/leads/${owner.productSurfaces.candidateId}`,
+    'auth-v2-account-team-e2e-shot-lead-detail-data-1440.png',
+  )
+  assert(
+    await page.locator('[data-motion-disclosure]').count() >= 1,
+    'Authenticated lead detail disclosure is missing.',
+  )
+
+  await inspectSurface(
+    page,
+    'opportunities-data-1440',
+    '/opportunities',
+    'auth-v2-account-team-e2e-shot-opportunities-data-1440.png',
+  )
+  const commercialCard = page.locator('article[data-semantic-mode="v3"]')
+  await commercialCard.waitFor({ state: 'visible' })
+  const diagnostics = commercialCard.locator('details').filter({
+    hasText: 'Как радар сделал вывод',
+  })
+  await diagnostics.locator('summary').click()
+  assert(
+    await diagnostics.getAttribute('open') === '',
+    'Commercial Signal diagnostics disclosure did not open.',
+  )
+
+  await inspectSurface(
+    page,
+    'evidence-radar-data-1440',
+    '/opportunities/radar',
+    'auth-v2-account-team-e2e-shot-evidence-radar-data-1440.png',
+  )
+  await page.locator('[data-evidence-radar-map]').waitFor({ state: 'visible' })
+  const marker = page.locator('[data-evidence-radar-map] button[data-motion-interactive]').first()
+  await marker.click()
+  assert(
+    await marker.getAttribute('aria-pressed') === 'true',
+    'Evidence Radar marker selection did not become active.',
+  )
+  await page.locator('[data-evidence-lead-card]').waitFor({ state: 'visible' })
+  assert(
+    await page.locator('[data-motion-status]').filter({ hasText: 'Выбрано:' }).count() === 1,
+    'Evidence Radar selected-marker status is missing.',
+  )
+  report.flows.authenticatedProductSurfaces = {
+    leadsWithData: true,
+    leadDetail: true,
+    filterDisclosureStatusInteractions: true,
+    opportunities: true,
+    commercialSignalCard: true,
+    evidenceRadarMarkerSelection: true,
+  }
+}
+
 async function runCoreAuthFlows(fixtures) {
   const signupEmail =
     `signup-${process.pid}-${Date.now()}@example.invalid`
@@ -1155,6 +1567,20 @@ try {
     AUTH_V2_E2E_DIST_DIR: e2eDistName,
     AUTH_V2_E2E_TSCONFIG: e2eTsconfigName,
     NODE_EXTRA_CA_CERTS: httpsCertPath,
+    OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+    OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+    OPPORTUNITY_OUTCOMES_UI_ENABLED: 'true',
+    OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+    OPPORTUNITY_COMMERCIAL_SIGNAL_UI_ENABLED: 'true',
+    COMPANY_EVENTS_V1_ENABLED: 'true',
+    COMPANY_STATE_V1_ENABLED: 'true',
+    SIGNAL_EPISODES_V2_ENABLED: 'true',
+    COMMERCIAL_THESIS_V1_ENABLED: 'true',
+    EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: 'true',
+    AGENCY_DNA_MATCH_V2_ENABLED: 'true',
+    OPPORTUNITY_SCORING_V3_ENABLED: 'true',
+    QUERY_PLANNER_V2_ENABLED: 'true',
+    EVIDENCE_RADAR_V1_ENABLED: 'true',
   }
   await writeFile(outboxPath, '[]\n', 'utf8')
   await run(process.execPath, [migrateScript], testEnvironment)
@@ -1198,6 +1624,8 @@ try {
   )
   const ownerPage = await ownerContext.newPage()
   observePage(ownerPage, 'owner')
+
+  await verifyAuthenticatedProductSurfaces(ownerPage, fixtures.owner)
 
   await inspectSurface(
     ownerPage,

@@ -55,5 +55,19 @@ describe('runtime documentation contract', () => {
     expect(currentState).toContain('data-motion-*')
     expect(currentState).toContain('feature-flagged')
     expect(currentState).toContain('semantic 404')
+    expect(currentState).toContain('test:auth-v2:account-team:e2e')
+    expect(currentState).toContain('реальную запись `auth_sessions`')
+  })
+
+  test('defines one serving vocabulary without collapsing persisted read models', () => {
+    const servingChain = 'COMPANY → EVIDENCE → SIGNAL → SCORE / QUALIFICATION → OPPORTUNITY → ACTION'
+
+    expect(architecture).toContain(servingChain)
+    expect(currentState).toContain(servingChain)
+    expect(architecture).toContain('`source count`')
+    expect(architecture).toContain('`evidence count`')
+    expect(architecture).toContain('не является probability продажи')
+    expect(architecture).toContain('не должны выдавать lead score за Opportunity score')
+    expect(architecture).toContain('полная консолидация legacy digest candidate и Opportunity')
   })
 })

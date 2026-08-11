@@ -58,7 +58,8 @@
 - Lead card показывает company/contact/signals/risks/score/status до раскрытия; persisted provenance и причины расчёта находятся в native disclosure. Вся карточка больше не является оборачивающей ссылкой, поэтому feedback/disclosure controls не создают вложенные interactive элементы.
 - Evidence Radar использует 44×44 marker hit area, единый hover/focus/selected contour, видимый selected status и детерминированный одноразовый reveal source dots. На mobile подписи маркеров скрываются, но выбранная компания остаётся доступна текстом; reduced motion оставляет выбор полностью статичным.
 - `npm run test:responsive-surfaces` проверяет 31 route на шести viewport: overflow/clipping, touch targets, labels, forms, duplicate IDs, console/page errors, keyboard focus indicator, dialogs, native disclosure, reduced-motion violations и continuous animations. Отчёт отдельно маркирует `rendered`, `authentication-required` и `feature-flagged`; semantic 404 считается ошибкой, кроме явно перечисленных default-dark Opportunity surfaces.
-- Успешный unauthenticated responsive audit не доказывает содержимое защищённой workspace-сессии. Opportunity/Radar browser evidence при default-dark flags фиксируется как недоступное, а не как проверенная рабочая поверхность; включение flags и authenticated fixture требуют отдельного scoped audit.
+- `test:auth-v2:account-team:e2e` использует одноразовую PostgreSQL БД, реальную запись `auth_sessions`, локальный HTTPS и `__Host-rr_session`. Изолированная product fixture проверяет `/leads` с данными, lead detail, `/opportunities`, Commercial Signal card и Evidence Radar marker selection, включая filter/disclosure/status interactions. Production secrets и auth bypass не используются; controlled flags действуют только в процессе disposable runner.
+- Успешный unauthenticated responsive audit по-прежнему не доказывает содержимое защищённой workspace-сессии. Authenticated fixture является локальным/CI acceptance evidence, а не подтверждением production flags, production data или live deployment.
 
 ## Commercial Signal Quality v2
 
@@ -105,6 +106,10 @@ Stage 2 operational states:
 
 Promotion разрешается только registry policy и live verifier. Фиксированное количество источников в narrative документации не является контрактом.
 
+## Serving contract lead и opportunity
+
+Каноническая цепочка: `COMPANY → EVIDENCE → SIGNAL → SCORE / QUALIFICATION → OPPORTUNITY → ACTION`. `/leads`, `/api/leads/*`, `/opportunities`, Commercial Signal reader и daily digest обязаны сохранять значения `score`, `confidence`, `whyNow`, source/evidence count, `fit`, `urgency` и `actionability` в смыслах, зафиксированных в `docs/architecture.md`. Legacy digest candidate и Opportunity пока остаются разными persisted read models; их скрытая табличная консолидация не выполнена и потребует отдельной lineage-first миграции.
+
 ## Deployment и feature flags
 
 - `main` защищён; task branches используют `codex/*`. Deploy допускается только из проверенного SHA после workflow `Tests`.
@@ -118,6 +123,10 @@ Promotion разрешается только registry policy и live verifier. 
 - Quality v2 correctness PR #176 объединён: merge SHA `d67f2e32a4ca5ad823a700e11d8388e89af4ef10`.
 - Search Preferences Isolation PR #177 объединён: merge SHA `01f459ee31d1a58d15c29a98fd956a900dc1e11e`.
 - Human-reviewed quality validation infrastructure PR #178 объединён: merge SHA `f3d8868b9f186330e06df001234c4e130a8dac91`.
+- Landing sales/reliability slices PR #181–#184 объединены; delivery integrity PR #182 находится в `main` (`2258444d`).
+- Evidence Radar rollout/healthcheck correction PR #185 объединён: merge SHA `df4adb96`.
+- Landing copy refresh PR #186 объединён: merge SHA `f1d83e5e`.
+- Product Motion System PR #187 объединён: текущий snapshot `main` начинается с merge SHA `35a1d2d44f2914b5c1567b6b37615ab5d606083e`.
 - Текущий deployed SHA, production env flags, credentials, provider availability, migrations и live health в рамках этого snapshot не проверены.
 - Поэтому текущая production формулировка: **code merged/verified where stated; production rollout not authorized; real Commercial Signal quality not validated by human-reviewed data**.
 
