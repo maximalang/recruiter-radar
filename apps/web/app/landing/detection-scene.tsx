@@ -36,7 +36,7 @@ export default function DetectionScene({
           Компании, которым стоит написать сегодня.
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Recruiter Radar связывает сигналы найма с компаниями и показывает короткий приоритет: что изменилось, насколько сигнал надёжен и на какие факты опереться.
+          Соберите радар под специализацию агентства: Recruiter Radar связывает сигналы найма с компаниями и показывает короткий приоритет — что изменилось, насколько сигнал надёжен и на какие факты опереться.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a
