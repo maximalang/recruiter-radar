@@ -392,7 +392,49 @@ export async function ensurePaidOrderEntitlement(
     throw new Error("DATABASE_URL is not set.");
   }
 
-  await pool.query(`
+  if (isPaymentsPool(pool)) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await insertPaidOrderEntitlement(order.id, client);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+    return;
+  }
+
+  await insertPaidOrderEntitlement(order.id, pool);
+}
+
+function isPaymentsPool(db: PaymentsDbClient): db is Pool {
+  return "connect" in db && typeof db.connect === "function" && !("release" in db);
+}
+
+async function insertPaidOrderEntitlement(
+  orderId: string | number,
+  db: PaymentsDbClient,
+): Promise<void> {
+  const normalizedOrderId = normalizeCheckoutOrderId(orderId);
+
+  await db.query(`
+    SELECT pg_advisory_xact_lock(
+      hashtextextended(
+        'checkout-entitlement:' || workspace_id::TEXT || ':' || entitlement_owner_id::TEXT,
+        0::BIGINT
+      )
+    )
+    FROM checkout_orders
+    WHERE id = $1
+      AND status = 'paid'
+      AND paid_at IS NOT NULL
+      AND plan_code IN ('pilot', 'monthly', 'quarterly')
+  `, [normalizedOrderId]);
+
+  await db.query(`
     WITH paid_order AS MATERIALIZED (
       SELECT
         id,
@@ -412,36 +454,24 @@ export async function ensurePaidOrderEntitlement(
         AND paid_at IS NOT NULL
       LIMIT 1
     ),
-    locked_order AS MATERIALIZED (
-      SELECT
-        paid_order.*,
-        pg_advisory_xact_lock(
-          hashtextextended(
-            'checkout-entitlement:' || paid_order.workspace_id::TEXT || ':'
-              || paid_order.entitlement_owner_id::TEXT,
-            0::BIGINT
-          )
-        ) AS owner_lock
-      FROM paid_order
-      WHERE duration_days IS NOT NULL
-    ),
     access_start AS (
       SELECT GREATEST(
-        locked_order.paid_at,
+        paid_order.paid_at,
         COALESCE(
           MAX(entitlement.ends_at) FILTER (
             WHERE entitlement.revoked_at IS NULL
               AND checkout.status = 'paid'
           ),
-          locked_order.paid_at
+          paid_order.paid_at
         )
       ) AS starts_at
-      FROM locked_order
+      FROM paid_order
       LEFT JOIN checkout_order_entitlements entitlement
-        ON entitlement.workspace_id = locked_order.workspace_id
-       AND entitlement.entitlement_owner_id = locked_order.entitlement_owner_id
+        ON entitlement.workspace_id = paid_order.workspace_id
+       AND entitlement.entitlement_owner_id = paid_order.entitlement_owner_id
       LEFT JOIN checkout_orders checkout ON checkout.id = entitlement.order_id
-      GROUP BY locked_order.paid_at
+      WHERE paid_order.duration_days IS NOT NULL
+      GROUP BY paid_order.paid_at
     )
     INSERT INTO checkout_order_entitlements (
       order_id,
@@ -454,18 +484,19 @@ export async function ensurePaidOrderEntitlement(
       ends_at
     )
     SELECT
-      locked_order.id,
-      locked_order.entitlement_owner_id,
-      locked_order.workspace_id,
-      locked_order.entitlement_owner_id,
-      locked_order.plan_code,
-      locked_order.duration_days,
+      paid_order.id,
+      paid_order.entitlement_owner_id,
+      paid_order.workspace_id,
+      paid_order.entitlement_owner_id,
+      paid_order.plan_code,
+      paid_order.duration_days,
       ast.starts_at,
-      ast.starts_at + (locked_order.duration_days * INTERVAL '1 day')
-    FROM locked_order
+      ast.starts_at + (paid_order.duration_days * INTERVAL '1 day')
+    FROM paid_order
     CROSS JOIN access_start ast
+    WHERE paid_order.duration_days IS NOT NULL
     ON CONFLICT (order_id) DO NOTHING
-  `, [normalizeCheckoutOrderId(order.id)]);
+  `, [normalizedOrderId]);
 }
 
 export async function ensurePilotApplicationForOrder(

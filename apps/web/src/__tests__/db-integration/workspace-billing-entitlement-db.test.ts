@@ -167,7 +167,27 @@ describe("workspace billing entitlement ownership", () => {
       return (await getCheckoutOrderById(order.id))!;
     }));
 
-    await Promise.all(paidOrders.map((order) => ensurePaidOrderEntitlement(order)));
+    const firstClient = await database.connect();
+    const secondClient = await database.connect();
+    try {
+      await firstClient.query("BEGIN");
+      await secondClient.query("BEGIN");
+      await ensurePaidOrderEntitlement(paidOrders[0]!, firstClient);
+      const secondBackend = await secondClient.query<{ processId: number }>(
+        `SELECT pg_backend_pid() AS "processId"`,
+      );
+
+      const secondGrant = ensurePaidOrderEntitlement(paidOrders[1]!, secondClient);
+      await waitForAdvisoryLock(secondBackend.rows[0]!.processId);
+      await firstClient.query("COMMIT");
+      await secondGrant;
+      await secondClient.query("COMMIT");
+    } finally {
+      await firstClient.query("ROLLBACK").catch(() => undefined);
+      await secondClient.query("ROLLBACK").catch(() => undefined);
+      firstClient.release();
+      secondClient.release();
+    }
     const windows = await database.query<{
       orderId: string;
       startsAt: Date;
@@ -238,4 +258,23 @@ function checkoutPayload() {
     paymentMessage: null,
     paymentProviderPayload: null,
   };
+}
+
+async function waitForAdvisoryLock(processId: number): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const activity = await database.query<{ waitEventType: string | null; waitEvent: string | null }>(
+      `SELECT wait_event_type AS "waitEventType", wait_event AS "waitEvent"
+       FROM pg_stat_activity
+       WHERE pid = $1`,
+      [processId],
+    );
+    if (
+      activity.rows[0]?.waitEventType === "Lock" &&
+      activity.rows[0]?.waitEvent === "advisory"
+    ) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error("Concurrent entitlement writer did not wait for the workspace advisory lock.");
 }
