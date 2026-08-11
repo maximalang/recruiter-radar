@@ -6,9 +6,8 @@ import { BrandLogo } from "./brand-logo";
 import { CookieSettingsButton } from "./cookie-settings-button";
 
 const PRODUCT_LINKS = [
-  { href: "/#scene-workspace", label: "Рабочая выдача" },
+  { href: "/#scene-workspace", label: "Пример" },
   { href: "/#scene-evidence", label: "Как работает" },
-  { href: "/#scene-delivery", label: "Доставка" },
   { href: "/#pricing", label: "Тарифы" },
   { href: "/#faq", label: "FAQ" },
 ] as const;
@@ -40,7 +39,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark"; showCookieSet
               <BrandLogo size="small" tone={tone} joined={false} />
             </Link>
             <p className={s.footerLine} data-consent-safe-copy>
-              Проверяемые сигналы найма — чтобы понимать, какой компании стоит написать сейчас и почему.
+              Recruiter Radar помогает рекрутинговым агентствам находить компании с актуальным поводом для первого контакта — по проверяемым сигналам найма.
             </p>
           </div>
 

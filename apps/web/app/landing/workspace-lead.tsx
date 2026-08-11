@@ -32,10 +32,10 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
     limit: 3,
   });
   const scoreParts = [
-    ["Совпадение", item.relevanceSignals.fit],
-    ["Намерение", item.relevanceSignals.intent],
-    ["Срочность", item.relevanceSignals.urgency],
-    ["Контакт", item.relevanceSignals.reachability],
+    ["Совпадение с нишей", item.relevanceSignals.fit],
+    ["Сила сигнала", item.relevanceSignals.intent],
+    ["Свежесть", item.relevanceSignals.urgency],
+    ["Доступность контакта", item.relevanceSignals.reachability],
   ] as const;
 
   return (
@@ -56,7 +56,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
         <span className={styles.workspaceScore} data-lead-score>
           <strong>{points}</strong>
           <small>/100</small>
-          {defaultOpen ? <b className={sceneStyles.confidence}>высокая уверенность</b> : null}
+          {defaultOpen ? <b className={sceneStyles.confidence}>{item.confidenceLabel}</b> : null}
         </span>
         <span className={styles.leadChevron} aria-hidden="true"><ArrowGlyph size={16} /></span>
       </summary>
@@ -67,18 +67,18 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
             <p>{freshness ? `${whyNow} Последнее изменение — ${freshness}.` : whyNow}</p>
           </div>
           <div className={sceneStyles.proofBlock}>
-            <span>Как начать разговор</span>
+            <span>Что можно предложить</span>
             <p>{item.opener?.trim() || "Проверить факты и выбрать безопасный путь обращения"}</p>
           </div>
           <div className={sceneStyles.proofBlock}>
-            <span>Корпоративный контакт</span>
+            <span>Где связаться</span>
             <p>{contactPath}</p>
           </div>
         </div>
 
         <div className={sceneStyles.sideProof}>
-          <div className={sceneStyles.factors} aria-label="Что влияет на приоритет рекомендации">
-            <span>Что влияет на приоритет</span>
+          <div className={sceneStyles.factors} aria-label="Почему компания выше">
+            <span>Почему компания выше</span>
             <div className={`${styles.workspaceFiur} ${sceneStyles.factorsList}`}>
               {scoreParts.map(([label, value]) => (
                 <div key={label}>
@@ -96,8 +96,8 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
         </div>
 
         <div className={`${styles.workspaceLeadFooter} ${sceneStyles.leadFooter}`}>
-          <span>Сила сигнала {score}/100 · уровень уверенности {item.confidence_gate ?? "требует проверки"}</span>
-          <strong>Без автоматической отправки</strong>
+          <span>Сила сигнала {score}/100 · {item.confidenceLabel}</span>
+          <strong>Сообщения не отправляются автоматически</strong>
         </div>
       </div>
     </details>

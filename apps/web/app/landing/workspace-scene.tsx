@@ -46,7 +46,7 @@ export default function WorkspaceScene(props: WorkspaceProps) {
           <div className={sceneStyles.productRail} aria-label="Состояние предпросмотра выдачи">
             <div className={sceneStyles.railIdentity}>
               <strong>RECRUITER RADAR</strong>
-              <span>/ ИНТЕРАКТИВНЫЙ ПРИМЕР</span>
+              <span>/ ПРИМЕР</span>
             </div>
             <span className={sceneStyles.railStatus}>готов к настройке</span>
           </div>
@@ -76,10 +76,10 @@ function WorkspaceIntro() {
     <div className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
       <p className={styles.sceneLabel}>Интерактивный пример</p>
       <h2 id="workspace-title" className={styles.sceneHeading}>
-        Настройте профиль. <em>Посмотрите, кого радар поднимет выше.</em>
+        Настройте нишу — <em>посмотрите, какие компании радар поставит в приоритет.</em>
       </h2>
       <p className={styles.sceneLead}>
-        Выберите специализацию и географию — пример пересчитается по той же логике приоритизации, что и рабочая выдача.
+        Выберите специализацию и географию. Радар покажет компании, которые сейчас активнее нанимают в вашем сегменте, и объяснит почему.
       </p>
     </div>
   );
@@ -89,7 +89,7 @@ function PreviewConfigurator(props: Pick<WorkspaceProps, "previewInput" | "hasPr
   return (
     <div id="preview-configurator" className={`${styles.workspaceControls} ${sceneStyles.anchor} ${sceneStyles.controls}`}>
       <p className={sceneStyles.controlHint}>
-        <strong>Быстрый старт:</strong> выберите готовый профиль или введите свой — затем посмотрите раскрытую рекомендацию и «почему сейчас».
+        Выберите готовый пример или задайте свою специализацию и город.
       </p>
       <div className={`${styles.presetStrip} ${sceneStyles.presets}`} aria-label="Готовые профили радара">
         <span>Готовые профили</span>
@@ -135,10 +135,10 @@ function PreviewConfigurator(props: Pick<WorkspaceProps, "previewInput" | "hasPr
         {props.previewInput.excludeKeywords ? <input type="hidden" name="excludeKeywords" value={props.previewInput.excludeKeywords} /> : null}
         <input type="hidden" name="dailyDigestLimit" value={props.previewInput.dailyDigestLimit} />
         <button type="submit" data-preview-submit>
-          <span data-preview-submit-label>Пересчитать радар →</span>
-          <span data-preview-submit-status hidden>Сверяем сигналы…</span>
+          <span data-preview-submit-label>Показать компании →</span>
+          <span data-preview-submit-status hidden>Ищем свежие сигналы…</span>
         </button>
-        {props.hasPreview ? <Link href="/#scene-workspace">Сбросить профиль</Link> : null}
+        {props.hasPreview ? <Link href="/#scene-workspace">Сбросить</Link> : null}
       </form>
     </div>
   );
@@ -163,38 +163,36 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
         />
         <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
           <div>
-            <span>РАДАР / {String(previewState.items.length).padStart(2, "0")}</span>
-            <strong>{previewState.isPersonalized ? "Приоритет по вашему профилю" : "Пример возможностей на сегодня"}</strong>
+            <span>КОМПАНИИ НА СЕГОДНЯ / {String(previewState.items.length).padStart(2, "0")}</span>
+            <strong>{previewState.isPersonalized ? "Приоритет по вашему профилю" : "Пример сегодняшней выдачи"}</strong>
           </div>
           <span data-live={previewState.isLive || undefined}>
-            {previewState.isLive ? "свежие данные" : "демо-данные"}
+            {previewState.isLive ? "свежие данные" : "демо"}
           </span>
         </div>
 
         {!previewState.isLive ? (
           <p className={styles.workspaceDataNote}>
             <strong>Обезличенный пример.</strong>{" "}
-            {previewState.isPersonalized
-              ? "Приоритет реально пересчитан по вашему профилю; названия и факты остаются примерными."
-              : "Выберите профиль: порядок компаний изменится по тем же правилам, что в рабочей выдаче."}
+            Названия и часть фактов изменены, но логика приоритета и структура карточек соответствуют рабочей выдаче.
           </p>
         ) : null}
 
         {appliedProfile.length > 0 ? (
           <div className={styles.appliedProfile} aria-label="Применённый профиль">
-            <span>Применено</span>{appliedProfile.map((value) => <strong key={value}>{value}</strong>)}
+            <span>Профиль:</span><strong>{appliedProfile.join(" · ")}</strong>
           </div>
         ) : null}
 
         {previewState.items.length === 0 ? (
           <div className={styles.workspaceEmpty} role="status">
-            <span>00 / Нет совпадений</span>
-            <strong>Попробуйте шире географию или конкретнее специализацию.</strong>
+            <span>Пока нет точных совпадений.</span>
+            <strong>Попробуйте расширить географию или уточнить специализацию.</strong>
           </div>
         ) : (
           <div className={styles.workspaceLeadList}>
             {previewState.isPersonalized && !previewState.hasExactMatches ? (
-              <p className={styles.workspaceMatchNote}>Точных совпадений пока нет — показаны ближайшие по релевантности.</p>
+              <p className={styles.workspaceMatchNote}>Пока нет точных совпадений. Показаны ближайшие по релевантности компании.</p>
             ) : null}
             {visibleItems.map((item, index) => (
               <WorkspaceLead
@@ -234,12 +232,12 @@ function WorkspaceResultsFailure({ checkoutHref, embedded }: { checkoutHref: str
       role="status"
     >
       <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
-        <div><span>РАДАР / НЕДОСТУПЕН</span><strong>Не удалось обновить выдачу.</strong></div>
+        <div><span>ПРИМЕР НЕДОСТУПЕН</span><strong>Не удалось обновить пример.</strong></div>
         <span>можно повторить</span>
       </div>
       <div className={styles.workspaceEmpty}>
-        <span>Временная ошибка загрузки</span>
-        <strong>Измените профиль или повторите запрос. Тарифы, FAQ и следующий шаг доступны ниже.</strong>
+        <span>Попробуйте ещё раз.</span>
+        <strong>Тарифы и ответы на вопросы доступны ниже.</strong>
       </div>
       <div className={sceneStyles.footerRail}>
         <Link
@@ -248,7 +246,7 @@ function WorkspaceResultsFailure({ checkoutHref, embedded }: { checkoutHref: str
           data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
           data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
         >
-          Оставить заявку на неделю <ArrowGlyph />
+          Попробовать 7 дней <ArrowGlyph />
         </Link>
         <small>7 дней · без автопродления</small>
       </div>

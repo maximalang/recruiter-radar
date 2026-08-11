@@ -27,23 +27,23 @@ describe("landing runtime truth contract", () => {
     expect(aggregateChannels).toContain("email_digest_enabled");
 
     for (const label of [
-      'title: "Web"',
+      'title: "Веб-кабинет"',
       'title: "Telegram"',
       'title: "Email"',
       'title: "VK"',
       'title: "Push в браузере"',
-      'title: "HTTPS webhook"',
+      'title: "Webhook"',
     ]) {
       expect(delivery).toContain(label);
     }
-    expect(delivery).toContain('status: "подключаемый"');
-    expect(delivery).toContain('status: "после настройки"');
-    expect(delivery).toContain('status: "интеграция"');
-    expect(delivery).toContain("при включённой активной push-подписке");
-    expect(delivery).toContain("signed endpoint настраивается отдельно");
-    expect(delivery).toContain("Обращение компаниям всегда отправляете вы");
+    expect(delivery).toContain('status: "Всегда доступен"');
+    expect(delivery).toContain('status: "Можно подключить"');
+    expect(delivery).not.toContain("VAPID");
+    expect(delivery).not.toContain("signed endpoint");
+    expect(delivery).not.toContain("n8n");
+    expect(delivery).toContain("Сообщения компаниям не отправляются автоматически");
 
-    for (const label of ["Telegram", "VK", "email-дайджесте", "браузерных уведомлениях", "защищённый HTTPS-webhook"]) {
+    for (const label of ["Telegram", "email", "другие каналы уведомлений"]) {
       expect(faq).toContain(label);
     }
     expect(faq).not.toContain("остальные способы доставки не входят");
@@ -64,15 +64,15 @@ describe("landing runtime truth contract", () => {
     expect(registry).toContain("supporting-evidence-only");
     expect(registry).toContain("never-lead-originating");
 
-    expect(evidence).toContain("Сигнал найма → доказательство");
+    expect(evidence).toContain("Почему сейчас");
     expect(evidence).toContain("Карьерная страница");
     expect(evidence).toContain("Публичные вакансии");
     expect(evidence).toContain("Прямой источник");
     expect(evidence).not.toContain("SOURCE_ROLES");
 
-    expect(faq).toContain("основные сигналы приходят из hh.ru, Работы России и карьерных страниц");
-    expect(faq).toContain("Сайт компании и реестры ФНС подтверждают организацию");
-    expect(faq).toContain("влияют на выдачу только после проверки качества и стабильности данных");
+    expect(faq).toContain("включая hh.ru, «Работу России» и карьерные страницы");
+    expect(faq).toContain("Сайты компаний и данные ФНС используются для проверки организации");
+    expect(faq).toContain("официального пути контакта");
     expect(evidence).not.toContain("adapter ready / digest gated");
     expect(evidence).not.toContain("promotion gate");
     expect(faq).not.toContain("lead-originate");

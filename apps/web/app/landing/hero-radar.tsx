@@ -5,7 +5,16 @@ import { useEffect, useRef } from "react";
 import styles from "./hero-radar.module.css";
 
 const CLUSTERS = [
-  { id: "career", x: 69, y: 30, label: "повод собран", meta: "3 подтверждения", active: true },
+  {
+    id: "career",
+    x: 69,
+    y: 30,
+    eyebrow: "СВЕЖИЙ СИГНАЛ",
+    company: "Промышленная группа",
+    label: "Инженерный найм ускорился",
+    meta: "3 подтверждения · сегодня",
+    active: true,
+  },
   { id: "vacancies", x: 38, y: 35, label: "новые роли", meta: "8 позиций" },
   { id: "repeat", x: 48, y: 68, label: "повтор", meta: "3 роли снова открыты" },
   { id: "leadership", x: 78, y: 58, label: "усиление", meta: "руководитель направления" },
@@ -125,10 +134,14 @@ export default function HeroRadar() {
             className={styles.clusterTarget}
             style={{ left: `${cluster.x}%`, top: `${cluster.y}%` }}
             data-active={("active" in cluster && cluster.active) || undefined}
-            aria-label={`${cluster.label}: ${cluster.meta}`}
+            aria-label={"company" in cluster
+              ? `${cluster.eyebrow}. ${cluster.company}. ${cluster.label}: ${cluster.meta}`
+              : `${cluster.label}: ${cluster.meta}`}
           >
             <span className={styles.targetDot} aria-hidden="true" />
             <span className={styles.microLabel} aria-hidden="true">
+              {"eyebrow" in cluster ? <small>{cluster.eyebrow}</small> : null}
+              {"company" in cluster ? <b>{cluster.company}</b> : null}
               <strong>{cluster.label}</strong>
               <small>{cluster.meta}</small>
             </span>

@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Recruiter Radar — компании, которым стоит написать сегодня",
   description:
-    "Recruiter Radar находит сигналы найма, показывает доказательства и помогает рекрутинговым агентствам выбрать безопасный момент для выхода на компанию.",
+    "Recruiter Radar помогает рекрутинговым агентствам находить компании с активным наймом и понятным поводом для первого контакта.",
 };
 
 type HomePageProps = {

@@ -14,6 +14,18 @@ import panelStyles from "./conversion-panel.module.css";
 import finalStyles from "./final-radar.module.css";
 import styles from "./landing.module.css";
 
+const PILOT_BULLETS = [
+  "Ежедневный приоритет компаний",
+  "Почему сейчас + факты и источники",
+  "Настройка под нишу и географию",
+] as const;
+
+const LANDING_PLAN_DESCRIPTIONS = {
+  pilot: "Короткий запуск, чтобы проверить Recruiter Radar на своей специализации.",
+  monthly: "Для регулярного поиска новых клиентских возможностей.",
+  quarterly: "Для агентств, которые используют радар как постоянный канал поиска клиентов.",
+} as const;
+
 export default function ConversionPanel(props: {
   previewInput: PublicPreviewInput;
   paymentConfigured: boolean;
@@ -33,27 +45,27 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <div className={styles.pricingIntro} data-pricing-intro>
-          <span>Пилот без обязательств</span>
-          <h2>7 дней, чтобы проверить не интерфейс — результат.</h2>
+          <span>Попробуйте на своей нише</span>
+          <h2>7 дней за 990 ₽ — проверьте качество клиентских возможностей на своей нише.</h2>
           <p>
-            Начните с недели. Продолжайте только если радар полезен. Смотрите на своей нише: появляются ли новые компании, понятен ли «почему сейчас», хватает ли доказательств для уверенного выхода.{" "}
+            За неделю станет понятно, находит ли радар новые релевантные компании, даёт ли понятный повод для обращения и хватает ли фактов перед первым контактом.{" "}
             {props.paymentConfigured
-              ? "990 ₽ за неделю, разово, без автопродления. Если радар полезен — месяц и квартал дешевле в пересчёте на неделю."
+              ? "Разовая оплата. Без автопродления."
               : "Оставьте заявку на 7-дневный пилот без списания. Профиль сохранится — оплату можно завершить после подключения платежей."}
           </p>
         </div>
 
         <div className={`${styles.pilotOffer} ${panelStyles.pilotOffer}`} data-pricing-primary="true">
           <div className={styles.pilotMeta}>
-            <span>Пилот</span>
+            <span>Неделя</span>
             <strong>{pilotPlan.cadence}</strong>
           </div>
           <div className={styles.pilotPrice}>
             <strong>{pilotPlan.price}</strong>
           </div>
-          <p>Проверьте на своих нишах не интерфейс, а сам результат: кому писать, почему сейчас и чем это подтверждено.</p>
+          <p>{LANDING_PLAN_DESCRIPTIONS.pilot}</p>
           <ul>
-            {pilotPlan.bullets.slice(0, 3).map((bullet) => <li key={bullet}><ArrowGlyph size={14} />{bullet}</li>)}
+            {PILOT_BULLETS.map((bullet) => <li key={bullet}><ArrowGlyph size={14} />{bullet}</li>)}
           </ul>
           <Link
             href={buildCheckoutHref({ ...props.previewInput, planCode: pilotPlan.code })}
@@ -68,25 +80,23 @@ export default function ConversionPanel(props: {
         </div>
 
         <div className={`${styles.secondaryOffers} ${panelStyles.secondaryOffers}`} aria-label="Продолжение после пилота" data-pricing-secondary="true">
-          <span className={styles.secondaryOfferLabel}>Если радар подходит — продолжение дешевле</span>
+          <span className={styles.secondaryOfferLabel}>Продолжите, если радар подходит вашей нише</span>
           {secondaryPlans.map((plan) => {
             const quarterly = plan.code === "quarterly";
             return (
               <article key={plan.code} data-plan-code={plan.code} data-recommended={plan.isPrimary || undefined}>
                 <div className={panelStyles.offerTopline}>
                   <span>{plan.name}</span>
-                  {plan.isPrimary ? <b>Рекомендуем</b> : null}
+                  <b>{plan.cadence}</b>
                 </div>
                 <strong>{plan.price}</strong>
-                <small className={panelStyles.planEquivalent}>{plan.monthlyEquivalent}</small>
-                <p>{plan.description}</p>
+                <small className={panelStyles.planEquivalent}>
+                  {quarterly ? "≈ 2 330 ₽ за 30 дней" : plan.monthlyEquivalent}
+                </small>
+                <p>{LANDING_PLAN_DESCRIPTIONS[plan.code]}</p>
                 <div className={panelStyles.planProof}>
-                  {plan.discountLabel ? <span>{plan.discountLabel}</span> : null}
-                  <span>{quarterly ? "минимальная цена периода" : "30 дней регулярной работы"}</span>
+                  <span>{quarterly ? "Экономия 1 980 ₽" : "На 30% выгоднее недели"}</span>
                 </div>
-                <ul>
-                  {plan.bullets.slice(0, 2).map((bullet) => <li key={bullet}><ArrowGlyph size={13} />{bullet}</li>)}
-                </ul>
                 <Link
                   href={buildCheckoutHref({ ...props.previewInput, planCode: plan.code })}
                   data-analytics-event={LANDING_ANALYTICS_EVENT.continuationCtaClicked}
@@ -109,10 +119,10 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <div className={styles.faqHeading} data-faq-heading>
-          <span>Перед запуском — короткие ответы.</span>
-          <h2>Вопросы, которые стоит закрыть до запуска.</h2>
-          <p>Источники, приоритет, доставка, контроль и оплата — без мелкого шрифта.</p>
-          <small data-faq-trust>Интерактивный пример — без регистрации. Данные в нём обезличены.</small>
+          <span>Коротко о главном</span>
+          <h2>Что важно знать перед запуском.</h2>
+          <p>Как появляются компании, откуда берутся данные и что происходит после оплаты.</p>
+          <small data-faq-trust>Пример можно настроить без регистрации.</small>
         </div>
         <div className={styles.faqList} data-faq-list>
           {props.faqItems.map((item, index) => (
@@ -131,13 +141,13 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <span>7 ДНЕЙ / СВОЯ НИША</span>
-        <h2>Проверьте, кому стоит написать сейчас — и почему.</h2>
-        <p>За неделю станет видно, даёт ли радар новые компании и достаточно ли фактов для уверенного первого контакта.</p>
+        <h2>Посмотрите, кому стоит написать сейчас.</h2>
+        <p>Настройте нишу и географию. За неделю вы увидите, помогает ли радар находить новые поводы для разговора с потенциальными клиентами.</p>
         <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
           <li>990 ₽ / 7 дней</li>
           <li>Без автопродления</li>
-          <li>Доказательства по каждой возможности</li>
-          <li>Обращения отправляете только вы</li>
+          <li>Факты по каждой компании</li>
+          <li>Сообщения отправляете вы</li>
         </ul>
         <div className={finalStyles.radar} data-final-radar-composition="signal-lock" aria-hidden="true">
           <i className={finalStyles.arc} />

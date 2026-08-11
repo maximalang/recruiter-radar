@@ -31,12 +31,12 @@ export default function DetectionScene({
       </div>
 
       <div className={sceneStyles.copy} data-hero-copy>
-        <p className={sceneStyles.serviceLabel}>Для рекрутинговых агентств в России</p>
+        <p className={sceneStyles.serviceLabel}>Поиск новых клиентов для рекрутинговых агентств</p>
         <h1 id="detection-title" className={sceneStyles.title} data-hero-title>
           Компании, которым стоит написать сегодня.
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Recruiter Radar замечает свежие изменения в найме, сверяет их по источникам и показывает, где появился реальный повод для первого контакта.
+          Recruiter Radar отслеживает свежие изменения в найме и показывает, где появился реальный повод предложить подбор — с фактами и источниками по каждой компании.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a
@@ -45,14 +45,14 @@ export default function DetectionScene({
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Посмотреть возможности <ArrowGlyph />
+            Посмотреть пример <ArrowGlyph />
           </a>
-          <span className={sceneStyles.actionHint}>Соберите радар под специализацию агентства · без регистрации</span>
+          <span className={sceneStyles.actionHint}>Настройте нишу и географию · без регистрации</span>
         </div>
         <Link href="/login?returnTo=%2Fdashboard" className={sceneStyles.loginLink}>Уже есть доступ? Войти</Link>
         <p className={sceneStyles.microcopy} data-hero-trust-line>
           {paymentConfigured
-            ? "7 дней · разовая оплата · без автопродления · сообщения отправляете вы"
+            ? "7 дней · 990 ₽ · без автопродления · сообщения отправляете вы"
             : "7 дней · заявка без списания · сообщения отправляете вы"}
         </p>
       </div>

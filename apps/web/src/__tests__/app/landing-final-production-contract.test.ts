@@ -17,12 +17,12 @@ describe("landing final production contract", () => {
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
     expect(hero).toContain('data-hero-layout="ambient-radar"');
     expect(hero).toContain("Компании, которым стоит написать сегодня.");
-    expect(hero).toContain("Посмотреть возможности");
+    expect(hero).toContain("Посмотреть пример");
     expect(hero).toContain("Уже есть доступ? Войти");
     expect(hero).not.toContain("HeroInstrument");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("заявка без списания");
-    expect(hero).toContain("разовая оплата");
+    expect(hero).toContain("990 ₽");
     expect(hero).toContain("LANDING_ANALYTICS_EVENT.previewStarted");
     expect(hero).not.toContain("Компании подают сигнал.");
   });
@@ -35,15 +35,14 @@ describe("landing final production contract", () => {
     expect(conversion).toContain('data-conversion-scenes="continuous"');
     expect(conversion).toContain('data-pricing-layout="unified-grid"');
     expect(conversion).toContain('data-faq-layout="editorial"');
-    expect(conversion).toContain("Начните с недели. Продолжайте только если радар полезен.");
-    expect(conversion).toContain("Проверьте на своих нишах не интерфейс, а сам результат");
+    expect(conversion).toContain("Попробуйте на своей нише");
+    expect(conversion).toContain("7 дней за 990 ₽ — проверьте качество клиентских возможностей на своей нише.");
     expect(conversion).toContain("Запустить на 7 дней");
-    expect(conversion).toContain("Если радар подходит — продолжение дешевле");
     expect(conversion).toContain("Разовая оплата · без автопродления");
     expect(conversion).toContain("Подключить месяц");
     expect(conversion).toContain("Подключить квартал");
     expect(conversion).not.toContain("<span>{pilotPlan.cadence}</span>");
-    expect(conversion).toContain("Перед запуском — короткие ответы.");
+    expect(conversion).toContain("Коротко о главном");
     expect(conversion).not.toContain("Ответы раскрываются без перехода");
 
     expect(visual).toContain("--page-gutter:");
@@ -83,12 +82,12 @@ describe("landing final production contract", () => {
     expect(timeline).toContain('id="scene-signal-timeline"');
     expect(timeline).toContain("data-timeline-event");
     expect(timeline).toContain('data-opportunity-lock="true"');
-    expect(delivery).toContain("Обращение компаниям всегда отправляете вы.");
+    expect(delivery).toContain("Сообщения компаниям не отправляются автоматически.");
     expect(delivery).toContain('data-delivery-routes="connected"');
     expect(delivery).toContain("PRIMARY_ROUTES.map");
     expect(delivery).toContain("EXTRA_ROUTES.map");
     expect(delivery).toContain('data-manual-outreach-boundary="true"');
-    expect(evidence).toContain("Сигнал найма → доказательство");
+    expect(evidence).toContain("Почему сейчас");
     expect(evidence).not.toContain("открыть факт");
     expect(evidence).not.toContain("SOURCE_ROLES");
   });
@@ -96,10 +95,10 @@ describe("landing final production contract", () => {
   test("keeps FAQ copy professional and free of internal delivery terminology", () => {
     const faq = source("app/landing/landing-faq.ts");
 
-    expect(faq).toContain("Recruiter Radar отправляет сообщения компаниям?");
+    expect(faq).toContain("Recruiter Radar сам пишет компаниям?");
     expect(faq).toContain("Где я получаю результаты?");
-    expect(faq).toContain("защищённый HTTPS-webhook");
-    expect(faq).not.toContain("Радар сам пишет компаниям?");
+    expect(faq).not.toContain("HTTPS-webhook");
+    expect(faq).not.toContain("n8n");
     expect(faq).not.toContain("Куда приходит выдача?");
     expect(faq).not.toContain("email digest");
     expect(faq).not.toContain("browser push");

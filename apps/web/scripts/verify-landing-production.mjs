@@ -119,16 +119,16 @@ async function assertRequiredSurface(page, label) {
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
   assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
-  assert.match(await page.locator("#scene-workspace").innerText(), /рабочая выдача|пример утренней выдачи/i);
+  assert.match(await page.locator("#scene-workspace").innerText(), /пример сегодняшней выдачи|приоритет по вашему профилю/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
-  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение компаниям всегда отправляете вы/i);
+  assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const pricingText = await page.locator("#pricing").innerText();
-  assert.match(pricingText, /Начните с недели\. Продолжайте только если радар полезен/i);
+  assert.match(pricingText, /7 дней за 990 ₽ — проверьте качество клиентских возможностей/i);
   assert.match(pricingText, /990 ₽/);
   assert.match(pricingText, /2 990 ₽/);
   assert.match(pricingText, /6 990 ₽/);
-  assert.match(await page.locator("#faq").innerText(), /Перед запуском — короткие ответы/i);
-  await page.getByRole("heading", { name: /Проверьте, кому стоит написать сейчас/ }).waitFor();
+  assert.match(await page.locator("#faq").innerText(), /Коротко о главном/i);
+  await page.getByRole("heading", { name: /Посмотрите, кому стоит написать сейчас/ }).waitFor();
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor();
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor();
 }
@@ -617,7 +617,9 @@ async function assertNoJs(browser) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
   assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
-  assert.match(await page.locator("#scene-workspace").innerText(), /рабочая выдача|пример утренней выдачи/i);
+  const noJsWorkspaceText = await page.locator("#scene-workspace").innerText();
+  assert.match(noJsWorkspaceText, /интерактивный пример/i);
+  assert.match(noJsWorkspaceText, /показать компании/i);
   assert.equal(await page.locator("#preview-configurator form").count(), 1, "no-JS configurator missing");
   await page.getByLabel("Специализация").waitFor({ state: "attached" });
   await page.getByLabel("География").waitFor({ state: "attached" });
@@ -626,12 +628,12 @@ async function assertNoJs(browser) {
   await skeleton.waitFor({ state: "attached" });
   assert.equal(await skeleton.evaluate((element) => element.closest("#preview-results") === element), true, "no-JS skeleton escaped results boundary");
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
-  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение компаниям всегда отправляете вы/i);
+  assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const noJsPricingText = await page.locator("#pricing").innerText();
-  assert.match(noJsPricingText, /Начните с недели\. Продолжайте только если радар полезен/i);
+  assert.match(noJsPricingText, /7 дней за 990 ₽ — проверьте качество клиентских возможностей/i);
   assert.match(noJsPricingText, /990 ₽/);
   assert.ok(await page.locator("#faq summary").count() >= 1, "no-JS FAQ question missing");
-  await page.getByRole("heading", { name: /Проверьте, кому стоит написать сейчас/ }).waitFor({ state: "attached" });
+  await page.getByRole("heading", { name: /Посмотрите, кому стоит написать сейчас/ }).waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor({ state: "attached" });
   const followsResults = await page.evaluate(() => {
