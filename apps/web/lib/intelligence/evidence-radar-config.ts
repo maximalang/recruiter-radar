@@ -1,4 +1,4 @@
-import { isOpportunityCommercialSignalUiEnabledForContext } from '@/lib/opportunities/config'
+import { isOpportunityEngineV1EnabledForContext } from '@/lib/opportunities/config'
 
 export const EVIDENCE_RADAR_V1_FEATURE_FLAG = 'EVIDENCE_RADAR_V1_ENABLED' as const
 export const EVIDENCE_RADAR_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG =
@@ -20,11 +20,19 @@ export function isEvidenceRadarV1EnabledForContext(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   if (context.workspaceId == null) return false
-  if (!isOpportunityCommercialSignalUiEnabledForContext(context, env)) return false
+  if (!hasEvidenceRadarV1PrerequisitesForContext(context, env)) return false
   if (isEvidenceRadarV1Enabled(env)) return true
   return parseCanaryWorkspaceIds(
     env[EVIDENCE_RADAR_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG],
   ).has(String(context.workspaceId))
+}
+
+function hasEvidenceRadarV1PrerequisitesForContext(
+  context: EvidenceRadarFeatureContext,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return context.workspaceId != null &&
+    isOpportunityEngineV1EnabledForContext(context, env)
 }
 
 export function parseEvidenceRadarCanaryWorkspaceIds(
