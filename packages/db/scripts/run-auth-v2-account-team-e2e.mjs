@@ -1006,7 +1006,7 @@ async function inspectCurrentSurface(
 }
 
 async function inspectSurface(page, key, pathname, screenshotName) {
-  await page.goto(`${baseUrl}${pathname}`, { waitUntil: 'networkidle' })
+  await page.goto(`${baseUrl}${pathname}`, { waitUntil: 'domcontentloaded' })
   await inspectCurrentSurface(page, key, pathname, screenshotName)
 }
 
