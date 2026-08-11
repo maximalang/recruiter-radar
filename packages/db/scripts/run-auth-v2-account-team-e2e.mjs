@@ -1095,14 +1095,16 @@ async function challengeState(token) {
 async function expireChallenge(token) {
   const result = await database.query(
     `UPDATE auth_challenges
-     SET expires_at = NOW() + INTERVAL '100 milliseconds'
+     SET created_at = NOW() - INTERVAL '2 seconds',
+         expires_at = NOW() - INTERVAL '1 second'
      WHERE token_hash = $1
        AND consumed_at IS NULL
        AND invalidated_at IS NULL`,
     [hashToken(token)],
   )
   assert(result.rowCount === 1, 'Auth challenge could not be expired.')
-  await delay(300)
+  const expiredChallenge = await challengeState(token)
+  assert(expiredChallenge.expired === true, 'Auth challenge did not enter expired state.')
 }
 
 async function accountByEmail(email) {

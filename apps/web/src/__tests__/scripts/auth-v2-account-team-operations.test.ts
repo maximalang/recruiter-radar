@@ -116,6 +116,11 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("coreMagicLink");
     expect(runner).toContain("resendInvalidation");
     expect(runner).toContain("expiredLink");
+    expect(runner).toContain(
+      "SET created_at = NOW() - INTERVAL '2 seconds',\n"
+        + "         expires_at = NOW() - INTERVAL '1 second'",
+    );
+    expect(runner).not.toContain("SET expires_at = NOW() + INTERVAL '100 milliseconds'");
     expect(runner).toContain("accountSwitch");
     expect(runner).toContain("onboarding");
     expect(runner).toContain("logout");
