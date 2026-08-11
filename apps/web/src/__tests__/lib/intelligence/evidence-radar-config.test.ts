@@ -5,30 +5,38 @@ import {
 
 const prerequisiteEnv = {
   OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
-  OPPORTUNITY_OUTCOMES_ENABLED: 'true',
-  OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
-  COMPANY_EVENTS_V1_ENABLED: 'true',
-  COMPANY_STATE_V1_ENABLED: 'true',
-  SIGNAL_EPISODES_V2_ENABLED: 'true',
-  COMMERCIAL_THESIS_V1_ENABLED: 'true',
-  EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: 'true',
-  AGENCY_DNA_MATCH_V2_ENABLED: 'true',
-  OPPORTUNITY_SCORING_V3_ENABLED: 'true',
-  OPPORTUNITY_COMMERCIAL_SIGNAL_UI_ENABLED: 'true',
 } as const
 
 const context = { dataOwnerId: '1', workspaceId: '42' }
 
 describe('Evidence Radar rollout gate', () => {
-  it('stays dark by default even when Commercial Signal UI is enabled', () => {
+  it('stays dark by default when its base prerequisite is enabled', () => {
     expect(isEvidenceRadarV1EnabledForContext(context, prerequisiteEnv)).toBe(false)
   })
 
-  it('allows an explicit global enable only after upstream prerequisites are enabled', () => {
+  it('allows an explicit global enable only after the base Opportunity context is enabled', () => {
     expect(isEvidenceRadarV1EnabledForContext(context, {
       ...prerequisiteEnv,
       EVIDENCE_RADAR_V1_ENABLED: 'true',
     })).toBe(true)
+    expect(isEvidenceRadarV1EnabledForContext(context, {
+      EVIDENCE_RADAR_V1_ENABLED: 'true',
+    })).toBe(false)
+  })
+
+  it('does not inherit unrelated Outcome Ledger, workspace-reader, or Commercial Signal UI gates', () => {
+    const env = {
+      ...prerequisiteEnv,
+      OPPORTUNITY_OUTCOMES_ENABLED: 'false',
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'false',
+      OPPORTUNITY_COMMERCIAL_SIGNAL_UI_ENABLED: 'false',
+      EVIDENCE_RADAR_V1_ENABLED: 'true',
+    }
+
+    expect(isEvidenceRadarV1EnabledForContext(context, env)).toBe(true)
+  })
+
+  it('remains disabled when the base Opportunity context is unavailable', () => {
     expect(isEvidenceRadarV1EnabledForContext(context, {
       EVIDENCE_RADAR_V1_ENABLED: 'true',
     })).toBe(false)

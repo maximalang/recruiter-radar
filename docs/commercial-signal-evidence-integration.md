@@ -22,3 +22,5 @@ Merge является additive/dark. Он не включает автомат�
 - массовый outreach.
 
 Активация выполняется отдельно после source review, dry-run качества и workspace canary.
+
+Evidence Radar reader rollout не наследует широкий `OPPORTUNITY_COMMERCIAL_SIGNAL_UI_ENABLED` gate. Его минимальный runtime prerequisite — доступный для context базовый Opportunity Engine и валидный workspace; Outcome Ledger и workspace reader switch не используются Evidence Radar readers и не должны блокировать их canary.

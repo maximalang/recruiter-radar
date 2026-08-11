@@ -160,11 +160,11 @@ Personal contacts are outside this model. DB rejects `is_personal = true` and no
 
 ## Regional radar
 
-`/opportunities/radar` и `/opportunities/sources` защищены `opportunities:read`, базовым Opportunity Engine gate и отдельным Evidence Radar rollout gate. `isEvidenceRadarV1EnabledForContext()` дополнительно требует все prerequisites существующего Commercial Signal UI, поэтому Evidence Radar нельзя включить поверх неполного upstream intelligence stack.
+`/opportunities/radar` и `/opportunities/sources` защищены `opportunities:read`, базовым Opportunity Engine gate и отдельным Evidence Radar rollout gate. `isEvidenceRadarV1EnabledForContext()` использует собственный минимальный prerequisite contract: валидный `workspaceId` и доступный для этого context базовый Opportunity Engine. Outcome Ledger, workspace reader switch и широкий Commercial Signal UI gate не являются prerequisites этих read-only Evidence Radar surfaces: readers обращаются к собственным workspace-scoped таблицам Evidence Radar и не читают outcome/workflow UI state.
 
 Evidence Radar остаётся dark-by-default. Доступ разрешается только одним из двух способов:
 
-- `EVIDENCE_RADAR_V1_ENABLED=true` — явное глобальное включение после выполнения upstream prerequisites;
+- `EVIDENCE_RADAR_V1_ENABLED=true` — явное глобальное включение после выполнения базового Opportunity prerequisite;
 - `EVIDENCE_RADAR_V1_CANARY_WORKSPACE_IDS=<workspace ids>` — ограниченный workspace canary при выключенном global flag.
 
 Malformed, zero и negative workspace IDs игнорируются; контекст без workspace остаётся выключенным. Сам Evidence Radar flag не включает автоматически внешние source adapters и не заменяет source-specific legal/contract review.
