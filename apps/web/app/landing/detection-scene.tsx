@@ -33,7 +33,7 @@ export default function DetectionScene({
       <div className={sceneStyles.copy} data-hero-copy>
         <p className={sceneStyles.serviceLabel}>Для рекрутинговых агентств в России</p>
         <h1 id="detection-title" className={sceneStyles.title} data-hero-title>
-          Компании, которым стоит написать сейчас.
+          Компании, которым стоит написать сегодня.
         </h1>
         <p className={sceneStyles.description} data-hero-description>
           Recruiter Radar замечает свежие изменения в найме, сверяет их по источникам и показывает, где появился реальный повод для первого контакта.
@@ -45,11 +45,11 @@ export default function DetectionScene({
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Показать возможности <ArrowGlyph />
+            Посмотреть возможности <ArrowGlyph />
           </a>
-          <span className={sceneStyles.actionHint}>Без регистрации · пример сразу на странице</span>
+          <span className={sceneStyles.actionHint}>Соберите радар под специализацию агентства · без регистрации</span>
         </div>
-        <Link href="/login?returnTo=%2Fdashboard" className={sceneStyles.loginLink}>Войти в кабинет</Link>
+        <Link href="/login?returnTo=%2Fdashboard" className={sceneStyles.loginLink}>Уже есть доступ? Войти</Link>
         <p className={sceneStyles.microcopy} data-hero-trust-line>
           {paymentConfigured
             ? "7 дней · разовая оплата · без автопродления · сообщения отправляете вы"
