@@ -28,18 +28,24 @@ describe("landing visual and login reliability polish", () => {
   test("uses a restrained ambient radar without the retired instrument runtime", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const heroScene = source("app/landing/detection-scene.module.css");
+    const heroRadar = source("app/landing/hero-radar.tsx");
+    const heroRadarStyles = source("app/landing/hero-radar.module.css");
     const visual = source("app/landing/landing-visual-system.module.css");
 
     expect(hero).toContain('data-hero-layout="ambient-radar"');
-    expect(hero).toContain("sceneStyles.ambientRing");
+    expect(hero).toContain("<HeroRadar />");
     expect(hero).not.toContain("HeroInstrument");
     expect(heroScene).toContain("var(--signal-strong)");
+    expect(heroRadar).toContain('data-hero-radar="premium"');
+    expect(heroRadarStyles).toContain(".ringLayer");
+    expect(heroRadarStyles).not.toContain("sweep");
     expect(heroScene).not.toContain("#7fd8bd");
     expect(heroScene).not.toContain("#dcff8a");
     expect(heroScene).not.toContain("#c8f36a");
     expect(visual).not.toContain("data-hero-instrument");
     expect(visual).not.toContain("@keyframes signalBreath");
     expect(heroScene).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(heroRadarStyles).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
   test("sends the landing login CTA directly to the login flow and restores mobile-menu focus synchronously", () => {

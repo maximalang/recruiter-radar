@@ -11,6 +11,7 @@ import {
 } from "../../lib/publicProduct";
 import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
 import panelStyles from "./conversion-panel.module.css";
+import finalStyles from "./final-radar.module.css";
 import styles from "./landing.module.css";
 
 export default function ConversionPanel(props: {
@@ -131,18 +132,21 @@ export default function ConversionPanel(props: {
       >
         <span>ПЕРВАЯ ВЫДАЧА / 7 ДНЕЙ</span>
         <h2>Проверьте, кому стоит написать сейчас.</h2>
-        <p>Соберите радар под специализацию агентства. За одну рабочую неделю станет понятно, даёт ли он новые компании и достаточно ли фактов для уверенного первого контакта.</p>
+        <p>Настройте специализацию агентства и проверьте за неделю, появляются ли новые компании с достаточными фактами для первого контакта.</p>
         <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
           <li>990 ₽ / 7 дней</li>
           <li>Без автопродления</li>
           <li>Доказательства по каждой возможности</li>
           <li>Обращения отправляете только вы</li>
         </ul>
-        <div className={panelStyles.finalSignal} data-final-signal-composition="agency-profile" aria-hidden="true">
-          <span className={panelStyles.profileNode}>Профиль агентства</span>
-          <i className={panelStyles.signalRoute} />
-          <span className={panelStyles.signalField}>5 приоритетных компаний</span>
-          <span className={panelStyles.constellation}><i /><i /><i /><i /><i /></span>
+        <div className={finalStyles.radar} data-final-radar-composition="signal-lock" aria-hidden="true">
+          <i className={finalStyles.arc} />
+          <i className={finalStyles.arc} />
+          <span className={finalStyles.cluster}><i /><i /><i /></span>
+          <span className={finalStyles.cluster}><i /><i /></span>
+          <span className={finalStyles.cluster}><i /><i /><i /></span>
+          <span className={finalStyles.activeCluster}><i /><i /><i /><i /></span>
+          <span className={finalStyles.annotation}><strong>сильный повод</strong><small>3 подтверждения · сегодня</small></span>
         </div>
         <div className={styles.finalActions}>
           <Link

@@ -1,0 +1,145 @@
+.radar {
+  --radar-x: 0;
+  --radar-y: 0;
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.field {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ringLayer,
+.arcLayer,
+.tickLayer,
+.labelLayer,
+.ambientLayer,
+.linkLayer,
+.clusterLayer,
+.activeLayer {
+  transform-box: view-box;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.ringLayer { transform: translate3d(calc(var(--radar-x) * 2.5px), calc(var(--radar-y) * 2.5px), 0); }
+.arcLayer,
+.tickLayer,
+.labelLayer { transform: translate3d(calc(var(--radar-x) * 1.5px), calc(var(--radar-y) * 1.5px), 0); }
+.clusterLayer,
+.linkLayer { transform: translate3d(calc(var(--radar-x) * 4px), calc(var(--radar-y) * 4px), 0); }
+.activeLayer { transform: translate3d(calc(var(--radar-x) * 5.5px), calc(var(--radar-y) * 5.5px), 0) translate(530px, 223px); }
+
+.ringLayer circle {
+  fill: none;
+  stroke: rgba(181, 234, 216, .34);
+  stroke-width: 1;
+  stroke-dasharray: 178 42 56 31;
+}
+.ringLayer circle:nth-child(2) { stroke-opacity: .7; stroke-dasharray: 136 34 44 28; }
+.ringLayer circle:nth-child(3) { stroke-opacity: .56; stroke-dasharray: 96 26 36 22; }
+.ringLayer circle:nth-child(4) { stroke-opacity: .45; stroke-dasharray: 66 21 28 18; }
+
+.arcLayer path {
+  fill: none;
+  stroke: rgba(181, 234, 216, .48);
+  stroke-width: 1.05;
+  stroke-linecap: round;
+}
+.tickLayer path {
+  fill: none;
+  stroke: rgba(242, 239, 231, .34);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+.labelLayer text {
+  fill: rgba(242, 239, 231, .38);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .12em;
+}
+.ambientLayer { animation: ambientDrift 24s ease-in-out infinite alternate; }
+.ambientLayer circle { fill: rgba(181, 234, 216, .34); }
+.linkLayer path {
+  fill: none;
+  stroke: rgba(158, 215, 196, .34);
+  stroke-width: .8;
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+}
+.clusterLayer { animation: clusterDrift 19s ease-in-out infinite alternate; }
+.clusterLayer circle,
+.activeLayer circle { fill: #9ed7c4; }
+.copperDot { fill: #c18a67 !important; }
+.activeLayer { animation: activeDrift 17s ease-in-out infinite alternate; }
+.activeHalo { fill: rgba(181, 234, 216, .05) !important; stroke: rgba(181, 234, 216, .14); stroke-width: 1; }
+.activeCore { fill: #d8f3ea !important; }
+
+.clusterTargets { position: absolute; inset: 0; }
+.clusterTarget {
+  position: absolute;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: -1.75rem 0 0 -1.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #b5ead8;
+  cursor: default;
+}
+.targetDot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: .42rem;
+  height: .42rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .36;
+  transform: translate(-50%, -50%);
+  transition: opacity .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.clusterTarget[data-active] .targetDot { opacity: .86; box-shadow: 0 0 0 9px rgba(181,234,216,.055); }
+.microLabel {
+  position: absolute;
+  top: calc(50% + 1rem);
+  left: 50%;
+  display: grid;
+  gap: .16rem;
+  min-width: 8.5rem;
+  opacity: 0;
+  text-align: left;
+  transform: translate3d(-18%, 4px, 0);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.microLabel strong,
+.microLabel small { font-family: var(--mono); font-size: .5rem; font-weight: 600; letter-spacing: .045em; text-transform: uppercase; }
+.microLabel small { color: rgba(242,239,231,.48); font-weight: 500; }
+.clusterTarget:hover .targetDot,
+.clusterTarget:focus-visible .targetDot { opacity: 1; transform: translate(-50%, -50%) scale(1.18); box-shadow: 0 0 0 10px rgba(181,234,216,.07); }
+.clusterTarget:hover .microLabel,
+.clusterTarget:focus-visible .microLabel { opacity: 1; transform: translate3d(-18%, 0, 0); }
+.clusterTarget:focus-visible { outline: 1px solid rgba(181,234,216,.5); outline-offset: 2px; }
+
+@keyframes ambientDrift { from { transform: translate3d(-2px, 2px, 0); } to { transform: translate3d(3px, -3px, 0); } }
+@keyframes clusterDrift { from { translate: -2px 2px; } to { translate: 3px -3px; } }
+@keyframes activeDrift { from { translate: 0 0; } to { translate: 3px -2px; } }
+
+@media (max-width: 1100px) {
+  .clusterTargets { display: none; }
+  .labelLayer text:nth-child(n+4), .linkLayer path:nth-child(n+3) { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ringLayer, .arcLayer, .tickLayer, .labelLayer, .ambientLayer, .linkLayer, .clusterLayer, .activeLayer {
+    animation: none !important;
+    transform: none !important;
+    translate: none !important;
+  }
+  .activeLayer { transform: translate(530px, 223px) !important; }
+  .targetDot, .microLabel { transition: none !important; }
+}

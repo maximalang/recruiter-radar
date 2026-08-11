@@ -44,7 +44,7 @@ export default function EvidenceScene() {
               Сигнал найма → доказательство → <em>коммерческая возможность.</em>
             </h2>
             <p className={styles.sceneLead}>
-              Радар не выдаёт список вакансий. Он показывает компании, которым стоит написать сейчас, и факты, на которые можно опереться.
+              Радар показывает компании, которым стоит написать сейчас, и факты, на которые можно опереться.
             </p>
           </div>
 
@@ -63,7 +63,6 @@ export default function EvidenceScene() {
               <i className={sceneStyles.scaleTrack} aria-hidden="true" />
             </div>
           </div>
-
         </div>
 
         <div className={sceneStyles.ledger}>
@@ -72,12 +71,18 @@ export default function EvidenceScene() {
               <span>ДОКАЗАТЕЛЬНАЯ БАЗА</span>
               <strong>{DEMO_COMPANY.name}</strong>
             </div>
-            <p>Три записи показывают, что произошло, когда сигнал появился и насколько прямой источник его подтверждает.</p>
+            <p>Что произошло, когда сигнал появился и насколько прямой источник его подтверждает.</p>
           </div>
 
           <ul className={sceneStyles.records}>
             {SOURCE_ROWS.map((row, index) => (
-              <li key={row.source} className={sceneStyles.record}>
+              <li
+                key={row.source}
+                className={sceneStyles.record}
+                tabIndex={0}
+                data-evidence-row
+                aria-label={`${row.source}: ${row.fact}. ${row.confidence}`}
+              >
                 <span className={sceneStyles.recordIndex}>{String(index + 1).padStart(2, "0")}</span>
                 <div className={sceneStyles.recordFact}>
                   <span>{row.source}</span>
@@ -92,7 +97,6 @@ export default function EvidenceScene() {
             ))}
           </ul>
         </div>
-
       </div>
     </section>
   );

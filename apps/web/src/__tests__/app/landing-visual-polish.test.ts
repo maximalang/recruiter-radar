@@ -13,13 +13,18 @@ describe("polished unified landing visual contract", () => {
   it("keeps one hero layout owner with a lightweight ambient radar", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
+    const radar = source("app/landing/hero-radar.tsx");
+    const radarStyles = source("app/landing/hero-radar.module.css");
     const landingStyles = source("app/landing/landing.module.css");
     const visualStyles = source("app/landing/landing-visual-system.module.css");
     const obsoleteResponsiveStyles = resolve(WEB_ROOT, "app/landing/detection-responsive.module.css");
     const compatibilityRadar = source("app/landing/brand-glyphs.tsx");
 
     expect(heroScene).toContain('data-hero-layout="ambient-radar"');
-    expect(heroScene).toContain("ambientRing");
+    expect(heroScene).toContain("<HeroRadar />");
+    expect(radar).toContain('data-hero-radar="premium"');
+    expect(radarStyles).toMatch(/\.ringLayer\s+circle\s*\{/);
+    expect(radarStyles).not.toContain("sweep");
     expect(heroScene).not.toContain("HeroInstrument");
     expect(heroScene).not.toContain("data-hero-signal-card");
     expect(heroScene).not.toContain("detectionFooter");
@@ -37,23 +42,33 @@ describe("polished unified landing visual contract", () => {
     expect(landingStyles).not.toContain(".instrumentCore");
   });
 
-  it("uses a dedicated mobile signal fragment and keeps the radar out of document flow", () => {
+  it("uses the same ambient radar marker on mobile without exposing tablet hotspots", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
+    const radarStyles = source("app/landing/hero-radar.module.css");
 
-    expect(heroScene).toContain('data-mobile-hero-signal="true"');
-    expect(sceneStyles).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.mobileSignal\s*\{[\s\S]*?display:\s*block;/);
-    expect(sceneStyles).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.fieldFigure\s*\{\s*display:\s*none;/);
-    expect(sceneStyles).toMatch(/\.ambientRing\s*\{/);
+    expect(heroScene).toContain("data-mobile-hero-signal");
+    expect(heroScene).toContain("<HeroRadar />");
+    expect(sceneStyles).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.fieldFigure\s*\{/);
+    expect(radarStyles).toMatch(/@media \(max-width: 1100px\)[\s\S]*?\.clusterTargets\s*\{\s*display:\s*none;/);
     expect(sceneStyles).not.toMatch(/@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?bottom:\s*-12rem;/);
   });
 
-  it("keeps the retired timeline out of the reduced landing composition", () => {
+  it("keeps the compact signal timeline between detection and workspace", () => {
     const page = source("app/landing/landing-page.tsx");
+    const timeline = source("app/landing/signal-timeline-scene.tsx");
+    const detectionIndex = page.indexOf("<DetectionScene");
+    const timelineIndex = page.indexOf("<SignalTimelineScene");
+    const workspaceIndex = page.indexOf("<WorkspaceScene");
 
-    expect(page).not.toContain("SignalTimelineScene");
-    expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.tsx"))).toBe(false);
-    expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.module.css"))).toBe(false);
+    expect(page).toContain("SignalTimelineScene");
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.tsx"))).toBe(true);
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.module.css"))).toBe(true);
+    expect(timeline).toContain('id="scene-signal-timeline"');
+    expect(timeline).toContain("data-timeline-event");
+    expect(timeline).toContain('data-opportunity-lock="true"');
+    expect(timelineIndex).toBeGreaterThan(detectionIndex);
+    expect(workspaceIndex).toBeGreaterThan(timelineIndex);
   });
 
   it("separates the core workspace from connected delivery routes", () => {
@@ -61,7 +76,8 @@ describe("polished unified landing visual contract", () => {
 
     expect(delivery).toContain('data-delivery-core="workspace"');
     expect(delivery).toContain('data-delivery-routes="connected"');
-    expect(delivery).toContain("DELIVERY_CHANNELS.slice(1).map");
+    expect(delivery).toContain("PRIMARY_ROUTES.map");
+    expect(delivery).toContain("EXTRA_ROUTES.map");
   });
 
   it("preserves the manual outreach boundary without a standalone composer scene", () => {
@@ -72,7 +88,9 @@ describe("polished unified landing visual contract", () => {
     expect(page).not.toContain("OutreachScene");
     expect(existsSync(resolve(WEB_ROOT, "app/landing/outreach-scene.tsx"))).toBe(false);
     expect(delivery).toContain("Обращение компаниям всегда отправляете вы");
-    expect(conversion).toContain('data-final-signal-composition="agency-profile"');
+    expect(delivery).toContain('data-manual-outreach-boundary="true"');
+    expect(conversion).toContain('data-final-radar-composition="signal-lock"');
+    expect(conversion).not.toContain('data-final-signal-composition="agency-profile"');
     expect(source("app/landing/conversion-panel.module.css")).not.toContain("right: -3rem");
   });
 

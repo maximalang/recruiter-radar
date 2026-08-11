@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import { ArrowGlyph } from "./brand-glyphs";
+import HeroRadar from "./hero-radar";
 import sceneStyles from "./detection-scene.module.css";
 
 export default function DetectionScene({
@@ -19,18 +20,8 @@ export default function DetectionScene({
       data-header-tone="dark"
       data-hero-layout="ambient-radar"
     >
-      <div className={sceneStyles.mobileSignal} data-mobile-hero-signal="true" aria-hidden="true">
-        <span className={sceneStyles.mobileRing} />
-        <span className={sceneStyles.mobileRing} />
-        <span className={sceneStyles.mobileConstellation}><i /><i /><i /><i /><i /></span>
-      </div>
-
-      <div className={sceneStyles.fieldFigure} data-hero-visual aria-hidden="true">
-        <span className={sceneStyles.ambientRing} />
-        <span className={sceneStyles.ambientRing} />
-        <span className={sceneStyles.ambientRing} />
-        <span className={sceneStyles.ambientAxis} />
-        <span className={sceneStyles.ambientNode} />
+      <div className={sceneStyles.fieldFigure} data-hero-visual data-mobile-hero-signal>
+        <HeroRadar />
       </div>
 
       <div className={sceneStyles.kicker}>
@@ -45,7 +36,7 @@ export default function DetectionScene({
           Компании, которым стоит написать сегодня.
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Recruiter Radar собирает сигналы найма, связывает их с конкретными компаниями и показывает короткий приоритетный список: что изменилось, насколько сигнал надёжен и на какие факты можно сослаться в первом контакте.
+          Соберите радар под специализацию агентства: Recruiter Radar связывает сигналы найма с компаниями и показывает короткий приоритет — что изменилось, насколько сигнал надёжен и на какие факты опереться.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a

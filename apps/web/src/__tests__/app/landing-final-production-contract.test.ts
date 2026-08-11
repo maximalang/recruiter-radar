@@ -72,15 +72,22 @@ describe("landing final production contract", () => {
     expect(visual).toMatch(/#faq details\[open\] p[\s\S]*animation: none;/);
   });
 
-  test("preserves the manual outreach boundary inside the reduced composition", () => {
+  test("preserves the manual outreach boundary with the signal timeline in composition", () => {
     const page = source("app/landing/landing-page.tsx");
+    const timeline = source("app/landing/signal-timeline-scene.tsx");
     const delivery = source("app/landing/delivery-scene.tsx");
     const evidence = source("app/landing/evidence-scene.tsx");
 
     expect(page).not.toContain("<OutreachScene");
-    expect(page).not.toContain("<SignalTimelineScene");
+    expect(page).toContain("<SignalTimelineScene");
+    expect(timeline).toContain('id="scene-signal-timeline"');
+    expect(timeline).toContain("data-timeline-event");
+    expect(timeline).toContain('data-opportunity-lock="true"');
     expect(delivery).toContain("Обращение компаниям всегда отправляете вы.");
-    expect(delivery).toContain('title: "+ интеграции"');
+    expect(delivery).toContain('data-delivery-routes="connected"');
+    expect(delivery).toContain("PRIMARY_ROUTES.map");
+    expect(delivery).toContain("EXTRA_ROUTES.map");
+    expect(delivery).toContain('data-manual-outreach-boundary="true"');
     expect(evidence).toContain("Сигнал найма → доказательство");
     expect(evidence).not.toContain("открыть факт");
     expect(evidence).not.toContain("SOURCE_ROLES");
