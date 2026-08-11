@@ -4,9 +4,9 @@ import { DEMO_COMPANY } from "./landing-copy";
 import styles from "./landing.module.css";
 
 const DELIVERY_STEPS = [
-  { title: "Задали фокус", text: "Специализация и география задают, что считать релевантным." },
-  { title: "Radar следит", text: "Свежие изменения связываются с компаниями и проверяемыми источниками." },
-  { title: "Получили повод", text: "В выдаче — кому написать, почему сейчас и чем это подтверждается." },
+  { title: "Задайте нишу", text: "Укажите специализацию и географию агентства." },
+  { title: "Радар следит за рынком", text: "Свежие изменения в найме связываются с компаниями и проверяются по источникам." },
+  { title: "Получайте компании с поводом", text: "В выдаче видно, кому написать, почему сейчас и на каких фактах это основано." },
 ] as const;
 
 type DeliveryChannelKey = "cabinet" | "telegram" | "email" | "vk" | "push" | "webhook";
@@ -21,26 +21,26 @@ type DeliveryChannel = {
 
 const CORE_CHANNEL: DeliveryChannel = {
   key: "cabinet",
-  title: "Web",
-  status: "всегда",
-  text: "Полная карточка: приоритет, «почему сейчас», доказательства и история сигнала.",
-  note: "основной кабинет",
+  title: "Веб-кабинет",
+  status: "Всегда доступен",
+  text: "Полная карточка компании, причины приоритета, факты и история сигнала.",
+  note: "основной рабочий экран",
 };
 
 const PRIMARY_ROUTES: ReadonlyArray<DeliveryChannel> = [
   {
     key: "telegram",
     title: "Telegram",
-    status: "подключаемый",
-    text: "Короткая ежедневная выдача через подключённого бота.",
-    note: "после подключения",
+    status: "Можно подключить",
+    text: "Короткая подборка новых возможностей.",
+    note: "дополнительные уведомления",
   },
   {
     key: "email",
     title: "Email",
-    status: "подключаемый",
-    text: "Агрегированная выдача на рабочий адрес профиля.",
-    note: "после согласия в профиле",
+    status: "Можно подключить",
+    text: "Регулярная подборка на рабочую почту.",
+    note: "дополнительные уведомления",
   },
 ];
 
@@ -48,23 +48,23 @@ const EXTRA_ROUTES: ReadonlyArray<DeliveryChannel> = [
   {
     key: "vk",
     title: "VK",
-    status: "подключаемый",
-    text: "События радара через настроенное VK-сообщество.",
-    note: "после настройки сообщества",
+    status: "Можно подключить",
+    text: "Уведомления через рабочее сообщество.",
+    note: "после настройки",
   },
   {
     key: "push",
     title: "Push в браузере",
-    status: "после настройки",
-    text: "Браузерное уведомление при включённой активной push-подписке.",
-    note: "активная подписка / VAPID",
+    status: "Можно подключить",
+    text: "Уведомления в браузере.",
+    note: "после настройки",
   },
   {
     key: "webhook",
-    title: "HTTPS webhook",
-    status: "интеграция",
-    text: "Подписанный HTTPS webhook передаёт события в n8n, CRM или внутренний процесс.",
-    note: "signed endpoint настраивается отдельно",
+    title: "Webhook",
+    status: "Можно подключить",
+    text: "Передача событий во внешний рабочий процесс.",
+    note: "после отдельной настройки",
   },
 ];
 
@@ -115,12 +115,12 @@ export default function DeliveryScene() {
     >
       <div className={styles.deliveryLayout}>
         <div className={styles.deliveryIntro}>
-          <p className={styles.sceneLabel}>Доставка и outreach</p>
+          <p className={styles.sceneLabel}>От сигнала к контакту</p>
           <h2 id="delivery-title" className={styles.sceneHeading}>
-            Радар работает рядом с вами, <em>а не вместо вас.</em>
+            Радар находит повод. <em>Пишете вы.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Он собирает и доставляет возможности. Решение, финальная проверка и отправка сообщения остаются за вами.
+            Recruiter Radar следит за изменениями в найме, выбирает наиболее релевантные компании и готовит контекст для первого обращения. Финальное решение всегда остаётся за вами.
           </p>
         </div>
 
@@ -138,9 +138,9 @@ export default function DeliveryScene() {
           <div className={sceneStyles.capabilityHeader}>
             <div>
               <span>Доставка</span>
-              <strong>Выдача — там, где удобнее работать.</strong>
+              <strong>Получайте выдачу там, где удобно работать.</strong>
             </div>
-            <p>Web доступен всегда. Остальные каналы появляются только после вашей настройки.</p>
+            <p>Полная информация всегда доступна в веб-кабинете. При необходимости подключите дополнительные уведомления.</p>
           </div>
           <div className={sceneStyles.channelHierarchy}>
             <article className={sceneStyles.coreChannel} data-channel={CORE_CHANNEL.key} data-delivery-core="workspace">
@@ -168,24 +168,24 @@ export default function DeliveryScene() {
 
         <div className={sceneStyles.outreachSequence} data-manual-outreach-boundary="true">
           <div className={sceneStyles.outreachFacts}>
-            <span className={sceneStyles.groupLabel}>Готовый контекст для первого контакта</span>
+            <span className={sceneStyles.groupLabel}>Контекст для первого обращения</span>
             <strong>{DEMO_COMPANY.name}</strong>
             <dl>
               <div><dt>Что изменилось</dt><dd>{DEMO_COMPANY.whyNow}</dd></div>
-              <div><dt>С чем выходить</dt><dd>Точечный подбор по сложным инженерным ролям и руководителям направления.</dd></div>
-              <div><dt>Куда писать</dt><dd>Карьерная страница → контакты работодателя → рабочий канал компании.</dd></div>
+              <div><dt>Что можно предложить</dt><dd>Точечный подбор инженеров и руководителей направления.</dd></div>
+              <div><dt>Где искать контакт</dt><dd>Карьерная страница и официальный рабочий канал компании.</dd></div>
             </dl>
           </div>
           <div className={sceneStyles.outreachDraft}>
-            <div><SignalGlyph size={30} /><span>ЧЕРНОВИК / НЕ ОТПРАВЛЕН</span></div>
-            <p>«Вижу, что вы расширяете инженерную команду: открыли 8 позиций и повторно опубликовали 3 сложные роли. Если часть из них требует внешнего поиска, можем подключиться точечно.»</p>
-            <strong>Проверьте факты. Отправьте своим голосом.</strong>
+            <div><SignalGlyph size={30} /><span>ПРИМЕР СООБЩЕНИЯ / НЕ ОТПРАВЛЕНО</span></div>
+            <p>«Вижу, что вы расширяете инженерную команду: за неделю открыли несколько новых позиций, а часть сложных ролей появилась повторно. Если по некоторым вакансиям нужен внешний поиск, можем подключиться точечно.»</p>
+            <strong>Проверьте факты и адаптируйте сообщение под свой стиль.</strong>
           </div>
         </div>
 
         <aside className={styles.deliveryBoundary}>
-          <span>Никакой авторассылки</span>
-          <strong>Обращение компаниям всегда отправляете вы.</strong>
+          <span>Контроль остаётся у вас</span>
+          <strong>Сообщения компаниям не отправляются автоматически.</strong>
         </aside>
       </div>
     </section>

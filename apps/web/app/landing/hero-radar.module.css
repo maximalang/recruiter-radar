@@ -118,8 +118,11 @@
   transition: opacity .18s ease, transform .18s ease;
 }
 .microLabel strong,
-.microLabel small { font-family: var(--mono); font-size: .5rem; font-weight: 600; letter-spacing: .045em; text-transform: uppercase; }
+.microLabel small,
+.microLabel b { font-family: var(--mono); font-size: .5rem; font-weight: 600; letter-spacing: .045em; text-transform: uppercase; }
 .microLabel small { color: rgba(242,239,231,.48); font-weight: 500; }
+.microLabel b { color: rgba(242,239,231,.86); }
+.clusterTarget[data-active] .microLabel { opacity: 1; transform: translate3d(-18%, 0, 0); }
 .clusterTarget:hover .targetDot,
 .clusterTarget:focus-visible .targetDot { opacity: 1; transform: translate(-50%, -50%) scale(1.18); box-shadow: 0 0 0 10px rgba(181,234,216,.07); }
 .clusterTarget:hover .microLabel,

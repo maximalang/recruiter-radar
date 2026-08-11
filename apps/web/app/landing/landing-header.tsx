@@ -176,7 +176,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           >
-            Посмотреть возможности <ArrowGlyph />
+            Посмотреть пример <ArrowGlyph />
           </a>
           <button
             ref={menuButtonRef}
@@ -206,14 +206,14 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
           {LANDING_NAV_ITEMS.map(renderNavLink)}
         </nav>
         <div className={headerStyles.mobileActions}>
-          <Link href={LOGIN_HREF} onClick={() => closeMenu(false)}>Личный кабинет</Link>
+          <Link href={LOGIN_HREF} onClick={() => closeMenu(false)}>Войти</Link>
           <a
             href={previewHref}
             onClick={() => closeMenu(false)}
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           >
-            Посмотреть возможности <ArrowGlyph />
+            Посмотреть пример <ArrowGlyph />
           </a>
         </div>
       </div>

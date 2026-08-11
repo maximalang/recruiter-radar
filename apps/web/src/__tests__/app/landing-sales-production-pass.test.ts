@@ -48,8 +48,8 @@ describe("landing sales production pass", () => {
     expect(panel).toContain("data-recommended={plan.isPrimary || undefined}");
     expect(panel).toContain("990 ₽ / 7 дней");
     expect(panel).toContain("Без автопродления");
-    expect(panel).toContain("Доказательства по каждой возможности");
-    expect(panel).toContain("Обращения отправляете только вы");
+    expect(panel).toContain("Факты по каждой компании");
+    expect(panel).toContain("Сообщения отправляете вы");
   });
 
   it("uses lightweight reveal motion with a reduced-motion fallback", () => {

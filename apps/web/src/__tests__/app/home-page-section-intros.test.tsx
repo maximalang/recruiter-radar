@@ -215,12 +215,12 @@ describe("final unified evidence-first landing contract", () => {
 
     expect(markup).toContain('id="preview-results"');
     expect(markup).toContain("data-preview-results-ready");
-    expect(markup).toContain("Временная ошибка загрузки");
-    expect(markup).toContain("Тарифы, FAQ и следующий шаг доступны ниже");
+    expect(markup).toContain("Не удалось обновить пример");
+    expect(markup).toContain("Тарифы и ответы на вопросы доступны ниже");
     expect(markup).toContain(`href="${checkoutHref.replaceAll("&", "&amp;")}"`);
     expect(markup).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.checkoutStarted}"`);
     expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.preview}"`);
-    expect(markup).toContain("Оставить заявку на неделю");
+    expect(markup).toContain("Попробовать 7 дней");
     expect(source("app/landing/workspace-scene.module.css")).toMatch(/\.checkout\s*\{[\s\S]*?min-height:\s*52px/);
   });
 
@@ -236,18 +236,18 @@ describe("final unified evidence-first landing contract", () => {
     const offerAliasSource = source("app/offer/page.tsx");
 
     expect(html).toContain('id="scene-workspace"');
-    expect(html).toContain("рабочая выдача");
-    expect(html).toContain("рабочая выдача");
+    expect(html).toContain("Интерактивный пример");
+    expect(html).toContain("Показать компании");
     expect(html).toContain('id="preview-configurator"');
     expect(html).toContain('id="preview-results"');
-    expect(html).toContain("Временная ошибка загрузки");
+    expect(html).toContain("Не удалось обновить пример");
     expect(html).toContain('id="scene-evidence"');
     expect(html).toContain('id="scene-delivery"');
     expect(html).not.toContain('id="scene-outreach"');
     expect(html).not.toContain('id="scene-timeline"');
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
-    expect(html).toContain("Соберите радар под специализацию агентства");
+    expect(html).toContain("Настройте нишу и географию");
     expect(footerSource).toContain('href="/legal"');
     expect(footerSource).toContain('href="/terms"');
     expect(footerSource).toContain('href="/payment-and-refund"');
@@ -278,7 +278,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(markup.match(/name="preview-leads"/g)).toHaveLength(2);
     expect(markup).toContain("Почему сейчас");
     expect(markup).toContain("Факты и источники");
-    expect(markup).toContain("Без автоматической отправки");
+    expect(markup).toContain("Сообщения не отправляются автоматически");
   });
 
   it("keeps product copy, analytics and manual outreach boundary", () => {
@@ -287,17 +287,17 @@ describe("final unified evidence-first landing contract", () => {
     const delivery = renderToStaticMarkup(<DeliveryScene />);
 
     expect(hero).toContain("Компании, которым стоит написать сегодня");
-    expect(hero).toContain("Посмотреть возможности");
+    expect(hero).toContain("Посмотреть пример");
     expect(hero).toContain("Уже есть доступ? Войти");
     expect(hero).toContain("заявка без списания");
     expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
     expect(hero).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
     expect(evidence).toContain("ОЦЕНКА РАДАРА");
-    expect(evidence).toContain("ДОКАЗАТЕЛЬНАЯ БАЗА");
-    expect(evidence).toContain("Сигнал найма");
+    expect(evidence).toContain("ФАКТЫ ПО КОМПАНИИ");
+    expect(evidence).toContain("Почему сейчас");
     expect(evidence).not.toContain("открыть факт");
-    expect(delivery).toContain("Radar следит");
-    expect(delivery).toContain("Обращение компаниям всегда отправляете вы.");
+    expect(delivery).toContain("Радар следит за рынком");
+    expect(delivery).toContain("Сообщения компаниям не отправляются автоматически.");
   });
 
   it("keeps pricing data untouched and checkout analytics available", () => {
@@ -312,7 +312,7 @@ describe("final unified evidence-first landing contract", () => {
 
     expect(text).toContain("Оставьте заявку на 7-дневный пилот");
     expect(text).toContain("Оставить заявку на пилот");
-    expect(text).toContain("Перед запуском — короткие ответы");
+    expect(text).toContain("Коротко о главном");
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted)).toBe(true);
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked)).toBe(true);
   });
@@ -345,8 +345,8 @@ describe("final unified evidence-first landing contract", () => {
     expect(header).toContain('document.body.style.overflow = "hidden"');
     expect(header).toContain("scrollbarWidth");
     expect(header).toContain("menuButtonRef.current?.focus");
-    expect(header).toContain("Посмотреть возможности");
-    expect(header).not.toContain("Посмотреть пример");
+    expect(header).toContain("Посмотреть пример");
+    expect(header).not.toContain("Посмотреть возможности");
     expect(headerCss).toMatch(/\.navLink\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/);
   });
 

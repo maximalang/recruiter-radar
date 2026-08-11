@@ -87,7 +87,7 @@ describe("polished unified landing visual contract", () => {
 
     expect(page).not.toContain("OutreachScene");
     expect(existsSync(resolve(WEB_ROOT, "app/landing/outreach-scene.tsx"))).toBe(false);
-    expect(delivery).toContain("Обращение компаниям всегда отправляете вы");
+    expect(delivery).toContain("Сообщения компаниям не отправляются автоматически");
     expect(delivery).toContain('data-manual-outreach-boundary="true"');
     expect(conversion).toContain('data-final-radar-composition="signal-lock"');
     expect(conversion).not.toContain('data-final-signal-composition="agency-profile"');
@@ -190,7 +190,7 @@ describe("polished unified landing visual contract", () => {
     expect(footer).not.toContain('href: "/#scene-timeline"');
     expect(footer).toContain('href: "/#scene-workspace"');
     expect(footer).toContain('href: "/#scene-evidence"');
-    expect(footer).toContain('href: "/#scene-delivery"');
+    expect(footer).not.toContain('href: "/#scene-delivery"');
     expect(footer).not.toContain('href: "/#scene-outreach"');
     expect(footer).toContain("CookieSettingsButton");
     expect(footer).toContain('href: "/#pricing"');

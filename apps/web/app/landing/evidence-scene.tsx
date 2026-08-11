@@ -6,21 +6,18 @@ const SOURCE_ROWS = [
   {
     source: "Карьерная страница",
     fact: "8 инженерных позиций",
-    discovered: "сегодня 08:42",
-    eventDate: "4 авг",
+    eventDate: "4 августа",
     confidence: "Прямой источник",
   },
   {
     source: "Публичные вакансии",
-    fact: "руководитель направления",
-    discovered: "сегодня 08:45",
-    eventDate: "1 авг",
+    fact: "Новая руководящая роль",
+    eventDate: "1 августа",
     confidence: "Подтверждено",
   },
   {
     source: "Повторная публикация",
-    fact: "3 роли обновлены повторно",
-    discovered: "сегодня 08:47",
+    fact: "3 роли появились снова",
     eventDate: "сегодня",
     confidence: "Свежий сигнал",
   },
@@ -39,12 +36,12 @@ export default function EvidenceScene() {
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.top}>
           <div className={sceneStyles.intro}>
-            <p className={styles.sceneLabel}>Сигнал найма → доказательство</p>
+            <p className={styles.sceneLabel}>Почему сейчас</p>
             <h2 id="evidence-title" className={styles.sceneHeading}>
-              Приоритет, который можно <em>объяснить.</em>
+              По каждой компании видно, <em>на чём основана рекомендация.</em>
             </h2>
             <p className={styles.sceneLead}>
-              У каждой рекомендации — источник, дата события и уровень подтверждения. Оценка строится на фактах, которые можно проверить до первого контакта.
+              Радар показывает, что изменилось в найме, когда это произошло, где найдено и чем подтверждено. Факты можно проверить до первого сообщения.
             </p>
           </div>
 
@@ -56,7 +53,7 @@ export default function EvidenceScene() {
             </div>
             <div className={sceneStyles.scoreMeta}>
               <strong>Высокая уверенность</strong>
-              <span>4 фактора</span>
+              <span>4 подтверждающих фактора</span>
             </div>
             <div className={sceneStyles.scale} aria-label="Шкала уверенности">
               <span>низкая</span><span>подтверждённая</span><span>высокая</span>
@@ -68,10 +65,10 @@ export default function EvidenceScene() {
         <div className={sceneStyles.ledger}>
           <div className={sceneStyles.ledgerHeading}>
             <div>
-              <span>ДОКАЗАТЕЛЬНАЯ БАЗА</span>
+              <span>ФАКТЫ ПО КОМПАНИИ</span>
               <strong>{DEMO_COMPANY.name}</strong>
             </div>
-            <p>Наведите или сфокусируйте факт — увидите, как доказательства связаны с уверенностью радара.</p>
+            <p>Источник · что найдено · дата · статус</p>
           </div>
 
           <ul className={sceneStyles.records}>
@@ -89,8 +86,7 @@ export default function EvidenceScene() {
                   <strong>{row.fact}</strong>
                 </div>
                 <dl className={sceneStyles.recordMeta}>
-                  <div><dt>найдено</dt><dd>{row.discovered}</dd></div>
-                  <div><dt>событие</dt><dd>{row.eventDate}</dd></div>
+                  <div><dt>Дата</dt><dd>{row.eventDate}</dd></div>
                 </dl>
                 <span className={sceneStyles.recordStatus}>{row.confidence}</span>
               </li>
