@@ -13,7 +13,7 @@ const TIMELINE_EVENTS = [
 export default function SignalTimelineScene() {
   return (
     <section
-      id="scene-timeline"
+      id="scene-signal-timeline"
       className={`${styles.scene} ${styles.lightScene} ${styles.timelineScene} ${sceneStyles.section}`}
       aria-labelledby="timeline-title"
       data-header-tone="light"
