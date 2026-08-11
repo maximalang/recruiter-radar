@@ -39,6 +39,9 @@ export function EvidenceRadarMap(props: {
           <span>размер — hiring intent</span>
           <span>прозрачность — confidence</span>
         </div>
+        <p className={styles.selectedStatus} role="status" aria-live="polite" data-motion-status>
+          {selected ? `Выбрано: ${selected.organizationName}, ${selected.location.city}` : ''}
+        </p>
 
         <div className={styles.map} data-evidence-radar-map>
           {props.boundaries && props.boundaries.length > 0 ? (
@@ -92,8 +95,8 @@ export function EvidenceRadarMap(props: {
         </div>
       </section>
 
-      <aside className={styles.detailPanel} aria-live="polite">
-        {selected ? <EvidenceLeadDetail lead={selected} /> : null}
+      <aside className={styles.detailPanel} aria-label="Детали выбранной организации">
+        {selected ? <EvidenceLeadDetail key={selected.cardId} lead={selected} /> : null}
       </aside>
     </div>
   )
@@ -130,7 +133,11 @@ function OrganizationCluster(props: {
             <i
               key={`${props.lead.cardId}:source:${index}`}
               className={styles.sourceDot}
-              style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+              data-evidence-source
+              style={{
+                transform: `translate(${offset.x}px, ${offset.y}px)`,
+                '--source-index': index,
+              } as CSSProperties}
             />
           )
         })}
@@ -139,6 +146,7 @@ function OrganizationCluster(props: {
         type="button"
         className={styles.organizationMarker}
         onClick={props.onSelect}
+        data-motion-interactive
         aria-pressed={props.selected}
         aria-label={`${props.lead.organizationName}, ${props.lead.location.city}`}
       >
@@ -162,7 +170,7 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
   const mode = typeof staffing?.mode === 'string' ? staffing.mode : null
 
   return (
-    <article className={styles.leadCard} data-evidence-lead-card>
+    <article className={styles.leadCard} data-evidence-lead-card data-motion-disclosure>
       <header className={styles.leadHeader}>
         <div>
           <span className={styles.eyebrow}>Evidence lead</span>

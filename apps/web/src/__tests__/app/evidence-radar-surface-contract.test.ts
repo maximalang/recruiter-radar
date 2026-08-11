@@ -5,6 +5,7 @@ describe('Evidence Radar production surface contract', () => {
   const opportunitiesRoot = resolve(process.cwd(), 'app', 'opportunities')
   const intelligenceRoot = resolve(process.cwd(), 'lib', 'intelligence')
   const map = readFileSync(resolve(opportunitiesRoot, 'evidence-radar-map.tsx'), 'utf8')
+  const mapCss = readFileSync(resolve(opportunitiesRoot, 'evidence-radar-map.module.css'), 'utf8')
   const radarPage = readFileSync(resolve(opportunitiesRoot, 'radar', 'page.tsx'), 'utf8')
   const sourcePage = readFileSync(resolve(opportunitiesRoot, 'sources', 'page.tsx'), 'utf8')
   const repository = readFileSync(resolve(intelligenceRoot, 'evidence-radar-repository.ts'), 'utf8')
@@ -28,6 +29,19 @@ describe('Evidence Radar production surface contract', () => {
     expect(map).toContain('lead.score.contributions')
     expect(map).toContain('lead.contactPaths')
     expect(map).toContain('riskReasons')
+  })
+
+  it('keeps selection operable across pointer, keyboard, touch and reduced motion', () => {
+    expect(map).toContain('data-motion-interactive')
+    expect(map).toContain('data-motion-disclosure')
+    expect(map).toContain('data-evidence-source')
+    expect(map).toContain("'--source-index'")
+    expect(mapCss).toMatch(/\.organizationMarker\s*\{[^}]*width:\s*44px[^}]*height:\s*44px/)
+    expect(mapCss).toContain('.organizationMarker:focus-visible')
+    expect(mapCss).toContain('.organizationMarker:hover')
+    expect(mapCss).toContain('@keyframes evidenceSourceReveal')
+    expect(mapCss).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(mapCss).toContain('animation: none')
   })
 
   it('renders administrative boundaries only from verified persisted GeoJSON', () => {
