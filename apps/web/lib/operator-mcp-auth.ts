@@ -7,9 +7,26 @@ import {
 export const OPERATOR_MCP_RESOURCE =
   'https://recruiter-radar.ru/api/internal/mcp'
 export const OPERATOR_MCP_PROTECTED_RESOURCE_METADATA_URL =
+  'https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/internal/mcp'
+export const OPERATOR_MCP_COMPAT_PROTECTED_RESOURCE_METADATA_URL =
   'https://recruiter-radar.ru/.well-known/oauth-protected-resource'
-export const OPERATOR_MCP_REQUIRED_SCOPE = 'rr.operator.read'
+
+export const OPERATOR_MCP_READ_SCOPE = 'rr.operator.read'
+export const OPERATOR_MCP_RESTART_SCOPE = 'rr.operator.restart'
+export const OPERATOR_MCP_PROXY_SCOPE = 'rr.operator.proxy'
+export const OPERATOR_MCP_REQUIRED_SCOPE = OPERATOR_MCP_READ_SCOPE
+export const OPERATOR_MCP_READ_SCOPES = [OPERATOR_MCP_READ_SCOPE] as const
+export const OPERATOR_MCP_RESTART_SCOPES = [
+  OPERATOR_MCP_READ_SCOPE,
+  OPERATOR_MCP_RESTART_SCOPE,
+] as const
+export const OPERATOR_MCP_PROXY_SCOPES = [
+  OPERATOR_MCP_READ_SCOPE,
+  OPERATOR_MCP_PROXY_SCOPE,
+] as const
+
 export const OPERATOR_MCP_RATE_LIMIT = 60
+export const OPERATOR_MCP_PREAUTH_RATE_LIMIT = 120
 export const OPERATOR_MCP_RATE_WINDOW_MS = 60_000
 
 const OAUTH_CACHE_TTL_MS = 5 * 60_000
@@ -50,48 +67,36 @@ const jwksCache = new Map<string, CachedValue<JsonWebKeyRecord[]>>()
 const rateBuckets = new Map<string, RateBucket>()
 
 export type OperatorMcpAuthResult =
-  | { ok: true; subject: string }
+  | { ok: true; subject: string; scopes: Set<string> }
   | { ok: false; reason: string }
 
 export function getOperatorMcpOAuthConfig(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): OAuthConfig | null {
-  const rawIssuer = env.RR_MCP_OAUTH_ISSUER?.trim() ?? ''
+  const issuer = env.RR_MCP_OAUTH_ISSUER?.trim() ?? ''
   const rawAllowedSubjects = env.RR_MCP_OAUTH_ALLOWED_SUBJECTS?.trim() ?? ''
 
-  if (!rawIssuer || !rawAllowedSubjects) return null
+  if (!issuer || !rawAllowedSubjects || !isIssuerUrl(issuer)) return null
 
-  let issuerUrl: URL
-  try {
-    issuerUrl = new URL(rawIssuer)
-  } catch {
-    return null
-  }
-
-  if (
-    issuerUrl.protocol !== 'https:' ||
-    issuerUrl.username ||
-    issuerUrl.password ||
-    issuerUrl.search ||
-    issuerUrl.hash
-  ) {
-    return null
-  }
-
-  // URL#toString canonicalizes an origin-only issuer to the RFC-compatible
-  // trailing-slash form used by providers such as Auth0. Keep that exact issuer
-  // identifier for protected-resource metadata and access-token validation.
-  const issuer = issuerUrl.toString()
   const allowedSubjects = new Set(
     rawAllowedSubjects
       .split(',')
       .map((value) => value.trim())
       .filter(Boolean),
   )
-
   if (allowedSubjects.size === 0) return null
 
   return { issuer, allowedSubjects }
+}
+
+export function getOperatorMcpSupportedScopes(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string[] {
+  const scopes = [OPERATOR_MCP_READ_SCOPE]
+  if (env.RR_MCP_MUTATIONS_ENABLED === 'true') {
+    scopes.push(OPERATOR_MCP_RESTART_SCOPE, OPERATOR_MCP_PROXY_SCOPE)
+  }
+  return scopes
 }
 
 export function getOperatorMcpProtectedResourceMetadata(
@@ -103,17 +108,20 @@ export function getOperatorMcpProtectedResourceMetadata(
   return {
     resource: OPERATOR_MCP_RESOURCE,
     authorization_servers: [config.issuer],
-    scopes_supported: [OPERATOR_MCP_REQUIRED_SCOPE],
+    bearer_methods_supported: ['header'],
+    scopes_supported: getOperatorMcpSupportedScopes(env),
   }
 }
 
 export function getOperatorMcpAuthenticateChallenge(
   error?: 'invalid_token' | 'insufficient_scope',
+  requiredScopes: readonly string[] = OPERATOR_MCP_READ_SCOPES,
 ): string {
+  const scope = requiredScopes.join(' ')
   const suffix = error
-    ? `, error="${error}", error_description="OAuth authorization is required for Recruiter Radar operator diagnostics"`
+    ? `, error="${error}", error_description="OAuth authorization is required for Recruiter Radar operator access"`
     : ''
-  return `Bearer resource_metadata="${OPERATOR_MCP_PROTECTED_RESOURCE_METADATA_URL}", scope="${OPERATOR_MCP_REQUIRED_SCOPE}"${suffix}`
+  return `Bearer resource_metadata="${OPERATOR_MCP_PROTECTED_RESOURCE_METADATA_URL}", scope="${scope}"${suffix}`
 }
 
 export async function verifyOperatorMcpAccessToken(
@@ -169,7 +177,7 @@ export async function verifyOperatorMcpAccessToken(
   }
 
   const nowSeconds = Math.floor(nowMs / 1000)
-  if (canonicalizeIssuer(claims.iss) !== config.issuer) {
+  if (claims.iss !== config.issuer) {
     return { ok: false, reason: 'issuer_mismatch' }
   }
   if (!hasAudience(claims.aud, OPERATOR_MCP_RESOURCE)) {
@@ -192,7 +200,7 @@ export async function verifyOperatorMcpAccessToken(
   }
 
   const scopes = getTokenScopes(claims)
-  if (!scopes.has(OPERATOR_MCP_REQUIRED_SCOPE)) {
+  if (!scopes.has(OPERATOR_MCP_READ_SCOPE)) {
     return { ok: false, reason: 'insufficient_scope' }
   }
 
@@ -201,12 +209,20 @@ export async function verifyOperatorMcpAccessToken(
     return { ok: false, reason: 'subject_not_allowed' }
   }
 
-  return { ok: true, subject }
+  return { ok: true, subject, scopes }
+}
+
+export function hasOperatorMcpScopes(
+  tokenScopes: ReadonlySet<string>,
+  requiredScopes: readonly string[],
+): boolean {
+  return requiredScopes.every((scope) => tokenScopes.has(scope))
 }
 
 export function checkOperatorMcpRateLimit(
   key: string,
   nowMs = Date.now(),
+  limit = OPERATOR_MCP_RATE_LIMIT,
 ): { allowed: boolean; retryAfterSeconds: number } {
   const normalizedKey = key.trim() || 'unknown'
   let bucket = rateBuckets.get(normalizedKey)
@@ -223,7 +239,7 @@ export function checkOperatorMcpRateLimit(
   if (rateBuckets.size > 5_000) cleanupRateBuckets(nowMs)
 
   return {
-    allowed: bucket.count <= OPERATOR_MCP_RATE_LIMIT,
+    allowed: bucket.count <= limit,
     retryAfterSeconds,
   }
 }
@@ -242,7 +258,7 @@ async function loadOAuthMetadata(
   const cached = metadataCache.get(issuer)
   if (cached && cached.expiresAt > nowMs) return cached.value
 
-  const issuerBase = issuer.replace(/\/$/, '')
+  const issuerBase = issuer.endsWith('/') ? issuer.slice(0, -1) : issuer
   const candidates = [
     `${issuerBase}/.well-known/openid-configuration`,
     `${issuerBase}/.well-known/oauth-authorization-server`,
@@ -252,12 +268,12 @@ async function loadOAuthMetadata(
   for (const url of candidates) {
     try {
       const body = await fetchJsonObject(url, fetchImpl)
-      const discoveredIssuer = canonicalizeIssuer(body.issuer)
+      if (body.issuer !== issuer) throw new Error('OAuth issuer mismatch')
       const jwksUri = typeof body.jwks_uri === 'string' ? body.jwks_uri : ''
-      if (discoveredIssuer !== issuer || !isSecureHttpsUrl(jwksUri)) {
-        throw new Error('OAuth metadata is inconsistent')
+      if (!isSecureHttpsUrl(jwksUri)) {
+        throw new Error('OAuth metadata does not expose a secure JWKS URL')
       }
-      const value = { issuer: discoveredIssuer, jwksUri }
+      const value = { issuer, jwksUri }
       metadataCache.set(issuer, { expiresAt: nowMs + OAUTH_CACHE_TTL_MS, value })
       return value
     } catch (error) {
@@ -375,29 +391,31 @@ function getTokenScopes(claims: JsonObject): Set<string> {
   return scopes
 }
 
-function canonicalizeIssuer(value: unknown): string {
-  if (typeof value !== 'string' || !value.trim()) return ''
+function isIssuerUrl(value: string): boolean {
   try {
-    const url = new URL(value.trim())
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash
-    ) {
-      return ''
-    }
-    return url.toString()
+    const url = new URL(value)
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash &&
+      url.pathname === '/'
+    )
   } catch {
-    return ''
+    return false
   }
 }
 
 function isSecureHttpsUrl(value: string): boolean {
   try {
     const url = new URL(value)
-    return url.protocol === 'https:' && !url.username && !url.password
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.hash
+    )
   } catch {
     return false
   }

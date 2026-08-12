@@ -1,0 +1,226 @@
+name: Operator MCP Bootstrap
+
+# This is deliberately separate from the public application deploy. A failure
+# here cannot roll back or mutate the already-verified customer-facing release.
+# The bootstrap only runs after Deploy succeeds for main and uses that exact SHA.
+on:
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: operator-mcp-prod
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      RR_OPERATOR_AUTH_PROVIDER: ${{ vars.RR_OPERATOR_AUTH_PROVIDER }}
+      RR_MCP_ENABLED_REQUESTED: ${{ vars.RR_MCP_ENABLED }}
+      RR_MCP_MUTATIONS_REQUESTED: ${{ vars.RR_MCP_MUTATIONS_ENABLED }}
+      RR_MCP_OAUTH_ISSUER_REQUESTED: ${{ vars.RR_MCP_OAUTH_ISSUER }}
+      RR_MCP_OAUTH_ALLOWED_SUBJECTS_REQUESTED: ${{ secrets.RR_MCP_OAUTH_ALLOWED_SUBJECTS }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Verify exact main commit
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
+
+      - name: Validate operator deployment artifacts
+        run: |
+          set -euo pipefail
+          bash -n scripts/deploy/configure-operator-mcp.sh
+          bash -n scripts/deploy/configure-operator-mcp-caddy.sh
+          sh -n scripts/deploy/configure-caddy-real-ip.sh
+          python3 -m py_compile scripts/operator-mcp/rr-operator-agent.py
+
+      - name: Resolve fail-dark operator configuration
+        run: |
+          set -euo pipefail
+          umask 077
+          enabled=false
+          mutations=false
+          issuer=''
+          subjects=''
+
+          requested="${RR_MCP_ENABLED_REQUESTED:-false}"
+          case "$requested" in
+            true | false | '') ;;
+            *) echo "RR_MCP_ENABLED repository variable must be true or false" >&2; exit 1 ;;
+          esac
+
+          if [ "$requested" = "true" ]; then
+            if [ "${RR_OPERATOR_AUTH_PROVIDER:-}" != "workos" ]; then
+              echo "RR_MCP_ENABLED=true requires RR_OPERATOR_AUTH_PROVIDER=workos" >&2
+              exit 1
+            fi
+            issuer="${RR_MCP_OAUTH_ISSUER_REQUESTED:-}"
+            subjects="${RR_MCP_OAUTH_ALLOWED_SUBJECTS_REQUESTED:-}"
+            if ! [[ "$issuer" =~ ^https://[A-Za-z0-9.-]+/?$ ]]; then
+              echo "RR_MCP_OAUTH_ISSUER must be a root HTTPS AuthKit issuer" >&2
+              exit 1
+            fi
+            if ! [[ "$subjects" =~ ^user_[A-Za-z0-9]+(,user_[A-Za-z0-9]+)*$ ]]; then
+              echo "RR_MCP_OAUTH_ALLOWED_SUBJECTS must contain immutable WorkOS user IDs only" >&2
+              exit 1
+            fi
+            enabled=true
+            case "${RR_MCP_MUTATIONS_REQUESTED:-false}" in
+              true) mutations=true ;;
+              false | '') mutations=false ;;
+              *) echo "RR_MCP_MUTATIONS_ENABLED repository variable must be true or false" >&2; exit 1 ;;
+            esac
+          fi
+
+          cat > /tmp/rr-operator-bootstrap.env <<EOF
+          RR_MCP_ENABLED=${enabled}
+          RR_MCP_MUTATIONS_ENABLED=${mutations}
+          RR_MCP_OAUTH_ISSUER=${issuer}
+          RR_MCP_OAUTH_ALLOWED_SUBJECTS=${subjects}
+          RR_DEPLOY_SHA=${DEPLOY_SHA}
+          EOF
+          chmod 600 /tmp/rr-operator-bootstrap.env
+          printf 'RR_MCP_ENABLED=%s\n' "$enabled" >> "$GITHUB_ENV"
+
+      - name: Setup SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload staged operator bootstrap
+        run: |
+          set -euo pipefail
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "mkdir -p /opt/recruiter-radar/scripts/operator-mcp"
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/configure-operator-mcp.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-operator-mcp.${DEPLOY_SHA}.sh
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/configure-operator-mcp-caddy.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-operator-mcp-caddy.${DEPLOY_SHA}.sh
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/operator-mcp/rr-operator-agent.py \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/scripts/operator-mcp/rr-operator-agent.${DEPLOY_SHA}.py
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            /tmp/rr-operator-bootstrap.env \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/.rr-operator-bootstrap.${DEPLOY_SHA}.env
+          rm -f /tmp/rr-operator-bootstrap.env
+
+      - name: Configure isolated operator runtime
+        run: |
+          set -euo pipefail
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "EXPECTED_DEPLOY_SHA='${DEPLOY_SHA}' bash -s" <<'SSH_EOF'
+          set -Eeuo pipefail
+          cd /opt/recruiter-radar
+          lock_path=/tmp/recruiter-radar-operator-bootstrap.lock
+          bootstrap_env="/opt/recruiter-radar/.rr-operator-bootstrap.${EXPECTED_DEPLOY_SHA}.env"
+          staged_configurator="/opt/recruiter-radar/configure-operator-mcp.${EXPECTED_DEPLOY_SHA}.sh"
+          staged_caddy="/opt/recruiter-radar/configure-operator-mcp-caddy.${EXPECTED_DEPLOY_SHA}.sh"
+          staged_agent="/opt/recruiter-radar/scripts/operator-mcp/rr-operator-agent.${EXPECTED_DEPLOY_SHA}.py"
+          cleanup() {
+            rm -f "$bootstrap_env" "$staged_configurator" "$staged_caddy" "$staged_agent"
+          }
+          trap cleanup EXIT
+
+          exec 9> "$lock_path"
+          flock -w 120 9
+          test -f "$bootstrap_env"
+          chmod 600 "$bootstrap_env"
+          test "$(wc -l < "$bootstrap_env")" -eq 5
+
+          read_bootstrap_value() {
+            local key="$1"
+            sed -n "s/^${key}=//p" "$bootstrap_env" | tail -n 1
+          }
+          RR_MCP_ENABLED="$(read_bootstrap_value RR_MCP_ENABLED)"
+          RR_MCP_MUTATIONS_ENABLED="$(read_bootstrap_value RR_MCP_MUTATIONS_ENABLED)"
+          RR_MCP_OAUTH_ISSUER="$(read_bootstrap_value RR_MCP_OAUTH_ISSUER)"
+          RR_MCP_OAUTH_ALLOWED_SUBJECTS="$(read_bootstrap_value RR_MCP_OAUTH_ALLOWED_SUBJECTS)"
+          RR_DEPLOY_SHA="$(read_bootstrap_value RR_DEPLOY_SHA)"
+          export RR_MCP_ENABLED RR_MCP_MUTATIONS_ENABLED RR_MCP_OAUTH_ISSUER RR_MCP_OAUTH_ALLOWED_SUBJECTS RR_DEPLOY_SHA
+
+          case "$RR_MCP_ENABLED" in true | false) ;; *) exit 61 ;; esac
+          case "$RR_MCP_MUTATIONS_ENABLED" in true | false) ;; *) exit 62 ;; esac
+          if [ "$RR_MCP_ENABLED" = "true" ]; then
+            [[ "$RR_MCP_OAUTH_ISSUER" =~ ^https://[A-Za-z0-9.-]+/?$ ]] || exit 63
+            [[ "$RR_MCP_OAUTH_ALLOWED_SUBJECTS" =~ ^user_[A-Za-z0-9]+(,user_[A-Za-z0-9]+)*$ ]] || exit 64
+          fi
+          test "$RR_DEPLOY_SHA" = "$EXPECTED_DEPLOY_SHA"
+
+          mv "$staged_configurator" /opt/recruiter-radar/configure-operator-mcp.sh
+          mv "$staged_caddy" /opt/recruiter-radar/configure-operator-mcp-caddy.sh
+          mv "$staged_agent" /opt/recruiter-radar/scripts/operator-mcp/rr-operator-agent.py
+          chmod 700 \
+            /opt/recruiter-radar/configure-operator-mcp.sh \
+            /opt/recruiter-radar/configure-operator-mcp-caddy.sh \
+            /opt/recruiter-radar/scripts/operator-mcp/rr-operator-agent.py
+
+          /opt/recruiter-radar/configure-operator-mcp.sh --preflight
+          /opt/recruiter-radar/configure-operator-mcp.sh
+          /opt/recruiter-radar/configure-operator-mcp-caddy.sh
+
+          docker exec recruiter-radar-operator-1 node -e '
+            const url = new URL(process.env.DATABASE_URL || "");
+            if (url.username !== "rr_operator_ro") process.exit(1);
+            if (process.env.RR_OPERATOR_MODE !== "true") process.exit(1);
+            if (process.env.MIGRATE_ON_START !== "false") process.exit(1);
+            if (process.env.RR_DEPLOY_SHA !== process.argv[1]) process.exit(1);
+          ' "$EXPECTED_DEPLOY_SHA"
+          curl -fsS http://127.0.0.1:3001/api/health >/dev/null
+          systemctl is-active --quiet rr-operator-agent.service
+          SSH_EOF
+
+      - name: Verify public operator boundary
+        run: |
+          set -euo pipefail
+          if [ "$RR_MCP_ENABLED" = "true" ]; then
+            metadata_code="$(curl -sS -o /tmp/operator-metadata.json -w '%{http_code}' \
+              https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/internal/mcp)"
+            test "$metadata_code" = "200"
+            node -e '
+              const fs = require("fs");
+              const value = JSON.parse(fs.readFileSync("/tmp/operator-metadata.json", "utf8"));
+              if (value.resource !== "https://recruiter-radar.ru/api/internal/mcp") process.exit(1);
+              if (!Array.isArray(value.authorization_servers) || value.authorization_servers.length !== 1) process.exit(1);
+              if (!Array.isArray(value.scopes_supported) || !value.scopes_supported.includes("rr.operator.read")) process.exit(1);
+            '
+            unauth_code="$(curl -sS -D /tmp/operator-headers.txt -o /dev/null -w '%{http_code}' \
+              -X POST https://recruiter-radar.ru/api/internal/mcp \
+              -H 'content-type: application/json' \
+              --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}')"
+            test "$unauth_code" = "401"
+            grep -Fq 'resource_metadata="https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/internal/mcp"' \
+              /tmp/operator-headers.txt
+          else
+            endpoint_code="$(curl -sS -o /dev/null -w '%{http_code}' \
+              -X POST https://recruiter-radar.ru/api/internal/mcp \
+              -H 'content-type: application/json' \
+              --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}')"
+            metadata_code="$(curl -sS -o /dev/null -w '%{http_code}' \
+              https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/internal/mcp)"
+            test "$endpoint_code" = "404"
+            test "$metadata_code" = "404"
+          fi
+
+      - name: Cleanup local bootstrap material
+        if: always()
+        run: rm -f /tmp/rr-operator-bootstrap.env /tmp/operator-metadata.json /tmp/operator-headers.txt

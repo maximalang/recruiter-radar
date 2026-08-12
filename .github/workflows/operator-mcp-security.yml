@@ -1,0 +1,50 @@
+name: Operator MCP Security
+
+on:
+  push:
+    branches:
+      - main
+      - 'codex/**'
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: operator-mcp-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  operator-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate operator scripts
+        run: |
+          bash -n scripts/deploy/configure-operator-mcp.sh
+          bash -n scripts/deploy/configure-operator-mcp-caddy.sh
+          sh -n scripts/deploy/configure-caddy-real-ip.sh
+          python3 -m py_compile scripts/operator-mcp/rr-operator-agent.py
+          python3 scripts/test/operator-mcp-agent.py
+          bash scripts/test/operator-mcp-caddy.sh
+          bash scripts/test/operator-mcp-bootstrap-security.sh
+          bash scripts/test/configure-caddy-production.sh
+
+      - name: Run operator MCP contract tests
+        run: npm test --workspace @recruiter-radar/web -- --runInBand src/__tests__/api/internal/operator-mcp-route.test.ts
+
+      - name: Type and production-build checks
+        run: |
+          npm run check --workspace @recruiter-radar/web
+          npm run build --workspace @recruiter-radar/web
