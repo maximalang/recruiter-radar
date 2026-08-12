@@ -254,7 +254,7 @@ export async function createOperatorAuthServer() {
     },
     features: {
       devInteractions: { enabled: false },
-      registration: { enabled: true },
+      registration: { enabled: true, issueRegistrationAccessToken: false },
       registrationManagement: { enabled: false },
       revocation: { enabled: true },
       resourceIndicators: {
@@ -286,6 +286,7 @@ export async function createOperatorAuthServer() {
         },
       }
     },
+    idTokenSigningAlgValues: ['ES256'],
     interactions: {
       url(_ctx, interaction) {
         return `${OIDC_PREFIX}/interaction/${interaction.uid}`
