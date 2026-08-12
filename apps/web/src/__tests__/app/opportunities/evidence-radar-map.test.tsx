@@ -53,7 +53,9 @@ describe('EvidenceRadarMap selection', () => {
       {
         id: 'evidence-1',
         eventType: 'hiring_growth',
+        sourceRegistryId: 'source-registry-1',
         occurredAt: '2026-08-11T00:00:00.000Z',
+        detectedAt: '2026-08-11T01:00:00.000Z',
         sourceFamily: 'career-pages',
         confidence: 0.9,
         canonicalUrl: 'https://example.test/careers',
