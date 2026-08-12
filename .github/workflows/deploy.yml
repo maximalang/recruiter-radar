@@ -34,6 +34,7 @@ jobs:
 
       - name: Validate deployment scripts
         run: |
+          node --check scripts/deploy/verify-public-readiness.mjs
           bash -n scripts/deploy/configure-notification-encryption.sh
           bash -n scripts/deploy/configure-caddy-real-ip.sh
           bash -n scripts/deploy/rollback-guard.sh
@@ -349,6 +350,9 @@ jobs:
           done
           echo "Public deployment verification failed (last health status: $code)"
           exit 1
+
+      - name: Verify exact public readiness and critical routes
+        run: node scripts/deploy/verify-public-readiness.mjs https://recruiter-radar.ru "$DEPLOY_SHA"
 
       - name: Verify public landing events route
         run: |

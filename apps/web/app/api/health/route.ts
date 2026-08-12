@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server';
 
 import { getPool } from '../../../lib/db-pool';
+import {
+  configurationReadiness,
+  EXPECTED_LATEST_MIGRATION,
+  readDeploySha,
+} from '../../../lib/health-readiness';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const timestamp = new Date().toISOString();
 
-  let db: 'ok' | 'error' = 'ok';
+  let database: 'ok' | 'error' = 'ok';
+  let migrations: 'current' | 'pending' | 'unknown' = 'unknown';
   let redis: 'ok' | 'unavailable' | 'error' = 'ok';
 
   // DB check
@@ -15,11 +21,20 @@ export async function GET() {
   if (pool) {
     try {
       await pool.query('SELECT 1');
+      const migration = await pool.query<{ current: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1
+           FROM schema_migrations
+           WHERE version = $1
+         ) AS current`,
+        [EXPECTED_LATEST_MIGRATION],
+      );
+      migrations = migration.rows[0]?.current === true ? 'current' : 'pending';
     } catch {
-      db = 'error';
+      database = 'error';
     }
   } else {
-    db = 'error';
+    database = 'error';
   }
 
   // Redis check (optional — REDIS_URL may not be set)
@@ -42,11 +57,23 @@ export async function GET() {
     }
   }
 
-  const healthy = db === 'ok' && redis !== 'error';
+  const healthy = database === 'ok' && migrations === 'current' && redis !== 'error';
   const status = healthy ? 'healthy' : 'unhealthy';
 
   return NextResponse.json(
-    { status, db, redis, timestamp },
+    {
+      status,
+      db: database,
+      redis,
+      version: { deploySha: readDeploySha() },
+      checks: {
+        database,
+        migrations,
+        configuration: configurationReadiness(),
+        redis,
+      },
+      timestamp,
+    },
     {
       status: healthy ? 200 : 503,
       headers: { 'Cache-Control': 'no-store' },
