@@ -120,7 +120,7 @@ async function registerPublicClient(httpClient) {
 
 function authorizationPath(clientId, verifier, overrides = {}) {
   const challenge = createHash('sha256').update(verifier).digest('base64url')
-  const params = new URLSearchParams({ client_id: clientId, redirect_uri: REDIRECT_URI, response_type: 'code', scope: 'openid offline_access rr.operator.read', resource: RESOURCE, state: 'state-123', code_challenge: challenge, code_challenge_method: 'S256', ...overrides })
+  const params = new URLSearchParams({ client_id: clientId, redirect_uri: REDIRECT_URI, response_type: 'code', scope: 'openid offline_access rr.operator.read', resource: RESOURCE, prompt: 'consent', state: 'state-123', code_challenge: challenge, code_challenge_method: 'S256', ...overrides })
   return `/operator/oauth/auth?${params}`
 }
 

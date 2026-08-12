@@ -317,6 +317,8 @@ export async function createOperatorAuthServer() {
     ttl: {
       AccessToken: ACCESS_TOKEN_TTL,
       AuthorizationCode: AUTHORIZATION_CODE_TTL,
+      Grant: REFRESH_TOKEN_TTL,
+      IdToken: ACCESS_TOKEN_TTL,
       RefreshToken: REFRESH_TOKEN_TTL,
       Session: SESSION_TTL,
       Interaction: INTERACTION_TTL,
