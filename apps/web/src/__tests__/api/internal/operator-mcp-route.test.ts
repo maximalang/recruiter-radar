@@ -23,7 +23,8 @@ import { GET, POST } from '@/app/api/internal/mcp/route'
 import { GET as GET_PROTECTED_RESOURCE } from '@/app/.well-known/oauth-protected-resource/route'
 
 const mockedGetClient = jest.mocked(getClient)
-const ISSUER = 'https://auth.example.test'
+const ISSUER = 'https://rr-operator.eu.auth0.com/'
+const ISSUER_BASE = ISSUER.replace(/\/$/, '')
 const SUBJECT = 'auth0|operator-123'
 const KID = 'operator-test-key'
 const NOW_SECONDS = Math.floor(Date.now() / 1000)
@@ -94,13 +95,13 @@ function mockOAuthDiscovery() {
         ? input.toString()
         : input.url
 
-    if (url === `${ISSUER}/.well-known/openid-configuration`) {
+    if (url === `${ISSUER_BASE}/.well-known/openid-configuration`) {
       return Response.json({
         issuer: ISSUER,
-        jwks_uri: `${ISSUER}/.well-known/jwks.json`,
+        jwks_uri: `${ISSUER_BASE}/.well-known/jwks.json`,
       })
     }
-    if (url === `${ISSUER}/.well-known/jwks.json`) {
+    if (url === `${ISSUER_BASE}/.well-known/jwks.json`) {
       return Response.json({ keys: [publicJwk] })
     }
     return new Response('not found', { status: 404 })
@@ -143,7 +144,9 @@ describe('read-only operator MCP route', () => {
 
   beforeEach(() => {
     process.env.RR_MCP_ENABLED = 'true'
-    process.env.RR_MCP_OAUTH_ISSUER = ISSUER
+    // Operators commonly paste the Auth0 tenant domain without its trailing slash.
+    // The resource server must canonicalize that to Auth0's exact `iss` value.
+    process.env.RR_MCP_OAUTH_ISSUER = ISSUER_BASE
     process.env.RR_MCP_OAUTH_ALLOWED_SUBJECTS = SUBJECT
     process.env.RR_DEPLOY_SHA = '9c343597a1e49175220d4c95134d4a03fb8bcd0d'
     process.env.DATABASE_URL = 'postgres://redacted.example.invalid/database'
@@ -168,7 +171,7 @@ describe('read-only operator MCP route', () => {
     expect((await GET_PROTECTED_RESOURCE()).status).toBe(404)
   })
 
-  it('publishes OAuth protected-resource metadata without exposing credentials', async () => {
+  it('publishes canonical OAuth protected-resource metadata without exposing credentials', async () => {
     const response = await GET_PROTECTED_RESOURCE()
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
@@ -176,6 +179,23 @@ describe('read-only operator MCP route', () => {
       authorization_servers: [ISSUER],
       scopes_supported: [OPERATOR_MCP_REQUIRED_SCOPE],
     })
+  })
+
+  it('accepts an Auth0-shaped issuer with its canonical trailing slash', async () => {
+    const good = await POST(request(
+      rpc('tools/list'),
+      { token: accessToken(), realIp: '203.0.113.9' },
+    ))
+    expect(good.status).toBe(200)
+
+    const wrongIssuer = await POST(request(
+      rpc('tools/list'),
+      {
+        token: accessToken({ iss: 'https://other-tenant.eu.auth0.com/' }),
+        realIp: '203.0.113.8',
+      },
+    ))
+    expect(wrongIssuer.status).toBe(401)
   })
 
   it('requires a valid OAuth access token and advertises resource metadata on 401', async () => {
@@ -203,11 +223,14 @@ describe('read-only operator MCP route', () => {
     expect(await good.text()).not.toContain(accessToken())
   })
 
-  it('rejects missing scope and expired tokens', async () => {
-    expect((await POST(request(
+  it('uses 403 for insufficient scope and 401 for expired tokens', async () => {
+    const insufficient = await POST(request(
       rpc('tools/list'),
       { token: accessToken({ scope: 'openid' }), realIp: '203.0.113.14' },
-    ))).status).toBe(401)
+    ))
+    expect(insufficient.status).toBe(403)
+    expect(insufficient.headers.get('www-authenticate')).toContain('error="insufficient_scope"')
+    expect(insufficient.headers.get('www-authenticate')).toContain(OPERATOR_MCP_REQUIRED_SCOPE)
 
     expect((await POST(request(
       rpc('tools/list'),

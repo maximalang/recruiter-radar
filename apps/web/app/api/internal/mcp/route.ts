@@ -84,13 +84,14 @@ export async function POST(request: Request) {
     request.headers.get('authorization'),
   )
   if (!auth.ok) {
-    const challengeError = auth.reason === 'insufficient_scope'
+    const insufficientScope = auth.reason === 'insufficient_scope'
+    const challengeError = insufficientScope
       ? 'insufficient_scope'
       : 'invalid_token'
     return NextResponse.json(
-      { error: 'unauthorized' },
+      { error: insufficientScope ? 'insufficient_scope' : 'unauthorized' },
       {
-        status: 401,
+        status: insufficientScope ? 403 : 401,
         headers: {
           ...JSON_HEADERS,
           'WWW-Authenticate': getOperatorMcpAuthenticateChallenge(challengeError),

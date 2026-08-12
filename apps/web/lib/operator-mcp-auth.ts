@@ -78,7 +78,10 @@ export function getOperatorMcpOAuthConfig(
     return null
   }
 
-  const issuer = issuerUrl.toString().replace(/\/$/, '')
+  // URL#toString canonicalizes an origin-only issuer to the RFC-compatible
+  // trailing-slash form used by providers such as Auth0. Keep that exact issuer
+  // identifier for protected-resource metadata and access-token validation.
+  const issuer = issuerUrl.toString()
   const allowedSubjects = new Set(
     rawAllowedSubjects
       .split(',')
@@ -166,7 +169,9 @@ export async function verifyOperatorMcpAccessToken(
   }
 
   const nowSeconds = Math.floor(nowMs / 1000)
-  if (claims.iss !== config.issuer) return { ok: false, reason: 'issuer_mismatch' }
+  if (canonicalizeIssuer(claims.iss) !== config.issuer) {
+    return { ok: false, reason: 'issuer_mismatch' }
+  }
   if (!hasAudience(claims.aud, OPERATOR_MCP_RESOURCE)) {
     return { ok: false, reason: 'audience_mismatch' }
   }
@@ -237,17 +242,17 @@ async function loadOAuthMetadata(
   const cached = metadataCache.get(issuer)
   if (cached && cached.expiresAt > nowMs) return cached.value
 
+  const issuerBase = issuer.replace(/\/$/, '')
   const candidates = [
-    `${issuer}/.well-known/openid-configuration`,
-    `${issuer}/.well-known/oauth-authorization-server`,
+    `${issuerBase}/.well-known/openid-configuration`,
+    `${issuerBase}/.well-known/oauth-authorization-server`,
   ]
 
   let lastError: unknown = new Error('OAuth discovery failed')
   for (const url of candidates) {
     try {
       const body = await fetchJsonObject(url, fetchImpl)
-      const discoveredIssuer =
-        typeof body.issuer === 'string' ? body.issuer.replace(/\/$/, '') : ''
+      const discoveredIssuer = canonicalizeIssuer(body.issuer)
       const jwksUri = typeof body.jwks_uri === 'string' ? body.jwks_uri : ''
       if (discoveredIssuer !== issuer || !isSecureHttpsUrl(jwksUri)) {
         throw new Error('OAuth metadata is inconsistent')
@@ -368,6 +373,25 @@ function getTokenScopes(claims: JsonObject): Set<string> {
     for (const scope of claims.permissions) if (typeof scope === 'string') scopes.add(scope)
   }
   return scopes
+}
+
+function canonicalizeIssuer(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) return ''
+  try {
+    const url = new URL(value.trim())
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      return ''
+    }
+    return url.toString()
+  } catch {
+    return ''
+  }
 }
 
 function isSecureHttpsUrl(value: string): boolean {
