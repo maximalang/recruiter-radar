@@ -395,6 +395,19 @@ def audit(request_id: str, action: str, args: Dict[str, Any], status: str, durat
     print(json.dumps(event, separators=(",", ":")), flush=True)
 
 
+def audit_internal_exception(request_id: str, action: str, exc: Exception) -> None:
+    event: Dict[str, Any] = {
+        "event": "rr_operator_agent_internal_error",
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "requestId": request_id,
+        "action": action,
+        "exceptionType": type(exc).__name__,
+    }
+    if isinstance(exc, OSError) and isinstance(exc.errno, int):
+        event["errno"] = exc.errno
+    print(json.dumps(event, separators=(",", ":")), flush=True)
+
+
 class Handler(socketserver.StreamRequestHandler):
     def handle(self) -> None:
         started = time.monotonic()
@@ -429,8 +442,9 @@ class Handler(socketserver.StreamRequestHandler):
         except (json.JSONDecodeError, UnicodeDecodeError):
             response = {"ok": False, "error": "invalid_json"}
             audit(request_id, action, args, "error", int((time.monotonic() - started) * 1000), "invalid_json")
-        except Exception:
+        except Exception as exc:
             response = {"ok": False, "error": "internal_error"}
+            audit_internal_exception(request_id, action, exc)
             audit(request_id, action, args, "error", int((time.monotonic() - started) * 1000), "internal_error")
         encoded = (json.dumps(response, separators=(",", ":")) + "\n").encode("utf-8")
         self.wfile.write(encoded)
