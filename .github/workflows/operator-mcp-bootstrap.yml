@@ -69,8 +69,12 @@ jobs:
             fi
             issuer="${RR_MCP_OAUTH_ISSUER_REQUESTED:-}"
             subjects="${RR_MCP_OAUTH_ALLOWED_SUBJECTS_REQUESTED:-}"
-            if [ -z "$issuer" ] || [ -z "$subjects" ]; then
-              echo "WorkOS issuer and immutable allowed subject must be configured before enabling MCP" >&2
+            if ! [[ "$issuer" =~ ^https://[A-Za-z0-9.-]+/?$ ]]; then
+              echo "RR_MCP_OAUTH_ISSUER must be a root HTTPS AuthKit issuer" >&2
+              exit 1
+            fi
+            if ! [[ "$subjects" =~ ^user_[A-Za-z0-9]+(,user_[A-Za-z0-9]+)*$ ]]; then
+              echo "RR_MCP_OAUTH_ALLOWED_SUBJECTS must contain immutable WorkOS user IDs only" >&2
               exit 1
             fi
             enabled=true
@@ -141,10 +145,25 @@ jobs:
           flock -w 120 9
           test -f "$bootstrap_env"
           chmod 600 "$bootstrap_env"
-          set -a
-          # shellcheck disable=SC1090
-          source "$bootstrap_env"
-          set +a
+          test "$(wc -l < "$bootstrap_env")" -eq 5
+
+          read_bootstrap_value() {
+            local key="$1"
+            sed -n "s/^${key}=//p" "$bootstrap_env" | tail -n 1
+          }
+          RR_MCP_ENABLED="$(read_bootstrap_value RR_MCP_ENABLED)"
+          RR_MCP_MUTATIONS_ENABLED="$(read_bootstrap_value RR_MCP_MUTATIONS_ENABLED)"
+          RR_MCP_OAUTH_ISSUER="$(read_bootstrap_value RR_MCP_OAUTH_ISSUER)"
+          RR_MCP_OAUTH_ALLOWED_SUBJECTS="$(read_bootstrap_value RR_MCP_OAUTH_ALLOWED_SUBJECTS)"
+          RR_DEPLOY_SHA="$(read_bootstrap_value RR_DEPLOY_SHA)"
+          export RR_MCP_ENABLED RR_MCP_MUTATIONS_ENABLED RR_MCP_OAUTH_ISSUER RR_MCP_OAUTH_ALLOWED_SUBJECTS RR_DEPLOY_SHA
+
+          case "$RR_MCP_ENABLED" in true | false) ;; *) exit 61 ;; esac
+          case "$RR_MCP_MUTATIONS_ENABLED" in true | false) ;; *) exit 62 ;; esac
+          if [ "$RR_MCP_ENABLED" = "true" ]; then
+            [[ "$RR_MCP_OAUTH_ISSUER" =~ ^https://[A-Za-z0-9.-]+/?$ ]] || exit 63
+            [[ "$RR_MCP_OAUTH_ALLOWED_SUBJECTS" =~ ^user_[A-Za-z0-9]+(,user_[A-Za-z0-9]+)*$ ]] || exit 64
+          fi
           test "$RR_DEPLOY_SHA" = "$EXPECTED_DEPLOY_SHA"
 
           mv "$staged_configurator" /opt/recruiter-radar/configure-operator-mcp.sh
