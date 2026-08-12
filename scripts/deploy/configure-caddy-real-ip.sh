@@ -9,6 +9,8 @@ trust_boundary_comment="    # Trust boundary: overwrite client X-Real-IP at the 
 real_ip_header="        header_up X-Real-IP {remote_host}"
 forwarded_proto_header="        header_up X-Forwarded-Proto https"
 host_header="        header_up Host recruiter-radar.ru"
+operator_begin="    # BEGIN Recruiter Radar operator MCP (managed)"
+operator_end="    # END Recruiter Radar operator MCP (managed)"
 
 reload_caddy() {
   can_systemd_reload="$(
@@ -39,6 +41,13 @@ if [ "$site_block_count" -ne 1 ]; then
   exit 1
 fi
 
+operator_begin_count="$(grep -Fxc "$operator_begin" "$config_path" || true)"
+operator_end_count="$(grep -Fxc "$operator_end" "$config_path" || true)"
+if [ "$operator_begin_count" -ne "$operator_end_count" ] || [ "$operator_begin_count" -gt 1 ]; then
+  echo "Malformed managed operator MCP Caddy block; refusing an unsafe rewrite." >&2
+  exit 1
+fi
+
 proxy_layout="$(
   awk \
     -v target_site_line="$target_site_line" \
@@ -46,10 +55,20 @@ proxy_layout="$(
     -v trust_boundary_comment="$trust_boundary_comment" \
     -v real_ip_header="$real_ip_header" \
     -v forwarded_proto_header="$forwarded_proto_header" \
-    -v host_header="$host_header" '
+    -v host_header="$host_header" \
+    -v operator_begin="$operator_begin" \
+    -v operator_end="$operator_end" '
     $0 == target_site_line {
       in_target_site = 1
       target_closed = 0
+      next
+    }
+    in_target_site && $0 == operator_begin {
+      in_operator = 1
+      next
+    }
+    in_target_site && in_operator {
+      if ($0 == operator_end) in_operator = 0
       next
     }
     in_target_site && $0 == "}" {
@@ -61,7 +80,7 @@ proxy_layout="$(
       lines[++line_count] = $0
     }
     END {
-      if (!target_closed) {
+      if (!target_closed || in_operator) {
         print "ambiguous"
         exit
       }
@@ -175,6 +194,8 @@ awk \
   -v real_ip_header="$real_ip_header" \
   -v forwarded_proto_header="$forwarded_proto_header" \
   -v host_header="$host_header" \
+  -v operator_begin="$operator_begin" \
+  -v operator_end="$operator_end" \
   -v proxy_layout="$proxy_layout" '
   function print_canonical_proxy() {
     print trust_boundary_comment
@@ -188,6 +209,16 @@ awk \
   $0 == target_site_line {
     in_target_site = 1
     print
+    next
+  }
+  in_target_site && $0 == operator_begin {
+    in_operator = 1
+    print
+    next
+  }
+  in_target_site && in_operator {
+    print
+    if ($0 == operator_end) in_operator = 0
     next
   }
   in_target_site && skip_legacy_proxy {
