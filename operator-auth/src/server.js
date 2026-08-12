@@ -263,7 +263,7 @@ export async function createOperatorAuthServer() {
           return undefined
         },
         useGrantedResource() {
-          return true
+          return false
         },
         getResourceServerInfo(_ctx, resource) {
           if (resource !== RESOURCE) throw new errors.InvalidTarget('Unknown resource')
@@ -299,6 +299,13 @@ export async function createOperatorAuthServer() {
       required() {
         return true
       },
+    },
+    routes: {
+      authorization: `${OIDC_PREFIX}/auth`,
+      jwks: `${OIDC_PREFIX}/jwks`,
+      registration: `${OIDC_PREFIX}/reg`,
+      revocation: `${OIDC_PREFIX}/token/revocation`,
+      token: `${OIDC_PREFIX}/token`,
     },
     responseTypes: ['code'],
     grantTypes: ['authorization_code', 'refresh_token'],
@@ -504,8 +511,15 @@ export async function createOperatorAuthServer() {
         providerCallback(req, res)
         return
       }
-      if (url.pathname === `${OIDC_PREFIX}/.well-known/openid-configuration` || url.pathname.startsWith(`${OIDC_PREFIX}/`)) {
-        req.url = req.url.slice(OIDC_PREFIX.length) || '/'
+      if (url.pathname === `${OIDC_PREFIX}/.well-known/openid-configuration`) {
+        req.url = req.url.replace(
+          `${OIDC_PREFIX}/.well-known/openid-configuration`,
+          '/.well-known/openid-configuration',
+        )
+        providerCallback(req, res)
+        return
+      }
+      if (url.pathname.startsWith(`${OIDC_PREFIX}/`)) {
         providerCallback(req, res)
         return
       }
