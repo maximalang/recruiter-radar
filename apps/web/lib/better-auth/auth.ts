@@ -13,10 +13,20 @@ import {
 
 const runtime = getBetterAuthRuntimeConfig();
 
+function buildDatabaseConnectionString(connectionString: string): string {
+  const url = new URL(connectionString);
+  const requiredOptions = "-c search_path=better_auth,public -c statement_timeout=10000";
+  const existingOptions = url.searchParams.get("options")?.trim();
+  url.searchParams.set(
+    "options",
+    existingOptions ? `${existingOptions} ${requiredOptions}` : requiredOptions,
+  );
+  url.searchParams.set("application_name", "recruiter-radar-better-auth");
+  return url.toString();
+}
+
 const database = new Pool({
-  connectionString: runtime.databaseUrl,
-  application_name: "recruiter-radar-better-auth",
-  options: "-c search_path=better_auth,public -c statement_timeout=10000",
+  connectionString: buildDatabaseConnectionString(runtime.databaseUrl),
   max: 5,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 10_000,
