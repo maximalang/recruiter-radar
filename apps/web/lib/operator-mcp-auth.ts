@@ -291,6 +291,9 @@ async function loadOAuthMetadata(
       if (!isSecureHttpsUrl(jwksUri)) {
         throw new Error('OAuth metadata does not expose a secure JWKS URL')
       }
+      if (jwksUri !== `${issuerBase}/jwks`) {
+        throw new Error('OAuth metadata exposes an unexpected JWKS URL')
+      }
       const value = { issuer, jwksUri }
       metadataCache.set(issuer, { expiresAt: nowMs + OAUTH_CACHE_TTL_MS, value })
       return value
@@ -338,8 +341,13 @@ function findSigningKey(
 ): JsonWebKeyRecord | undefined {
   return keys.find((key) =>
     key.kid === kid &&
-    (key.use === undefined || key.use === 'sig') &&
-    (key.alg === undefined || key.alg === alg),
+    key.kty === 'EC' &&
+    key.crv === 'P-256' &&
+    key.use === 'sig' &&
+    key.alg === alg &&
+    typeof key.x === 'string' && key.x.length > 0 &&
+    typeof key.y === 'string' && key.y.length > 0 &&
+    key.d === undefined,
   )
 }
 
