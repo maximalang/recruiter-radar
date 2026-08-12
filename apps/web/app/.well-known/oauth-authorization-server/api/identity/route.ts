@@ -1,6 +1,6 @@
 import { isBetterAuthMcpEnabled } from "../../../../../lib/better-auth/config";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   if (!isBetterAuthMcpEnabled()) {
     return new Response(null, {
       status: 404,
@@ -13,7 +13,8 @@ export async function GET(): Promise<Response> {
       import("@better-auth/oauth-provider"),
       import("../../../../../lib/better-auth/auth"),
     ]);
-    return oauthProviderAuthServerMetadata(auth)();
+    const handler = oauthProviderAuthServerMetadata(auth);
+    return handler(request);
   } catch {
     return new Response(null, {
       status: 503,
