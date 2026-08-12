@@ -7,8 +7,8 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 
-COPY operator-auth/package.json ./package.json
-RUN npm install --omit=dev --no-audit --no-fund \
+COPY operator-auth/package.json operator-auth/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund \
     && npm cache clean --force
 
 COPY operator-auth/src ./src
