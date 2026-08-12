@@ -273,6 +273,71 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
     expect(first?.idempotent).toBe(false)
     expect(replay?.idempotent).toBe(true)
 
+    const retryEpisodeId = await insertEpisode('concurrent-shown-retry')
+    const retryOpportunityId = await insertOpportunity(
+      retryEpisodeId,
+      'concurrent-shown-retry',
+    )
+    const retryCycle = `brief:2026-07-27:${token}`
+    const retryOccurredAt = Date.UTC(2026, 6, 27)
+    const shownPayload = outcomePayload(
+      'shown',
+      `shown:${retryOpportunityId}:${retryCycle}`,
+      retryOccurredAt,
+      { metadata: { surface: 'morning_brief', cycleId: retryCycle } },
+    )
+    const concurrentShown = await Promise.all([
+      recordOpportunityOutcome({
+        ownerId,
+        opportunityId: retryOpportunityId,
+        actorType: 'user',
+        actorUserId: ownerId,
+        payload: shownPayload,
+      }),
+      recordOpportunityOutcome({
+        ownerId,
+        opportunityId: retryOpportunityId,
+        actorType: 'user',
+        actorUserId: ownerId,
+        payload: shownPayload,
+      }),
+    ])
+    expect(concurrentShown.map((result) => result?.idempotent).sort())
+      .toEqual([false, true])
+    const sameCycleRows = await database.query<{ count: number }>(
+      `SELECT COUNT(*)::INTEGER AS count
+       FROM opportunity_outcome_events
+       WHERE owner_id = $1
+         AND opportunity_id = $2
+         AND event_type = 'shown'`,
+      [ownerId, retryOpportunityId],
+    )
+    expect(sameCycleRows.rows[0]?.count).toBe(1)
+
+    const nextCycle = `brief:2026-07-28:${token}`
+    const nextShown = await recordOpportunityOutcome({
+      ownerId,
+      opportunityId: retryOpportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      payload: outcomePayload(
+        'shown',
+        `shown:${retryOpportunityId}:${nextCycle}`,
+        Date.UTC(2026, 6, 28),
+        { metadata: { surface: 'morning_brief', cycleId: nextCycle } },
+      ),
+    })
+    expect(nextShown?.idempotent).toBe(false)
+    const differentCycleRows = await database.query<{ count: number }>(
+      `SELECT COUNT(*)::INTEGER AS count
+       FROM opportunity_outcome_events
+       WHERE owner_id = $1
+         AND opportunity_id = $2
+         AND event_type = 'shown'`,
+      [ownerId, retryOpportunityId],
+    )
+    expect(differentCycleRows.rows[0]?.count).toBe(2)
+
     await expect(recordOpportunityOutcome({
       ownerId,
       opportunityId: nextOpportunityId,
