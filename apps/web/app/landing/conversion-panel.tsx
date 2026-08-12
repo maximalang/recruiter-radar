@@ -9,6 +9,7 @@ import {
   buildCheckoutHref,
   type PublicPreviewInput,
 } from "../../lib/publicProduct";
+import { TargetIcon } from "../ui/icons";
 import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
 import panelStyles from "./conversion-panel.module.css";
 import finalStyles from "./final-radar.module.css";
@@ -142,7 +143,7 @@ export default function ConversionPanel(props: {
       >
         <span>7 ДНЕЙ / СВОЯ НИША</span>
         <h2>Посмотрите, кому стоит написать сейчас.</h2>
-        <p>Настройте нишу и географию. За неделю вы увидите, помогает ли радар находить новые поводы для разговора с потенциальными клиентами.</p>
+        <p>Настройте специализацию и географию. За 7 дней радар соберёт приоритет компаний, факты и понятный повод для первого контакта.</p>
         <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
           <li>990 ₽ / 7 дней</li>
           <li>Без автопродления</li>
@@ -150,13 +151,7 @@ export default function ConversionPanel(props: {
           <li>Сообщения отправляете вы</li>
         </ul>
         <div className={finalStyles.radar} data-final-radar-composition="signal-lock" aria-hidden="true">
-          <i className={finalStyles.arc} />
-          <i className={finalStyles.arc} />
-          <span className={finalStyles.cluster}><i /><i /><i /></span>
-          <span className={finalStyles.cluster}><i /><i /></span>
-          <span className={finalStyles.cluster}><i /><i /><i /></span>
-          <span className={finalStyles.activeCluster}><i /><i /><i /><i /></span>
-          <span className={finalStyles.annotation}><strong>сильный повод</strong><small>3 подтверждения · сегодня</small></span>
+          <TargetIcon className={finalStyles.glyph} />
         </div>
         <div className={styles.finalActions}>
           <Link
