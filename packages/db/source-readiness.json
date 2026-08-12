@@ -532,14 +532,14 @@
       "fixture": "tested",
       "contract": "tested",
       "configuration": { "mode": "launch-required", "acceptedEnvSets": [["FNS_OPEN_DATA_INPUT_FILE"]] },
-      "live": { "state": "reachable", "verifiedAt": "2026-08-12T20:05:00Z", "evidence": ["Official FNS open-data passports and current file.nalog.ru dataset archives were reachable; fixture coverage verifies INN filtering and derived headcount, revenue and government-support context."] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-13T00:35:00+03:00", "evidence": ["Official FNS open-data passports and current file.nalog.ru dataset archives were reachable; fixture coverage verifies INN filtering and derived headcount, revenue and government-support context.", "The explicit live sync discovered the current official headcount archive, downloaded all 98,434,553 bytes in verified HTTP ranges, matched SHA-256 265eca8b05a234ff629f57779ebbc647d07e42c7e43612b40e9ae84340de1464, streamed 2,044,132 legal-entity documents across 2,271 XML files, and published one company-level record for controlled INN 9102013580. The normal source fetch accepted the versioned snapshot with one normalized record, zero skips and zero sensitive fields; the temporary snapshot was then removed."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
       "pipelineProfile": "context-standard",
-      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "contract": ["npm run verify:source:readiness"] },
-      "blockers": ["Production needs one periodically refreshed reviewed bulk snapshot; the daily pipeline intentionally does not download multi-gigabyte FNS archives."]
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke", "npm run verify:fns-open-data:sync"], "live": ["npm run verify:fns-open-data:catalog-live"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": ["Run the explicit operator sync to publish a versioned snapshot and configure FNS_OPEN_DATA_INPUT_FILE; the daily pipeline intentionally does not download multi-gigabyte FNS archives."]
     },
     "government-procurement": {
       "implementation": "implemented",
