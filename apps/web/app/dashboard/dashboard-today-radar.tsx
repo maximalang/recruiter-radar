@@ -10,7 +10,7 @@ import {
   SignalFreshnessChip,
   UrgencyCueChip,
 } from "../ui/internal-page";
-import { SearchIcon } from "../ui/icons";
+import { TargetIcon } from "../ui/icons";
 import styles from "./dashboard-workspace.module.css";
 
 interface DashboardTodayRadarProps {
@@ -42,7 +42,7 @@ export default function DashboardTodayRadar({
 
       {topLeads.length === 0 ? (
         <EmptyState
-          icon={SearchIcon}
+          icon={TargetIcon}
           title={lastRunAt ? "Подходящих компаний пока нет" : "Первый запуск Radar ещё не завершён"}
           text={lastRunAt ? "Последний запуск завершён, но компании не прошли ваши текущие фильтры. Можно расширить рынок или дождаться свежих сигналов." : "Профиль сохранён. После первого сканирования здесь появятся компании с evidence и рекомендуемым действием."}
           action={{ href: "/settings/radar", label: "Проверить настройки Radar" }}
