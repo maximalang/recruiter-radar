@@ -447,7 +447,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   at the top of the main column now, so the sidebar leads with
                   the gate explanation instead of duplicating the gauge. */}
               <ContentCard>
-                <div className={ipStyles.sidebarLabel}>Уровень доверия</div>
+                <div className={ipStyles.sidebarLabel}>Подтверждение доказательствами</div>
                 <GateBadgeInline gate={lead.confidenceGate} />
                 <p className={ipStyles.gateDescription}>{GATE_DESC[lead.confidenceGate] ?? GATE_DESC.D}</p>
               </ContentCard>

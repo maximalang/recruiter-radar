@@ -3,14 +3,15 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useTransition } from 'react';
 import { CheckIcon, MotionIcon, XIcon } from '../ui/icons';
+import { GATE_LABELS } from '../ui/internal-page';
 import s from './leads-filters.module.css';
 
 const GATE_OPTIONS = [
-  { value: '', label: 'Все уровни доверия' },
-  { value: 'A', label: 'Авто (A)' },
-  { value: 'B', label: 'Авто с меткой (B)' },
-  { value: 'C', label: 'На проверке (C)' },
-  { value: 'D', label: 'Не доставлять (D)' },
+  { value: '', label: 'Все уровни подтверждения' },
+  { value: 'A', label: GATE_LABELS.A },
+  { value: 'B', label: GATE_LABELS.B },
+  { value: 'C', label: GATE_LABELS.C },
+  { value: 'D', label: GATE_LABELS.D },
 ] as const;
 
 const FEEDBACK_OPTIONS = [
@@ -131,7 +132,7 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
           onChange={(e) => updateFilter('gate', e.target.value)}
           className={s.filterSelect}
           data-active={currentGate !== '' ? 'true' : undefined}
-          aria-label="Фильтр по уровню доверия"
+          aria-label="Фильтр по уровню подтверждения"
         >
           {GATE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>

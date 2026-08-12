@@ -274,10 +274,10 @@ export function DetailLayout(props: {
 /* ── Gate badge inline ── */
 
 export const GATE_LABELS: Record<string, string> = {
-  A: "Авто (A)",
-  B: "Авто с меткой (B)",
-  C: "На проверке (C)",
-  D: "Не доставлять (D)",
+  A: "Подтверждение A",
+  B: "Подтверждение B",
+  C: "Подтверждение C",
+  D: "Подтверждение D",
 };
 
 export const GATE_DESC: Record<string, string> = {
@@ -317,7 +317,7 @@ export const FEEDBACK_LABELS: Record<string, { label: string; icon: (p: SVGProps
 
 export function GateBadgeInline(props: { gate: string }) {
   return (
-    <span className={s.gateBadgeInline} data-gate={props.gate} aria-label={`Уровень доверия: ${GATE_LABELS[props.gate] ?? props.gate}`}>
+    <span className={s.gateBadgeInline} data-gate={props.gate} aria-label={`Уровень подтверждения доказательствами: ${props.gate}`}>
       {repairVisibleNode(GATE_LABELS[props.gate] ?? props.gate)}
     </span>
   );
