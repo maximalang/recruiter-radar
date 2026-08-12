@@ -110,9 +110,12 @@ if [ "$mcp_enabled" = "true" ]; then
     echo "OAuth issuer and immutable allowed subject are required before enabling operator MCP" >&2
     exit 1
   fi
-  case "$oauth_issuer" in https://*) ;; *) echo "OAuth issuer must use HTTPS" >&2; exit 1 ;; esac
-  if [[ "$oauth_issuer" =~ [[:space:]] ]] || [[ "$allowed_subjects" =~ [[:space:]] ]]; then
-    echo "OAuth issuer/subject configuration must not contain whitespace" >&2
+  if ! [[ "$oauth_issuer" =~ ^https://[A-Za-z0-9.-]+/?$ ]]; then
+    echo "OAuth issuer must be a root HTTPS AuthKit issuer" >&2
+    exit 1
+  fi
+  if ! [[ "$allowed_subjects" =~ ^user_[A-Za-z0-9]+(,user_[A-Za-z0-9]+)*$ ]]; then
+    echo "OAuth subjects must be comma-separated immutable WorkOS user IDs" >&2
     exit 1
   fi
 fi
@@ -214,7 +217,7 @@ services:
       RR_OPERATOR_MODE: "true"
       MIGRATE_ON_START: "false"
     volumes:
-      - ${AGENT_RUNTIME_DIR}:${AGENT_RUNTIME_DIR}:rw
+      - ${AGENT_RUNTIME_DIR}:${AGENT_RUNTIME_DIR}:ro
     group_add:
       - "${operator_gid}"
     read_only: true
@@ -239,6 +242,7 @@ User=root
 Group=root
 ExecStart=/usr/bin/python3 ${AGENT_INSTALL_PATH}
 Environment=RR_OPERATOR_MUTATIONS_ENABLED=${mutations_enabled}
+Environment=PYTHONDONTWRITEBYTECODE=1
 Restart=on-failure
 RestartSec=2
 UMask=0077
@@ -276,8 +280,8 @@ fi
 
 # Create/update a fixed, non-inheriting PostgreSQL login. The password is hex
 # generated locally and supplied only over stdin; it is never printed or placed
-# in process argv. default_transaction_read_only makes accidental writes fail
-# even if a future diagnostic query is incorrectly implemented.
+# in process argv. Role flags and grants are reasserted on every bootstrap so
+# privilege drift is removed rather than silently inherited.
 {
   cat <<'SQL_HEAD'
 DO $$
@@ -287,13 +291,17 @@ BEGIN
   END IF;
 END
 $$;
+ALTER ROLE rr_operator_ro LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5;
+ALTER ROLE rr_operator_ro SET default_transaction_read_only = on;
+ALTER ROLE rr_operator_ro SET statement_timeout = '5s';
 SQL_HEAD
   printf "ALTER ROLE rr_operator_ro PASSWORD '%s';\n" "$db_password"
   cat <<SQL_BODY
-ALTER ROLE rr_operator_ro SET default_transaction_read_only = on;
-REVOKE CREATE ON SCHEMA public FROM rr_operator_ro;
+REVOKE ALL PRIVILEGES ON DATABASE "${db_name}" FROM rr_operator_ro;
 GRANT CONNECT ON DATABASE "${db_name}" TO rr_operator_ro;
+REVOKE ALL PRIVILEGES ON SCHEMA public FROM rr_operator_ro;
 GRANT USAGE ON SCHEMA public TO rr_operator_ro;
+REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM rr_operator_ro;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO rr_operator_ro;
 DO \$\$
 DECLARE owner_name text;
