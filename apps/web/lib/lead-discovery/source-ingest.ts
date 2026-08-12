@@ -32,7 +32,6 @@ import {
   type SourceId,
 } from '@/lib/sources/source-registry'
 import { getPool } from '@/lib/db-pool'
-import { deriveHabrKeywordsFromProfiles } from './habr-keywords'
 import {
   buildProfileSearchEnv,
   type ProfileSearchInput,
@@ -43,7 +42,10 @@ import {
   industryDemoteTerms,
   type FeedbackPatternEvent,
 } from './query-feedback-tuning'
-import { buildProfileGdeltQueries } from './gdelt-query-builder'
+import {
+  buildTrackedCompanyGdeltQueries,
+  MAX_GDELT_QUERIES,
+} from './gdelt-query-builder'
 import {
   buildCompanySiteTargets,
   MAX_COMPANY_SITE_TARGETS_PER_RUN,
@@ -200,24 +202,6 @@ async function loadSearchPrefsFromDb(source: SourceId): Promise<Record<string, s
 }
 
 /**
- * Load the `roles` arrays of every active client profile.
- *
- * Used only by habr-career keyword derivation: ingestion is global, so the
- * search must reflect the union of all active profiles' ICP roles, not one
- * profile's. Returns [] when no pool (test/dev) — caller falls back to ENV.
- */
-async function loadActiveProfileRoles(): Promise<string[][]> {
-  const pool = getPool()
-  if (!pool) return []
-  const { rows } = await pool.query<{ roles: string[] | null }>(`
-    SELECT roles
-    FROM client_profiles
-    WHERE is_active = TRUE
-  `)
-  return rows.map(r => r.roles ?? [])
-}
-
-/**
  * Load the ICP search fields of every active client profile.
  *
  * Ingestion is global: `ingestAllPrimarySources()` fills ONE shared signal
@@ -264,8 +248,7 @@ async function loadActiveProfileSearchInputs(): Promise<ProfileSearchInput[]> {
  * ingestion. Operator includeKeywords and excludeKeywords are unioned across
  * profiles; role/industry/exclusion arrays are unioned and deduped. This keeps
  * ingestion global (one fetch per source) while the query reflects every
- * active profile's ICP — the same pattern `loadActiveProfileRoles` uses for
- * habr-career, generalised to all supported search sources.
+ * active profile's ICP.
  */
 function unionProfileSearchInputs(inputs: readonly ProfileSearchInput[]): ProfileSearchInput {
   const union = (arrs: ReadonlyArray<readonly string[]>): string[] => {
@@ -335,7 +318,7 @@ async function loadActiveFeedbackPatterns(): Promise<FeedbackPatternEvent[]> {
  * Resolve the profile-derived search env for a source from the UNION of all
  * active client profiles, with feedback-driven demote terms applied.
  *
- * Precedence (matches the habr-career contract): an explicit operator override
+ * Precedence: an explicit operator override
  * already present in `dbSearchEnv` (from `user_search_preferences`) or in the
  * caller's filtered env ALWAYS wins — operators can pin a query. Only keys the
  * operator has NOT set are derived from profiles. When the profile union yields
@@ -378,29 +361,8 @@ async function resolveProfileSearchEnv(
   return result
 }
 
-/**
- * Resolve the habr-career keyword search env from active profiles' roles.
- *
- * Precedence: an explicit DB/ENV keyword pref (HABR_CAREER_KEYWORD or the
- * multi-value HABR_CAREER_KEYWORDS already present in `dbSearchEnv`) always
- * wins — operators can override the heuristic. Otherwise we derive keywords
- * from the union of active profiles' roles and inject them as
- * HABR_CAREER_KEYWORDS. When neither yields anything, we inject nothing and the
- * adapter falls back to its own default keyword.
- */
-async function resolveHabrKeywordEnv(
-  dbSearchEnv: Record<string, string>
-): Promise<Record<string, string>> {
-  if (dbSearchEnv.HABR_CAREER_KEYWORD || dbSearchEnv.HABR_CAREER_KEYWORDS) return {}
-
-  const roleLists = await loadActiveProfileRoles()
-  const keywords = deriveHabrKeywordsFromProfiles(roleLists)
-  if (keywords.length === 0) return {}
-
-  return { HABR_CAREER_KEYWORDS: keywords.join(',') }
-}
-
 const MAX_GOVERNMENT_ENRICHMENT_INNS_PER_RUN = 50
+const MAX_INDUSTRY_MEDIA_TARGETS_PER_RUN = 100
 const GOVERNMENT_ENRICHMENT_SOURCE_IDS = new Set<SourceId>([
   'fns-open-data',
   'government-procurement',
@@ -430,6 +392,42 @@ async function resolveGovernmentEnrichmentInnsEnv(
 
   if (rows.length === 0) return {}
   return { GOVERNMENT_ENRICHMENT_INNS: rows.map(row => row.inn).join(',') }
+}
+
+async function resolveIndustryMediaTargetsEnv(
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  if (dbSearchEnv.INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON) return {}
+  if (process.env.INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON) return {}
+
+  const pool = getPool()
+  if (!pool) return { INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON: '[]' }
+  const { rows } = await pool.query<{ company_name: string; company_domain: string }>(`
+    SELECT
+      o.name AS company_name,
+      o.domain AS company_domain
+    FROM orgs o
+    JOIN signals hiring_signal
+      ON hiring_signal.org_id = o.id
+      AND hiring_signal.signal_type = 'job_posting'
+      AND hiring_signal.source = ANY($2::text[])
+    WHERE o.domain IS NOT NULL
+      AND o.domain <> ''
+      AND o.name IS NOT NULL
+      AND o.name <> ''
+      AND NOT EXISTS (
+        SELECT 1
+        FROM signals media_signal
+        WHERE media_signal.org_id = o.id
+          AND media_signal.source = 'industry-media'
+          AND media_signal.occurred_at >= NOW() - INTERVAL '23 hours'
+      )
+    GROUP BY o.id, o.name, o.domain
+    ORDER BY MAX(hiring_signal.occurred_at) DESC, o.id
+    LIMIT $1
+  `, [MAX_INDUSTRY_MEDIA_TARGETS_PER_RUN, getHiringEvidenceSourceIds()])
+
+  return { INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON: JSON.stringify(rows) }
 }
 
 /**
@@ -578,38 +576,55 @@ function resolveCompanyNewsroomsTargetsEnv(
 }
 
 /**
- * Resolve the funding-business-signals GDELT query env from the union of all
- * active client profiles' ICP.
- *
- * Precedence (matches the habr/job-board contract): an explicit operator
- * override already present in `dbSearchEnv` (FUNDING_SIGNALS_GDELT_QUERIES
- * pinned via user_search_preferences) or in process.env ALWAYS wins. Only when
- * nobody pinned it do we derive GDELT queries from the profiles' industries and
- * inject them as FUNDING_SIGNALS_GDELT_QUERIES (newline-joined, the shape
- * parseGdeltQueries consumes). When the profile union yields no industries, we
- * inject nothing and the source falls back to file/provider/no-input.
- *
- * This unlocks funding-business-signals' FREE live-public GDELT mode with zero
- * manual ENV curation: the source runs live-public whenever at least one
- * active profile declares an industry, no paid key needed. The source stays
- * isPrimary:false (admin-triggered, not daily-cron) and context-only (Gate D).
+ * Resolve free GDELT queries for already tracked companies. Broad profile or
+ * industry queries cannot identify the subject company and are therefore not
+ * eligible for automatic ingestion. Each generated query carries the existing
+ * organization name and strong domain identity, and only organizations with
+ * prior hiring evidence are selected. A 23-hour freshness guard prevents the
+ * supporting stage from repeatedly querying the same company.
  */
 async function resolveFundingGdeltEnv(
   dbSearchEnv: Record<string, string>
 ): Promise<Record<string, string>> {
   if (dbSearchEnv.FUNDING_SIGNALS_GDELT_QUERIES) return {}
+  if (dbSearchEnv.FUNDING_SIGNALS_GDELT_QUERIES_JSON) return {}
   if (process.env.FUNDING_SIGNALS_GDELT_QUERIES) return {}
   if (process.env.FUNDING_SIGNALS_GDELT_QUERIES_JSON) return {}
   if (process.env.FUNDING_BUSINESS_SIGNALS_INPUT_FILE) return {}
   if (process.env.FUNDING_SIGNALS_PROVIDER_API_URL) return {}
 
-  const inputs = await loadActiveProfileSearchInputs()
-  if (inputs.length === 0) return {}
-  const unionInput = unionProfileSearchInputs(inputs)
-  const queries = buildProfileGdeltQueries(unionInput)
-  if (queries.length === 0) return {}
+  const pool = getPool()
+  if (!pool) return {}
+  const hiringSources = getHiringEvidenceSourceIds()
+  const { rows } = await pool.query<{ company_name: string | null; company_domain: string | null }>(`
+    SELECT
+      o.name AS company_name,
+      o.domain AS company_domain
+    FROM orgs o
+    JOIN signals hiring_signal ON hiring_signal.org_id = o.id
+    WHERE o.domain IS NOT NULL
+      AND BTRIM(o.domain) <> ''
+      AND o.name IS NOT NULL
+      AND BTRIM(o.name) <> ''
+      AND hiring_signal.signal_type = 'job_posting'
+      AND hiring_signal.source = ANY($1::text[])
+      AND NOT EXISTS (
+        SELECT 1
+        FROM signals context_signal
+        WHERE context_signal.org_id = o.id
+          AND context_signal.source = 'funding-business-signals'
+          AND context_signal.occurred_at >= NOW() - INTERVAL '23 hours'
+      )
+    GROUP BY o.id, o.name, o.domain
+    ORDER BY MAX(hiring_signal.occurred_at) DESC, o.id
+    LIMIT $2
+  `, [hiringSources, MAX_GDELT_QUERIES])
+  const queries = buildTrackedCompanyGdeltQueries(rows.map(row => ({
+    companyName: row.company_name,
+    companyDomain: row.company_domain,
+  })))
 
-  return { FUNDING_SIGNALS_GDELT_QUERIES: queries }
+  return { FUNDING_SIGNALS_GDELT_QUERIES_JSON: JSON.stringify({ queries }) }
 }
 
 /**
@@ -641,12 +656,8 @@ export async function ingestSource(
   const dbSearchEnv = await loadSearchPrefsFromDb(source)
   const searchEnvVars = getSearchEnvVars(source)
 
-  // habr-career: derive search keywords from the union of active profiles'
-  // roles (ingestion is global), unless an explicit keyword pref is set.
-  const habrDerivedEnv =
-    source === 'habr-career' ? await resolveHabrKeywordEnv(dbSearchEnv) : {}
-  // funding-business-signals: derive free live-public GDELT queries from the
-  // union of active profiles' industries, unless an operator pinned them.
+  // funding-business-signals: derive free public GDELT context queries from
+  // tracked companies that already have direct hiring evidence.
   const fundingDerivedEnv =
     source === 'funding-business-signals' ? await resolveFundingGdeltEnv(dbSearchEnv) : {}
   // company-site: derive the targets FILE from orgs the radar is already
@@ -665,18 +676,20 @@ export async function ingestSource(
     GOVERNMENT_ENRICHMENT_SOURCE_IDS.has(source)
       ? await resolveGovernmentEnrichmentInnsEnv(dbSearchEnv)
       : {}
+  const industryMediaDerivedEnv =
+    source === 'industry-media' ? await resolveIndustryMediaTargetsEnv(dbSearchEnv) : {}
   // Generalised profile-derived search env for the other search-capable
-  // sources (hh, superjob, rabota-rossii). For habr-career,
-  // funding-business-signals, company-site, and company-newsrooms the
-  // specialised resolvers above already emit their keys. egrul-fns accepts
-  // only an operator-provided official snapshot and has no search parameters.
+  // sources (hh, superjob, rabota-rossii). Habr Career accepts only a reviewed
+  // snapshot or explicitly permitted provider and has no derived search keys.
+  // The other specialised sources above already emit their keys. egrul-fns
+  // accepts only an operator-provided official snapshot.
   // Operator overrides in dbSearchEnv always win (resolver strips already-pinned
   // keys).
   const profileDerivedEnv =
-    (source === 'habr-career' || source === 'funding-business-signals' || source === 'egrul-fns' || source === 'company-site' || source === 'company-newsrooms' || GOVERNMENT_ENRICHMENT_SOURCE_IDS.has(source))
+    (source === 'habr-career' || source === 'funding-business-signals' || source === 'industry-media' || source === 'egrul-fns' || source === 'company-site' || source === 'company-newsrooms' || GOVERNMENT_ENRICHMENT_SOURCE_IDS.has(source))
       ? {}
       : await resolveProfileSearchEnv(source, dbSearchEnv)
-  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv, ...companySiteDerivedEnv, ...companyNewsroomsDerivedEnv, ...governmentDerivedEnv }
+  const derivedSearchEnv = { ...profileDerivedEnv, ...fundingDerivedEnv, ...companySiteDerivedEnv, ...companyNewsroomsDerivedEnv, ...governmentDerivedEnv, ...industryMediaDerivedEnv }
 
   return new Promise<IngestResult>((resolvePromise) => {
     // Filter env vars through whitelist — prevent injection of

@@ -276,11 +276,15 @@
       "fixture": "tested",
       "contract": "tested",
       "configuration": {
-        "mode": "launch-required",
-        "acceptedEnvSets": [["HABR_CAREER_INPUT_FILE"], ["HABR_CAREER_KEYWORD"], ["HABR_CAREER_PROVIDER_API_URL", "HABR_CAREER_PROVIDER_API_TOKEN"]]
+        "mode": "provider-required",
+        "acceptedEnvSets": [["HABR_CAREER_INPUT_FILE"], ["HABR_CAREER_PROVIDER_API_URL", "HABR_CAREER_PROVIDER_API_TOKEN"]]
       },
-      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
-      "requiresLiveVerification": true,
+      "live": {
+        "state": "blocked",
+        "verifiedAt": "2026-08-12T21:30:00Z",
+        "evidence": ["The agreement effective 2026-08-10 restricts copying and commercial use without permission (sections 5.3-5.4). robots.txt allows the listings path but does not grant commercial reuse. Direct HTML collection is disabled."]
+      },
+      "requiresLiveVerification": false,
       "confidence": "pending",
       "eligibility": "supporting-evidence-only",
       "legalReview": "required",
@@ -289,7 +293,7 @@
         "fixture": ["npm run verify:habr-career:smoke"],
         "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
       },
-      "blockers": ["Robots/legal review and confidence approval are pending."]
+      "blockers": ["A reviewed lawful snapshot or explicitly permitted provider is required; direct commercial HTML collection is disabled."]
     },
     "superjob": {
       "implementation": "implemented",
@@ -356,26 +360,6 @@
         "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
       },
       "blockers": ["A compliant provider or reviewed company-level snapshot is required; personal-profile data is prohibited."]
-    },
-    "regional-job-boards": {
-      "implementation": "implemented",
-      "fixture": "tested",
-      "contract": "tested",
-      "configuration": {
-        "mode": "provider-required",
-        "acceptedEnvSets": [["REGIONAL_JOB_BOARDS_INPUT_FILE"], ["REGIONAL_JOB_BOARDS_PROVIDER_API_URL", "REGIONAL_JOB_BOARDS_PROVIDER_API_TOKEN"]]
-      },
-      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
-      "requiresLiveVerification": true,
-      "confidence": "pending",
-      "eligibility": "supporting-evidence-only",
-      "legalReview": "required",
-      "pipelineProfile": "hiring-gated-standard",
-      "verification": {
-        "fixture": ["npm run verify:rf-source-expansion:smoke"],
-        "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
-      },
-      "blockers": ["Each board needs a reviewed provider/legal path and confidence approval."]
     },
     "egrul-fns": {
       "implementation": "implemented",
@@ -468,9 +452,9 @@
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["FUNDING_BUSINESS_SIGNALS_INPUT_FILE"], ["FUNDING_SIGNALS_GDELT_QUERIES"], ["FUNDING_SIGNALS_GDELT_QUERIES_JSON"], ["FUNDING_SIGNALS_PROVIDER_API_URL", "FUNDING_SIGNALS_PROVIDER_API_TOKEN"]]
+        "acceptedEnvSets": [["DATABASE_URL"], ["FUNDING_BUSINESS_SIGNALS_INPUT_FILE"], ["FUNDING_SIGNALS_GDELT_QUERIES"], ["FUNDING_SIGNALS_GDELT_QUERIES_JSON"], ["FUNDING_SIGNALS_PROVIDER_API_URL", "FUNDING_SIGNALS_PROVIDER_API_TOKEN"]]
       },
-      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-12T21:28:00Z", "evidence": ["The official public GDELT DOC API was reachable without credentials from the local runtime but returned its documented HTTP 429 request-rate response; no live article or DB success is claimed."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
@@ -480,7 +464,7 @@
         "fixture": ["npm run verify:funding-business-signals:smoke"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["Publisher-versus-subject identity confidence still requires production review."]
+      "blockers": ["Production live normalization remains unverified because the controlled request was rate-limited. Automatic queries are now restricted to tracked companies with hiring evidence and a strong domain; publisher-versus-subject attribution remains context-only."]
     },
     "company-newsrooms": {
       "implementation": "implemented",
@@ -512,20 +496,21 @@
       "fixture": "tested",
       "contract": "tested",
       "configuration": {
-        "mode": "provider-required",
-        "acceptedEnvSets": [["INDUSTRY_MEDIA_INPUT_FILE"], ["INDUSTRY_MEDIA_PROVIDER_API_URL", "INDUSTRY_MEDIA_PROVIDER_API_TOKEN"]]
+        "mode": "launch-required",
+        "acceptedEnvSets": [["DATABASE_URL"], ["INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON"], ["INDUSTRY_MEDIA_INPUT_FILE"], ["INDUSTRY_MEDIA_FEED_REGISTRY_FILE"], ["INDUSTRY_MEDIA_PROVIDER_API_URL", "INDUSTRY_MEDIA_PROVIDER_API_TOKEN"]]
       },
-      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-13T01:15:00+03:00", "evidence": ["Production-runtime disposable DB verification of the checked-in official Bank of Russia RSS feed passed the allowlisted-host and public-DNS guards and created 6 signals, 6 evidence items, and 6 lineage rows for one organization. Official source URLs, context-only tier, source ownership, payload attribution, curated-rss-atom extraction, and zero sensitive payload fields were asserted; the temporary database was dropped and zero matching databases remained."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
-      "legalReview": "required",
+      "legalReview": "approved",
       "pipelineProfile": "context-standard",
       "verification": {
-        "fixture": ["npm run verify:rf-source-expansion:smoke"],
+        "fixture": ["npm run verify:rf-source-expansion:smoke", "npm run verify:industry-media:feeds"],
+        "live": ["npm run verify:company-context:live-db"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["A reviewed provider/input is required and publisher identity must never become subject-company identity."]
+      "blockers": []
     },
     "fns-open-data": {
       "implementation": "implemented",

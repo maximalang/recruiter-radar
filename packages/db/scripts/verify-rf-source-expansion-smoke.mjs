@@ -8,7 +8,6 @@ import { buildFetchSummary as buildSuperjobSummary, resolveSuperjobConfiguredInp
 import { buildFetchSummary as buildHabrSummary, resolveHabrCareerConfiguredInput } from './source-habr-career.mjs';
 import { buildFetchSummary as buildNewsroomsSummary, resolveCompanyNewsroomsConfiguredInput } from './source-company-newsrooms.mjs';
 import { buildFetchSummary as buildMediaSummary, resolveIndustryMediaConfiguredInput } from './source-industry-media.mjs';
-import { buildFetchSummary as buildRegionalSummary, resolveRegionalJobBoardsConfiguredInput } from './source-regional-job-boards.mjs';
 
 const scriptDir = fileURLToPath(new URL('.', import.meta.url));
 const jobFixturePath = resolve(scriptDir, './rf-job-sources-smoke-fixture.json');
@@ -91,19 +90,6 @@ fileModeResults.push(await verifyFileMode({
   expectedRecordsReceived: 4,
   expectedSkippedRecords: 2,
 }));
-fileModeResults.push(await verifyFileMode({
-  source: 'regional-job-boards',
-  env: 'REGIONAL_JOB_BOARDS_INPUT_FILE',
-  fixturePath: jobFixturePath,
-  resolveInput: resolveRegionalJobBoardsConfiguredInput,
-  buildSummary: buildRegionalSummary,
-  expectedPrimaryKey: 'domain:tech-rf-smoke.example',
-  expectedOrgExternalId: null,
-  expectedSignalType: 'job_posting',
-  expectedRecordsReceived: 4,
-  expectedSkippedRecords: 2,
-}));
-
 const providerMode = await verifyProviderMode();
 const newsroomsLiveMode = await verifyNewsroomsLiveMode();
 

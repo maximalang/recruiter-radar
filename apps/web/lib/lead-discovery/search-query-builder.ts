@@ -93,7 +93,6 @@ interface SourceSearchParams {
 const SOURCE_SEARCH_PARAM: Readonly<Record<string, SourceSearchParams>> = {
   hh: { text: 'HH_SEARCH_TEXT', roleKeywords: null, region: null },
   superjob: { text: 'SUPERJOB_KEYWORD', roleKeywords: 'SUPERJOB_KEYWORD', region: null },
-  'habr-career': { text: 'HABR_CAREER_KEYWORD', roleKeywords: 'HABR_CAREER_KEYWORDS', region: null },
   'rabota-rossii': { text: 'RABOTA_ROSSII_SEARCH_TEXT', roleKeywords: null, region: 'RABOTA_ROSSII_REGION' },
   'career-pages': { text: null, roleKeywords: null, region: null },
   'tech-job-boards': { text: null, roleKeywords: null, region: null },

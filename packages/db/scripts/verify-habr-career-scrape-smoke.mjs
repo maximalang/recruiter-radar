@@ -1,11 +1,12 @@
 /**
- * Habr Career scraping smoke.
+ * Habr Career reviewed-snapshot parser smoke.
  *
  * Guards the extraction → normalization seam: `extractVacancyCardsFromHtml`
  * must emit the canonical keys (`job_title`, `company_name`) that
  * `normalizeJobPostingRecord` consumes. A key mismatch here silently drops
  * every scraped card ("N records received, 0 normalized") — this asserts the
- * full path survives.
+ * full path survives. This fixture-only verifier performs no network request
+ * and does not authorize direct commercial HTML collection.
  */
 
 import assert from 'node:assert/strict';
@@ -141,7 +142,7 @@ assert.equal(first.signalExternalId, 'habr-career:1000123');
 assert.equal(first.sourceUrl, 'https://career.habr.com/vacancies/1000123');
 
 console.log(JSON.stringify({
-  smoke: 'habr-career-scrape',
+  smoke: 'habr-career-snapshot-parser',
   cardsExtracted: records.length,
   normalizedRecords: survivors.length,
   sample: { jobTitle: first.jobTitle, companyName: first.companyName, board: first.payload.board },

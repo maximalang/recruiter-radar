@@ -38,7 +38,7 @@ Source registry разделяет несколько независимых с�
 - `hh`;
 - `rabota-rossii`;
 - `career-pages`;
-- provider-gated secondary sources: `superjob`, `habr-career`, `linkedin-company-pages`, `tech-job-boards`, `regional-job-boards`.
+- provider/gate-controlled secondary sources: `habr-career`, `linkedin-company-pages`, and `tech-job-boards`; regional boards must be registered under concrete reviewed source IDs.
 
 ### Enrichment и context
 

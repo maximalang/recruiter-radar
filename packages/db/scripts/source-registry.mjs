@@ -61,8 +61,6 @@ const companyNewsroomsScriptPath = './packages/db/scripts/source-company-newsroo
 const companyNewsroomsAbsoluteScriptPath = resolve(scriptDir, './source-company-newsrooms.mjs');
 const industryMediaScriptPath = './packages/db/scripts/source-industry-media.mjs';
 const industryMediaAbsoluteScriptPath = resolve(scriptDir, './source-industry-media.mjs');
-const regionalJobBoardsScriptPath = './packages/db/scripts/source-regional-job-boards.mjs';
-const regionalJobBoardsAbsoluteScriptPath = resolve(scriptDir, './source-regional-job-boards.mjs');
 const officialGovernmentSources = Object.freeze([
   ['fns-open-data', './packages/db/scripts/source-fns-open-data.mjs', './source-fns-open-data.mjs', 'Official FNS bulk datasets for company-size, financial, SME, support and tax context.'],
   ['government-procurement', './packages/db/scripts/source-government-procurement.mjs', './source-government-procurement.mjs', 'Official EIS/Treasury contract awards and supplier context.'],
@@ -80,7 +78,7 @@ const sourceReadinessContract = getSourceReadinessContract();
 // provider ids. `inDigest` therefore uses the canonical digest list + policy,
 // not membership in this scheduler set.
 const PRIMARY_INGESTION_SOURCES = Object.freeze(
-  new Set(['hh', 'superjob', 'habr-career', 'rabota-rossii', 'career-pages'])
+  new Set(['hh', 'superjob', 'rabota-rossii', 'career-pages'])
 );
 registerSource(
   defineSource({
@@ -408,8 +406,8 @@ registerRunnableScriptSource({
   sourceClass: 'primary-platform',
   evidenceTier: 'medium-signal',
   defaultConfidence: 0.69,
-  fetchModes: ['file', 'live-public', 'provider-token'],
-  description: 'Habr Career IT vacancy coverage via snapshots/provider/live HTML; live-public pending robots/legal review and confidence gates before digest use.',
+  fetchModes: ['file', 'provider-token'],
+  description: 'Habr Career evidence from reviewed snapshots or an explicitly permitted provider; direct commercial HTML collection is disabled.',
   scriptPath: habrCareerScriptPath,
   absoluteScriptPath: habrCareerAbsoluteScriptPath,
 });
@@ -432,22 +430,10 @@ registerRunnableScriptSource({
   sourceClass: 'market-signal',
   evidenceTier: 'context-only',
   defaultConfidence: 0.52,
-  fetchModes: ['file', 'provider-token'],
-  description: 'Curated industry media context after manual/legal source review; never lead-originating.',
+  fetchModes: ['file', 'live-public', 'provider-token'],
+  description: 'Curated public RSS/Atom company mentions from allowlisted publishers; context-only and never lead-originating.',
   scriptPath: industryMediaScriptPath,
   absoluteScriptPath: industryMediaAbsoluteScriptPath,
-});
-
-registerRunnableScriptSource({
-  id: 'regional-job-boards',
-  kind: 'job-board',
-  sourceClass: 'primary-platform',
-  evidenceTier: 'medium-signal',
-  defaultConfidence: 0.58,
-  fetchModes: ['file', 'provider-token'],
-  description: 'Regional job-board snapshots/provider feeds after legal and robots review; not in digest by default.',
-  scriptPath: regionalJobBoardsScriptPath,
-  absoluteScriptPath: regionalJobBoardsAbsoluteScriptPath,
 });
 
 export function listSources() {

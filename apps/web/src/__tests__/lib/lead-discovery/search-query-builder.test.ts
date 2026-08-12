@@ -196,14 +196,12 @@ describe('buildProfileSearchEnv', () => {
     expect(env.HH_SEARCH_TEXT).not.toContain(',')
   })
 
-  it('emits HABR_CAREER_KEYWORDS as comma-joined keywords', () => {
+  it('does not derive Habr search parameters while direct collection is disabled', () => {
     const env = buildProfileSearchEnv(
       'habr-career' as SourceId,
       makeInput({ roles: ['hr', 'sales'] }),
     )
-    expect(env.HABR_CAREER_KEYWORDS).toBeDefined()
-    expect(env.HABR_CAREER_KEYWORDS).toContain(',')
-    expect(env.HABR_CAREER_KEYWORDS.split(',')).toContain('рекрутер')
+    expect(env).toEqual({})
   })
 
   it('emits SUPERJOB_KEYWORD for superjob', () => {

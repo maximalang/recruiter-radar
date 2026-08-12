@@ -48,13 +48,9 @@ FEDRESURS_PROVIDER_API_TOKEN=your_fedresurs_token
 COMPANY_NEWSROOMS_PROVIDER_API_URL=https://api.prnewswire.com
 COMPANY_NEWSROOMS_PROVIDER_API_TOKEN=your_prnewswire_token
 
-# Industry Media
-INDUITY_MEDIA_PROVIDER_API_URL=https://api.muckrack.com
-INDUSTRY_MEDIA_PROVIDER_API_TOKEN=your_muckrack_token
-
-# Regional Job Boards
-REGIONAL_JOB_BOARDS_PROVIDER_API_URL=https://api.regionjob.ru
-REGIONAL_JOB_BOARDS_PROVIDER_API_TOKEN=your_regionjob_token
+# Industry Media (optional provider override; public curated feeds are default)
+INDUSTRY_MEDIA_PROVIDER_API_URL=https://provider.example/api
+INDUSTRY_MEDIA_PROVIDER_API_TOKEN=your_provider_token
 
 # Tech Job Boards (optional for additional coverage)
 TECH_JOB_BOARDS_PROVIDER_API_URL=https://api.greenhouse.io

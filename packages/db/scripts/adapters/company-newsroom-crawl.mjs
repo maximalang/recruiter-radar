@@ -1,6 +1,7 @@
 import { isIP } from 'node:net';
 
 import { fetchText } from './source-http.mjs';
+import { parseRssAtomFeed } from './feed-parser.mjs';
 
 const NEWSROOM_PATH_PATTERN = /(?:^|\/)(?:news|newsroom|press|media|press-center|press_center|novosti|press-releases|press_releases)(?:\/|$)/i;
 const FEED_TYPE_PATTERN = /(?:application|text)\/(?:rss|atom)\+xml/i;
@@ -99,37 +100,15 @@ export function extractCompanyNewsroomItemsFromHtml(html, pageUrl, target) {
 export function parseCompanyNewsroomFeed(xml, feedUrl, target) {
   const records = [];
   const seen = new Set();
-  const blocks = [
-    ...extractElementBlocks(xml, 'item'),
-    ...extractElementBlocks(xml, 'entry'),
-  ];
-
-  for (const block of blocks) {
-    const sourceUrl = resolveSameCompanyUrl(
-      extractElementText(block, 'link') ?? extractLinkHref(block),
-      feedUrl,
-      target,
-    );
-    const headline = cleanText(extractElementText(block, 'title'));
-    const occurredAt = parsePublishedDate(
-      extractElementText(block, 'pubDate')
-        ?? extractElementText(block, 'published')
-        ?? extractElementText(block, 'updated')
-        ?? extractElementText(block, 'dc:date'),
-    );
-    const summary = cleanText(
-      extractElementText(block, 'description')
-        ?? extractElementText(block, 'summary')
-        ?? extractElementText(block, 'content'),
-    );
-
-    if (!sourceUrl || !headline || headline.length < 12 || !occurredAt) continue;
+  for (const item of parseRssAtomFeed(xml, feedUrl, { maxItems: 50 })) {
+    const sourceUrl = resolveSameCompanyUrl(item.url, feedUrl, target);
+    if (!sourceUrl || item.title.length < 12) continue;
     addRecord(records, seen, buildRecord({
       target,
       sourceUrl,
-      headline,
-      summary,
-      occurredAt,
+      headline: item.title,
+      summary: item.summary,
+      occurredAt: item.publishedAt,
       extractionMethod: 'company-feed',
     }));
   }

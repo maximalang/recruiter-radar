@@ -213,7 +213,8 @@ async function verifyHhForbiddenMapping(config) {
         'HH 403 forbidden must map to HhAccessForbiddenError',
       );
       assert.equal(error.status, 403);
-      assert.match(error.message, /IP\/geo restriction/);
+      assert.match(error.message, /does not prove a geo restriction/);
+      assert.match(error.message, /official application OAuth/);
       assert.match(error.message, /RU-resident/);
       return true;
     },

@@ -1,0 +1,11 @@
+[
+  {
+    "id": "cbr-press-releases",
+    "publisher": "Bank of Russia",
+    "url": "https://www.cbr.ru/rss/RssPress",
+    "allowed_host": "cbr.ru",
+    "category": "financial-regulation",
+    "trust_tier": "official",
+    "polling_interval_minutes": 60
+  }
+]

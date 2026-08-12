@@ -21,7 +21,6 @@ export const QUERY_PLANNER_GEOGRAPHY_VERSION_V2 =
 export const QUERY_PLANNER_V2_SOURCES = [
   'hh',
   'superjob',
-  'habr-career',
   'rabota-rossii',
 ] as const
 
@@ -213,7 +212,6 @@ for (const definition of RF_REGIONS) {
 const SOURCE_PAGE_BUDGET: Readonly<Record<QueryPlannerV2Source, number>> = {
   hh: 3,
   superjob: 3,
-  'habr-career': 3,
   'rabota-rossii': 5,
 }
 
@@ -223,10 +221,6 @@ const SOURCE_ALLOWED_OVERRIDE_KEYS: Readonly<
   hh: new Set(['HH_SEARCH_TEXT', 'HH_AREA', 'HH_PAGES', 'HH_PER_PAGE']),
   superjob: new Set([
     'SUPERJOB_KEYWORD', 'SUPERJOB_TOWN', 'SUPERJOB_PAGES', 'SUPERJOB_PER_PAGE',
-  ]),
-  'habr-career': new Set([
-    'HABR_CAREER_KEYWORD', 'HABR_CAREER_KEYWORDS', 'HABR_CAREER_CITY',
-    'HABR_CAREER_REMOTE', 'HABR_CAREER_PAGES',
   ]),
   'rabota-rossii': new Set([
     'RABOTA_ROSSII_SEARCH_TEXT', 'RABOTA_ROSSII_REGION_CODE',
@@ -550,15 +544,6 @@ function buildSourceQueryEnv(input: {
     if (input.geography.resolution === 'resolved' && input.geography.displayName) {
       env.SUPERJOB_TOWN = input.geography.displayName
     }
-  } else if (input.source === 'habr-career') {
-    env.HABR_CAREER_PAGES = String(input.pageBudget)
-    if (input.geography.resolution === 'resolved' && input.geography.displayName) {
-      env.HABR_CAREER_CITY = input.geography.displayName
-    }
-    if (input.geography.remoteRelation === 'region_or_remote' ||
-        input.geography.remoteRelation === 'remote_anywhere') {
-      env.HABR_CAREER_REMOTE = 'true'
-    }
   } else {
     env.RABOTA_ROSSII_PAGES = String(input.pageBudget)
     if (input.geography.rabotaRossiiRegionCodes.length > 0) {
@@ -594,7 +579,6 @@ function resolveEffectivePageBudget(
   const key: Record<QueryPlannerV2Source, string> = {
     hh: 'HH_PAGES',
     superjob: 'SUPERJOB_PAGES',
-    'habr-career': 'HABR_CAREER_PAGES',
     'rabota-rossii': 'RABOTA_ROSSII_PAGES',
   }
   const value = Number(queryEnv[key[source]])

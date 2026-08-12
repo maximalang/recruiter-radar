@@ -9,7 +9,7 @@ import { resolve } from 'node:path';
 import pg from 'pg';
 
 const { Client } = pg;
-const sourceIds = ['company-site', 'company-newsrooms'];
+const sourceIds = ['company-site', 'company-newsrooms', 'industry-media'];
 
 assert.equal(process.env.SOURCE_LIVE_VERIFY, '1', 'SOURCE_LIVE_VERIFY=1 is required.');
 assert.equal(
@@ -44,6 +44,12 @@ try {
   const newsroomMetrics = runSource('source-company-newsrooms.mjs', {
     COMPANY_NEWSROOMS_TARGETS_FILE: newsroomTargetsPath,
   });
+  const industryMediaMetrics = runSource('source-industry-media.mjs', {
+    INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON: JSON.stringify([{
+      company_name: 'Банк России',
+      company_domain: 'cbr.ru',
+    }]),
+  });
 
   assert.equal(siteMetrics.source, 'company-site');
   assert.equal(siteMetrics.action, 'pipeline');
@@ -54,6 +60,14 @@ try {
   assert.ok(newsroomMetrics.normalizedRecords >= 1);
   assert.equal(newsroomMetrics.signalUpsertsCompleted, newsroomMetrics.normalizedRecords);
   assert.equal(newsroomMetrics.crawlErrors, 0);
+  assert.equal(industryMediaMetrics.source, 'industry-media');
+  assert.equal(industryMediaMetrics.action, 'pipeline');
+  assert.ok(industryMediaMetrics.normalizedRecords >= 1);
+  assert.equal(
+    industryMediaMetrics.signalUpsertsCompleted,
+    industryMediaMetrics.normalizedRecords,
+  );
+  assert.equal(industryMediaMetrics.feedErrors, 0);
 
   const verified = await client.query(
     `SELECT
@@ -62,7 +76,11 @@ try {
        COUNT(DISTINCT lineage.signal_id)::int AS signals,
        COUNT(DISTINCT lineage.evidence_id)::int AS evidence,
        COUNT(DISTINCT lineage.organization_id)::int AS organizations,
-       BOOL_AND(lineage.source_url LIKE 'https://vk.company/%') AS official_source_urls,
+       BOOL_AND(CASE
+         WHEN lineage.source = 'industry-media'
+           THEN lineage.source_url LIKE 'https://www.cbr.ru/%'
+         ELSE lineage.source_url LIKE 'https://vk.company/%'
+       END) AS official_source_urls,
        BOOL_AND(lineage.evidence_tier = 'context') AS context_only,
        BOOL_AND(signal.org_id = lineage.organization_id) AS signal_owner_consistent,
        BOOL_AND(evidence.org_id = lineage.organization_id) AS evidence_owner_consistent,
@@ -106,6 +124,10 @@ try {
   assert.ok(
     verified.rows.find((row) => row.source === 'company-newsrooms').extraction_methods.includes('dated-link'),
   );
+  assert.deepEqual(
+    verified.rows.find((row) => row.source === 'industry-media').extraction_methods,
+    ['curated-rss-atom'],
+  );
 
   console.log(JSON.stringify({
     ok: true,
@@ -113,6 +135,7 @@ try {
     mode: 'live-fetch-normalize-ingest-evidence-lineage',
     siteMetrics,
     newsroomMetrics,
+    industryMediaMetrics,
     sources: verified.rows,
   }, null, 2));
 } finally {

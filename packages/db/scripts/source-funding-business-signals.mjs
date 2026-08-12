@@ -96,6 +96,18 @@ export function resolveFundingInput() {
     return { inputMode: 'gdelt-pending', gdeltQueries };
   }
 
+  if (process.env.FUNDING_SIGNALS_GDELT_QUERIES_JSON?.trim()) {
+    return {
+      inputMode: 'expected-zero',
+      inputFilePath: null,
+      recordsReceived: 0,
+      duplicateRecords: 0,
+      normalizedRecords: [],
+      skippedRecords: 0,
+      zeroReason: 'no-eligible-company-targets',
+    };
+  }
+
   throw new Error(
     'No input configured for funding-business-signals.\n'
       + 'Set FUNDING_BUSINESS_SIGNALS_INPUT_FILE for file mode, or\n'
@@ -159,17 +171,24 @@ export async function resolveFundingProviderInput({ providerUrl, providerToken }
 
 export async function resolveFundingGdeltInput({ gdeltQueries }) {
   const records = [];
+  let previousRequestStartedAt = 0;
 
   for (const queryConfig of gdeltQueries) {
+    const waitMs = Math.max(0, resolveGdeltMinIntervalMs() - (Date.now() - previousRequestStartedAt));
+    if (waitMs > 0) {
+      await new Promise((resolveWait) => setTimeout(resolveWait, waitMs));
+    }
+    previousRequestStartedAt = Date.now();
     const gdeltRecords = await fetchGdeltRecords(queryConfig);
     records.push(...gdeltRecords);
   }
 
+  const syndication = dedupeGdeltSyndicationRecords(records);
   const fetchedAt = new Date().toISOString();
   const normalizedRecords = [];
   let skippedRecords = 0;
 
-  for (const [index, record] of records.entries()) {
+  for (const [index, record] of syndication.records.entries()) {
     const normalized = normalizeFundingRecord(record, fetchedAt, index + 1);
 
     if (!normalized) {
@@ -195,7 +214,7 @@ export async function resolveFundingGdeltInput({ gdeltQueries }) {
     liveProvider: 'gdelt-doc-api',
     queriesReceived: gdeltQueries.length,
     recordsReceived: records.length,
-    duplicateRecords: dedupeResult.duplicateRecords,
+    duplicateRecords: syndication.duplicateRecords + dedupeResult.duplicateRecords,
     normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
@@ -208,6 +227,7 @@ async function fetchGdeltRecords(queryConfig) {
   url.searchParams.set('format', 'json');
   url.searchParams.set('maxrecords', String(queryConfig.maxRecords));
   url.searchParams.set('timespan', queryConfig.timespan);
+  url.searchParams.set('sort', 'datedesc');
 
   const body = await fetchJson(url, {
     sourceName: 'funding-business-signals gdelt',
@@ -244,6 +264,12 @@ function mapGdeltArticle(article, queryConfig, index) {
     published_at: parseGdeltDate(article?.seendate),
     source: 'gdelt-doc-api',
     publisher_domain: domain,
+    gdelt_query: queryConfig.query,
+    syndication_fingerprint: buildGdeltSyndicationKey({
+      company_domain: queryConfig.companyDomain,
+      headline: title,
+      published_at: parseGdeltDate(article?.seendate),
+    }),
     raw: article,
   };
 }
@@ -393,6 +419,8 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
   const summary = toNonEmptyText(record.summary ?? record.description);
   const sourceUrl = toUrlOrNull(record.source_url ?? record.url ?? record.article_url);
   const publisherDomain = normalizeDomain(record.publisher_domain ?? record.source_domain ?? record.publisher);
+  const discoveryQuery = toNonEmptyText(record.gdelt_query ?? record.query);
+  const syndicationFingerprint = toNonEmptyText(record.syndication_fingerprint);
   const eventType = toNonEmptyText(record.event_type ?? record.signal_type ?? record.type);
   const amount = toNonEmptyText(record.amount ?? record.funding_amount);
   const currency = toNonEmptyText(record.currency) ?? 'USD';
@@ -448,6 +476,8 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
     summary,
     sourceUrl,
     publisherDomain,
+    discoveryQuery,
+    syndicationFingerprint,
     eventType,
     signalType,
     amount,
@@ -636,6 +666,7 @@ export function buildFetchSummary(input) {
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    zeroReason: input.zeroReason ?? undefined,
   };
 }
 
@@ -655,6 +686,7 @@ function buildIngestSummary(input, stats) {
     evidenceUpsertsCompleted: stats.evidenceUpsertCount,
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
+    zeroReason: input.zeroReason ?? undefined,
   };
 }
 
@@ -674,6 +706,7 @@ function buildPipelineSummary(input, stats) {
     evidenceUpsertsCompleted: stats.evidenceUpsertCount,
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
+    zeroReason: input.zeroReason ?? undefined,
   };
 }
 
@@ -709,7 +742,10 @@ function inferGdeltEventType(title) {
   if (/\bmerger\b|\bmerges\b/.test(normalizedTitle)) return 'merger';
   if (/funding|raises|raised|investment|invests|venture|capital/.test(normalizedTitle)) return 'funding_round';
   if (/hiring|recruit|vacanc|jobs|open positions/.test(normalizedTitle)) return 'hiring_context';
-  if (/expands|expansion|launches|opens office|new office/.test(normalizedTitle)) return 'expansion';
+  if (/government contract|public contract|wins contract|awarded contract/.test(normalizedTitle)) return 'government_contract';
+  if (/layoff|redundan|job cuts|сокращ|увольнен/.test(normalizedTitle)) return 'layoffs';
+  if (/restructur|реорганизац|реструктур/.test(normalizedTitle)) return 'restructuring';
+  if (/expands|expansion|launches|opens office|new office|new factory|opens factory/.test(normalizedTitle)) return 'expansion';
 
   return 'press_mention';
 }
@@ -752,6 +788,10 @@ function clampInteger(value, fallback, min, max) {
 
 function resolveGdeltTimeoutMs() {
   return clampInteger(process.env.FUNDING_SIGNALS_GDELT_TIMEOUT_MS, 60000, 5000, 120000);
+}
+
+function resolveGdeltMinIntervalMs() {
+  return clampInteger(process.env.FUNDING_SIGNALS_GDELT_MIN_INTERVAL_MS, 6000, 5000, 30000);
 }
 
 function buildSignalSummaryText(record) {
@@ -800,8 +840,36 @@ function buildSignalPayload(record) {
     investors: record.investors,
     source_url: record.sourceUrl,
     publisher_domain: record.publisherDomain,
+    discovery_query: record.discoveryQuery,
+    syndication_fingerprint: record.syndicationFingerprint,
     fetched_at: record.fetchedAt,
   };
+}
+
+function dedupeGdeltSyndicationRecords(records) {
+  const seen = new Set();
+  const deduped = [];
+  let duplicateRecords = 0;
+  for (const record of records) {
+    const key = buildGdeltSyndicationKey(record);
+    if (key && seen.has(key)) {
+      duplicateRecords += 1;
+      continue;
+    }
+    if (key) seen.add(key);
+    deduped.push(record);
+  }
+  return { records: deduped, duplicateRecords };
+}
+
+function buildGdeltSyndicationKey(record) {
+  const company = normalizeDomain(record?.company_domain);
+  const headline = normalizeSourceKeyText(record?.headline ?? record?.title)
+    ?.replace(/[^a-z0-9\u0400-\u04ff]+/giu, ' ')
+    .trim();
+  const published = toTimestampOrNull(record?.published_at ?? record?.occurred_at);
+  if (!company || !headline || !published) return null;
+  return `${company}|${published.slice(0, 10)}|${headline}`;
 }
 
 function buildOrgSourceMetadata(record, sourceKey) {

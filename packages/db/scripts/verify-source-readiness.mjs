@@ -33,7 +33,6 @@ const expectedSources = [
   'habr-career',
   'company-newsrooms',
   'industry-media',
-  'regional-job-boards',
   'fns-open-data',
   'government-procurement',
   'cbr-registry',
@@ -60,7 +59,6 @@ const digestLeadSources = [
   'habr-career',
   'tech-job-boards',
   'linkedin-company-pages',
-  'regional-job-boards',
 ];
 const digestContextSources = [
   'funding-business-signals',
@@ -86,7 +84,6 @@ const providerTokenSources = [
   'habr-career',
   'company-newsrooms',
   'industry-media',
-  'regional-job-boards',
 ];
 const requireLiveConfig = process.argv.includes('--require-live-config')
   || process.env.SOURCE_READINESS_REQUIRE_LIVE_CONFIG === '1';

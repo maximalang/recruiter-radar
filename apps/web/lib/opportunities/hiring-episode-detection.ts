@@ -558,6 +558,11 @@ export function canonicalizeVacancies(
 ): CanonicalVacancy[] {
   const parent = signals.map((_, index) => index)
   const explicitIdsByProvider = signals.map(explicitIdsForSignal)
+  const publicationTimes = signals.map((signal) => Date.parse(signal.occurredAt))
+  const earliestPublicationByRoot = publicationTimes.map((timestamp) =>
+    Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY)
+  const latestPublicationByRoot = publicationTimes.map((timestamp) =>
+    Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY)
   const find = (index: number): number => {
     while (parent[index] !== index) {
       parent[index] = parent[parent[index]]
@@ -565,7 +570,7 @@ export function canonicalizeVacancies(
     }
     return index
   }
-  const union = (left: number, right: number) => {
+  const union = (left: number, right: number, enforcePublicationWindow: boolean) => {
     const leftRoot = find(left)
     const rightRoot = find(right)
     if (leftRoot === rightRoot) return
@@ -581,7 +586,26 @@ export function canonicalizeVacancies(
       })
       return
     }
+    if (enforcePublicationWindow) {
+      const earliestPublication = Math.min(
+        earliestPublicationByRoot[leftRoot],
+        earliestPublicationByRoot[rightRoot],
+      )
+      const latestPublication = Math.max(
+        latestPublicationByRoot[leftRoot],
+        latestPublicationByRoot[rightRoot],
+      )
+      if (latestPublication - earliestPublication > VACANCY_PUBLICATION_WINDOW_MS) return
+    }
     parent[rightRoot] = leftRoot
+    earliestPublicationByRoot[leftRoot] = Math.min(
+      earliestPublicationByRoot[leftRoot],
+      earliestPublicationByRoot[rightRoot],
+    )
+    latestPublicationByRoot[leftRoot] = Math.max(
+      latestPublicationByRoot[leftRoot],
+      latestPublicationByRoot[rightRoot],
+    )
     explicitIdsByProvider[leftRoot] = mergeExplicitIdsByProvider(
       explicitIdsByProvider[leftRoot],
       explicitIdsByProvider[rightRoot],
@@ -590,9 +614,8 @@ export function canonicalizeVacancies(
 
   signals.forEach((signal, index) => {
     for (let otherIndex = 0; otherIndex < index; otherIndex += 1) {
-      if (publicationsReferToSameVacancy(signal, signals[otherIndex])) {
-        union(index, otherIndex)
-      }
+      const matchKind = vacancyPublicationMatchKind(signal, signals[otherIndex])
+      if (matchKind) union(index, otherIndex, matchKind === 'fallback')
     }
   })
 
@@ -667,27 +690,31 @@ function explicitVacancyIdentity(signal: HiringSignalInput): string | null {
   if (signal.externalVacancyId) {
     return `external:${normalizeText(signal.source)}:${normalizeExternalVacancyId(signal.externalVacancyId)}`
   }
-  return signal.sourceUrl ? `url:${signal.sourceUrl}` : null
+  const canonicalUrl = canonicalVacancyUrl(signal.sourceUrl)
+  return canonicalUrl ? `url:${canonicalUrl}` : null
 }
 
-function publicationsReferToSameVacancy(
+function vacancyPublicationMatchKind(
   left: HiringSignalInput,
   right: HiringSignalInput,
-): boolean {
+): 'explicit' | 'url' | 'fallback' | null {
   const leftExplicit = explicitVacancyIdentity(left)
   const rightExplicit = explicitVacancyIdentity(right)
-  if (leftExplicit && leftExplicit === rightExplicit) return true
-  if (left.sourceUrl && left.sourceUrl === right.sourceUrl) return true
+  if (leftExplicit && leftExplicit === rightExplicit) return 'explicit'
+  const leftUrl = canonicalVacancyUrl(left.sourceUrl)
+  const rightUrl = canonicalVacancyUrl(right.sourceUrl)
+  if (leftUrl && leftUrl === rightUrl) return 'url'
   if (fallbackVacancyFingerprint(left) !== fallbackVacancyFingerprint(right)) {
-    return false
+    return null
   }
+  if (!withinPublicationWindow(left.occurredAt, right.occurredAt)) return null
   const conflictingSameSourceIds =
     normalizeText(left.source) === normalizeText(right.source) &&
     Boolean(left.externalVacancyId) &&
     Boolean(right.externalVacancyId) &&
     normalizeExternalVacancyId(left.externalVacancyId ?? '') !==
       normalizeExternalVacancyId(right.externalVacancyId ?? '')
-  return !conflictingSameSourceIds
+  return conflictingSameSourceIds ? null : 'fallback'
 }
 
 function canonicalVacancyIdentity(publications: HiringSignalInput[]): string {
@@ -698,13 +725,21 @@ function canonicalVacancyIdentity(publications: HiringSignalInput[]): string {
   ))
   if (externalIds.length === 1) return `external:${externalIds[0]}`
 
-  const urls = uniqueSorted(publications.flatMap((publication) =>
-    publication.sourceUrl ? [publication.sourceUrl] : [],
-  ))
+  const urls = uniqueSorted(publications.flatMap((publication) => {
+    const url = canonicalVacancyUrl(publication.sourceUrl)
+    return url ? [url] : []
+  }))
   if (urls.length === 1) return `url:${urls[0]}`
 
   const fallbacks = uniqueSorted(publications.map(fallbackVacancyFingerprint))
-  return `fallback:${fallbacks.join('||')}`
+  const firstPublication = [...publications]
+    .map((publication) => Date.parse(publication.occurredAt))
+    .filter(Number.isFinite)
+    .sort((left, right) => left - right)[0]
+  const windowAnchor = typeof firstPublication === 'number' && Number.isFinite(firstPublication)
+    ? new Date(firstPublication).toISOString().slice(0, 10)
+    : 'unknown'
+  return `fallback:${fallbacks.join('||')}:window:${windowAnchor}`
 }
 
 function fallbackVacancyFingerprint(signal: HiringSignalInput): string {
@@ -713,6 +748,36 @@ function fallbackVacancyFingerprint(signal: HiringSignalInput): string {
     normalizeRoleTitle(signal.title),
     normalizeRoleTitle(signal.region ?? ''),
   ].join('|')
+}
+
+const VACANCY_PUBLICATION_WINDOW_MS = 21 * DAY_MS
+
+function withinPublicationWindow(left: string, right: string): boolean {
+  const leftTime = Date.parse(left)
+  const rightTime = Date.parse(right)
+  return Number.isFinite(leftTime)
+    && Number.isFinite(rightTime)
+    && Math.abs(leftTime - rightTime) <= VACANCY_PUBLICATION_WINDOW_MS
+}
+
+function canonicalVacancyUrl(value: string | null): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    if (!['http:', 'https:'].includes(url.protocol)) return null
+    url.hash = ''
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^utm_/i.test(key) || ['ref', 'from', 'source', 'campaign'].includes(key.toLowerCase())) {
+        url.searchParams.delete(key)
+      }
+    }
+    url.searchParams.sort()
+    url.hostname = url.hostname.toLowerCase()
+    if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, '')
+    return url.toString()
+  } catch {
+    return null
+  }
 }
 
 function repeatedVacancyIdentity(signal: HiringSignalInput): string {

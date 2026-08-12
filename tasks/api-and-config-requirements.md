@@ -58,7 +58,7 @@
 - **Boundary:** каждая запись обязана содержать официальный URL ФНС; сторонние зеркала и произвольные provider endpoint отключены.
 
 ### `funding-business-signals` 🟡
-- **Free path:** `FUNDING_SIGNALS_GDELT_QUERIES="russia funding,seed round russia"` (GDELT public API).
+- **Free path:** `DATABASE_URL` lets the daily supporting stage build bounded exact-company GDELT queries only for tracked organizations with hiring evidence and a strong domain. Operator query JSON remains an override.
 - **Provider path:** `FUNDING_SIGNALS_PROVIDER_API_URL` + `FUNDING_SIGNALS_PROVIDER_API_TOKEN` (Crunchbase, PitchBook, Dealroom).
 
 ### `transparent-business-fns` 🟡
@@ -70,20 +70,19 @@
 - **Provider path:** `FEDRESURS_PROVIDER_API_URL` + `FEDRESURS_PROVIDER_API_TOKEN`
 
 ### `habr-career` 🟡
-- **Free path:** `HABR_CAREER_INPUT_FILE=path/to/fixture.json`
-- **Provider path:** `HABR_CAREER_PROVIDER_API_URL` + `HABR_CAREER_PROVIDER_API_TOKEN`
+- **Snapshot path:** `HABR_CAREER_INPUT_FILE=path/to/reviewed-lawful-snapshot.json`
+- **Provider path:** `HABR_CAREER_PROVIDER_API_URL` + `HABR_CAREER_PROVIDER_API_TOKEN` after explicit permission. Direct commercial HTML collection is disabled.
 
 ### `company-newsrooms` 🟡
 - **Free path:** `COMPANY_NEWSROOMS_INPUT_FILE` или `COMPANY_NEWSROOMS_TARGETS_FILE`
 - **Provider path:** `COMPANY_NEWSROOMS_PROVIDER_API_URL` + `COMPANY_NEWSROOMS_PROVIDER_API_TOKEN`
 
 ### `industry-media` 🟡
-- **Free path:** `INDUSTRY_MEDIA_INPUT_FILE`
+- **Free path:** checked-in allowlisted public RSS/Atom registry plus automatic tracked-company matching through `DATABASE_URL`; `INDUSTRY_MEDIA_FEED_REGISTRY_FILE` is an operator override.
 - **Provider path:** `INDUSTRY_MEDIA_PROVIDER_API_URL` + `INDUSTRY_MEDIA_PROVIDER_API_TOKEN`
 
-### `regional-job-boards` 🟡
-- **Free path:** `REGIONAL_JOB_BOARDS_INPUT_FILE`
-- **Provider path:** `REGIONAL_JOB_BOARDS_PROVIDER_API_URL` + `REGIONAL_JOB_BOARDS_PROVIDER_API_TOKEN`
+### Regional/specialist boards
+- The generic `regional-job-boards` pseudo-source is retired. Add a concrete source ID only after its official/public access and provenance have been reviewed.
 
 ### `superjob` 🟡
 - **Free path:** `SUPERJOB_INPUT_FILE`
@@ -167,10 +166,9 @@
 | funding-signals | 🟡 | $0 / $99-500 | GDELT или Crunchbase |
 | transparent-fns | 🟡 | $0 / $50-200 | provider |
 | fedresurs | 🟡 | $0 / $50-200 | provider |
-| habr-career | 🟡 | $0 | INPUT_FILE достаточно |
-| company-newsrooms | 🟡 | $0 / $50-100 | targets file |
-| industry-media | 🟡 | $0 / $50-100 | INPUT_FILE |
-| regional-job-boards | 🟡 | $0 | INPUT_FILE |
+| habr-career | 🟡 | $0 / provider | reviewed lawful snapshot or explicit provider permission |
+| company-newsrooms | 🟢 | $0 / $50-100 | auto targets + optional provider |
+| industry-media | 🟢 | $0 / $50-100 | curated RSS/Atom + optional provider |
 | superjob | 🟡 | $0 | бесплатная регистрация app |
 | linkedin-company-pages | 🔴 | $39-200 | **выбрать provider** |
 | **cheerio** | engine | $0 | — |

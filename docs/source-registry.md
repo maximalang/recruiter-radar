@@ -8,12 +8,12 @@
 > policy; never relax policy to preserve prose. Per-source legal/robots reviews live in
 > `docs/source-review/`; cross-cutting policy in `docs/source-priority-policy.md`.
 
-Last reconciled: **2026-08-12** against `source-policy.json`, `source-readiness.json`,
+Last reconciled: **2026-08-13** against `source-policy.json`, `source-readiness.json`,
 `source-registry.mjs`, `source-digest-evidence.sql`, and `docs/source-review/`.
 
 ---
 
-## Policy and observed-runtime snapshot (2026-08-12 reconciliation)
+## Policy and observed-runtime snapshot (2026-08-13 reconciliation)
 
 **Digest-allowed by canonical policy: 9** — `hh`, `career-pages`, `greenhouse`, `lever`,
 `ashby`, `recruitee`, `workable`, `rabota-rossii`, and `superjob`.
@@ -32,11 +32,12 @@ environment.
 | recruitee | production disposable DB: 50 signals/evidence/lineage | digest-allowed; live-verified | official public Careers Site API; sensitive provider fields stripped |
 | workable | production disposable DB: 12 signals/evidence/lineage | digest-allowed; live-verified | public account jobs endpoint; account discovered from company page |
 | smartrecruiters | local public API: 8 normalized; production HTTP 403 | blocked from digest | adapter retained; production egress/proxy path is not currently reachable |
-| habr-career | historical HTTP 200 | blocked from digest | confidence and legal/robots gates remain open in policy |
+| habr-career | direct HTML disabled | blocked from digest | Class C; reviewed lawful snapshot or explicitly permitted provider only |
 | superjob | current disposable live DB: 40 signals/evidence/lineage | digest-allowed; live-verified | production app-id found; 32 direct-employer eligible, 8 non-direct rejected |
 | hh | unauthenticated `/areas` HTTP 200; `/vacancies` HTTP 403 | digest-allowed; registration-required | official application OAuth implemented; `HH_CLIENT_ID`/`HH_CLIENT_SECRET` absent, so geo is not yet proven |
+| industry-media | production disposable DB: 6 signals/evidence/lineage | context-only; live-verified | official CBR RSS; allowlisted host/public DNS, one tracked organization, zero sensitive payload fields |
 | egrul-fns / transparent-business / fedresurs | n/a | enrichment/context only | never originate leads |
-| tech-job-boards / linkedin / regional / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set |
+| tech-job-boards / linkedin / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set; generic regional pseudo-source retired |
 
 **Still blocked, documented in `docs/source-review/`:** avito (robots disallow `/api/`+catalog),
 rabota.ru (BI.ZONE WAF), zarplata.ru (= HH backend, same 403), Telegram channels (rejected by
@@ -90,9 +91,9 @@ A source reaching the digest is gated in **two** independent places. Both must a
    signal.source IN ('hh', 'career-pages', 'greenhouse', 'lever', 'ashby',
                       'recruitee', 'workable', 'smartrecruiters',
                       'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards',
-                      'linkedin-company-pages', 'regional-job-boards')
+                      'linkedin-company-pages')
    ```
-   Only `signal_type = 'job_posting'` rows from these 14 sources are even *considered*.
+   Only `signal_type = 'job_posting'` rows from these 13 sources are even *considered*.
 
 2. **`promotionStatus`** — even when a source is in the SQL whitelist, if its
    `promotionStatus` is `blocked-from-digest-pending-confidence-tests` it is held out of
@@ -224,11 +225,11 @@ INNs only; third-party mirrors, arbitrary endpoints, and 12-digit IP/person reco
 | id | class / evidence tier | leadEligibility | promotionStatus | live? |
 |---|---|---|---|---|
 | **superjob** | primary-platform / medium-signal (0.66) | confidence-gated-evidence | **digest-allowed** | free-registration app-id; live-verified |
-| **habr-career** | primary-platform / medium-signal (0.69) | confidence-gated-evidence | **blocked-from-digest-pending-confidence-tests** | public/provider path; legal and confidence gates open |
+| **habr-career** | primary-platform / medium-signal (0.69) | confidence-gated-evidence | **blocked-from-digest-pending-confidence-tests** | reviewed snapshot or permitted provider only; direct HTML disabled |
 | **tech-job-boards** | primary-platform / medium-signal (0.68) | confidence-gated-evidence | blocked-from-digest | live + provider |
 | **linkedin-company-pages** | primary-platform / medium-signal (0.72) | confidence-gated-evidence | blocked-from-digest | provider-token only |
 | **company-site** | company-surface / medium-signal (0.68) | enrichment-only | supporting-evidence-only | live-public; production-runtime verified |
-| **funding-business-signals** | market-signal / context-only (0.58) | context-only | never-lead-originating | live + provider |
+| **funding-business-signals** | market-signal / context-only (0.58) | context-only | never-lead-originating | free public GDELT + provider; identity-bound automatic targets |
 
 **superjob** — needs the free-registration `SUPERJOB_API_APP_ID`; anonymous API is not a
 production path. The 2026-08-12 production-runtime disposable DB verifier persisted 40 live
@@ -236,13 +237,10 @@ vacancies end-to-end. Explicit publisher attribution admitted 32 direct-employer
 rejected 8 recruitment-agency/outsourcing/aggregator postings from candidate origination, with
 zero eligibility mismatches and no sensitive payload fields. Pagination remains built in.
 
-**habr-career** — public HTML/provider paths exist, but policy holds the source out of digest
-delivery until the outstanding legal/robots review and confidence tests are complete. Only
-public `/vacancies` listings are in scope; candidate/PII surfaces remain prohibited.
-Single-source platform aggregation → gated at C until corroborated.
-Keyword breadth is derived from active profiles' roles at ingest time
-(`deriveHabrKeywordsFromProfiles`); was a contributor to the leads=0 pipeline gap (see memory
-`project_leads_pipeline_gaps`). Live probe 200 as of 2026-06-30.
+**habr-career** — direct commercial HTML collection is disabled. The current agreement's
+copying/commercial-use restrictions are controlling even though robots.txt allows the listing
+path. Only a reviewed lawful snapshot or explicitly permitted provider may be run manually;
+candidate/PII surfaces remain prohibited and the source stays outside automatic ingestion.
 
 **tech-job-boards** — legacy curated/provider shell for generic technology boards. Concrete
 Greenhouse, Lever, Ashby, Recruitee, Workable, and SmartRecruiters boards now use individual
@@ -257,7 +255,10 @@ supporting stage derives only already-tracked companies and refreshes a company 
 A 2026-08-12 production-runtime disposable DB run persisted the official VK page end-to-end.
 
 **funding-business-signals** — funding/growth context; must not create a lead without direct
-hiring evidence elsewhere.
+hiring evidence elsewhere. The daily supporting stage builds at most four exact-name GDELT
+queries from tracked companies that already have a strong domain and hiring evidence, with a
+23-hour refresh guard. A controlled request reached the official API but returned HTTP 429, so
+live normalization is not claimed.
 
 ---
 
@@ -266,18 +267,18 @@ hiring evidence elsewhere.
 | id | class / evidence tier | leadEligibility | promotionStatus | live? |
 |---|---|---|---|---|
 | **company-newsrooms** | company-surface / context-only (0.60) | context-only | never-lead-originating | live public discovery + provider; production-runtime verified |
-| **industry-media** | market-signal / context-only (0.52) | context-only | never-lead-originating | provider-token |
-| **regional-job-boards** | primary-platform / medium-signal (0.58) | confidence-gated-evidence | blocked-from-digest | provider-token |
+| **industry-media** | market-signal / context-only (0.52) | context-only | never-lead-originating | curated public RSS/Atom + optional provider |
 
 **company-newsrooms / industry-media** — context only; an article publisher domain must **never**
-become company identity. `company-newsrooms` now discovers same-company listings and RSS/Atom
+become company identity. `company-newsrooms` discovers same-company listings and RSS/Atom
 feeds for already-tracked organizations, requires dated article-level records, and refreshes at
 most daily. A 2026-08-12 production-runtime disposable DB run persisted 30 official VK releases
 with one organization owner, context-only evidence, exact source URLs, and zero sensitive fields.
-Supporting context never originates a lead alone.
+Supporting context never originates a lead alone. `industry-media` polls an allowlisted feed
+registry and matches articles only to already-tracked companies with hiring evidence.
 
-**regional-job-boards** — each board needs its own legal/robots/provider review and confidence
-gates before digest use.
+The generic **regional-job-boards** pseudo-source is retired. Each board needs a concrete source
+ID plus its own official-access, legal, provenance, and confidence review.
 
 ---
 

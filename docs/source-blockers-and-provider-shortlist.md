@@ -96,16 +96,16 @@ This document provides an honest operational report on source readiness, blocker
   - Digest: Never lead-originating
 
 - **industry-media**: Industry media coverage
-  - Status: Curated/provider only
+  - Status: Allowlisted public RSS/Atom live path plus optional provider
   - Blocker: Publisher domains ≠ company identity
   - Ready: Yes
   - Digest: Never lead-originating
 
-- **regional-job-boards**: Regional job boards
-  - Status: Provider/snapshot per board
-  - Blocker: Legal/robots review required per board
-  - Ready: Yes with provider
-  - Digest: Blocked until confidence gates
+- **regional/specialist boards**: no generic runtime source
+  - Status: each board must receive a concrete source ID
+  - Blocker: official/public access, provenance, legal review, and confidence gates per board
+  - Ready: only after concrete-source review
+  - Digest: blocked until the concrete source passes its gates
 
 ## API-Mega-List Provider Shortlist
 

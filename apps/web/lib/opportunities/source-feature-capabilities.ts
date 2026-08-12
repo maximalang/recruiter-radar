@@ -105,7 +105,6 @@ export const SOURCE_FEATURE_CAPABILITIES: Record<SourceId, CapabilitySet> = {
   'rabota-rossii': vacancySource({ salary: true }),
   'company-site': vacancySource({ salary: true, corporateContact: true }),
   'tech-job-boards': vacancySource({ salary: true }),
-  'regional-job-boards': vacancySource({ salary: true }),
   'funding-business-signals': nonVacancySource(),
   fedresurs: nonVacancySource({ economics: true }),
   'transparent-business-fns': nonVacancySource({ economics: true }),

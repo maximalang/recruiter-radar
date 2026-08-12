@@ -14,6 +14,7 @@ const jobSourceLiveVerifierPath = resolve(repoRoot, 'packages', 'db', 'scripts',
 const sourceLiveDbRunnerPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'run-source-live-db-verifier.mjs')
 const credentialManifestPath = resolve(repoRoot, 'packages', 'db', 'source-credentials.json')
 const credentialVerifierPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'verify-source-credentials.mjs')
+const habrSourcePath = resolve(repoRoot, 'packages', 'db', 'scripts', 'source-habr-career.mjs')
 
 const SOURCE_IDS = [
   'hh',
@@ -29,7 +30,6 @@ const SOURCE_IDS = [
   'superjob',
   'tech-job-boards',
   'linkedin-company-pages',
-  'regional-job-boards',
   'egrul-fns',
   'transparent-business-fns',
   'fedresurs',
@@ -364,6 +364,14 @@ describe('source live readiness contract', () => {
       accessClass: 'A',
       credentialSets: [],
     }))
+    expect(manifest.sources['funding-business-signals']).toEqual(expect.objectContaining({
+      accessClass: 'A',
+      registration: 'none-for-gdelt',
+    }))
+    expect(manifest.sources['habr-career']).toEqual(expect.objectContaining({
+      accessClass: 'C',
+      registration: 'explicit-permission-or-provider',
+    }))
 
     const serialized = JSON.stringify(manifest)
     expect(serialized).not.toMatch(/(secretValue|tokenValue|credentialValue)/i)
@@ -381,5 +389,17 @@ describe('source live readiness contract', () => {
     expect(report.sources.find((source: { id: string }) => source.id === 'rabota-rossii')).toEqual(
       expect.objectContaining({ accessClass: 'A', configuredNow: true }),
     )
+  })
+
+  it('keeps Habr Career direct commercial HTML collection disabled', () => {
+    const source = readFileSync(habrSourcePath, 'utf8')
+    expect(source).not.toContain('fetchHabrCareerPages')
+    expect(source).not.toContain('HABR_CAREER_KEYWORD')
+    expect(source).not.toContain('live-scrape')
+
+    const readiness = readReadinessContract().sources['habr-career']
+    expect(readiness.configuration.mode).toBe('provider-required')
+    expect(readiness.live.state).toBe('blocked')
+    expect(readiness.legalReview).toBe('required')
   })
 })

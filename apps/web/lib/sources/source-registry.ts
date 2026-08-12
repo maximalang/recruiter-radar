@@ -27,7 +27,6 @@ export type SourceId =
   | 'rabota-rossii'
   | 'company-site'
   | 'tech-job-boards'
-  | 'regional-job-boards'
   | 'funding-business-signals'
   | 'fedresurs'
   | 'transparent-business-fns'
@@ -116,28 +115,15 @@ const SOURCE_REGISTRY: SourceConfig[] = [
   {
     id: 'habr-career',
     name: 'Habr Career',
-    description: 'IT-focused job board',
+    description: 'IT job-board evidence from reviewed snapshots or an explicitly permitted provider',
     script: 'source-habr-career.mjs',
     requiredEnvVars: [],
     envPrefixes: ['HABR_'],
-    searchEnvVars: [
-      'HABR_CAREER_KEYWORD', 'HABR_CAREER_KEYWORDS', 'HABR_CAREER_PAGES',
-      'HABR_CAREER_TYPE', 'HABR_CAREER_QUALIFICATION', 'HABR_CAREER_REMOTE',
-      'HABR_CAREER_RELOCATION', 'HABR_CAREER_CITY', 'HABR_CAREER_CURRENCY',
-      'HABR_CAREER_SALAY_FROM', 'HABR_CAREER_SALAY_TO',
-    ],
-    isPrimary: true,
+    searchEnvVars: [],
+    isPrimary: false,
     category: 'job-board',
-    // Per-source timeout 240s (raised from the 120s default on 2026-07-15):
-    // career.habr.com is scraped (no partner API), with a respectful 2s
-    // SCRAPE_DELAY_MS between pages. With the multi-keyword derivation feeding
-    // ~9 role keywords × 3 pages, a run issues ~27 fetches (~54s in delay alone)
-    // plus per-card HTML extraction plus 150+ signal upserts — it reliably
-    // exceeds the 120s default. A 120s execFile kill was discarding EVERY fetched
-    // record each day (the run that reached the DB wrote 0; the 165 that appeared
-    // in logs were lost), so habr-career silently produced no signals from the
-    // cron despite a successful fetch. 240s matches the career-pages precedent.
-    timeoutMs: 240_000,
+    // Direct commercial HTML collection is disabled under the current Habr
+    // agreement. Manual runs require a reviewed snapshot or permitted provider.
   },
   {
     id: 'linkedin-company-pages',
@@ -348,26 +334,6 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     category: 'job-board',
   },
   {
-    id: 'regional-job-boards',
-    name: 'Regional Russian job boards',
-    description: 'Regional Russian job-board vacancies — file or provider feed',
-    script: 'source-regional-job-boards.mjs',
-    // File mode (REGIONAL_JOB_BOARDS_INPUT_FILE) or provider mode
-    // (REGIONAL_JOB_BOARDS_PROVIDER_API_URL + _TOKEN). There is no free live
-    // crawl — the operator supplies a feed after a legal/robots review, which
-    // is why requiredEnvVars is empty (no key is technically required, but the
-    // feed must be configured or the script exits with a clear "no input"
-    // error). Digest-eligible: signal_type 'job_posting', accepted by the
-    // digest SQL.
-    requiredEnvVars: [],
-    envPrefixes: ['REGIONAL_JOB_BOARDS_'],
-    searchEnvVars: [],
-    // NOT primary: needs an operator-supplied feed and a per-board legal review.
-    // Run on demand from the admin panel once a feed is configured.
-    isPrimary: false,
-    category: 'job-board',
-  },
-  {
     id: 'funding-business-signals',
     name: 'Funding & business signals (GDELT)',
     description: 'Funding rounds / venture signals — corroborating context (not a lead trigger)',
@@ -376,34 +342,33 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // public GDELT global news/event database (no paid key). File mode
     // (FUNDING_BUSINESS_SIGNALS_INPUT_FILE) and provider mode
     // (FUNDING_SIGNALS_PROVIDER_API_URL + _TOKEN) are also supported.
-    // FUNDING_SIGNALS_GDELT_QUERIES is listed as a searchEnvVar so it is
-    // EXCLUDED from the caller env whitelist and instead derived per-profile
-    // from the active profiles' ICP (gdelt-query-builder) — same contract as
-    // the job-board search params. An operator can still pin it via
-    // user_search_preferences; the derived default only fills when unset.
+    // Automatic query JSON is derived from already tracked companies with
+    // hiring evidence plus a strong domain. Broad industry-only queries are
+    // rejected because they cannot attribute the article subject safely.
     requiredEnvVars: [],
     envPrefixes: ['FUNDING_BUSINESS_SIGNALS_', 'FUNDING_SIGNALS_'],
-    searchEnvVars: ['FUNDING_SIGNALS_GDELT_QUERIES'],
+    searchEnvVars: ['FUNDING_SIGNALS_GDELT_QUERIES', 'FUNDING_SIGNALS_GDELT_QUERIES_JSON'],
     // CONTEXT-only source (2026-07-15): signal_type 'funding' / 'funding_round'
     // does NOT originate a lead — per Gate D, context without direct hiring
     // proof is supporting context only, never a lead. The digest SQL filters
     // to signal_type='job_posting' for lead candidacy, so these records
     // corroborate org identity (INN/OGRN/domain) but never surface as leads on
-    // their own. Run on demand from the admin panel to enrich the context pool;
-    // a future enhancement can read them as Urgency corroboration on an EXISTING
-    // job_posting lead (that would be a digest-SQL change — deferred).
+    // their own. It runs after primary hiring ingestion and refreshes only
+    // existing companies, never cold subjects.
     isPrimary: false,
-    category: 'registry',
+    dailyStage: 'supporting',
+    category: 'business-signal',
   },
   {
     id: 'industry-media',
     name: 'Industry media',
-    description: 'Curated industry-media events used as supporting context only',
+    description: 'Curated public RSS/Atom company mentions used as supporting context only',
     script: 'source-industry-media.mjs',
     requiredEnvVars: [],
     envPrefixes: ['INDUSTRY_MEDIA_'],
-    searchEnvVars: [],
+    searchEnvVars: ['INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON'],
     isPrimary: false,
+    dailyStage: 'supporting',
     category: 'business-signal',
   },
   {
