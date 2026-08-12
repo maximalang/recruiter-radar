@@ -22,11 +22,21 @@ const database = new Pool({
   connectionTimeoutMillis: 10_000,
 });
 
-const plugins = [jwt()];
+const jwtPlugin = jwt({
+  disableSettingJwtHeader: true,
+  jwks: {
+    // The operator resource server intentionally supports a small asymmetric
+    // algorithm allowlist. ES256 keeps that contract narrow and interoperable.
+    keyPairConfig: { alg: "ES256" },
+    // Better Auth encrypts private keys by default. Rotate without invalidating
+    // tokens signed by the previous key during the grace period.
+    rotationInterval: 60 * 60 * 24 * 30,
+    gracePeriod: 60 * 60 * 24 * 30,
+  },
+});
 
-if (runtime.mcpEnabled) {
-  plugins.push(
-    oauthProvider({
+const oauthPlugin = runtime.mcpEnabled
+  ? oauthProvider({
       loginPage: "/login",
       consentPage: "/auth/mcp-consent",
       validAudiences: [BETTER_AUTH_MCP_RESOURCE],
@@ -42,9 +52,8 @@ if (runtime.mcpEnabled) {
       },
       allowDynamicClientRegistration: runtime.dcrEnabled,
       allowUnauthenticatedClientRegistration: runtime.dcrEnabled,
-    }),
-  );
-}
+    })
+  : null;
 
 export const auth = betterAuth({
   appName: "Recruiter Radar",
@@ -53,6 +62,9 @@ export const auth = betterAuth({
   baseURL: runtime.baseOrigin,
   basePath: BETTER_AUTH_BASE_PATH,
   trustedOrigins: [runtime.baseOrigin],
+  // OAuth Provider mode has its own standards-compliant token endpoint.
+  // Do not expose the generic JWT /token endpoint as a parallel bearer path.
+  disabledPaths: ["/token"],
   emailAndPassword: {
     enabled: false,
   },
@@ -79,7 +91,7 @@ export const auth = betterAuth({
     useSecureCookies: runtime.baseOrigin.startsWith("https://"),
     cookiePrefix: "rr_identity",
   },
-  plugins,
+  plugins: oauthPlugin ? [jwtPlugin, oauthPlugin] : [jwtPlugin],
 });
 
 export type RecruiterRadarBetterAuth = typeof auth;
