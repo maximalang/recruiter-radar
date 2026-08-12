@@ -1,0 +1,40 @@
+name: Operator Sync Diagnostics
+
+on:
+  push:
+    branches: [codex/operator-mcp-local-oidc]
+    paths: [.github/workflows/operator-sync-diagnostics.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/operator-mcp-local-oidc
+          fetch-depth: 0
+      - name: Merge latest main and improve DCR assertion diagnostics
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git merge --no-edit origin/main
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('operator-auth/test/security.test.js')
+          s = p.read_text()
+          old = """  assert.equal(response.status, 201)\n  const body = await response.json()"""
+          new = """  const body = await response.json()\n  assert.equal(response.status, 201, JSON.stringify(body))"""
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+          PY
+          git add operator-auth/test/security.test.js
+          if ! git diff --cached --quiet; then
+            git commit -m 'test(operator-auth): preserve DCR error details'
+          fi
+          git push origin HEAD:codex/operator-mcp-local-oidc
