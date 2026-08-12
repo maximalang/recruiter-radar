@@ -1,0 +1,100 @@
+name: Operator MCP Runtime Smoke
+
+# Verifies the real host-agent adapter path after the isolated operator bootstrap.
+# This intentionally exercises only read-only allowlisted actions and never prints
+# service log contents, environment values, credentials, or arbitrary host data.
+on:
+  workflow_run:
+    workflows: [Operator MCP Bootstrap]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: operator-mcp-runtime-smoke-prod
+  cancel-in-progress: false
+
+jobs:
+  runtime-smoke:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Verify allowlisted host-agent adapters
+        run: |
+          set -euo pipefail
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            'bash -s' <<'SSH_EOF'
+          set -euo pipefail
+          if ! python3 - <<'PY'
+          import json
+          import socket
+          import sys
+          import uuid
+
+          socket_path = "/run/recruiter-radar-operator/agent.sock"
+          checks = [
+              ("system_health", {}),
+              ("service_state", {"service": "web"}),
+              ("recent_logs", {"service": "web", "sinceSeconds": 60, "limit": 1}),
+              ("resource_usage", {"services": ["web"]}),
+              ("reverse_proxy_state", {}),
+          ]
+
+          failed = False
+          for action, args in checks:
+              request = {
+                  "requestId": f"runtime-smoke-{uuid.uuid4()}",
+                  "action": action,
+                  "args": args,
+              }
+              payload = (json.dumps(request, separators=(",", ":")) + "\n").encode()
+              with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                  client.settimeout(12)
+                  client.connect(socket_path)
+                  client.sendall(payload)
+                  client.shutdown(socket.SHUT_WR)
+                  chunks = []
+                  while True:
+                      chunk = client.recv(65536)
+                      if not chunk:
+                          break
+                      chunks.append(chunk)
+              raw = b"".join(chunks).decode("utf-8").strip()
+              try:
+                  response = json.loads(raw)
+              except json.JSONDecodeError:
+                  print(json.dumps({"action": action, "ok": False, "error": "invalid_agent_json"}))
+                  failed = True
+                  continue
+              if response.get("ok") is not True:
+                  error = response.get("error") if isinstance(response.get("error"), str) else "unknown_error"
+                  print(json.dumps({"action": action, "ok": False, "error": error}))
+                  failed = True
+              else:
+                  # Deliberately do not print result payloads. In particular, recent_logs
+                  # may contain sanitized but still untrusted production text.
+                  print(json.dumps({"action": action, "ok": True}))
+
+          sys.exit(1 if failed else 0)
+          PY
+          then
+            echo 'Operator host-agent adapter smoke failed; showing bounded safe audit diagnostics.' >&2
+            journalctl -u rr-operator-agent.service -n 120 --no-pager -o cat \
+              | grep -E '"event":"rr_operator_agent_(audit|internal_error)"' \
+              | tail -n 60 || true
+            exit 1
+          fi
+          SSH_EOF
