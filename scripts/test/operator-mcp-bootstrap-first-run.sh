@@ -83,7 +83,7 @@ RR_TEST_MARKER="$marker" \
 RR_MCP_ENABLED=false \
 RR_MCP_MUTATIONS_ENABLED=false \
 RR_DEPLOY_SHA=1111111111111111111111111111111111111111 \
-  "$bootstrap" --preflight >/dev/null
+  bash "$bootstrap" --preflight >/dev/null
 
 [ -f "$marker" ]
 [ ! -e "$app_dir/.rr-operator.env" ]
