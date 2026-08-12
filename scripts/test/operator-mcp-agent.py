@@ -2,6 +2,7 @@
 import importlib.util
 import os
 import pathlib
+import subprocess
 import unittest
 from unittest import mock
 
@@ -57,6 +58,27 @@ class OperatorAgentTests(unittest.TestCase):
         with self.assertRaisesRegex(agent.AgentError, 'invalid_since'):
             agent.recent_logs({'service': 'web', 'sinceSeconds': 59})
 
+    def test_subprocess_capture_uses_legacy_compatible_kwargs(self):
+        completed = subprocess.CompletedProcess(['docker', 'version'], 0, 'ok\n', '')
+        with mock.patch.object(agent.subprocess, 'run', return_value=completed) as run_mock:
+            result = agent.run(['docker', 'version'], timeout=4)
+
+        self.assertIs(result, completed)
+        args, kwargs = run_mock.call_args
+        self.assertEqual(args, (['docker', 'version'],))
+        self.assertFalse(kwargs['shell'])
+        self.assertFalse(kwargs['check'])
+        self.assertEqual(kwargs['timeout'], 4)
+        self.assertIs(kwargs['stdout'], subprocess.PIPE)
+        self.assertIs(kwargs['stderr'], subprocess.PIPE)
+        self.assertTrue(kwargs['universal_newlines'])
+        self.assertNotIn('capture_output', kwargs)
+        self.assertNotIn('text', kwargs)
+        self.assertEqual(
+            kwargs['env'],
+            {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'},
+        )
+
     def test_mutations_are_fail_closed_by_default(self):
         with mock.patch.object(agent, 'MUTATIONS_ENABLED', False):
             with self.assertRaisesRegex(agent.AgentError, 'mutations_disabled'):
@@ -76,6 +98,8 @@ class OperatorAgentTests(unittest.TestCase):
     def test_no_shell_execution_or_generic_host_read_contract(self):
         source = AGENT_PATH.read_text(encoding='utf-8')
         self.assertNotIn('shell=True', source)
+        self.assertNotIn('capture_output=True', source)
+        self.assertNotIn('text=True', source)
         self.assertNotIn('os.system(', source)
         self.assertNotIn('subprocess.Popen(', source)
         self.assertNotIn("action == 'execute_shell'", source)
