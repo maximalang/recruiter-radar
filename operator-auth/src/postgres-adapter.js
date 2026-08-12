@@ -156,10 +156,11 @@ export async function getLoginThrottle(pool, keys) {
 }
 
 export async function recordLoginFailure(pool, keys) {
-  await pool.query('BEGIN')
+  const client = await pool.connect()
   try {
+    await client.query('BEGIN')
     for (const key of keys) {
-      await pool.query(
+      await client.query(
         `INSERT INTO ${SCHEMA}.login_throttle
            (throttle_key, failures, locked_until, updated_at)
          VALUES ($1, 1, NULL, NOW())
@@ -174,10 +175,12 @@ export async function recordLoginFailure(pool, keys) {
         [key],
       )
     }
-    await pool.query('COMMIT')
+    await client.query('COMMIT')
   } catch (error) {
-    await pool.query('ROLLBACK')
+    await client.query('ROLLBACK')
     throw error
+  } finally {
+    client.release()
   }
 }
 
