@@ -9,6 +9,10 @@ const rollbackPath = resolve(repoRoot, 'packages', 'db', 'migrations', `${migrat
 const runtimePath = resolve(repoRoot, 'packages', 'db', 'scripts', 'adapters', 'rf-source-runtime.mjs')
 const resolutionPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'adapters', 'organization-resolution.mjs')
 const packageJsonPath = resolve(repoRoot, 'package.json')
+const digestFixturePaths = [
+  'verify-mixed-ranking-smoke.mjs',
+  'verify-rf-context-corroboration-smoke.mjs',
+].map((file) => resolve(repoRoot, 'packages', 'db', 'scripts', file))
 
 describe('source identity and evidence lineage contract', () => {
   it('keeps source evidence lineage append-only and organization-consistent', () => {
@@ -71,6 +75,18 @@ describe('source identity and evidence lineage contract', () => {
     expect(runtime).not.toContain("evidenceRole === 'primary_platform' ? 'direct'")
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
     expect(packageJson.scripts['verify:source:identity-lineage']).toContain('verify-source-identity-lineage.mjs')
+  })
+
+  it('keeps digest smoke fixtures aligned with exact signal lineage inputs', () => {
+    for (const fixturePath of digestFixturePaths) {
+      const fixture = readFileSync(fixturePath, 'utf8')
+
+      expect(fixture).toContain('id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY')
+      expect(fixture).toContain('source_url TEXT')
+      expect(fixture).toContain('CREATE TEMP TABLE source_signal_evidence_lineage_v1')
+      expect(fixture).toContain('source_signal_ids')
+      expect(fixture).toContain('source_record_urls')
+    }
   })
 
   it('routes custom source writers through the same identity and lineage boundaries', () => {

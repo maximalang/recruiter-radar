@@ -71,6 +71,16 @@ try {
     'corroborated lead gains the funding context family (cross-source corroboration)',
   );
   assert.equal(
+    corroborated.source_signal_ids.length,
+    2,
+    'corroborated lead must preserve both selected signal ids',
+  );
+  assert.equal(
+    corroborated.source_record_urls.length,
+    2,
+    'corroborated lead must preserve both selected source URLs',
+  );
+  assert.equal(
     corroborated.confidence_gate,
     'B',
     'single-source HH lead corroborated by a РФ context source sharing the INN should lift from gate C to gate B',
@@ -146,13 +156,22 @@ async function setupFixture(client) {
     ) ON COMMIT DROP;
 
     CREATE TEMP TABLE signals (
+      id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       org_id TEXT NOT NULL,
       source TEXT NOT NULL,
       signal_type TEXT NOT NULL,
       external_id TEXT,
       headline TEXT,
+      source_url TEXT,
       occurred_at TIMESTAMPTZ,
       payload JSONB NOT NULL DEFAULT '{}'::jsonb
+    ) ON COMMIT DROP;
+
+    CREATE TEMP TABLE source_signal_evidence_lineage_v1 (
+      id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      signal_id BIGINT NOT NULL,
+      evidence_id BIGINT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     ) ON COMMIT DROP;
   `);
 
@@ -169,13 +188,14 @@ async function setupFixture(client) {
       ('org-funding-corroborated', 'funding-business-signals', 'fund-corrob-1', 'Corroborated HH Co', 'inn:${SHARED_INN}', '{}'::jsonb),
       ('org-funding-only', 'funding-business-signals', 'fund-only-1', 'Context Only Co', 'inn:7709999999', '{}'::jsonb);
 
-    INSERT INTO signals (org_id, source, signal_type, external_id, headline, occurred_at, payload) VALUES
+    INSERT INTO signals (org_id, source, signal_type, external_id, headline, source_url, occurred_at, payload) VALUES
       (
         'org-hh-corroborated',
         'hh',
         'job_posting',
         'hh-corrob-signal',
         'Senior Recruiter',
+        'https://hh.ru/vacancy/hh-corrob-signal',
         NOW() - interval '1 day',
         '{"hh_employer_id": "hh-corrob-1", "employer_name": "Corroborated HH Co"}'::jsonb
       ),
@@ -185,6 +205,7 @@ async function setupFixture(client) {
         'funding',
         'fund-corrob-signal',
         'Series B funding round',
+        'https://funding.example/events/fund-corrob-signal',
         NOW() - interval '2 days',
         '{"source_entity_external_id": "fund-corrob-1", "source_entity_display_name": "Corroborated HH Co", "event_type": "series_b"}'::jsonb
       ),
@@ -194,6 +215,7 @@ async function setupFixture(client) {
         'funding',
         'fund-only-signal',
         'Series A funding round',
+        'https://funding.example/events/fund-only-signal',
         NOW() - interval '2 days',
         '{"source_entity_external_id": "fund-only-1", "source_entity_display_name": "Context Only Co", "event_type": "series_a"}'::jsonb
       );
