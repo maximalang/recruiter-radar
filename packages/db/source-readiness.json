@@ -15,6 +15,20 @@
       "opportunityEligibility": "contract-tested",
       "observability": "contract-tested"
     },
+    "hiring-primary-standard": {
+      "discover": "contract-tested",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "contract-tested",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "contract-tested",
+      "signal": "contract-tested",
+      "confidence": "contract-tested",
+      "opportunityEligibility": "contract-tested",
+      "observability": "contract-tested"
+    },
     "hiring-gated": {
       "discover": "contract-tested",
       "fetch": "contract-tested",
@@ -29,6 +43,20 @@
       "opportunityEligibility": "blocked",
       "observability": "contract-tested"
     },
+    "hiring-gated-standard": {
+      "discover": "contract-tested",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "contract-tested",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "contract-tested",
+      "signal": "contract-tested",
+      "confidence": "blocked",
+      "opportunityEligibility": "blocked",
+      "observability": "contract-tested"
+    },
     "enrichment-only": {
       "discover": "not-applicable",
       "fetch": "contract-tested",
@@ -38,6 +66,20 @@
       "dedupe": "contract-tested",
       "ingest": "contract-tested",
       "evidence": "blocked",
+      "signal": "contract-tested",
+      "confidence": "not-applicable",
+      "opportunityEligibility": "not-applicable",
+      "observability": "contract-tested"
+    },
+    "enrichment-standard": {
+      "discover": "not-applicable",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "contract-tested",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "contract-tested",
       "signal": "contract-tested",
       "confidence": "not-applicable",
       "opportunityEligibility": "not-applicable",
@@ -66,6 +108,20 @@
       "dedupe": "contract-tested",
       "ingest": "contract-tested",
       "evidence": "blocked",
+      "signal": "contract-tested",
+      "confidence": "not-applicable",
+      "opportunityEligibility": "not-applicable",
+      "observability": "contract-tested"
+    },
+    "context-standard": {
+      "discover": "not-applicable",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "contract-tested",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "contract-tested",
       "signal": "contract-tested",
       "confidence": "not-applicable",
       "opportunityEligibility": "not-applicable",
@@ -130,14 +186,13 @@
       "confidence": "approved",
       "eligibility": "digest-eligible",
       "legalReview": "approved",
-      "pipelineProfile": "hiring-primary",
+      "pipelineProfile": "hiring-primary-standard",
       "verification": {
         "fixture": ["npm run verify:rabota-rossii:smoke"],
         "contract": ["npm run verify:rabota-rossii:confidence", "npm run verify:source:readiness"]
       },
       "blockers": [
-        "The historical 2026-06-23 live probe is stale and is not current verification.",
-        "Source ingestion does not yet materialize evidence_items lineage."
+        "The historical 2026-06-23 live probe is stale and is not current verification."
       ]
     },
     "habr-career": {
@@ -153,7 +208,7 @@
       "confidence": "pending",
       "eligibility": "supporting-evidence-only",
       "legalReview": "required",
-      "pipelineProfile": "hiring-gated",
+      "pipelineProfile": "hiring-gated-standard",
       "verification": {
         "fixture": ["npm run verify:habr-career:smoke"],
         "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
@@ -173,7 +228,7 @@
       "confidence": "pending",
       "eligibility": "supporting-evidence-only",
       "legalReview": "approved",
-      "pipelineProfile": "hiring-gated",
+      "pipelineProfile": "hiring-gated-standard",
       "verification": {
         "fixture": ["npm run verify:source:confidence"],
         "contract": ["npm run verify:source:readiness"]
@@ -233,7 +288,7 @@
       "confidence": "pending",
       "eligibility": "supporting-evidence-only",
       "legalReview": "required",
-      "pipelineProfile": "hiring-gated",
+      "pipelineProfile": "hiring-gated-standard",
       "verification": {
         "fixture": ["npm run verify:rf-source-expansion:smoke"],
         "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
@@ -273,7 +328,7 @@
       "confidence": "not-applicable",
       "eligibility": "enrichment-only",
       "legalReview": "approved",
-      "pipelineProfile": "enrichment-only",
+      "pipelineProfile": "enrichment-standard",
       "verification": {
         "fixture": ["npm run verify:rf-source-expansion:smoke"],
         "contract": ["npm run verify:source:readiness"]
@@ -293,7 +348,7 @@
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
-      "pipelineProfile": "context-only",
+      "pipelineProfile": "context-standard",
       "verification": {
         "fixture": ["npm run verify:rf-source-expansion:smoke"],
         "contract": ["npm run verify:source:readiness"]
@@ -353,7 +408,7 @@
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
-      "pipelineProfile": "context-only",
+      "pipelineProfile": "context-standard",
       "verification": {
         "fixture": ["npm run verify:rf-source-expansion:smoke"],
         "contract": ["npm run verify:source:readiness"]
@@ -373,7 +428,7 @@
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "required",
-      "pipelineProfile": "context-only",
+      "pipelineProfile": "context-standard",
       "verification": {
         "fixture": ["npm run verify:rf-source-expansion:smoke"],
         "contract": ["npm run verify:source:readiness"]

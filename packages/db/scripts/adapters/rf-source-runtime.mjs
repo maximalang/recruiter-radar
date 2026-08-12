@@ -15,7 +15,12 @@ import {
   stripBom,
 } from './source-records.mjs';
 import { loadEnvFile, normalizeDomain } from '../lib/common-utils.mjs';
+import { writeEvidence } from '../lib/evidence-writer.mjs';
 import { fetchJson } from './source-http.mjs';
+import {
+  assertOrgSourceRefOwner,
+  resolveOrganizationOwner,
+} from './organization-resolution.mjs';
 
 export { loadEnvFile, normalizeDomain };
 
@@ -148,10 +153,14 @@ export function createStandardSourceRuntime(config) {
         source_url = EXCLUDED.source_url,
         occurred_at = EXCLUDED.occurred_at,
         payload = EXCLUDED.payload
+      RETURNING id, org_id, source_url, occurred_at, payload
     `;
 
     let orgUpsertCount = 0;
     let signalUpsertCount = 0;
+    let evidenceUpsertCount = 0;
+    let evidenceCreatedCount = 0;
+    let lineageCreatedCount = 0;
 
     await client.connect();
 
@@ -162,6 +171,7 @@ export function createStandardSourceRuntime(config) {
         const orgResult = await upsertOrgSourceRef(client, sourceId, record);
         orgUpsertCount += orgResult.insertedOrg ? 1 : 0;
 
+        const signalPayload = buildSignalPayload(sourceId, config, record);
         const signalResult = await client.query(signalUpsertQuery, [
           orgResult.orgId,
           record.signalType ?? config.signalType,
@@ -171,15 +181,82 @@ export function createStandardSourceRuntime(config) {
           record.summary,
           record.sourceUrl,
           record.occurredAt,
-          buildSignalPayload(sourceId, config, record),
+          signalPayload,
         ]);
 
         signalUpsertCount += signalResult.rowCount ?? 0;
+        const signal = signalResult.rows[0];
+        if (!signal?.source_url) {
+          throw new Error(`${sourceId}/${record.signalExternalId} ingested without an original source URL`);
+        }
+
+        const evidenceRole = record.evidenceRole ?? config.evidenceRole;
+        const evidenceTier = evidenceRole === 'primary_platform' ? 'corroboration' : 'context';
+        const evidence = await writeEvidence(client, {
+          source: sourceId,
+          url: signal.source_url,
+          fetchedAt: signal.occurred_at,
+          tier: evidenceTier,
+          orgId: Number(signal.org_id),
+          payloadRef: {
+            signal_id: Number(signal.id),
+            source_external_id: record.signalExternalId,
+            source_record_type: record.sourceRecordType ?? config.sourceRecordType,
+            normalized_at: record.fetchedAt,
+          },
+        });
+        evidenceUpsertCount += 1;
+        evidenceCreatedCount += evidence.inserted ? 1 : 0;
+
+        const lineageResult = await client.query(
+          `INSERT INTO source_signal_evidence_lineage_v1 (
+             signal_id,
+             evidence_id,
+             organization_id,
+             source,
+             source_family,
+             external_id,
+             source_url,
+             fetched_at,
+             published_at,
+             normalized_at,
+             evidence_tier,
+             confidence,
+             extraction_method,
+             organization_resolution_reason,
+             signal_payload_snapshot
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, $11, $12, $13, $14)
+           ON CONFLICT (signal_id, evidence_id) DO NOTHING`,
+          [
+            signal.id,
+            evidence.id,
+            signal.org_id,
+            sourceId,
+            config.sourceFamily ?? sourceId,
+            record.signalExternalId,
+            signal.source_url,
+            signal.occurred_at,
+            record.fetchedAt,
+            evidenceTier,
+            JSON.stringify({ state: record.confidence == null ? 'unavailable' : 'reported', value: record.confidence ?? null }),
+            record.extractionMethod ?? input.inputMode,
+            orgResult.resolutionReason,
+            JSON.stringify(signalPayload),
+          ],
+        );
+        lineageCreatedCount += lineageResult.rowCount ?? 0;
       }
 
       await client.query('COMMIT');
 
-      return { orgUpsertCount, signalUpsertCount };
+      return {
+        orgUpsertCount,
+        signalUpsertCount,
+        evidenceUpsertCount,
+        evidenceCreatedCount,
+        lineageCreatedCount,
+      };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -263,6 +340,9 @@ export function createStandardSourceRuntime(config) {
       sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
       orgsCreated: stats.orgUpsertCount,
       signalUpsertsCompleted: stats.signalUpsertCount,
+      evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+      evidenceCreated: stats.evidenceCreatedCount,
+      lineageCreated: stats.lineageCreatedCount,
     };
   }
 
@@ -282,6 +362,9 @@ export function createStandardSourceRuntime(config) {
       sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
       orgsCreated: stats.orgUpsertCount,
       signalUpsertsCompleted: stats.signalUpsertCount,
+      evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+      evidenceCreated: stats.evidenceCreatedCount,
+      lineageCreated: stats.lineageCreatedCount,
     };
   }
 
@@ -298,34 +381,8 @@ export function createStandardSourceRuntime(config) {
 }
 
 async function upsertOrgSourceRef(client, sourceId, record) {
-  await lockOrgSourceKeys(client, sourceId, record.orgSourceKeys);
-
-  const existingRefResult = await client.query(
-    `
-      SELECT org_id
-      FROM org_source_refs
-      WHERE source = $1::text
-        AND source_key = ANY($2::text[])
-      ORDER BY
-        CASE
-          WHEN source_key = $3 THEN 0
-          WHEN source_key = $4 THEN 1
-          WHEN source_key = $5 THEN 2
-          ELSE 3
-        END,
-        id ASC
-      LIMIT 1
-    `,
-    [
-      sourceId,
-      record.orgSourceKeys,
-      record.primarySourceKey,
-      record.domainSourceKey ?? record.innSourceKey ?? record.ogrnSourceKey,
-      record.companyNameSourceKey,
-    ],
-  );
-
-  let orgId = existingRefResult.rows[0]?.org_id;
+  const resolution = await resolveOrganizationOwner(client, sourceId, record);
+  let orgId = resolution.orgId;
   let insertedOrg = false;
 
   if (!orgId) {
@@ -373,6 +430,7 @@ async function upsertOrgSourceRef(client, sourceId, record) {
         buildOrgSourceMetadata(sourceId, record, sourceKey),
       ],
     );
+    await assertOrgSourceRefOwner(client, sourceId, sourceKey, orgId);
   }
 
   await client.query(
@@ -399,16 +457,7 @@ async function upsertOrgSourceRef(client, sourceId, record) {
     [orgId, record.orgDisplayName, record.companyDomain, record.companyWebsiteUrl],
   );
 
-  return { orgId, insertedOrg };
-}
-
-async function lockOrgSourceKeys(client, sourceId, sourceKeys) {
-  for (const sourceKey of [...sourceKeys].sort()) {
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext($2::text))', [
-      sourceId,
-      sourceKey,
-    ]);
-  }
+  return { orgId, insertedOrg, resolutionReason: resolution.resolutionReason };
 }
 
 function buildSignalPayload(sourceId, config, record) {

@@ -74,6 +74,7 @@
     "web:check": "npm run check --workspace @recruiter-radar/web",
     "web:validate": "npm run validate --workspace @recruiter-radar/web",
     "source:list": "node packages/db/scripts/run-source-action.mjs list",
+    "verify:source:identity-lineage": "node packages/db/scripts/verify-source-identity-lineage.mjs",
     "source:fetch": "npm run source:fetch:primary",
     "source:fetch:primary": "node packages/db/scripts/run-source-action.mjs fetch primary",
     "source:fetch:hh": "node packages/db/scripts/run-source-action.mjs fetch hh",
