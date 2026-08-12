@@ -7,6 +7,7 @@ const readinessPath = resolve(repoRoot, 'packages', 'db', 'source-readiness.json
 const verifierPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'verify-sources-live-config.mjs')
 const sourceActionPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'run-source-action.mjs')
 const coveragePath = resolve(repoRoot, 'packages', 'db', 'scripts', 'source-coverage-requirements.mjs')
+const packageJsonPath = resolve(repoRoot, 'package.json')
 
 const SOURCE_IDS = [
   'hh',
@@ -96,6 +97,7 @@ describe('source live readiness contract', () => {
         opportunityEligibility: expect.any(String),
         observability: expect.any(String),
       }))
+      expect(contract.pipelineProfiles[readiness.pipelineProfile].observability).toBe('contract-tested')
       expect(readiness.live).toHaveProperty('verifiedAt')
       expect(readiness.live.verifiedAt === null || typeof readiness.live.verifiedAt === 'string').toBe(true)
 
@@ -208,5 +210,16 @@ describe('source live readiness contract', () => {
 
     expect(report.errors).toContain('hh readiness implementation is blocked')
     expect(readFileSync(coveragePath, 'utf8')).not.toContain('minMaturity')
+  })
+
+  it('makes generic source commands operate on the full primary set', () => {
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+    expect(packageJson.scripts['source:fetch:primary']).toContain('run-source-action.mjs fetch primary')
+    expect(packageJson.scripts['source:ingest:primary']).toContain('run-source-action.mjs ingest primary')
+    expect(packageJson.scripts['source:pipeline:primary']).toContain('run-source-action.mjs pipeline primary')
+
+    const runner = readFileSync(sourceActionPath, 'utf8')
+    expect(runner).toContain("requestedSourceId === 'primary'")
+    expect(runner).toContain('listPrimaryIngestionSourceIds')
   })
 })

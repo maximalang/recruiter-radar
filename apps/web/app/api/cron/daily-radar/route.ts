@@ -62,12 +62,35 @@ export async function POST(request: NextRequest) {
       )
     }
     const ingestOk = ingestResults.every(r => r.success)
+    for (const result of ingestResults) {
+      const sourcePayload = {
+        source: result.source,
+        outcome: result.outcome,
+        fetched: result.fetchedCount ?? null,
+        parsed: result.diagnostics?.parsedCount ?? null,
+        normalized: result.diagnostics?.normalizedCount ?? null,
+        duplicates: result.diagnostics?.duplicateCount ?? null,
+        skipped: result.diagnostics?.skippedCount ?? null,
+        organizations: result.diagnostics?.organizationCount ?? null,
+        evidence: result.diagnostics?.evidenceCount ?? null,
+        signals: result.upsertedCount ?? null,
+      }
+      if (result.success) {
+        logEvent('daily_radar.source_ingest_completed', sourcePayload)
+      } else {
+        logWarn('daily_radar.source_ingest_failed', sourcePayload)
+      }
+    }
     const ingestSummary = {
       total: ingestResults.length,
       succeeded: ingestResults.filter(r => r.success).length,
       failed: ingestResults.filter(r => !r.success).length,
       fetchedTotal: ingestResults.reduce((sum, r) => sum + (r.fetchedCount ?? 0), 0),
       upsertedTotal: ingestResults.reduce((sum, r) => sum + (r.upsertedCount ?? 0), 0),
+      outcomes: ingestResults.reduce<Record<string, number>>((counts, result) => {
+        counts[result.outcome] = (counts[result.outcome] ?? 0) + 1
+        return counts
+      }, {}),
     }
 
     const digestResults = await generateAndDeliverDigests()

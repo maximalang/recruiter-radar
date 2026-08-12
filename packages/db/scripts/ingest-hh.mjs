@@ -68,6 +68,7 @@ try {
     source: 'hh',
     action: 'pipeline',
     recordsReceived: vacancies.length,
+    parsedRecords: vacancies.length,
     recordsAfterDedupe: normalizedVacancies.length,
     duplicateRecords: normalizedVacancyResult.duplicateRecords,
     normalizedRecords: normalizedVacancies.length,

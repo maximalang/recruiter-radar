@@ -77,6 +77,7 @@ function getScriptDir(): string {
 export interface IngestResult {
   source: SourceId
   success: boolean
+  outcome: IngestOutcome
   /** Items fetched from the API. */
   fetchedCount?: number
   /** Items upserted into signals table. */
@@ -85,6 +86,28 @@ export interface IngestResult {
   log?: string
   /** Error message if success is false. */
   error?: string
+  diagnostics?: IngestDiagnostics
+}
+
+export type IngestOutcome =
+  | 'ingested'
+  | 'ingested-with-duplicates'
+  | 'expected-zero'
+  | 'unexpected-zero'
+  | 'normalization-zero'
+  | 'ingestion-zero'
+  | 'missing-summary'
+  | 'invalid-summary'
+  | 'failed'
+
+export interface IngestDiagnostics {
+  parsedCount?: number
+  normalizedCount?: number
+  duplicateCount?: number
+  skippedCount?: number
+  organizationCount?: number
+  evidenceCount?: number
+  zeroReason?: string
 }
 
 /**
@@ -611,14 +634,14 @@ export async function ingestSource(
   try {
     config = getSourceConfig(source)
   } catch {
-    return { source, success: false, error: `Unknown source: ${source}` }
+    return { source, success: false, outcome: 'failed', error: `Unknown source: ${source}` }
   }
   const scriptDir = getScriptDir()
   const scriptPath = resolve(scriptDir, config.script)
 
   // Guard: ensure resolved path doesn't escape scripts dir (path traversal)
   if (!scriptPath.startsWith(scriptDir)) {
-    return { source, success: false, error: `Script path escapes scripts directory: ${config.script}` }
+    return { source, success: false, outcome: 'failed', error: `Script path escapes scripts directory: ${config.script}` }
   }
 
   // Load search params from user_search_preferences (DB), falling back to ENV
@@ -686,7 +709,7 @@ export async function ingestSource(
     const spawnNodeScript = getExecFile()
     spawnNodeScript(
       'node',
-      [scriptPath],
+      [scriptPath, 'pipeline'],
       {
         env: mergedEnv,
         // Per-source timeout (SourceConfig.timeoutMs) falling back to 120s.
@@ -703,22 +726,38 @@ export async function ingestSource(
           resolvePromise({
             source,
             success: false,
+            outcome: 'failed',
             error: message,
             log: stdout?.trim() || undefined,
           })
           return
         }
 
-        // Parse JSON metrics from last line of stdout
+        // Parse the final structured summary. Source CLIs pretty-print JSON,
+        // so line-by-line parsing silently lost metrics while still reporting
+        // success to daily-radar.
         const metrics = parseJsonMetrics(stdout)
-        const fetchedCount = metrics?.fetchedCount
-        const upsertedCount = metrics?.upsertedCount
+        if (!metrics) {
+          resolvePromise({
+            source,
+            success: false,
+            outcome: 'missing-summary',
+            error: 'Source process exited successfully without a structured runtime summary.',
+            log: stdout?.trim() || undefined,
+          })
+          return
+        }
+
+        const classification = classifyIngestMetrics(metrics)
 
         resolvePromise({
           source,
-          success: true,
-          fetchedCount,
-          upsertedCount,
+          success: classification.success,
+          outcome: classification.outcome,
+          fetchedCount: metrics.fetchedCount,
+          upsertedCount: metrics.upsertedCount,
+          diagnostics: metrics.diagnostics,
+          error: classification.error,
           log: stdout?.trim() || undefined,
         })
       }
@@ -745,17 +784,21 @@ export async function ingestAllPrimarySources(
   return Promise.all(sources.map(source => ingestSource(source, env)))
 }
 
-/** Extract structured metrics from the last JSON line of stdout. */
-function parseJsonMetrics(output: string): { fetchedCount?: number; upsertedCount?: number } | undefined {
+interface ParsedSourceMetrics {
+  fetchedCount?: number
+  upsertedCount?: number
+  diagnostics: IngestDiagnostics
+}
+
+/** Extract structured metrics from the final JSON object in stdout. */
+function parseJsonMetrics(output: string): ParsedSourceMetrics | undefined {
   if (!output) return undefined
-  const lines = output.trim().split('\n')
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i].trim()
-    if (!line) continue
+  const trimmed = output.trim()
+
+  for (const candidate of extractJsonObjectCandidates(trimmed).reverse()) {
     try {
-      const parsed = JSON.parse(line)
+      const parsed = JSON.parse(candidate)
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        // Map known output formats to unified metrics
         const fetchedCount =
           typeof parsed.fetchedCount === 'number' ? parsed.fetchedCount
           : typeof parsed.recordsReceived === 'number' ? parsed.recordsReceived
@@ -765,7 +808,19 @@ function parseJsonMetrics(output: string): { fetchedCount?: number; upsertedCoun
           : typeof parsed.signalUpsertsCompleted === 'number' ? parsed.signalUpsertsCompleted
           : undefined
         if (fetchedCount !== undefined || upsertedCount !== undefined) {
-          return { fetchedCount, upsertedCount }
+          return {
+            fetchedCount,
+            upsertedCount,
+            diagnostics: {
+              parsedCount: numberValue(parsed.parsedRecords),
+              normalizedCount: numberValue(parsed.normalizedRecords),
+              duplicateCount: numberValue(parsed.duplicateRecords),
+              skippedCount: numberValue(parsed.skippedRecords),
+              organizationCount: numberValue(parsed.orgsCreated),
+              evidenceCount: numberValue(parsed.evidenceUpsertsCompleted),
+              zeroReason: stringValue(parsed.zeroReason),
+            },
+          }
         }
       }
     } catch {
@@ -773,4 +828,92 @@ function parseJsonMetrics(output: string): { fetchedCount?: number; upsertedCoun
     }
   }
   return undefined
+}
+
+function extractJsonObjectCandidates(value: string): string[] {
+  const starts: number[] = []
+  const candidates: string[] = []
+  let inString = false
+  let escaped = false
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (character === '\\') {
+        escaped = true
+      } else if (character === '"') {
+        inString = false
+      }
+      continue
+    }
+    if (character === '"' && starts.length > 0) {
+      inString = true
+      continue
+    }
+    if (character === '{') {
+      starts.push(index)
+      continue
+    }
+    if (character === '}' && starts.length > 0) {
+      const start = starts.pop()
+      if (start !== undefined) candidates.push(value.slice(start, index + 1))
+    }
+  }
+
+  return candidates
+}
+
+function classifyIngestMetrics(metrics: ParsedSourceMetrics): {
+  success: boolean
+  outcome: IngestOutcome
+  error?: string
+} {
+  const { fetchedCount, upsertedCount, diagnostics } = metrics
+
+  if (fetchedCount === undefined || upsertedCount === undefined) {
+    return {
+      success: false,
+      outcome: 'invalid-summary',
+      error: 'Source runtime summary must report records received and signal upserts.',
+    }
+  }
+  if (fetchedCount === 0) {
+    return diagnostics.zeroReason
+      ? { success: true, outcome: 'expected-zero' }
+      : {
+          success: false,
+          outcome: 'unexpected-zero',
+          error: 'Source returned zero records without an explicit zeroReason.',
+        }
+  }
+  if (diagnostics.normalizedCount === 0) {
+    return {
+      success: false,
+      outcome: 'normalization-zero',
+      error: `Source received ${fetchedCount} records but normalized none.`,
+    }
+  }
+  if (upsertedCount === 0) {
+    return {
+      success: false,
+      outcome: 'ingestion-zero',
+      error: 'Source normalized records but completed zero signal upserts.',
+    }
+  }
+  return {
+    success: true,
+    outcome: (diagnostics.duplicateCount ?? 0) > 0
+      ? 'ingested-with-duplicates'
+      : 'ingested',
+  }
+}
+
+function numberValue(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value : undefined
 }

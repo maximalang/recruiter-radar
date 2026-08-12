@@ -13,7 +13,7 @@
       "signal": "contract-tested",
       "confidence": "contract-tested",
       "opportunityEligibility": "contract-tested",
-      "observability": "blocked"
+      "observability": "contract-tested"
     },
     "hiring-gated": {
       "discover": "contract-tested",
@@ -27,7 +27,7 @@
       "signal": "contract-tested",
       "confidence": "blocked",
       "opportunityEligibility": "blocked",
-      "observability": "blocked"
+      "observability": "contract-tested"
     },
     "enrichment-only": {
       "discover": "not-applicable",
@@ -41,7 +41,7 @@
       "signal": "contract-tested",
       "confidence": "not-applicable",
       "opportunityEligibility": "not-applicable",
-      "observability": "blocked"
+      "observability": "contract-tested"
     },
     "supporting-evidence": {
       "discover": "contract-tested",
@@ -55,7 +55,7 @@
       "signal": "contract-tested",
       "confidence": "not-applicable",
       "opportunityEligibility": "not-applicable",
-      "observability": "blocked"
+      "observability": "contract-tested"
     },
     "context-only": {
       "discover": "not-applicable",
@@ -69,7 +69,7 @@
       "signal": "contract-tested",
       "confidence": "not-applicable",
       "opportunityEligibility": "not-applicable",
-      "observability": "blocked"
+      "observability": "contract-tested"
     }
   },
   "sources": {
@@ -117,7 +117,6 @@
       },
       "blockers": [
         "Current controlled live crawl has not been verified.",
-        "Zero-record and partial-crawl outcomes are not fully classified.",
         "Source ingestion does not yet materialize evidence_items lineage."
       ]
     },

@@ -1,7 +1,11 @@
 import { pathToFileURL } from 'node:url';
 
 import { SOURCE_ACTIONS } from './source-contract.mjs';
-import { executeSourceAction, listSourceSummaries } from './source-registry.mjs';
+import {
+  executeSourceAction,
+  listPrimaryIngestionSourceIds,
+  listSourceSummaries,
+} from './source-registry.mjs';
 import { recordSourceActionTelemetry } from './lib/product-telemetry.mjs';
 
 export function formatSourceActionResult(command, source, result) {
@@ -50,31 +54,71 @@ export async function runSourceActionCli(argv = process.argv.slice(2)) {
     return;
   }
 
-  const startedAt = Date.now();
-  try {
-    const { source, result } = await executeSourceAction(requestedSourceId, requestedCommand);
-    sourceIdForError = source.id;
+  if (requestedSourceId === 'primary') {
+    const sourceIds = listPrimaryIngestionSourceIds();
+    const results = await Promise.all(sourceIds.map((sourceId) => (
+      executeAndRecordSourceAction(sourceId, requestedCommand)
+    )));
+    const ok = results.every((result) => result.ok);
 
-    for (const line of formatSourceActionResult(requestedCommand, source, result)) {
-      console.log(line);
+    console.log(JSON.stringify({
+      action: requestedCommand,
+      scope: 'primary',
+      ok,
+      sourceCount: results.length,
+      succeeded: results.filter((result) => result.ok).length,
+      failed: results.filter((result) => !result.ok).length,
+      sources: results,
+    }, null, 2));
+
+    if (!ok) process.exitCode = 1;
+    return;
+  }
+
+  try {
+    const actionResult = await executeAndRecordSourceAction(requestedSourceId, requestedCommand);
+    sourceIdForError = actionResult.source;
+
+    if (!actionResult.ok) {
+      throw new Error(actionResult.error);
     }
 
-    await recordSourceActionTelemetry({
-      sourceId: source.id,
-      action: requestedCommand,
-      ok: true,
-      durationMs: Date.now() - startedAt,
-    });
+    for (const line of actionResult.output) {
+      console.log(line);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`${sourceIdForError.toUpperCase()} ${requestedCommand} failed: ${message}`);
+    process.exitCode = 1;
+  }
+}
+
+async function executeAndRecordSourceAction(sourceId, action) {
+  const startedAt = Date.now();
+
+  try {
+    const { source, result } = await executeSourceAction(sourceId, action);
     await recordSourceActionTelemetry({
-      sourceId: sourceIdForError,
-      action: requestedCommand,
+      sourceId: source.id,
+      action,
+      ok: true,
+      durationMs: Date.now() - startedAt,
+    });
+    return {
+      source: source.id,
+      ok: true,
+      summary: result.summary ?? null,
+      output: formatSourceActionResult(action, source, result),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await recordSourceActionTelemetry({
+      sourceId,
+      action,
       ok: false,
       durationMs: Date.now() - startedAt,
     });
-    process.exitCode = 1;
+    return { source: sourceId, ok: false, error: message, output: [] };
   }
 }
 
