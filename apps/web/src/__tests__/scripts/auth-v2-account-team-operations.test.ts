@@ -143,5 +143,5 @@ describe("auth v2 account and team operational contracts", () => {
 });
 
 async function readProjectFile(pathname: string): Promise<string> {
-  return readFile(resolve(root, pathname), "utf8");
+  return (await readFile(resolve(root, pathname), "utf8")).replaceAll("\r\n", "\n");
 }

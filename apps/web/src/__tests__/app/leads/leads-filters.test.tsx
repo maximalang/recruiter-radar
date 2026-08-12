@@ -25,9 +25,11 @@ afterEach(() => {
 describe('LeadsFilters (T3.1 — active filter state)', () => {
   it('marks the gate select data-active when a gate value is set', () => {
     const { container } = render(<LeadsFilters profiles={[]} />);
-    const gateSelect = container.querySelector('[aria-label="Фильтр по уровню доверия"]');
+    const gateSelect = container.querySelector('[aria-label="Фильтр по уровню подтверждения"]');
     expect(gateSelect).not.toBeNull();
     expect(gateSelect?.getAttribute('data-active')).toBe('true');
+    expect(screen.getByRole('option', { name: 'Подтверждение A' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Авто (A)' })).toBeNull();
   });
 
   it('does NOT mark the feedback select data-active when feedback is empty', () => {

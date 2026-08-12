@@ -25,6 +25,7 @@ import {
   LoadingState,
   MetricCard,
   MetricGrid,
+  GateBadgeInline,
 } from '@/app/ui/internal-page';
 import { SearchIcon, CheckIcon } from '@/app/ui/icons';
 
@@ -99,6 +100,17 @@ describe('MetricGrid', () => {
 
     expect(screen.getByRole('list')).toBeTruthy();
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+});
+
+describe('GateBadgeInline', () => {
+  it('presents the evidence confirmation grade separately from score or automation', () => {
+    render(<GateBadgeInline gate="A" />);
+
+    expect(screen.getByText('Подтверждение A')).toHaveAccessibleName(
+      'Уровень подтверждения доказательствами: A',
+    );
+    expect(screen.queryByText('Авто (A)')).toBeNull();
   });
 });
 

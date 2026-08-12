@@ -301,47 +301,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {/* Primary hiring signal — only when there is an actual argument to show */}
               {lead.whyNow && lead.whyNow.trim() && (
                 <ContentCard>
-                  <ContentCardTitle>Сигналы найма</ContentCardTitle>
+                  <ContentCardTitle>Почему сейчас</ContentCardTitle>
                   <p className={ipStyles.bodyText}>{lead.whyNow}</p>
-                </ContentCard>
-              )}
-
-              {/* Why this lead fits the agency — deterministic, evidence-backed */}
-              {fit && !fit.isEmpty && (
-                <ContentCard variant="hero">
-                  <ContentCardTitle>Почему этот лид вам подходит</ContentCardTitle>
-                  <ul className={ipStyles.fitList}>
-                    {fit.lines.map((line, i) => (
-                      <li key={i} className={ipStyles.fitItem}>
-                        <span className={ipStyles.fitItemIcon} aria-hidden="true">
-                          <FitIcon name={FIT_DIMENSION_ICON[line.dimension]} />
-                        </span>
-                        <span>{line.text}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </ContentCard>
-              )}
-
-              {/* Company / hiring summary — deterministic synthesis, no invented facts */}
-              {summaryLines.length > 0 && (
-                <ContentCard>
-                  <ContentCardTitle>Кратко о компании и найме</ContentCardTitle>
-                  <div className={ipStyles.summaryBlock}>
-                    {summaryLines.map((line, i) => (
-                      <p
-                        key={i}
-                        className={`${ipStyles.summaryLine} ${i === 0 ? ipStyles.summaryLineLead : ''}`.trim()}
-                      >
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                  {summary.isThin && (
-                    <p className={ipStyles.summaryStrength}>
-                      Доказательств немного — данные обновятся по мере поступления сигналов.
-                    </p>
-                  )}
                 </ContentCard>
               )}
 
@@ -394,6 +355,54 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 )}
               </ContentCard>
 
+              {/* Operational handoff closes the primary mobile decision layer. */}
+              <ContentCard>
+                <NextStepsBlock
+                  crmBlock={crmBlock}
+                  links={nextStepLinks}
+                  singleExportHref={singleExportHref}
+                />
+              </ContentCard>
+
+              {/* Why this lead fits the agency — deterministic, evidence-backed */}
+              {fit && !fit.isEmpty && (
+                <ContentCard variant="hero">
+                  <ContentCardTitle>Почему этот лид вам подходит</ContentCardTitle>
+                  <ul className={ipStyles.fitList}>
+                    {fit.lines.map((line, i) => (
+                      <li key={i} className={ipStyles.fitItem}>
+                        <span className={ipStyles.fitItemIcon} aria-hidden="true">
+                          <FitIcon name={FIT_DIMENSION_ICON[line.dimension]} />
+                        </span>
+                        <span>{line.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </ContentCard>
+              )}
+
+              {/* Company / hiring summary — deterministic synthesis, no invented facts */}
+              {summaryLines.length > 0 && (
+                <ContentCard>
+                  <ContentCardTitle>Кратко о компании и найме</ContentCardTitle>
+                  <div className={ipStyles.summaryBlock}>
+                    {summaryLines.map((line, i) => (
+                      <p
+                        key={i}
+                        className={`${ipStyles.summaryLine} ${i === 0 ? ipStyles.summaryLineLead : ''}`.trim()}
+                      >
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                  {summary.isThin && (
+                    <p className={ipStyles.summaryStrength}>
+                      Доказательств немного — данные обновятся по мере поступления сигналов.
+                    </p>
+                  )}
+                </ContentCard>
+              )}
+
               {/* Evidence card */}
               <ContentCard>
                 <ContentCardTitle>Доказательства</ContentCardTitle>
@@ -432,22 +441,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           }
           sidebar={
             <>
-              {/* Дальнейшие шаги — the operational handoff area. Sits at the top
-                  of the sidebar so the recruiter's next action is visible the
-                  moment they finish reading the verdict + evidence. */}
-              <ContentCard>
-                <NextStepsBlock
-                  crmBlock={crmBlock}
-                  links={nextStepLinks}
-                  singleExportHref={singleExportHref}
-                />
-              </ContentCard>
-
               {/* Confidence gate — the verdict score/gate live in the hero card
                   at the top of the main column now, so the sidebar leads with
                   the gate explanation instead of duplicating the gauge. */}
               <ContentCard>
-                <div className={ipStyles.sidebarLabel}>Уровень доверия</div>
+                <div className={ipStyles.sidebarLabel}>Подтверждение доказательствами</div>
                 <GateBadgeInline gate={lead.confidenceGate} />
                 <p className={ipStyles.gateDescription}>{GATE_DESC[lead.confidenceGate] ?? GATE_DESC.D}</p>
               </ContentCard>

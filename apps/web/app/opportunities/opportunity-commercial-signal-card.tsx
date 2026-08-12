@@ -149,17 +149,19 @@ function ConclusionBasis(props: {
 }) {
   return (
     <div className={styles.conclusionBasis} data-basis={props.conclusion.basis}>
-      <span>
-        {props.conclusion.basis === 'evidence'
-          ? 'Основано на доказательствах'
-          : 'Гипотеза — проверьте вручную'}
-      </span>
-      {props.conclusion.evidenceIds.length > 0 ? (
+      {props.conclusion.basis === 'evidence'
+        && props.conclusion.evidenceIds.length > 0 ? (
         <a href={`#evidence-${props.opportunityId}`}>
-          Подтверждения: {props.conclusion.evidenceIds
+          Подтверждено · {props.conclusion.evidenceIds
             .map((id) => `№${id}`).join(', ')}
         </a>
-      ) : null}
+      ) : (
+        <span>
+          {props.conclusion.basis === 'evidence'
+            ? 'Подтверждено'
+            : 'Гипотеза — проверьте вручную'}
+        </span>
+      )}
     </div>
   )
 }
