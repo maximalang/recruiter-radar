@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'apps/web/app/api/identity/**'
-      - 'apps/web/app/.well-known/oauth-authorization-server/**'
       - 'apps/web/lib/better-auth/**'
       - 'apps/web/src/__tests__/**better-auth**'
       - 'packages/db/migrations/*better_auth*'
@@ -18,7 +17,6 @@ on:
     branches: [ main ]
     paths:
       - 'apps/web/app/api/identity/**'
-      - 'apps/web/app/.well-known/oauth-authorization-server/**'
       - 'apps/web/lib/better-auth/**'
       - 'packages/db/migrations/*better_auth*'
       - 'packages/db/scripts/verify-better-auth-foundation.mjs'
@@ -48,8 +46,6 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/recruiter_radar_better_auth_test
       BETTER_AUTH_DB_CONTRACT_ALLOW: '1'
       BETTER_AUTH_ENABLED: 'false'
-      BETTER_AUTH_MCP_OAUTH_ENABLED: 'false'
-      BETTER_AUTH_MCP_DCR_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -58,8 +54,15 @@ jobs:
           cache: npm
       - name: Install reproducibly
         run: npm ci
+      - name: Reject unpatched OAuth Provider
+        shell: bash
+        run: |
+          if npm ls @better-auth/oauth-provider --all 2>/dev/null | grep -q '@better-auth/oauth-provider'; then
+            echo 'Unpatched @better-auth/oauth-provider must not be present in the website identity foundation.' >&2
+            exit 1
+          fi
       - name: Dependency security audit
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev --audit-level=moderate
       - name: Focused fail-dark policy tests
         run: >-
           npm test --workspace @recruiter-radar/web -- --runInBand
