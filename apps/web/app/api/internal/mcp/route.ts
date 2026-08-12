@@ -1,18 +1,25 @@
+import { randomUUID } from 'node:crypto'
+
 import { NextResponse } from 'next/server'
 
 import {
   OPERATOR_MCP_MAX_BODY_BYTES,
   OPERATOR_MCP_PROTOCOL_VERSION,
+  getOperatorMcpToolRequiredScopes,
   handleOperatorMcpRequest,
   isAllowedOperatorMcpOrigin,
   isOperatorMcpEnabled,
   isSupportedOperatorMcpProtocolVersion,
   validateModernMcpHeaders,
+  validateOperatorMcpProtocolUse,
 } from '../../../../lib/operator-mcp'
+import { writeOperatorMcpAuditEvent } from '../../../../lib/operator-mcp-audit'
 import {
-  OPERATOR_MCP_REQUIRED_SCOPE,
+  OPERATOR_MCP_PREAUTH_RATE_LIMIT,
+  OPERATOR_MCP_READ_SCOPES,
   checkOperatorMcpRateLimit,
   getOperatorMcpAuthenticateChallenge,
+  hasOperatorMcpScopes,
   verifyOperatorMcpAccessToken,
 } from '../../../../lib/operator-mcp-auth'
 
@@ -51,30 +58,40 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: Request) {
+  const requestId = requestIdFromHeader(request.headers.get('x-request-id'))
+  const responseHeaders = { ...JSON_HEADERS, 'X-Request-ID': requestId }
+
   if (!isOperatorMcpEnabled()) {
     return NextResponse.json(
       { error: 'not_found' },
-      { status: 404, headers: JSON_HEADERS },
+      { status: 404, headers: responseHeaders },
     )
   }
 
   if (!isAllowedOperatorMcpOrigin(request.headers.get('origin'))) {
     return NextResponse.json(
       { error: 'forbidden_origin' },
-      { status: 403, headers: JSON_HEADERS },
+      { status: 403, headers: responseHeaders },
     )
   }
 
-  const rateKey = request.headers.get('x-real-ip')?.trim() || 'unknown'
-  const rateLimit = checkOperatorMcpRateLimit(rateKey)
-  if (!rateLimit.allowed) {
+  // Caddy overwrites X-Real-IP at the sole public ingress. This limiter is a
+  // coarse unauthenticated abuse boundary; a second subject limiter is applied
+  // after OAuth verification so one IP cannot spoof another operator identity.
+  const sourceIp = request.headers.get('x-real-ip')?.trim() || 'unknown'
+  const preauthRateLimit = checkOperatorMcpRateLimit(
+    `ip:${sourceIp}`,
+    Date.now(),
+    OPERATOR_MCP_PREAUTH_RATE_LIMIT,
+  )
+  if (!preauthRateLimit.allowed) {
     return NextResponse.json(
       { error: 'rate_limited' },
       {
         status: 429,
         headers: {
-          ...JSON_HEADERS,
-          'Retry-After': String(rateLimit.retryAfterSeconds),
+          ...responseHeaders,
+          'Retry-After': String(preauthRateLimit.retryAfterSeconds),
         },
       },
     )
@@ -85,16 +102,30 @@ export async function POST(request: Request) {
   )
   if (!auth.ok) {
     const insufficientScope = auth.reason === 'insufficient_scope'
-    const challengeError = insufficientScope
-      ? 'insufficient_scope'
-      : 'invalid_token'
     return NextResponse.json(
       { error: insufficientScope ? 'insufficient_scope' : 'unauthorized' },
       {
         status: insufficientScope ? 403 : 401,
         headers: {
-          ...JSON_HEADERS,
-          'WWW-Authenticate': getOperatorMcpAuthenticateChallenge(challengeError),
+          ...responseHeaders,
+          'WWW-Authenticate': getOperatorMcpAuthenticateChallenge(
+            insufficientScope ? 'insufficient_scope' : 'invalid_token',
+            OPERATOR_MCP_READ_SCOPES,
+          ),
+        },
+      },
+    )
+  }
+
+  const subjectRateLimit = checkOperatorMcpRateLimit(`sub:${auth.subject}`)
+  if (!subjectRateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'rate_limited' },
+      {
+        status: 429,
+        headers: {
+          ...responseHeaders,
+          'Retry-After': String(subjectRateLimit.retryAfterSeconds),
         },
       },
     )
@@ -104,7 +135,7 @@ export async function POST(request: Request) {
   if (!contentType.startsWith('application/json')) {
     return NextResponse.json(
       { error: 'unsupported_media_type' },
-      { status: 415, headers: JSON_HEADERS },
+      { status: 415, headers: responseHeaders },
     )
   }
 
@@ -112,7 +143,7 @@ export async function POST(request: Request) {
   if (Number.isFinite(contentLength) && contentLength > OPERATOR_MCP_MAX_BODY_BYTES) {
     return NextResponse.json(
       { error: 'request_too_large' },
-      { status: 413, headers: JSON_HEADERS },
+      { status: 413, headers: responseHeaders },
     )
   }
 
@@ -120,7 +151,7 @@ export async function POST(request: Request) {
   if (Buffer.byteLength(rawBody, 'utf8') > OPERATOR_MCP_MAX_BODY_BYTES) {
     return NextResponse.json(
       { error: 'request_too_large' },
-      { status: 413, headers: JSON_HEADERS },
+      { status: 413, headers: responseHeaders },
     )
   }
 
@@ -132,7 +163,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json(
       { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } },
-      { status: 400, headers: JSON_HEADERS },
+      { status: 400, headers: responseHeaders },
     )
   }
 
@@ -140,8 +171,13 @@ export async function POST(request: Request) {
   if (!isSupportedOperatorMcpProtocolVersion(protocolHeader)) {
     return NextResponse.json(
       { error: 'unsupported_mcp_protocol_version' },
-      { status: 400, headers: JSON_HEADERS },
+      { status: 400, headers: responseHeaders },
     )
+  }
+
+  const protocolUseError = validateOperatorMcpProtocolUse(protocolHeader, body)
+  if (protocolUseError) {
+    return rpcRequestError(body, protocolUseError, responseHeaders)
   }
 
   const modernHeaderError = validateModernMcpHeaders(
@@ -151,52 +187,113 @@ export async function POST(request: Request) {
     body,
   )
   if (modernHeaderError) {
-    return NextResponse.json(
-      {
-        jsonrpc: '2.0',
-        id: typeof body.id === 'string' || typeof body.id === 'number' ? body.id : null,
-        error: { code: -32600, message: modernHeaderError },
-      },
-      { status: 400, headers: JSON_HEADERS },
-    )
+    return rpcRequestError(body, modernHeaderError, responseHeaders)
   }
 
-  const outcome = await handleOperatorMcpRequest(body, protocolHeader)
+  const toolContext = requestedToolContext(body)
+  if (toolContext) {
+    const requiredScopes = getOperatorMcpToolRequiredScopes(toolContext.name)
+    if (requiredScopes && !hasOperatorMcpScopes(auth.scopes, requiredScopes)) {
+      writeOperatorMcpAuditEvent({
+        requestId,
+        subject: auth.subject,
+        tool: toolContext.name,
+        args: toolContext.args,
+        status: 'denied',
+        durationMs: 0,
+        deploySha: safeSha(process.env.RR_DEPLOY_SHA),
+        mutationTarget:
+          typeof toolContext.args.service === 'string'
+            ? toolContext.args.service
+            : toolContext.name === 'reload_proxy'
+              ? 'caddy'
+              : null,
+        error: 'insufficient_scope',
+      })
+      return NextResponse.json(
+        { error: 'insufficient_scope' },
+        {
+          status: 403,
+          headers: {
+            ...responseHeaders,
+            'WWW-Authenticate': getOperatorMcpAuthenticateChallenge(
+              'insufficient_scope',
+              requiredScopes,
+            ),
+          },
+        },
+      )
+    }
+  }
+
+  const outcome = await handleOperatorMcpRequest(body, protocolHeader, {
+    requestId,
+    subject: auth.subject,
+  })
   if (outcome.body === null) {
     return new NextResponse(null, {
       status: outcome.status,
-      headers: JSON_HEADERS,
+      headers: responseHeaders,
     })
   }
 
   const result = outcome.body.result
   if (result && typeof result === 'object' && !Array.isArray(result)) {
     const resultRecord = result as Record<string, unknown>
-    if (protocolHeader === OPERATOR_MCP_PROTOCOL_VERSION &&
-        typeof resultRecord.resultType !== 'string') {
+    if (
+      protocolHeader === OPERATOR_MCP_PROTOCOL_VERSION &&
+      typeof resultRecord.resultType !== 'string'
+    ) {
       resultRecord.resultType = 'complete'
-    }
-
-    if (body.method === 'tools/list' && Array.isArray(resultRecord.tools)) {
-      resultRecord.tools = resultRecord.tools.map((tool) => {
-        if (!tool || typeof tool !== 'object' || Array.isArray(tool)) return tool
-        return {
-          ...(tool as Record<string, unknown>),
-          securitySchemes: [
-            { type: 'oauth2', scopes: [OPERATOR_MCP_REQUIRED_SCOPE] },
-          ],
-        }
-      })
     }
   }
 
   return NextResponse.json(outcome.body, {
     status: outcome.status,
     headers: {
-      ...JSON_HEADERS,
+      ...responseHeaders,
       ...(protocolHeader === OPERATOR_MCP_PROTOCOL_VERSION
         ? { 'MCP-Protocol-Version': OPERATOR_MCP_PROTOCOL_VERSION }
         : {}),
     },
   })
+}
+
+function requestedToolContext(body: Record<string, unknown>) {
+  if (body.method !== 'tools/call') return null
+  const params = asObject(body.params)
+  const name = typeof params.name === 'string' ? params.name : ''
+  if (!name) return null
+  return { name, args: asObject(params.arguments) }
+}
+
+function rpcRequestError(
+  body: Record<string, unknown>,
+  message: string,
+  headers: Record<string, string>,
+) {
+  return NextResponse.json(
+    {
+      jsonrpc: '2.0',
+      id: typeof body.id === 'string' || typeof body.id === 'number' ? body.id : null,
+      error: { code: -32600, message },
+    },
+    { status: 400, headers },
+  )
+}
+
+function requestIdFromHeader(value: string | null): string {
+  const candidate = value?.trim() ?? ''
+  return /^[A-Za-z0-9:._-]{1,128}$/.test(candidate) ? candidate : randomUUID()
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function safeSha(value: string | undefined): string | null {
+  const normalized = value?.trim().toLowerCase() ?? ''
+  return /^[a-f0-9]{40}$/.test(normalized) ? normalized : null
 }
