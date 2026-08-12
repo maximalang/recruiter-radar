@@ -64,16 +64,14 @@ jobs:
         working-directory: operator-auth
         shell: bash
         run: |
-          set -o pipefail
-          npm test 2>&1 | tee /tmp/operator-oauth-test.log
-          status=${PIPESTATUS[0]}
+          set +e
+          npm test > /tmp/operator-oauth-test.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/operator-oauth-test.log
           if [ "$status" -ne 0 ]; then
-            tail -n 20 /tmp/operator-oauth-test.log | while IFS= read -r line; do
-              line="${line//'%'/'%25'}"
-              line="${line//$'\r'/'%0D'}"
-              line="${line//$'\n'/'%0A'}"
-              printf '::error title=Operator OAuth integration::%s\n' "$line"
-            done
+            diagnostic="$(tail -n 30 /tmp/operator-oauth-test.log | base64 -w0)"
+            printf '::error file=operator-auth/test/security.test.js,line=1,title=Operator OAuth integration (base64)::%s\n' "$diagnostic"
             exit "$status"
           fi
 
