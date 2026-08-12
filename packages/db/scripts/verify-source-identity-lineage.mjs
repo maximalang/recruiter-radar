@@ -46,6 +46,40 @@ function runtime(sourceId, externalId, sourceUrl) {
   });
 }
 
+function weakNameRuntime(sourceId, externalId, sourceUrl) {
+  return createStandardSourceRuntime({
+    sourceId,
+    signalType: 'job_posting',
+    evidenceRole: 'primary_platform',
+    sourceRecordType: 'vacancy',
+    normalizeRecord: (raw, { fetchedAt }) => ({
+      orgName: 'ООО Одинаковое Имя',
+      orgDisplayName: 'Одинаковое Имя',
+      companyName: 'Одинаковое Имя',
+      companyDomain: null,
+      companyWebsiteUrl: null,
+      inn: null,
+      ogrn: null,
+      primarySourceKey: 'company-name:одинаковое имя',
+      innSourceKey: null,
+      ogrnSourceKey: null,
+      domainSourceKey: null,
+      companyNameSourceKey: 'company-name:одинаковое имя',
+      orgSourceKeys: ['company-name:одинаковое имя'],
+      orgSourceAliasKeys: [],
+      orgExternalId: externalId,
+      signalExternalId: externalId,
+      headline: raw.headline,
+      summary: 'weak-name isolation verification',
+      sourceUrl,
+      occurredAt: '2026-08-12T09:00:00.000Z',
+      fetchedAt,
+      evidenceRole: 'primary_platform',
+      extractionMethod: 'isolated-db-verifier',
+    }),
+  });
+}
+
 async function ingest(sourceId, externalId, sourceUrl) {
   const adapter = runtime(sourceId, externalId, sourceUrl);
   const input = adapter.buildInputFromRecords({
@@ -106,6 +140,29 @@ try {
     /append-only/,
   );
 
+  const weakSources = [`${PREFIX}-weak-one`, `${PREFIX}-weak-two`];
+  for (const [index, sourceId] of weakSources.entries()) {
+    const adapter = weakNameRuntime(
+      sourceId,
+      `weak-vacancy-${index + 1}`,
+      `https://weak-source-${index + 1}.example/vacancy`,
+    );
+    const input = adapter.buildInputFromRecords({
+      inputMode: 'isolated-db-verifier',
+      inputFilePath: null,
+      records: [{ headline: `weak-vacancy-${index + 1}` }],
+    });
+    const result = await adapter.ingest({ connectionString: process.env.DATABASE_URL, input });
+    assert.equal(result.orgUpsertCount, 1, 'company name alone must not merge organizations across sources');
+  }
+  const weakOwners = await client.query(
+    `SELECT COUNT(DISTINCT org_id)::int AS count
+     FROM org_source_refs
+     WHERE source = ANY($1::text[])`,
+    [weakSources],
+  );
+  assert.equal(weakOwners.rows[0].count, 2, 'weak company names must remain source-local');
+
   const conflictingOrg = await client.query(
     `INSERT INTO orgs (name) VALUES ('Conflicting legacy owner') RETURNING id`,
   );
@@ -124,6 +181,7 @@ try {
     ...counts.rows[0],
     replayEvidenceCreated: replay.evidenceCreatedCount,
     replayLineageCreated: replay.lineageCreatedCount,
+    weakNameOwners: weakOwners.rows[0].count,
     conflictMode: 'fail-closed',
   }));
 } finally {

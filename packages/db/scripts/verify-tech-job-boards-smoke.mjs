@@ -25,8 +25,8 @@ assert.equal(summary.inputFilePath, fixturePath);
 assert.equal(summary.recordsReceived, 6);
 assert.equal(summary.recordsAfterDedupe, 5, 'duplicate record should be removed by dedupe');
 assert.equal(summary.duplicateRecords, 1);
-assert.equal(summary.normalizedRecords, 4);
-assert.equal(summary.skippedRecords, 1);
+assert.equal(summary.normalizedRecords, 3);
+assert.equal(summary.skippedRecords, 2);
 
 const rec1 = input.normalizedRecords.find((r) => r.signalExternalId === 'habr-career:tjb-smoke-1');
 assert.ok(rec1, 'missing normalized record tjb-smoke-1');
@@ -51,9 +51,7 @@ assert.equal(rec3.companyName, 'FinTech Pro');
 assert.equal(rec3.board, 'getmatch');
 
 const rec4 = input.normalizedRecords.find((r) => r.companyName === 'Minimal Board Co');
-assert.ok(rec4, 'missing normalized record for Minimal Board Co');
-assert.equal(rec4.board, 'unknown');
-assert.equal(rec4.jobTitle, 'Python Developer');
+assert.equal(rec4, undefined, 'record without an original job URL must be rejected before ingest');
 assert.equal(
   input.normalizedRecords.some((r) => r.primarySourceKey === 'domain:jobs.example'),
   false,
@@ -88,7 +86,7 @@ console.log(JSON.stringify({
   dedupeVerified: true,
   liveMode,
   providerMode,
-  verifiedExternalIds: ['tjb-smoke-1', 'tjb-smoke-2', 'tjb-smoke-3', 'Minimal Board Co derived'],
+  verifiedExternalIds: ['tjb-smoke-1', 'tjb-smoke-2', 'tjb-smoke-3'],
   sideEffects: { databaseUrlUsed: false },
 }, null, 2));
 

@@ -23,8 +23,8 @@ assert.equal(summary.inputMode, 'file');
 assert.equal(summary.inputFilePath, fixturePath);
 assert.equal(summary.recordsReceived, 4);
 assert.equal(summary.duplicateRecords, 0);
-assert.equal(summary.normalizedRecords, 4);
-assert.equal(summary.skippedRecords, 0);
+assert.equal(summary.normalizedRecords, 3);
+assert.equal(summary.skippedRecords, 1);
 
 const rec1 = input.normalizedRecords.find((r) => r.signalExternalId === 'li-smoke-1');
 assert.ok(rec1, 'missing normalized record li-smoke-1');
@@ -47,9 +47,7 @@ assert.equal(rec3.linkedinCompanyId, '87654321');
 assert.equal(rec3.primarySourceKey, 'linkedin:87654321');
 
 const rec4 = input.normalizedRecords.find((r) => r.companyName === 'NoId Corp');
-assert.ok(rec4, 'missing normalized record for NoId Corp');
-assert.equal(rec4.jobTitle, 'QA Engineer');
-assert.equal(rec4.primarySourceKey, 'company-name:noid corp');
+assert.equal(rec4, undefined, 'record without an original LinkedIn/job URL must be rejected before ingest');
 
 for (const record of input.normalizedRecords) {
   assert.equal(record.orgSourceKeys.length > 0, true, `record ${record.signalExternalId} must have orgSourceKeys`);
@@ -82,7 +80,7 @@ console.log(JSON.stringify({
   normalizedRecords: summary.normalizedRecords,
   skippedRecords: summary.skippedRecords,
   providerMode,
-  verifiedExternalIds: ['li-smoke-1', 'li-smoke-2', 'li-smoke-3', 'NoId Corp derived'],
+  verifiedExternalIds: ['li-smoke-1', 'li-smoke-2', 'li-smoke-3'],
   sideEffects: { databaseUrlUsed: false },
 }, null, 2));
 

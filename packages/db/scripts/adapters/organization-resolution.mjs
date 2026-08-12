@@ -1,10 +1,42 @@
+import { isIP } from 'node:net';
+
 const PLATFORM_DOMAINS = new Set([
   'hh.ru',
+  'hhcdn.com',
+  'hh.kz',
+  'hh.ua',
   'career.habr.com',
+  'habr.com',
   'superjob.ru',
+  'superjob.com',
   'trudvsem.ru',
   'linkedin.com',
+  'rabota.ru',
+  'zarplata.ru',
+  'greenhouse.io',
+  'lever.co',
+  'workday.com',
+  'myworkdayjobs.com',
+  'ashbyhq.com',
+  'jobvite.com',
+  'smartrecruiters.com',
+  'bamboohr.com',
+  'workable.com',
+  'recruitee.com',
+  'breezy.hr',
+  'teamtailor.com',
+  'personio.com',
+  'jazz.co',
+  'jobs.eu',
 ]);
+
+const PUBLIC_SUFFIX_DOMAINS = new Set([
+  'co.uk', 'org.uk', 'gov.uk', 'ac.uk',
+  'com.au', 'net.au', 'org.au',
+  'co.jp', 'co.kr', 'com.cn', 'com.br', 'com.tr',
+]);
+
+const CORPORATE_SUBDOMAIN_PREFIXES = new Set(['www', 'career', 'careers', 'job', 'jobs', 'hr', 'vacancy', 'vacancies']);
 
 export function classifyStrongIdentityKey(value) {
   if (typeof value !== 'string') return null;
@@ -131,15 +163,30 @@ function dedupeStrongIdentities(sourceKeys) {
 
 function canonicalCompanyDomain(value) {
   if (typeof value !== 'string') return null;
-  let hostname;
-  try {
-    hostname = new URL(`http://${value.trim().replace(/^https?:\/\//i, '')}`).hostname;
-  } catch {
-    return null;
-  }
+  const raw = value.trim().toLowerCase();
+  if (
+    raw === ''
+    || raw.length > 253
+    || raw.endsWith('.')
+    || /[:/\\?#@\s]/.test(raw)
+    || raw.includes('..')
+    || raw.includes('xn--')
+    || isIP(raw) !== 0
+  ) return null;
 
-  const domain = hostname.toLowerCase().replace(/^www\./, '').replace(/\.$/, '');
-  if (!domain.includes('.') || domain.length > 253 || /[^a-z0-9.-]/.test(domain)) return null;
+  let labels = raw.split('.');
+  if (labels.length < 2) return null;
+  if (CORPORATE_SUBDOMAIN_PREFIXES.has(labels[0]) && labels.length > 2) {
+    labels = labels.slice(1);
+  }
+  if (labels.some((label) => (
+    label.length === 0
+    || label.length > 63
+    || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label)
+  ))) return null;
+
+  const domain = labels.join('.');
+  if (PUBLIC_SUFFIX_DOMAINS.has(domain)) return null;
   if (PLATFORM_DOMAINS.has(domain) || [...PLATFORM_DOMAINS].some((item) => domain.endsWith(`.${item}`))) return null;
   return domain;
 }

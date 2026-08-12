@@ -46,12 +46,15 @@ const SOURCE_ENV_PREFIXES = [
 ]
 
 function sourceFreeEnv(): NodeJS.ProcessEnv {
-  return Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => (
-      key !== 'DATABASE_URL'
-      && !SOURCE_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))
-    )),
-  )
+  return {
+    ...Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => (
+        key !== 'DATABASE_URL'
+        && !SOURCE_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))
+      )),
+    ),
+    NODE_ENV: process.env.NODE_ENV ?? 'test',
+  }
 }
 
 function readReadinessContract(): Record<string, any> {
@@ -157,6 +160,29 @@ describe('source live readiness contract', () => {
     expect(report.sources.find((source: { id: string }) => source.id === 'career-pages')).toEqual(
       expect.objectContaining({ configured: true, liveVerified: false }),
     )
+  })
+
+  it('uses the actual source input contract and does not treat DATABASE_URL as fetch configuration', () => {
+    const databaseOnly = spawnSync(process.execPath, [verifierPath, '--json'], {
+      cwd: repoRoot,
+      env: { ...sourceFreeEnv(), DATABASE_URL: 'postgresql://isolated.invalid/test' },
+      encoding: 'utf8',
+    })
+    const databaseOnlyReport = JSON.parse(databaseOnly.stdout)
+    expect(databaseOnlyReport.sources.find((source: { id: string }) => source.id === 'career-pages'))
+      .toEqual(expect.objectContaining({ configured: false, liveVerified: false }))
+
+    const linkedinInput = spawnSync(process.execPath, [verifierPath, '--json'], {
+      cwd: repoRoot,
+      env: {
+        ...sourceFreeEnv(),
+        LINKEDIN_COMPANY_PAGES_INPUT_FILE: 'company-snapshot.json',
+      },
+      encoding: 'utf8',
+    })
+    const linkedinReport = JSON.parse(linkedinInput.stdout)
+    expect(linkedinReport.sources.find((source: { id: string }) => source.id === 'linkedin-company-pages'))
+      .toEqual(expect.objectContaining({ configured: true, liveVerified: false }))
   })
 
   it('exposes the same evaluated readiness through the runtime registry', () => {

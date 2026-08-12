@@ -6,10 +6,10 @@
       "fetch": "contract-tested",
       "parse": "fixture-tested",
       "normalize": "fixture-tested",
-      "organizationResolution": "blocked",
+      "organizationResolution": "contract-tested",
       "dedupe": "contract-tested",
       "ingest": "contract-tested",
-      "evidence": "blocked",
+      "evidence": "contract-tested",
       "signal": "contract-tested",
       "confidence": "contract-tested",
       "opportunityEligibility": "contract-tested",
@@ -34,10 +34,10 @@
       "fetch": "contract-tested",
       "parse": "fixture-tested",
       "normalize": "fixture-tested",
-      "organizationResolution": "blocked",
+      "organizationResolution": "contract-tested",
       "dedupe": "contract-tested",
       "ingest": "contract-tested",
-      "evidence": "blocked",
+      "evidence": "contract-tested",
       "signal": "contract-tested",
       "confidence": "blocked",
       "opportunityEligibility": "blocked",
@@ -62,7 +62,7 @@
       "fetch": "contract-tested",
       "parse": "fixture-tested",
       "normalize": "fixture-tested",
-      "organizationResolution": "blocked",
+      "organizationResolution": "contract-tested",
       "dedupe": "contract-tested",
       "ingest": "contract-tested",
       "evidence": "blocked",
@@ -90,10 +90,10 @@
       "fetch": "contract-tested",
       "parse": "fixture-tested",
       "normalize": "fixture-tested",
-      "organizationResolution": "blocked",
+      "organizationResolution": "contract-tested",
       "dedupe": "contract-tested",
       "ingest": "contract-tested",
-      "evidence": "blocked",
+      "evidence": "contract-tested",
       "signal": "contract-tested",
       "confidence": "not-applicable",
       "opportunityEligibility": "not-applicable",
@@ -104,10 +104,10 @@
       "fetch": "contract-tested",
       "parse": "fixture-tested",
       "normalize": "fixture-tested",
-      "organizationResolution": "blocked",
+      "organizationResolution": "contract-tested",
       "dedupe": "contract-tested",
       "ingest": "contract-tested",
-      "evidence": "blocked",
+      "evidence": "contract-tested",
       "signal": "contract-tested",
       "confidence": "not-applicable",
       "opportunityEligibility": "not-applicable",
@@ -148,9 +148,7 @@
         "contract": ["npm run verify:source:readiness"]
       },
       "blockers": [
-        "Current target-runtime HH fetch has not been verified.",
-        "Source ingestion does not yet materialize evidence_items lineage.",
-        "Cross-source organization resolution is not canonical at write time."
+        "Current target-runtime HH fetch has not been verified."
       ]
     },
     "career-pages": {
@@ -159,7 +157,7 @@
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["CAREER_PAGES_INPUT_FILE"], ["CAREER_PAGES_TARGETS_FILE"], ["DATABASE_URL"]]
+        "acceptedEnvSets": [["CAREER_PAGES_INPUT_FILE"], ["CAREER_PAGES_TARGETS_FILE"]]
       },
       "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
       "requiresLiveVerification": true,
@@ -172,8 +170,7 @@
         "contract": ["npm run verify:career-pages:ingest", "npm run verify:source:readiness"]
       },
       "blockers": [
-        "Current controlled live crawl has not been verified.",
-        "Source ingestion does not yet materialize evidence_items lineage."
+        "Current controlled live crawl has not been verified."
       ]
     },
     "rabota-rossii": {
@@ -261,7 +258,7 @@
       "contract": "tested",
       "configuration": {
         "mode": "provider-required",
-        "acceptedEnvSets": [["LINKEDIN_INPUT_FILE"], ["LINKEDIN_PROVIDER_API_URL", "LINKEDIN_PROVIDER_API_TOKEN"]]
+        "acceptedEnvSets": [["LINKEDIN_COMPANY_PAGES_INPUT_FILE"], ["LINKEDIN_PROVIDER_API_URL", "LINKEDIN_PROVIDER_API_TOKEN"]]
       },
       "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
       "requiresLiveVerification": true,
@@ -313,7 +310,7 @@
         "fixture": ["npm run verify:egrul-fns:smoke"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["Only 10-digit legal-entity INNs are allowed; cross-source canonical identity remains incomplete."]
+      "blockers": ["Registry records do not currently expose a stable original source URL, so evidence_items lineage remains blocked."]
     },
     "transparent-business-fns": {
       "implementation": "implemented",
@@ -393,7 +390,7 @@
         "fixture": ["npm run verify:funding-business-signals:smoke"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["Publisher-versus-subject identity and source evidence lineage require hardening."]
+      "blockers": ["Publisher-versus-subject identity confidence still requires production review."]
     },
     "company-newsrooms": {
       "implementation": "implemented",

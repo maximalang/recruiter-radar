@@ -15,6 +15,7 @@ import {
 } from './adapters/source-records.mjs';
 import { loadEnvFile, normalizeDomain } from './lib/common-utils.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
+import { assertOrgSourceRefOwner, resolveOrganizationOwner } from './adapters/organization-resolution.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -592,34 +593,8 @@ async function ingestEgrulFns({ connectionString, input }) {
 }
 
 async function upsertOrgSourceRef(client, record) {
-  await lockOrgSourceKeys(client, record.orgSourceKeys);
-
-  const existingRefResult = await client.query(
-    `
-      SELECT org_id
-      FROM org_source_refs
-      WHERE source = $1::text
-        AND source_key = ANY($2::text[])
-      ORDER BY
-        CASE
-          WHEN source_key = $3 THEN 0
-          WHEN source_key = $4 THEN 1
-          WHEN source_key = $5 THEN 2
-          ELSE 3
-        END,
-        id ASC
-      LIMIT 1
-    `,
-    [
-      SOURCE_ID,
-      record.orgSourceKeys,
-      record.primarySourceKey,
-      record.innSourceKey ?? record.domainSourceKey,
-      record.companyNameSourceKey,
-    ],
-  );
-
-  let orgId = existingRefResult.rows[0]?.org_id;
+  const resolution = await resolveOrganizationOwner(client, SOURCE_ID, record);
+  let orgId = resolution.orgId;
   let insertedOrg = false;
 
   if (!orgId) {
@@ -667,6 +642,7 @@ async function upsertOrgSourceRef(client, record) {
         buildOrgSourceMetadata(record, sourceKey),
       ],
     );
+    await assertOrgSourceRefOwner(client, SOURCE_ID, sourceKey, orgId);
   }
 
   await client.query(
@@ -693,16 +669,7 @@ async function upsertOrgSourceRef(client, record) {
     [orgId, record.orgDisplayName, record.companyDomain, record.companyWebsiteUrl],
   );
 
-  return { orgId, insertedOrg };
-}
-
-async function lockOrgSourceKeys(client, sourceKeys) {
-  for (const sourceKey of [...sourceKeys].sort()) {
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext($2::text))', [
-      SOURCE_ID,
-      sourceKey,
-    ]);
-  }
+  return { orgId, insertedOrg, resolutionReason: resolution.resolutionReason };
 }
 
 export function buildFetchSummary(input) {

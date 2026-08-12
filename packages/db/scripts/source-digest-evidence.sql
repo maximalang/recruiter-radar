@@ -1,7 +1,11 @@
 WITH source_signal_rows AS (
   SELECT
+    signal.id AS signal_id,
     signal.org_id,
     signal.source,
+    signal.external_id AS source_record_external_id,
+    signal.source_url AS source_record_url,
+    lineage.evidence_id,
     signal.headline AS evidence_title,
     signal.occurred_at AS published_at,
     COALESCE(
@@ -103,6 +107,14 @@ WITH source_signal_rows AS (
     -- latest_published_at) while still letting them count toward source_families.
     (signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site', 'company-newsrooms', 'industry-media')) AS is_context_evidence
   FROM signals AS signal
+  LEFT JOIN LATERAL (
+    SELECT recorded.evidence_id
+    FROM source_signal_evidence_lineage_v1 AS recorded
+    WHERE recorded.signal_id = signal.id
+    ORDER BY recorded.created_at DESC, recorded.id DESC
+    LIMIT 1
+  ) AS lineage
+    ON TRUE
   WHERE
     (
       -- Lead originators: company-owned or platform hiring surfaces. Only these
@@ -128,10 +140,10 @@ WITH source_signal_rows AS (
 ),
 -- org_corroboration_keys: map each org_id to a canonical cross-source
 -- corroboration key derived from the STRONGEST shared strong key. This lets
--- signals from fragmented orgs (same employer, different org_id per source
--- because per-source resolution scopes WHERE source=$1) corroborate into one
--- evidence package at digest-assembly time — WITHOUT touching the hot upsert
--- path (the deferred canonical-org merge EPIC). Read-side only, reversible.
+-- signals from legacy fragmented orgs corroborate into one evidence package at
+-- digest-assembly time. Current writers resolve validated strong identity keys
+-- globally before upsert; this read-side bridge remains for historical rows and
+-- is reversible because it never rewrites ownership.
 --
 -- Key precedence (strongest first): inn: > ogrn: > domain:
 --   - inn:/ogrn: are legally unique → a perfect merge signal.
@@ -163,14 +175,14 @@ org_corroboration_keys AS (
     org.id AS org_id,
     COALESCE(
       -- Strongest: INN (10-digit legal entity). Globally namespaced across sources.
-      (SELECT ('inn:' || ref.source_key)
+      (SELECT ('inn:' || LOWER(REPLACE(ref.source_key, 'inn:', '')))
        FROM org_source_refs AS ref
        WHERE ref.org_id = org.id
          AND ref.source_key LIKE 'inn:%'
        ORDER BY ref.source_key ASC
        LIMIT 1),
       -- OGRN (13-digit). Same namespace across sources.
-      (SELECT ('ogrn:' || ref.source_key)
+      (SELECT ('ogrn:' || LOWER(REPLACE(ref.source_key, 'ogrn:', '')))
        FROM org_source_refs AS ref
        WHERE ref.org_id = org.id
          AND ref.source_key LIKE 'ogrn:%'
@@ -223,10 +235,14 @@ org_corroboration_keys AS (
 ),
 normalized_signal_rows AS (
   SELECT
+    signal.signal_id,
+    signal.evidence_id,
     signal.org_id,
     corb.corroboration_key,
     corb.corroboration_key_type,
     signal.source,
+    signal.source_record_external_id,
+    signal.source_record_url,
     signal.payload_source_keys,
     COALESCE(
       NULLIF(source_ref.external_id, ''),
@@ -397,6 +413,19 @@ aggregated AS (
       ELSE 'enrichment_context'
     END AS evidence_quality,
     ARRAY_AGG(DISTINCT source ORDER BY source) AS source_families,
+    ARRAY_AGG(DISTINCT signal_id ORDER BY signal_id) AS source_signal_ids,
+    ARRAY_REMOVE(
+      ARRAY_AGG(DISTINCT evidence_id ORDER BY evidence_id),
+      NULL
+    ) AS source_evidence_ids,
+    ARRAY_REMOVE(
+      ARRAY_AGG(DISTINCT NULLIF(BTRIM(source_record_external_id), '') ORDER BY NULLIF(BTRIM(source_record_external_id), '')),
+      NULL
+    ) AS source_record_external_ids,
+    ARRAY_REMOVE(
+      ARRAY_AGG(DISTINCT NULLIF(BTRIM(source_record_url), '') ORDER BY NULLIF(BTRIM(source_record_url), '')),
+      NULL
+    ) AS source_record_urls,
     -- evidence_titles holds the OPEN ROLE titles the agency acts on, so it must
     -- contain ONLY job_posting originator titles — a funding round headline or a
     -- fedresurs event label must never appear as a "vacancy". Context rows are
@@ -474,6 +503,10 @@ scored AS (
     source_display_name,
     evidence_quality,
     source_families,
+    source_signal_ids,
+    source_evidence_ids,
+    source_record_external_ids,
+    source_record_urls,
     evidence_titles,
     candidate_source_keys,
     location_names,
@@ -579,6 +612,10 @@ ranked AS (
     source_display_name,
     evidence_quality,
     source_families,
+    source_signal_ids,
+    source_evidence_ids,
+    source_record_external_ids,
+    source_record_urls,
     evidence_titles,
     candidate_source_keys,
     location_names,
@@ -634,6 +671,10 @@ SELECT
   source_display_name,
   ranked_org.career_page_url AS career_page_url,
   source_families,
+  source_signal_ids,
+  source_evidence_ids,
+  source_record_external_ids,
+  source_record_urls,
   evidence_titles,
   candidate_source_keys,
   location_names,

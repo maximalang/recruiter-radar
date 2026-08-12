@@ -35,7 +35,7 @@ describe('source identity and evidence lineage contract', () => {
   it('resolves only validated strong keys globally and never names', () => {
     const script = [
       `import { classifyStrongIdentityKey } from ${JSON.stringify(`file:///${resolutionPath.replaceAll('\\', '/')}`)};`,
-      "const values = ['inn:7707083893', 'inn:7707083894', 'ogrn:1027700132195', 'domain:www.example.ru', 'company-name:пример'];",
+      "const values = ['inn:7707083893', 'inn:7707083894', 'ogrn:1027700132195', 'domain:www.example.ru', 'domain:jobs.example.ru', 'domain:example.ru/path', 'domain:example.ru:443', 'domain:example.ru.', 'domain:boards.greenhouse.io', 'domain:co.uk', 'domain:xn--e1afmkfd.xn--p1ai', 'domain:127.0.0.1', 'company-name:пример'];",
       'console.log(JSON.stringify(values.map((value) => classifyStrongIdentityKey(value))));',
     ].join('\n')
     const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
@@ -49,6 +49,14 @@ describe('source identity and evidence lineage contract', () => {
       null,
       { key: 'ogrn:1027700132195', type: 'ogrn' },
       { key: 'domain:example.ru', type: 'domain' },
+      { key: 'domain:example.ru', type: 'domain' },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
       null,
     ])
   })
@@ -58,11 +66,35 @@ describe('source identity and evidence lineage contract', () => {
 
     expect(runtime).toContain('resolveOrganizationOwner')
     expect(runtime).toContain('assertOrgSourceRefOwner')
-    expect(runtime).toContain('writeEvidence')
-    expect(runtime).toContain('source_signal_evidence_lineage_v1')
+    expect(runtime).toContain('upsertSignalEvidenceLineage')
     expect(runtime).toContain("evidenceRole === 'primary_platform' ? 'corroboration' : 'context'")
     expect(runtime).not.toContain("evidenceRole === 'primary_platform' ? 'direct'")
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
     expect(packageJson.scripts['verify:source:identity-lineage']).toContain('verify-source-identity-lineage.mjs')
+  })
+
+  it('routes custom source writers through the same identity and lineage boundaries', () => {
+    const lineageSources = [
+      'ingest-hh.mjs',
+      'source-career-pages.mjs',
+      'source-tech-job-boards.mjs',
+      'source-linkedin-company-pages.mjs',
+      'source-company-site.mjs',
+      'source-funding-business-signals.mjs',
+    ]
+    for (const file of lineageSources) {
+      const source = readFileSync(resolve(repoRoot, 'packages', 'db', 'scripts', file), 'utf8')
+      expect(source).toContain('resolveOrganizationOwner')
+      expect(source).toContain('assertOrgSourceRefOwner')
+      expect(source).toContain('upsertSignalEvidenceLineage')
+    }
+
+    const egrul = readFileSync(resolve(repoRoot, 'packages', 'db', 'scripts', 'source-egrul-fns.mjs'), 'utf8')
+    expect(egrul).toContain('resolveOrganizationOwner')
+    expect(egrul).toContain('assertOrgSourceRefOwner')
+    expect(egrul).not.toContain('upsertSignalEvidenceLineage')
+
+    const hh = readFileSync(resolve(repoRoot, 'packages', 'db', 'scripts', 'ingest-hh.mjs'), 'utf8')
+    expect(hh).toContain('`domain:${vacancy.employerDomain}`')
   })
 })

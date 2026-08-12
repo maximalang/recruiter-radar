@@ -14,7 +14,12 @@ import {
   stripBom,
 } from './adapters/source-records.mjs';
 import { toUrlOrNull } from './adapters/rf-source-runtime.mjs';
+import {
+  assertOrgSourceRefOwner,
+  resolveOrganizationOwner,
+} from './adapters/organization-resolution.mjs';
 import { extractDomain } from './lib/adapter-base.mjs';
+import { upsertSignalEvidenceLineage } from './lib/source-lineage-writer.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -53,7 +58,14 @@ try {
   const normalizedVacancies = normalizedVacancyResult.records;
   const stats =
     normalizedVacancies.length === 0
-      ? { hhVacancyUpsertCount: 0, signalUpsertCount: 0, skippedSignalCount: 0 }
+      ? {
+          hhVacancyUpsertCount: 0,
+          signalUpsertCount: 0,
+          evidenceUpsertCount: 0,
+          evidenceCreatedCount: 0,
+          lineageCreatedCount: 0,
+          skippedSignalCount: 0,
+        }
       : await upsertVacancies(databaseUrl, normalizedVacancies);
 
   console.log(`hh search text: ${searchConfig.searchText}`);
@@ -74,6 +86,9 @@ try {
     normalizedRecords: normalizedVacancies.length,
     skippedRecords: normalizedVacancyResult.duplicateRecords + (stats.skippedSignalCount || 0),
     signalUpsertsCompleted: stats.signalUpsertCount,
+    evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+    evidenceCreated: stats.evidenceCreatedCount,
+    lineageCreated: stats.lineageCreatedCount,
   }));
 
   if (stats.skippedSignalCount > 0) {
@@ -206,31 +221,11 @@ async function upsertVacancies(connectionString, vacancies) {
       fetched_at = EXCLUDED.fetched_at
   `;
 
-  const signalUpsertQuery = `
-    INSERT INTO signals (
-      org_id,
-      signal_type,
-      source,
-      external_id,
-      headline,
-      summary,
-      source_url,
-      occurred_at,
-      payload
-    )
-    VALUES ($1, 'job_posting', $2, $3, $4, $5, $6, $7, $8)
-    ON CONFLICT (source, external_id) DO UPDATE
-    SET
-      org_id = EXCLUDED.org_id,
-      headline = EXCLUDED.headline,
-      summary = EXCLUDED.summary,
-      source_url = EXCLUDED.source_url,
-      occurred_at = EXCLUDED.occurred_at,
-      payload = EXCLUDED.payload
-  `;
-
   let hhVacancyUpsertCount = 0;
   let signalUpsertCount = 0;
+  let evidenceUpsertCount = 0;
+  let evidenceCreatedCount = 0;
+  let lineageCreatedCount = 0;
   let skippedSignalCount = 0;
 
   await client.connect();
@@ -258,19 +253,29 @@ async function upsertVacancies(connectionString, vacancies) {
         continue;
       }
 
-      const orgId = await upsertOrgSourceRef(client, vacancy);
-      const signalResult = await client.query(signalUpsertQuery, [
-        orgId,
-        hhSource,
-        vacancy.hhVacancyId,
-        vacancy.vacancyName,
-        buildSignalSummary(vacancy),
-        vacancy.alternateUrl,
-        vacancy.publishedAt ?? vacancy.fetchedAt,
-        buildSignalPayload(vacancy),
-      ]);
+      const org = await upsertOrgSourceRef(client, vacancy);
+      const lineage = await upsertSignalEvidenceLineage(client, {
+        orgId: org.orgId,
+        signalType: 'job_posting',
+        source: hhSource,
+        sourceFamily: 'job-board',
+        externalId: vacancy.hhVacancyId,
+        headline: vacancy.vacancyName,
+        summary: buildSignalSummary(vacancy),
+        sourceUrl: vacancy.alternateUrl,
+        publishedAt: vacancy.publishedAt ?? vacancy.fetchedAt,
+        normalizedAt: vacancy.fetchedAt,
+        payload: buildSignalPayload(vacancy),
+        sourceRecordType: 'job_posting',
+        evidenceTier: 'corroboration',
+        extractionMethod: 'hh-api',
+        organizationResolutionReason: org.resolutionReason,
+      });
 
-      signalUpsertCount += signalResult.rowCount ?? 0;
+      signalUpsertCount += lineage.signalUpsertCount;
+      evidenceUpsertCount += lineage.evidenceUpsertCount;
+      evidenceCreatedCount += lineage.evidenceCreatedCount;
+      lineageCreatedCount += lineage.lineageCreatedCount;
     }
 
     await client.query('COMMIT');
@@ -278,6 +283,9 @@ async function upsertVacancies(connectionString, vacancies) {
     return {
       hhVacancyUpsertCount,
       signalUpsertCount,
+      evidenceUpsertCount,
+      evidenceCreatedCount,
+      lineageCreatedCount,
       skippedSignalCount,
     };
   } catch (error) {
@@ -290,28 +298,11 @@ async function upsertVacancies(connectionString, vacancies) {
 
 async function upsertOrgSourceRef(client, vacancy) {
   const sourceKeys = buildOrgSourceKeys(vacancy);
-
-  await lockOrgSourceKeys(client, sourceKeys);
-
-  const existingRefResult = await client.query(
-    `
-      SELECT org_id
-      FROM org_source_refs
-      WHERE source = $1
-        AND source_key = ANY($2)
-      ORDER BY
-        CASE
-          WHEN source_key = $3 THEN 0
-          WHEN source_key = $4 THEN 1
-          ELSE 2
-        END,
-        id ASC
-      LIMIT 1
-    `,
-    [hhSource, sourceKeys, vacancy.orgSourceKey, vacancy.orgSourceAliasKey],
-  );
-
-  let orgId = existingRefResult.rows[0]?.org_id;
+  const resolution = await resolveOrganizationOwner(client, hhSource, {
+    orgSourceKeys: sourceKeys,
+    companyDomain: vacancy.employerDomain,
+  });
+  let orgId = resolution.orgId;
 
   if (!orgId) {
     // Insert with NULL domain first; domain is set afterwards via the
@@ -333,7 +324,7 @@ async function upsertOrgSourceRef(client, vacancy) {
   await updateOrgSourceRef(client, orgId, vacancy);
   await setOrgDomain(client, orgId, vacancy);
 
-  return orgId;
+  return { orgId, resolutionReason: resolution.resolutionReason };
 }
 
 // Best-effort domain enrichment. orgs has a UNIQUE index on LOWER(domain), so a
@@ -413,31 +404,12 @@ async function updateOrgSourceRef(client, orgId, vacancy) {
   );
 }
 
-async function lockOrgSourceKeys(client, sourceKeys) {
-  for (const sourceKey of [...sourceKeys].sort()) {
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [
-      hhSource,
-      sourceKey,
-    ]);
-  }
-}
-
 async function upsertOrgSourceKeys(client, orgId, vacancy) {
-  const sourceRefs = [
-    {
-      sourceKey: vacancy.orgSourceKey,
-      externalId: vacancy.hhEmployerId,
-      displayName: vacancy.orgDisplayName,
-    },
-  ];
-
-  for (const sourceKey of vacancy.orgSourceAliasKeys ?? []) {
-    sourceRefs.push({
-      sourceKey,
-      externalId: null,
-      displayName: vacancy.orgDisplayName,
-    });
-  }
+  const sourceRefs = buildOrgSourceKeys(vacancy).map((sourceKey) => ({
+    sourceKey,
+    externalId: sourceKey === vacancy.orgSourceKey ? vacancy.hhEmployerId : null,
+    displayName: vacancy.orgDisplayName,
+  }));
 
   for (const sourceRef of sourceRefs) {
     await client.query(
@@ -470,6 +442,7 @@ async function upsertOrgSourceKeys(client, orgId, vacancy) {
         buildOrgSourceMetadata(vacancy, sourceRef.sourceKey, sourceRef.externalId),
       ],
     );
+    await assertOrgSourceRefOwner(client, hhSource, sourceRef.sourceKey, orgId);
   }
 }
 
@@ -545,7 +518,8 @@ function buildEmployerNameSourceKey(employerName) {
 }
 
 function buildOrgSourceKeys(vacancy) {
-  return [vacancy.orgSourceKey, ...(vacancy.orgSourceAliasKeys ?? [])].filter(
+  const domainSourceKey = vacancy.employerDomain ? `domain:${vacancy.employerDomain}` : null;
+  return [vacancy.orgSourceKey, domainSourceKey, ...(vacancy.orgSourceAliasKeys ?? [])].filter(
     (sourceKey, index, sourceKeys) => Boolean(sourceKey) && sourceKeys.indexOf(sourceKey) === index,
   );
 }
