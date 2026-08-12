@@ -38,6 +38,7 @@ jobs:
           python3 -m py_compile scripts/operator-mcp/rr-operator-agent.py
           python3 scripts/test/operator-mcp-agent.py
           bash scripts/test/operator-mcp-caddy.sh
+          bash scripts/test/operator-mcp-bootstrap-security.sh
           bash scripts/test/configure-caddy-production.sh
 
       - name: Run operator MCP contract tests
