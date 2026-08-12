@@ -74,7 +74,7 @@
 
 - `CODE_VERIFIED`: **да** — #176, #177 и #178 находятся в `main`; exact-head CI #178 прошёл, включая Tests, Commercial Signal/Evidence Radar contracts, full Jest, PostgreSQL runtime/rollback, production acceptance, web build, responsive Playwright и Docker/Caddy smoke.
 - `QUALITY_VALIDATED`: **нет** — достаточного frozen human-reviewed validation/temporal holdout пока не подтверждено.
-- `DEPLOYED`: **код приложения подтверждён для `f85f3dd12bdfa28b420ef0cf0f2bceecc84d9a65`**, но Quality flags отдельно не проверены и из application deploy не выводятся.
+- `DEPLOYED`: **код приложения подтверждён для deployment receipt `265d3f6725bde98dd2a3a11c569147174e591d98`**, но Quality flags отдельно не проверены и из application deploy не выводятся.
 - `LIVE_VERIFIED`: **нет подтверждения** — real production source/provider/runtime behavior требует отдельной live проверки.
 
 Stage 2 operational states:
@@ -89,6 +89,7 @@ Stage 2 operational states:
 ## Observability и health
 
 - Structured events покрывают login request/email/session outcomes, checkout/webhook/entitlement reconciliation, radar runs/source failures/zero-opportunity anomaly и digest/channel outcomes.
+- Публичный `/api/health` fail-closed проверяет DB connectivity и наличие latest migration, возвращает только безопасные `version.deploySha` и статусы database/migrations/configuration/Redis. Текущий exact deploy всегда определяется из этого runtime-поля, а не из потенциально более старого документа.
 - `/api/health/readiness` возвращает только защищённый dependency report: DB probe, workflow prerequisites, отдельные email configuration/runtime/verification states и configuration-only статусы payment/Telegram/webpush.
 - Любая успешная доставка через центральный SMTP/Postbox transport записывает PII-free provider/configuration fingerprint evidence и переводит только эту актуальную конфигурацию в `runtimeState: healthy`; report показывает только `lastVerifiedAt` и `lastSuccessfulDeliveryAt`. Одна конфигурация остаётся `configured_unverified` и не считается live success.
 - Статусы providers не содержат credentials, tokens, email, signature или webhook payload.
@@ -123,15 +124,15 @@ Promotion разрешается только registry policy и live verifier. 
 
 ### Application
 
-- `CODE_MERGED`: **да** — PR #188 и #189 объединены в `main`; проверенный snapshot `main` — `f85f3dd12bdfa28b420ef0cf0f2bceecc84d9a65`.
-- `CI_VERIFIED`: **да** — push-to-main workflow `Tests` run `31528854942` завершился успешно для exact SHA `f85f3dd12bdfa28b420ef0cf0f2bceecc84d9a65`.
-- `DEPLOYED_SHA`: **`f85f3dd12bdfa28b420ef0cf0f2bceecc84d9a65`** — workflow `Deploy` run `31529443967` загрузил immutable image с этим тегом, переключил healthy web container и финализировал rollback guard.
-- `PUBLIC_HEALTH_VERIFIED`: **да** — тот же Deploy run получил HTTP 200 от публичного `/api/health` 11 августа 2026 года.
+- `CODE_MERGED`: **да** — PR #188–#192 объединены в `main`; final production-completion pass #191 входит в проверенный snapshot `265d3f6725bde98dd2a3a11c569147174e591d98`.
+- `CI_VERIFIED`: **да** — push-to-main workflow `Tests` run `31578312961` завершился успешно для exact SHA `265d3f6725bde98dd2a3a11c569147174e591d98`, включая full Jest/PostgreSQL, production acceptance, Auth v2, web build, landing/responsive Playwright и Docker smoke.
+- `DEPLOYED_SHA` (receipt 12 августа 2026): **`265d3f6725bde98dd2a3a11c569147174e591d98`** — workflow `Deploy` run `31578858158` загрузил immutable image с этим тегом, переключил healthy web container и удалил recovery marker после успешной финализации. Если `main` получил более новый docs-only successor, текущий exact SHA берётся из публичного `/api/health.version.deploySha`.
+- `PUBLIC_HEALTH_VERIFIED`: **да** — Deploy run и отдельный post-run verifier подтвердили HTTP 200, exact SHA выше, `database=ok`, `migrations=current`, `configuration=ready`, а также доступность `/` и `/login`.
 - `LANDING_LIVE_VERIFIED`: **да** — тот же Deploy run подтвердил landing anchor, brand layout, favicon assets и dry-run `POST /api/landing-events`.
 
 ### Commercial Signal
 
-- `CODE_VERIFIED`: **да** — contracts и authenticated browser fixture прошли на PR #189 и на push-to-main SHA выше.
+- `CODE_VERIFIED`: **да** — contracts и authenticated browser fixture прошли на PR #191 и на final push-to-main SHA выше; Evidence Radar сохраняет verified geography/evidence, а scoring diagnostics остаются вторичным disclosure.
 - `FLAGS_ENABLED`: **не подтверждено** — application deploy не доказывает значения production flags.
 - `CANARY_ENABLED`: **нет подтверждения** — текущий pass не включал canary и не менял rollout state.
 - `LIVE_SOURCE_VERIFIED`: **нет подтверждения** — fixture/contracts и публичный health не доказывают production source ingestion.
@@ -152,7 +153,7 @@ Promotion разрешается только registry policy и live verifier. 
 
 - Read-only inventory 11 августа 2026 года: Ubuntu 18.04.6 LTS, kernel 4.15, Docker 24.0.2, Compose 2.18.1, Caddy 2.7.6, PostgreSQL 16.14; root filesystem использован на 53%.
 - Host не подключён к Ubuntu Pro/ESM. UFW неактивен; SSH допускает root login и password authentication. Это P1 operational debt, а не application outage.
-- На host присутствуют ежедневные локальные gzip SQL backups за 4–11 августа и rollback image для `247861527be364c1b5d4ab0a0327979e3171e7a1`; off-host copy и успешный restore drill не подтверждены.
+- На host присутствовали ежедневные локальные gzip SQL backups за 4–11 августа; Deploy run `31578858158` сохранил предыдущий production image как rollback перед переключением на `265d3f67`. Off-host copy и успешный restore drill не подтверждены.
 - Миграция host не авторизована. Безопасный inventory/backup/restore/cutover plan: `docs/production-host-upgrade.md`.
 
 - Production-readiness изменения PR #174 объединены в `main`: merge SHA `9e1231521c80a78687d17d49278a9d15a78fb6ad`.
@@ -165,7 +166,10 @@ Promotion разрешается только registry policy и live verifier. 
 - Product Motion System PR #187 объединён: текущий snapshot `main` начинается с merge SHA `35a1d2d44f2914b5c1567b6b37615ab5d606083e`.
 - Technical/product consolidation PR #188 объединён: merge SHA `247861527be364c1b5d4ab0a0327979e3171e7a1`.
 - Premium visual/motion и correctness PR #189 объединён: merge/deployed SHA `f85f3dd12bdfa28b420ef0cf0f2bceecc84d9a65`.
-- Поэтому текущая production формулировка: **application code/CI/deploy/public health подтверждены для указанного exact SHA; production flags, live providers/source matrix и real Commercial Signal quality отдельно не подтверждены**.
+- Operator MCP OAuth PR #190 объединён: merge/deployed SHA `3214ae070af32466c3a029fe7411dc99728232db`.
+- Final production-completion pass PR #191 объединён: merge SHA `1395e60b64dc194bb1e0d568606fd263c73f347e`; он является предком final verified/deployed snapshot.
+- Auth0 OAuth finalization PR #192 объединён: final verified/deployed receipt SHA `265d3f6725bde98dd2a3a11c569147174e591d98`.
+- Поэтому текущая production формулировка: **application code/CI/deploy/public exact health подтверждены датированным receipt для указанного SHA; production flags, live providers/source matrix и real Commercial Signal quality отдельно не подтверждены**.
 
 ## External blockers
 
