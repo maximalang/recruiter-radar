@@ -43,6 +43,7 @@ jobs:
         shell: bash
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+          SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK: isolated
         run: |
           set +e
           npm run verify:smoke > /tmp/smoke-output.log 2>&1

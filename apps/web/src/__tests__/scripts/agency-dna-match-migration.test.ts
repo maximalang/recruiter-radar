@@ -223,7 +223,7 @@ describe('Agency DNA Match v2 migration contract', () => {
     expect(matchDown).toBeGreaterThan(-1)
     expect(propensityDown).toBeGreaterThan(matchDown)
     expect(opportunityDownVerifier).toContain(
-      'const PRE_FIXTURE_DOWN_MIGRATIONS = 27',
+      'const PRE_FIXTURE_DOWN_MIGRATIONS = 28',
     )
     expect(opportunityDownVerifier).not.toContain('CASCADE')
   })

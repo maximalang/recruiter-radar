@@ -50,6 +50,7 @@
       "company_name": "HeadlessCorp",
       "company_domain": "headless.example",
       "summary": "Компания получила инвестиции, но заголовок не указан.",
+      "source_url": "https://news.example/headless-series-b",
       "event_type": "series_b",
       "amount": "20000000",
       "currency": "USD",

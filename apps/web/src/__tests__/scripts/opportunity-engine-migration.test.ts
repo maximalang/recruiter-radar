@@ -178,11 +178,28 @@ const outcomeWorkspaceActorRollbackPath = resolve(
 const migratorPath = resolve(
   process.cwd(), '..', '..', 'packages', 'db', 'scripts', 'migrate.mjs',
 )
+const opportunityDownVerifierPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'scripts',
+  'verify-opportunity-engine-down.mjs',
+)
 
 describe('opportunity engine migration contract', () => {
   const migration = readFileSync(migrationPath, 'utf8')
   const rollback = readFileSync(rollbackPath, 'utf8')
   const compactMigration = migration.replace(/\s+/g, ' ')
+
+  it('rolls back newer source lineage before Opportunity-owned composite indexes', () => {
+    const verifier = readFileSync(opportunityDownVerifierPath, 'utf8')
+    const lineageIndex = verifier.indexOf(
+      "'20260812150000_add_source_signal_evidence_lineage.down.sql'",
+    )
+    const opportunityIndex = verifier.indexOf(
+      "'20260726130000_add_opportunity_engine_v1.down.sql'",
+    )
+
+    expect(lineageIndex).toBeGreaterThanOrEqual(0)
+    expect(opportunityIndex).toBeGreaterThan(lineageIndex)
+  })
 
   it('adds the episode, evidence, opportunity, and action tables', () => {
     for (const table of [

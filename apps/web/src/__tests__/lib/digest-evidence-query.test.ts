@@ -13,6 +13,22 @@ describe('digest evidence query mirror', () => {
     expect(DIGEST_EVIDENCE_QUERY).toBe(canonical)
   })
 
+  it('projects exact source signal and evidence lineage into every digest candidate', () => {
+    expect(DIGEST_EVIDENCE_QUERY).toContain('signal.id AS signal_id')
+    expect(DIGEST_EVIDENCE_QUERY).toContain('lineage.evidence_id')
+    expect(DIGEST_EVIDENCE_QUERY).toContain('AS source_signal_ids')
+    expect(DIGEST_EVIDENCE_QUERY).toContain('AS source_evidence_ids')
+    expect(DIGEST_EVIDENCE_QUERY).toContain('AS source_record_external_ids')
+    expect(DIGEST_EVIDENCE_QUERY).toContain('AS source_record_urls')
+  })
+
+  it('canonicalizes already-prefixed legal identity keys without duplicating the namespace', () => {
+    expect(DIGEST_EVIDENCE_QUERY).toContain("'inn:' || LOWER(REPLACE(ref.source_key, 'inn:', ''))")
+    expect(DIGEST_EVIDENCE_QUERY).toContain("'ogrn:' || LOWER(REPLACE(ref.source_key, 'ogrn:', ''))")
+    expect(DIGEST_EVIDENCE_QUERY).not.toContain("'inn:' || ref.source_key")
+    expect(DIGEST_EVIDENCE_QUERY).not.toContain("'ogrn:' || ref.source_key")
+  })
+
   // Regression guard for a prod-only HTTP 500 (PostgreSQL 42601 "syntax error at
   // or near \"FILTER\"") caused by writing an aggregate FILTER clause INSIDE the
   // aggregate's argument parentheses:

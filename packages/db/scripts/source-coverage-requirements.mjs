@@ -10,8 +10,7 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
       'egrul-fns': 'enrichment-only',
       'transparent-business-fns': 'enrichment-only',
       'fedresurs': 'context-only'
-    },
-    minMaturity: 'controlled-live-ready'
+    }
   }),
   P2: Object.freeze({
     description: 'Secondary sources with confidence gates',
@@ -24,8 +23,7 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
       'tech-job-boards': 'confidence-gated-evidence',
       'superjob': 'confidence-gated-evidence',
       'habr-career': 'confidence-gated-evidence'
-    },
-    minMaturity: 'curated-live-ready'
+    }
   }),
   P3: Object.freeze({
     description: 'Context sources with supporting role',
@@ -35,12 +33,11 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
       'company-newsrooms': 'context-only',
       'industry-media': 'context-only',
       'regional-job-boards': 'confidence-gated-evidence'
-    },
-    minMaturity: 'curated-context-only'
+    }
   })
 });
 
-export const DIGEST_SOURCES = Object.freeze(['hh', 'career-pages']);
+export const DIGEST_SOURCES = Object.freeze(['hh', 'career-pages', 'rabota-rossii']);
 
 export const PROMOTION_STATUSES = Object.freeze({
   'digest-allowed': 'Allowed in digest selection',
@@ -72,13 +69,25 @@ export function validateSourceCoverage(sources) {
 
       results[tier].present.push(sourceId);
 
-      // Check maturity
-      if (source.maturity && source.maturity < config.minMaturity) {
+      const readiness = source.readiness;
+      if (!readiness) {
         results[tier].nonCompliant.push({
           source: sourceId,
-          reason: `Maturity ${source.maturity} < required ${config.minMaturity}`
+          reason: 'Missing explicit readiness contract'
         });
-        results.errors.push(`${sourceId} maturity below required ${config.minMaturity}`);
+        results.errors.push(`${sourceId} readiness contract is missing`);
+      } else if (readiness.implementation !== 'implemented') {
+        results[tier].nonCompliant.push({
+          source: sourceId,
+          reason: `Readiness implementation is ${readiness.implementation}`
+        });
+        results.errors.push(`${sourceId} readiness implementation is ${readiness.implementation}`);
+      } else if (readiness.contract !== 'tested') {
+        results[tier].nonCompliant.push({
+          source: sourceId,
+          reason: `Readiness contract is ${readiness.contract}`
+        });
+        results.errors.push(`${sourceId} readiness contract is ${readiness.contract}`);
       }
 
       // Check lead eligibility match

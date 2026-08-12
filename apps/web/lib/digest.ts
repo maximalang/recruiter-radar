@@ -98,6 +98,10 @@ export async function getDigestItemsForClientProfile(input: {
       ranked_candidates.source_display_name,
       ranked_candidates.career_page_url,
       ranked_candidates.source_families,
+      ranked_candidates.source_signal_ids,
+      ranked_candidates.source_evidence_ids,
+      ranked_candidates.source_record_external_ids,
+      ranked_candidates.source_record_urls,
       ranked_candidates.evidence_titles,
       ranked_candidates.candidate_source_keys,
       ranked_candidates.location_names,
@@ -255,6 +259,10 @@ export async function runDigestForClientProfile(input: {
         ranked_candidates.source_display_name,
         ranked_candidates.career_page_url,
         ranked_candidates.source_families,
+        ranked_candidates.source_signal_ids,
+        ranked_candidates.source_evidence_ids,
+        ranked_candidates.source_record_external_ids,
+        ranked_candidates.source_record_urls,
         ranked_candidates.evidence_titles,
         ranked_candidates.candidate_source_keys,
         ranked_candidates.location_names,
@@ -328,6 +336,10 @@ export async function runDigestForClientProfile(input: {
           JSON.stringify({
             rank: item.rank,
             source_families: item.source_families,
+            source_signal_ids: item.source_signal_ids ?? [],
+            source_evidence_ids: item.source_evidence_ids ?? [],
+            source_record_external_ids: item.source_record_external_ids ?? [],
+            source_record_urls: item.source_record_urls ?? [],
             confidence_gate: item.confidence_gate,
             evidence_titles: item.evidence_titles,
             location_names: item.location_names,
@@ -494,6 +506,10 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
 
   const sourceExternalId = row.source_external_id ?? "";
   const sourceDisplayName = row.source_display_name ?? "";
+  const sourceSignalIds = normalizeIdentifierArray(row.source_signal_ids);
+  const sourceEvidenceIds = normalizeIdentifierArray(row.source_evidence_ids);
+  const sourceRecordExternalIds = normalizeTextArray(row.source_record_external_ids);
+  const sourceRecordUrls = normalizeTextArray(row.source_record_urls);
   const evidenceTitles = normalizeTextArray(row.evidence_titles);
   const candidateSourceKeys = normalizeTextArray(row.candidate_source_keys);
   const locationNames = normalizeTextArray(row.location_names);
@@ -526,6 +542,10 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
     source_external_id: sourceExternalId,
     source_display_name: sourceDisplayName,
     source_families: Array.isArray(row.source_families) ? row.source_families : [],
+    source_signal_ids: sourceSignalIds,
+    source_evidence_ids: sourceEvidenceIds,
+    source_record_external_ids: sourceRecordExternalIds,
+    source_record_urls: sourceRecordUrls,
     evidence_titles: evidenceTitles,
     candidate_source_keys: candidateSourceKeys,
     location_names: locationNames,
@@ -928,6 +948,22 @@ function normalizeTextArray(value: string[] | null | undefined): string[] {
     }
 
     uniqueValues.add(normalizedItem);
+  }
+
+  return Array.from(uniqueValues.values());
+}
+
+function normalizeIdentifierArray(value: Array<string | number> | null | undefined): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const uniqueValues = new Set<string>();
+  for (const item of value) {
+    const normalizedItem = String(item).trim();
+    if (normalizedItem !== "") {
+      uniqueValues.add(normalizedItem);
+    }
   }
 
   return Array.from(uniqueValues.values());

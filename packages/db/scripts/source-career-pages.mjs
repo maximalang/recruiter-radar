@@ -16,7 +16,12 @@ import {
   stripBom,
 } from './adapters/source-records.mjs';
 import { fetchJson as fetchJsonWithPolicy, fetchText } from './adapters/source-http.mjs';
+import {
+  assertOrgSourceRefOwner,
+  resolveOrganizationOwner,
+} from './adapters/organization-resolution.mjs';
 import { loadEnvFile, normalizeDomain, runScriptCli } from './lib/common-utils.mjs';
+import { upsertSignalEvidenceLineage } from './lib/source-lineage-writer.mjs';
 import {
   extractCareerPageContactPaths,
   toPersistableContactPaths,
@@ -86,6 +91,7 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
           discoverySummary: input.discoverySummary,
           targetsProcessed: input.targetsProcessed,
           recordsReceived: input.recordsReceived,
+          parsedRecords: input.recordsReceived,
           recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
           duplicateRecords: input.duplicateRecords,
           normalizedRecords: input.normalizedRecords.length,
@@ -94,6 +100,9 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
           extractionBreakdown: summarizeExtractionBreakdown(input.targetResults),
           orgsCreated: stats.orgUpsertCount,
           signalUpsertsCompleted: stats.signalUpsertCount,
+          evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+          evidenceCreated: stats.evidenceCreatedCount,
+          lineageCreated: stats.lineageCreatedCount,
         },
         null,
         2,
@@ -176,6 +185,9 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
         companyName: toNonEmptyText(target?.company_name ?? target?.companyName) ?? null,
         sourceUrl: toUrlOrNull(target?.source_url ?? target?.sourceUrl ?? target?.url),
         recordsFetched: 0,
+        outcome: 'page-unreachable',
+        pageFetched: false,
+        errorCategory: classifyCareerPageFetchError(error),
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -509,6 +521,10 @@ function buildCareerPageProbeUrls(seed) {
 }
 
 async function fetchHtmlPage(url) {
+  return (await fetchHtmlPageDetailed(url)).page;
+}
+
+async function fetchHtmlPageDetailed(url) {
   try {
     const { response, body: html } = await fetchText(url, {
       sourceName: 'career-pages discovery',
@@ -520,22 +536,60 @@ async function fetchHtmlPage(url) {
     });
 
     if (!response.ok) {
-      return null;
+      return {
+        page: null,
+        diagnostics: {
+          pageFetched: false,
+          fetchFailure: true,
+          errorCategory: `http-${response.status}`,
+        },
+      };
     }
 
     const contentType = response.headers.get('content-type') ?? '';
 
     if (!/html|text\//i.test(contentType)) {
-      return null;
+      return {
+        page: null,
+        diagnostics: {
+          pageFetched: true,
+          contentUnsupported: true,
+          resolvedUrl: response.url,
+          errorCategory: 'unsupported-content-type',
+        },
+      };
     }
 
     return {
-      url: response.url,
-      html,
+      page: {
+        url: response.url,
+        html,
+      },
+      diagnostics: {
+        pageFetched: true,
+        resolvedUrl: response.url,
+        errorCategory: null,
+      },
     };
-  } catch {
-    return null;
+  } catch (error) {
+    return {
+      page: null,
+      diagnostics: {
+        pageFetched: false,
+        fetchFailure: true,
+        errorCategory: classifyCareerPageFetchError(error),
+      },
+    };
   }
+}
+
+function classifyCareerPageFetchError(error) {
+  const status = Number(error?.status);
+  if (Number.isInteger(status) && status >= 400 && status <= 599) return `http-${status}`;
+  const code = typeof error?.code === 'string' ? error.code.trim().toLowerCase() : '';
+  if (code) return code;
+  if (error?.name === 'AbortError' || /timeout/i.test(error?.message ?? '')) return 'timeout';
+  return 'network-error';
 }
 
 export function detectCareerPageTargetFromHtml(html, seed) {
@@ -1085,13 +1139,16 @@ export function resolveCareerPagesDiscoveryReviewOutputPath() {
 async function fetchCareerPageTarget(target, index) {
   const normalizedTarget = normalizeFetchTarget(target, index);
   let records;
+  let fetchDiagnostics = {};
 
   if (normalizedTarget.adapter === 'greenhouse-board') {
     records = await fetchGreenhouseBoardRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'lever-postings') {
     records = await fetchLeverPostingsRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'same-domain-jsonld') {
-    records = await fetchSameDomainJsonLdRecords(normalizedTarget);
+    const fetched = await fetchSameDomainJsonLdRecords(normalizedTarget);
+    records = fetched.records;
+    fetchDiagnostics = fetched.diagnostics;
   } else if (normalizedTarget.adapter === 'json-feed') {
     records = await fetchJsonFeedRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'static-records') {
@@ -1114,6 +1171,14 @@ async function fetchCareerPageTarget(target, index) {
       companyName: normalizedTarget.companyName,
       sourceUrl: normalizedTarget.sourceUrl,
       recordsFetched: records.length,
+      outcome: resolveCareerPageTargetOutcome({
+        adapter: normalizedTarget.adapter,
+        recordsFetched: records.length,
+        ...fetchDiagnostics,
+      }),
+      pageFetched: fetchDiagnostics.pageFetched ?? true,
+      resolvedUrl: fetchDiagnostics.resolvedUrl ?? normalizedTarget.sourceUrl,
+      errorCategory: fetchDiagnostics.errorCategory ?? null,
       // Per-target extraction diagnostics. For same-domain targets this names
       // which extractor produced the records ('jsonld' vs 'html-card-fallback')
       // so a discovered target that fetched a page but yielded 0 is inspectable
@@ -1123,6 +1188,21 @@ async function fetchCareerPageTarget(target, index) {
       extractionMethod: resolveExtractionMethodForSummary(records, normalizedTarget.adapter),
     },
   };
+}
+
+export function resolveCareerPageTargetOutcome({
+  adapter,
+  recordsFetched,
+  pageFetched = false,
+  fetchFailure = false,
+  contentUnsupported = false,
+}) {
+  if (fetchFailure) return 'page-unreachable';
+  if (contentUnsupported) return 'extractor-unsupported';
+  if (recordsFetched > 0) return 'parsed';
+  if (adapter === 'same-domain-jsonld' && pageFetched) return 'extraction-zero-unexpected';
+  if (pageFetched) return 'no-vacancies-present';
+  return 'page-unreachable';
 }
 
 function resolveExtractionMethodForSummary(records, adapter) {
@@ -1244,10 +1324,11 @@ export function mapLeverPostingsPayload(payload, target) {
 }
 
 async function fetchSameDomainJsonLdRecords(target) {
-  const page = await fetchHtmlPage(target.sourceUrl);
+  const fetchResult = await fetchHtmlPageDetailed(target.sourceUrl);
+  const page = fetchResult.page;
 
   if (!page) {
-    return [];
+    return { records: [], diagnostics: fetchResult.diagnostics };
   }
 
   const careerPageUrl = target.careerPageUrl ?? target.sourceUrl;
@@ -1279,7 +1360,10 @@ async function fetchSameDomainJsonLdRecords(target) {
 
   if (jsonLdRecords.length > 0) {
     tagRecordsWithExtractionMethod(jsonLdRecords, 'jsonld');
-    return jsonLdRecords;
+    return {
+      records: jsonLdRecords,
+      diagnostics: { pageFetched: true, resolvedUrl: page.url },
+    };
   }
 
   // HTML-card fallback: many RU corporate career pages (Bitrix/1C-Bitrix,
@@ -1288,7 +1372,10 @@ async function fetchSameDomainJsonLdRecords(target) {
   // — is silently lost after the page was already fetched. The fallback is
   // guarded: title + same-domain URL required, no fabricated fields.
   const htmlCardRecords = extractVacancyCardsFromSameDomainHtml(page.html, seed);
-  return htmlCardRecords;
+  return {
+    records: htmlCardRecords,
+    diagnostics: { pageFetched: true, resolvedUrl: page.url },
+  };
 }
 
 function tagRecordsWithExtractionMethod(records, method) {
@@ -1423,31 +1510,11 @@ async function ingestCareerPages({ connectionString, input }) {
     connectionTimeoutMillis: dbConnectionTimeoutMillis,
   });
 
-  const signalUpsertQuery = `
-    INSERT INTO signals (
-      org_id,
-      signal_type,
-      source,
-      external_id,
-      headline,
-      summary,
-      source_url,
-      occurred_at,
-      payload
-    )
-    VALUES ($1, 'job_posting', $2, $3, $4, $5, $6, $7, $8)
-    ON CONFLICT (source, external_id) DO UPDATE
-    SET
-      org_id = EXCLUDED.org_id,
-      headline = EXCLUDED.headline,
-      summary = EXCLUDED.summary,
-      source_url = EXCLUDED.source_url,
-      occurred_at = EXCLUDED.occurred_at,
-      payload = EXCLUDED.payload
-  `;
-
   let orgUpsertCount = 0;
   let signalUpsertCount = 0;
+  let evidenceUpsertCount = 0;
+  let evidenceCreatedCount = 0;
+  let lineageCreatedCount = 0;
 
   await client.connect();
 
@@ -1458,18 +1525,28 @@ async function ingestCareerPages({ connectionString, input }) {
       const orgUpsertResult = await upsertOrgSourceRef(client, record);
       orgUpsertCount += orgUpsertResult.insertedOrg ? 1 : 0;
 
-      const signalResult = await client.query(signalUpsertQuery, [
-        orgUpsertResult.orgId,
-        SOURCE_ID,
-        record.signalExternalId,
-        record.jobTitle,
-        buildSignalSummary(record),
-        record.jobPostingUrl,
-        record.occurredAt,
-        buildSignalPayload(record),
-      ]);
+      const lineage = await upsertSignalEvidenceLineage(client, {
+        orgId: orgUpsertResult.orgId,
+        signalType: 'job_posting',
+        source: SOURCE_ID,
+        sourceFamily: 'company-owned-career',
+        externalId: record.signalExternalId,
+        headline: record.jobTitle,
+        summary: buildSignalSummary(record),
+        sourceUrl: record.jobPostingUrl,
+        publishedAt: record.occurredAt,
+        normalizedAt: record.fetchedAt,
+        payload: buildSignalPayload(record),
+        sourceRecordType: record.sourceRecordType,
+        evidenceTier: 'direct',
+        extractionMethod: record.extractionMethod,
+        organizationResolutionReason: orgUpsertResult.resolutionReason,
+      });
 
-      signalUpsertCount += signalResult.rowCount ?? 0;
+      signalUpsertCount += lineage.signalUpsertCount;
+      evidenceUpsertCount += lineage.evidenceUpsertCount;
+      evidenceCreatedCount += lineage.evidenceCreatedCount;
+      lineageCreatedCount += lineage.lineageCreatedCount;
     }
 
     await client.query('COMMIT');
@@ -1477,6 +1554,9 @@ async function ingestCareerPages({ connectionString, input }) {
     return {
       orgUpsertCount,
       signalUpsertCount,
+      evidenceUpsertCount,
+      evidenceCreatedCount,
+      lineageCreatedCount,
     };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -1487,47 +1567,10 @@ async function ingestCareerPages({ connectionString, input }) {
 }
 
 async function upsertOrgSourceRef(client, record) {
-  // Lock this record's source keys in ONE round-trip instead of one-per-key.
-  // Previously `lockOrgSourceKeys` issued a separate `pg_advisory_xact_lock`
-  // statement per key (3-5 round-trips/record × 619 records ≈ 2000+ round-trips
-  // — the dominant cost behind the >150s write that exceeded the ingest timeout
-  // and lost the whole batch). `lockRecordOrgSourceKeys` batches all of a
-  // record's keys into a single unnest-driven statement, cutting the lock
-  // round-trips ~3-5× while preserving the per-record lock ordering. Deadlock
-  // characteristics are UNCHANGED from the old per-key loop: we still lock each
-  // record's keys in sorted order, one record at a time — the same discipline
-  // rf-source-runtime.mjs and ingest-hh.mjs use — so concurrent parallel ingests
-  // (ingestAllPrimarySources runs all 5 sources via Promise.all) see no new
-  // circular-wait risk. A whole-batch pre-acquire would lock more for longer and
-  // mix badly with the other sources' per-record locking; deliberately avoided.
-  await lockRecordOrgSourceKeys(client, record.orgSourceKeys);
-
-  const existingRefResult = await client.query(
-    `
-      SELECT org_id
-      FROM org_source_refs
-      WHERE source = $1::text
-        AND source_key = ANY($2::text[])
-      ORDER BY
-        CASE
-          WHEN source_key = $3 THEN 0
-          WHEN source_key = $4 THEN 1
-          WHEN source_key = $5 THEN 2
-          ELSE 3
-        END,
-        id ASC
-      LIMIT 1
-    `,
-    [
-      SOURCE_ID,
-      record.orgSourceKeys,
-      record.primarySourceKey,
-      record.domainSourceKey,
-      record.companyNameSourceKey,
-    ],
-  );
-
-  let orgId = existingRefResult.rows[0]?.org_id;
+  // The shared resolver acquires deterministic source-local and validated
+  // strong-key locks before it selects an existing owner or permits creation.
+  const resolution = await resolveOrganizationOwner(client, SOURCE_ID, record);
+  let orgId = resolution.orgId;
   let insertedOrg = false;
 
   if (!orgId) {
@@ -1579,6 +1622,7 @@ async function upsertOrgSourceRef(client, record) {
         buildOrgSourceMetadata(record, sourceKey),
       ],
     );
+    await assertOrgSourceRefOwner(client, SOURCE_ID, sourceKey, orgId);
   }
 
   // Name / website_url / career_page_url are conflict-free (no unique index on
@@ -1623,6 +1667,7 @@ async function upsertOrgSourceRef(client, record) {
   return {
     orgId,
     insertedOrg,
+    resolutionReason: resolution.resolutionReason,
   };
 }
 
@@ -1654,26 +1699,6 @@ async function setOrgDomainSavepoint(client, orgId, domain) {
     const sqlstate = error?.code ?? '';
     if (sqlstate !== '23505') throw error;
   }
-}
-
-/**
- * Lock one record's org source keys in a single round-trip.
- *
- * Drop-in replacement for the old per-key `lockOrgSourceKeys` loop: sorts the
- * keys the same way (deterministic per-record order) and locks them all with one
- * `unnest`-driven statement instead of one statement per key. This cuts the
- * lock round-trips ~3-5× (a 619-record batch went from ~2000+ lock statements to
- * ~619) without changing the per-record lock ordering, so deadlock behaviour
- * vs the other parallel ingests is unchanged. `pg_advisory_xact_lock` is held
- * until COMMIT either way.
- */
-async function lockRecordOrgSourceKeys(client, sourceKeys) {
-  const sortedKeys = [...(sourceKeys ?? [])].sort();
-  if (sortedKeys.length === 0) return;
-  await client.query(
-    `SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext(key)) FROM unnest($2::text[]) AS t(key)`,
-    [SOURCE_ID, sortedKeys],
-  );
 }
 
 function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
@@ -1804,6 +1829,7 @@ export function buildFetchSummary(input) {
     targetsProcessed: input.targetsProcessed,
     targetResults: input.targetResults,
     recordsReceived: input.recordsReceived,
+    parsedRecords: input.recordsReceived,
     recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
@@ -1848,6 +1874,7 @@ function buildIngestSummary(input, stats) {
     discoverySummary: input.discoverySummary,
     targetsProcessed: input.targetsProcessed,
     recordsReceived: input.recordsReceived,
+    parsedRecords: input.recordsReceived,
     recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
@@ -1856,6 +1883,9 @@ function buildIngestSummary(input, stats) {
     extractionBreakdown: summarizeExtractionBreakdown(input.targetResults),
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
+    evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+    evidenceCreated: stats.evidenceCreatedCount,
+    lineageCreated: stats.lineageCreatedCount,
   };
 }
 

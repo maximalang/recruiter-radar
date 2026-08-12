@@ -15,7 +15,12 @@ import {
   stripBom,
 } from './source-records.mjs';
 import { loadEnvFile, normalizeDomain } from '../lib/common-utils.mjs';
+import { upsertSignalEvidenceLineage } from '../lib/source-lineage-writer.mjs';
 import { fetchJson } from './source-http.mjs';
+import {
+  assertOrgSourceRefOwner,
+  resolveOrganizationOwner,
+} from './organization-resolution.mjs';
 
 export { loadEnvFile, normalizeDomain };
 
@@ -127,31 +132,11 @@ export function createStandardSourceRuntime(config) {
       connectionTimeoutMillis: resolveDbConnectionTimeoutMillis(),
     });
 
-    const signalUpsertQuery = `
-      INSERT INTO signals (
-        org_id,
-        signal_type,
-        source,
-        external_id,
-        headline,
-        summary,
-        source_url,
-        occurred_at,
-        payload
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      ON CONFLICT (source, external_id) DO UPDATE
-      SET
-        org_id = EXCLUDED.org_id,
-        headline = EXCLUDED.headline,
-        summary = EXCLUDED.summary,
-        source_url = EXCLUDED.source_url,
-        occurred_at = EXCLUDED.occurred_at,
-        payload = EXCLUDED.payload
-    `;
-
     let orgUpsertCount = 0;
     let signalUpsertCount = 0;
+    let evidenceUpsertCount = 0;
+    let evidenceCreatedCount = 0;
+    let lineageCreatedCount = 0;
 
     await client.connect();
 
@@ -162,24 +147,42 @@ export function createStandardSourceRuntime(config) {
         const orgResult = await upsertOrgSourceRef(client, sourceId, record);
         orgUpsertCount += orgResult.insertedOrg ? 1 : 0;
 
-        const signalResult = await client.query(signalUpsertQuery, [
-          orgResult.orgId,
-          record.signalType ?? config.signalType,
-          sourceId,
-          record.signalExternalId,
-          record.headline,
-          record.summary,
-          record.sourceUrl,
-          record.occurredAt,
-          buildSignalPayload(sourceId, config, record),
-        ]);
-
-        signalUpsertCount += signalResult.rowCount ?? 0;
+        const signalPayload = buildSignalPayload(sourceId, config, record);
+        const evidenceRole = record.evidenceRole ?? config.evidenceRole;
+        const evidenceTier = evidenceRole === 'primary_platform' ? 'corroboration' : 'context';
+        const lineage = await upsertSignalEvidenceLineage(client, {
+          orgId: orgResult.orgId,
+          signalType: record.signalType ?? config.signalType,
+          source: sourceId,
+          sourceFamily: config.sourceFamily ?? sourceId,
+          externalId: record.signalExternalId,
+          headline: record.headline,
+          summary: record.summary,
+          sourceUrl: record.sourceUrl,
+          publishedAt: record.occurredAt,
+          normalizedAt: record.fetchedAt,
+          payload: signalPayload,
+          sourceRecordType: record.sourceRecordType ?? config.sourceRecordType,
+          evidenceTier,
+          confidence: record.confidence,
+          extractionMethod: record.extractionMethod ?? input.inputMode,
+          organizationResolutionReason: orgResult.resolutionReason,
+        });
+        signalUpsertCount += lineage.signalUpsertCount;
+        evidenceUpsertCount += lineage.evidenceUpsertCount;
+        evidenceCreatedCount += lineage.evidenceCreatedCount;
+        lineageCreatedCount += lineage.lineageCreatedCount;
       }
 
       await client.query('COMMIT');
 
-      return { orgUpsertCount, signalUpsertCount };
+      return {
+        orgUpsertCount,
+        signalUpsertCount,
+        evidenceUpsertCount,
+        evidenceCreatedCount,
+        lineageCreatedCount,
+      };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -238,6 +241,7 @@ export function createStandardSourceRuntime(config) {
       inputFilePath: input.inputFilePath,
       ...(config.buildSummaryExtras?.(input) ?? {}),
       recordsReceived: input.recordsReceived,
+      parsedRecords: input.recordsReceived,
       recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
       duplicateRecords: input.duplicateRecords,
       normalizedRecords: input.normalizedRecords.length,
@@ -254,6 +258,7 @@ export function createStandardSourceRuntime(config) {
       inputFilePath: input.inputFilePath,
       ...(config.buildSummaryExtras?.(input) ?? {}),
       recordsReceived: input.recordsReceived,
+      parsedRecords: input.recordsReceived,
       recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
       duplicateRecords: input.duplicateRecords,
       normalizedRecords: input.normalizedRecords.length,
@@ -261,6 +266,9 @@ export function createStandardSourceRuntime(config) {
       sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
       orgsCreated: stats.orgUpsertCount,
       signalUpsertsCompleted: stats.signalUpsertCount,
+      evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+      evidenceCreated: stats.evidenceCreatedCount,
+      lineageCreated: stats.lineageCreatedCount,
     };
   }
 
@@ -272,6 +280,7 @@ export function createStandardSourceRuntime(config) {
       inputFilePath: input.inputFilePath,
       ...(config.buildSummaryExtras?.(input) ?? {}),
       recordsReceived: input.recordsReceived,
+      parsedRecords: input.recordsReceived,
       recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
       duplicateRecords: input.duplicateRecords,
       normalizedRecords: input.normalizedRecords.length,
@@ -279,6 +288,9 @@ export function createStandardSourceRuntime(config) {
       sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
       orgsCreated: stats.orgUpsertCount,
       signalUpsertsCompleted: stats.signalUpsertCount,
+      evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+      evidenceCreated: stats.evidenceCreatedCount,
+      lineageCreated: stats.lineageCreatedCount,
     };
   }
 
@@ -295,34 +307,8 @@ export function createStandardSourceRuntime(config) {
 }
 
 async function upsertOrgSourceRef(client, sourceId, record) {
-  await lockOrgSourceKeys(client, sourceId, record.orgSourceKeys);
-
-  const existingRefResult = await client.query(
-    `
-      SELECT org_id
-      FROM org_source_refs
-      WHERE source = $1::text
-        AND source_key = ANY($2::text[])
-      ORDER BY
-        CASE
-          WHEN source_key = $3 THEN 0
-          WHEN source_key = $4 THEN 1
-          WHEN source_key = $5 THEN 2
-          ELSE 3
-        END,
-        id ASC
-      LIMIT 1
-    `,
-    [
-      sourceId,
-      record.orgSourceKeys,
-      record.primarySourceKey,
-      record.domainSourceKey ?? record.innSourceKey ?? record.ogrnSourceKey,
-      record.companyNameSourceKey,
-    ],
-  );
-
-  let orgId = existingRefResult.rows[0]?.org_id;
+  const resolution = await resolveOrganizationOwner(client, sourceId, record);
+  let orgId = resolution.orgId;
   let insertedOrg = false;
 
   if (!orgId) {
@@ -370,6 +356,7 @@ async function upsertOrgSourceRef(client, sourceId, record) {
         buildOrgSourceMetadata(sourceId, record, sourceKey),
       ],
     );
+    await assertOrgSourceRefOwner(client, sourceId, sourceKey, orgId);
   }
 
   await client.query(
@@ -396,16 +383,7 @@ async function upsertOrgSourceRef(client, sourceId, record) {
     [orgId, record.orgDisplayName, record.companyDomain, record.companyWebsiteUrl],
   );
 
-  return { orgId, insertedOrg };
-}
-
-async function lockOrgSourceKeys(client, sourceId, sourceKeys) {
-  for (const sourceKey of [...sourceKeys].sort()) {
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext($2::text))', [
-      sourceId,
-      sourceKey,
-    ]);
-  }
+  return { orgId, insertedOrg, resolutionReason: resolution.resolutionReason };
 }
 
 function buildSignalPayload(sourceId, config, record) {

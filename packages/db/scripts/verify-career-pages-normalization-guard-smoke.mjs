@@ -10,7 +10,32 @@
 
 import assert from 'node:assert/strict';
 
-import { buildNormalizedInput } from './source-career-pages.mjs';
+import {
+  buildNormalizedInput,
+  resolveCareerPageTargetOutcome,
+} from './source-career-pages.mjs';
+
+assert.equal(resolveCareerPageTargetOutcome({ recordsFetched: 3 }), 'parsed');
+assert.equal(resolveCareerPageTargetOutcome({
+  adapter: 'same-domain-jsonld',
+  recordsFetched: 0,
+  pageFetched: true,
+}), 'extraction-zero-unexpected');
+assert.equal(resolveCareerPageTargetOutcome({
+  adapter: 'same-domain-jsonld',
+  recordsFetched: 0,
+  fetchFailure: true,
+}), 'page-unreachable');
+assert.equal(resolveCareerPageTargetOutcome({
+  adapter: 'same-domain-jsonld',
+  recordsFetched: 0,
+  contentUnsupported: true,
+}), 'extractor-unsupported');
+assert.equal(resolveCareerPageTargetOutcome({
+  adapter: 'greenhouse-board',
+  recordsFetched: 0,
+  pageFetched: true,
+}), 'no-vacancies-present');
 
 // Records that look real to the fetcher but carry nothing the normalizer can
 // turn into a canonical record (no company identity, no usable job fields).
@@ -78,4 +103,5 @@ console.log(JSON.stringify({
   liveAllSkippedRejected: true,
   fileAllSkippedPermissive: true,
   emptyLiveAllowed: true,
+  perTargetOutcomesVerified: true,
 }, null, 2));
