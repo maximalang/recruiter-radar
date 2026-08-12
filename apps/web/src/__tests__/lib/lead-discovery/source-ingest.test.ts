@@ -770,6 +770,55 @@ describe('source-ingest', () => {
     })
   })
 
+  describe('government source enrichment INNs', () => {
+    it('derives the bounded legal-entity INN pool from freshest hiring signals', async () => {
+      let enrichmentSql = ''
+      mockGetPool.mockReturnValue({
+        query: jest.fn((sql: string) => {
+          if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
+          if (sql.includes('JOIN signals')) {
+            enrichmentSql = sql
+            return Promise.resolve({ rows: [{ inn: '7707083893' }, { inn: '7701234567' }] })
+          }
+          return Promise.resolve({ rows: [] })
+        }),
+      })
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'cbr-registry', recordsReceived: 2, signalUpsertsCompleted: 2 }), '')
+      })
+
+      await ingestSource('cbr-registry')
+
+      expect(capturedEnv?.GOVERNMENT_ENRICHMENT_INNS).toBe('7707083893,7701234567')
+      expect(enrichmentSql).toContain("orgs.inn ~ '^\\d{10}$'")
+      expect(enrichmentSql).toContain('ORDER BY MAX(signals.occurred_at) DESC, orgs.inn')
+    })
+
+    it('keeps an explicit operator INN pool authoritative', async () => {
+      mockGetPool.mockReturnValue({
+        query: jest.fn((sql: string) => {
+          if (sql.includes('user_search_preferences')) {
+            return Promise.resolve({ rows: [{ params: { GOVERNMENT_ENRICHMENT_INNS: '1111111111' } }] })
+          }
+          return Promise.resolve({ rows: [] })
+        }),
+      })
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'cbr-registry', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('cbr-registry')
+
+      expect(capturedEnv?.GOVERNMENT_ENRICHMENT_INNS).toBe('1111111111')
+    })
+  })
+
   describe('company-site targets FILE (live-public from DB orgs the radar tracks)', () => {
     // The resolver writes a real temp file to packages/db/scripts/.cache/ —
     // clean it up after each test so the working tree stays pristine. The path
@@ -1132,8 +1181,8 @@ describe('source-ingest', () => {
       }
     })
 
-    it('declares the two non-originating company-owned sources as supporting', () => {
-      expect(getDailySupportingSourceIds()).toEqual(['company-site', 'company-newsrooms'])
+    it('declares company-owned context plus credential-free CBR lookup as supporting', () => {
+      expect(getDailySupportingSourceIds()).toEqual(['company-site', 'company-newsrooms', 'cbr-registry'])
       expect(getHiringEvidenceSourceIds()).toEqual(expect.arrayContaining([
         'career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters',
       ]))
@@ -1151,7 +1200,7 @@ describe('source-ingest', () => {
       })
       mockExecFile.mockImplementation((_cmd, args: any, _opts: any, callback: any) => {
         const script = String(args[0])
-        const stage = script.includes('source-company-site') || script.includes('source-company-newsrooms')
+        const stage = script.includes('source-company-site') || script.includes('source-company-newsrooms') || script.includes('source-cbr-registry')
           ? 'supporting'
           : 'primary'
         events.push(stage)

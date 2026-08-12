@@ -19,5 +19,10 @@
   "habr-career": { "priority": "P2", "defaultConfidence": 0.69, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
   "company-newsrooms": { "priority": "P3", "defaultConfidence": 0.6, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
   "industry-media": { "priority": "P3", "defaultConfidence": 0.52, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
-  "regional-job-boards": { "priority": "P3", "defaultConfidence": 0.58, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" }
+  "regional-job-boards": { "priority": "P3", "defaultConfidence": 0.58, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "fns-open-data": { "priority": "P3", "defaultConfidence": 0.88, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "government-procurement": { "priority": "P3", "defaultConfidence": 0.66, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "cbr-registry": { "priority": "P3", "defaultConfidence": 0.9, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "rosstat-open-data": { "priority": "P3", "defaultConfidence": 0.66, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "rospatent-open-data": { "priority": "P3", "defaultConfidence": 0.66, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" }
 }

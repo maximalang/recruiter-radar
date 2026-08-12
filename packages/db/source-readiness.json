@@ -526,6 +526,76 @@
         "contract": ["npm run verify:source:readiness"]
       },
       "blockers": ["A reviewed provider/input is required and publisher identity must never become subject-company identity."]
+    },
+    "fns-open-data": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["FNS_OPEN_DATA_INPUT_FILE"]] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-12T20:05:00Z", "evidence": ["Official FNS open-data passports and current file.nalog.ru dataset archives were reachable; fixture coverage verifies INN filtering and derived headcount, revenue and government-support context."] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": ["Production needs one periodically refreshed reviewed bulk snapshot; the daily pipeline intentionally does not download multi-gigabyte FNS archives."]
+    },
+    "government-procurement": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["GOVERNMENT_PROCUREMENT_INPUT_FILE"]] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-12T20:05:00Z", "evidence": ["Official EIS/Treasury public catalogue and contract URL provenance were verified; fixture coverage derives large, first, series, growth, region and customer events by supplier INN."] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": ["Production needs one periodically refreshed reviewed EIS/Treasury bulk snapshot; per-company manual files are not supported."]
+    },
+    "cbr-registry": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T20:46:00Z", "evidence": ["Official Bank of Russia FinOrg SOAP GetFullInfoByINN returned and normalized the current participant status, types and licences for a controlled legal-entity INN without credentials; phone and email fields were not persisted.", "The government-open-data live verifier ingested the official CBR response together with reviewed FNS, EIS, Rosstat and Rospatent fixtures into a new isolated production-runtime PostgreSQL database, verified evidence and lineage ownership, context-only classification, official HTTPS provenance and zero sensitive payload fields, then dropped the database and confirmed no temporary database remained."] },
+      "requiresLiveVerification": true,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "live": ["npm run source:fetch:cbr-registry"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "rosstat-open-data": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["ROSSTAT_OPEN_DATA_INPUT_FILE"]] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-12T20:05:00Z", "evidence": ["Official Rosstat open-data catalogue exposed current machine-readable CSV datasets; normalization is aggregate-only and explicitly forbids company attribution."] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": ["Production needs a curated, periodically refreshed subset of official aggregate datasets relevant to industry, regional labour and market baselines."]
+    },
+    "rospatent-open-data": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["ROSPATENT_OPEN_DATA_INPUT_FILE"]] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-12T20:05:00Z", "evidence": ["Official Rospatent open-data catalogue exposed current trademark and invention CSV datasets; normalization accepts only 10-digit legal-entity applicant INNs and marks the result weak context, never hiring proof."] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": ["Production needs a periodically refreshed reviewed subset/index because the official full CSV registries are too large for a daily request path."]
     }
   }
 }

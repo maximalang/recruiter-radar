@@ -63,6 +63,13 @@ const industryMediaScriptPath = './packages/db/scripts/source-industry-media.mjs
 const industryMediaAbsoluteScriptPath = resolve(scriptDir, './source-industry-media.mjs');
 const regionalJobBoardsScriptPath = './packages/db/scripts/source-regional-job-boards.mjs';
 const regionalJobBoardsAbsoluteScriptPath = resolve(scriptDir, './source-regional-job-boards.mjs');
+const officialGovernmentSources = Object.freeze([
+  ['fns-open-data', './packages/db/scripts/source-fns-open-data.mjs', './source-fns-open-data.mjs', 'Official FNS bulk datasets for company-size, financial, SME, support and tax context.'],
+  ['government-procurement', './packages/db/scripts/source-government-procurement.mjs', './source-government-procurement.mjs', 'Official EIS/Treasury contract awards and supplier context.'],
+  ['cbr-registry', './packages/db/scripts/source-cbr-registry.mjs', './source-cbr-registry.mjs', 'Official Bank of Russia financial-market participant and license context.'],
+  ['rosstat-open-data', './packages/db/scripts/source-rosstat-open-data.mjs', './source-rosstat-open-data.mjs', 'Official aggregate Rosstat market, industry and regional context without company attribution.'],
+  ['rospatent-open-data', './packages/db/scripts/source-rospatent-open-data.mjs', './source-rospatent-open-data.mjs', 'Official Rospatent trademark and patent context for legal entities.'],
+]);
 const registry = new Map();
 const sourceReadinessContract = getSourceReadinessContract();
 // Mirrors the TS registry `isPrimary: true` set (apps/web/lib/sources/source-registry.ts):
@@ -367,6 +374,21 @@ registerRunnableScriptSource({
   scriptPath: fedresursScriptPath,
   absoluteScriptPath: fedresursAbsoluteScriptPath,
 });
+
+for (const [id, scriptPath, relativeScriptPath, description] of officialGovernmentSources) {
+  const isRegistry = id === 'fns-open-data' || id === 'cbr-registry' || id === 'rospatent-open-data';
+  registerRunnableScriptSource({
+    id,
+    kind: isRegistry ? 'company-registry' : 'business-signal',
+    sourceClass: isRegistry ? 'registry-reference' : 'market-signal',
+    evidenceTier: 'context-only',
+    defaultConfidence: id === 'cbr-registry' ? 0.9 : id === 'fns-open-data' ? 0.88 : 0.66,
+    fetchModes: id === 'cbr-registry' ? ['file', 'live-public'] : ['file'],
+    description,
+    scriptPath,
+    absoluteScriptPath: resolve(scriptDir, relativeScriptPath),
+  });
+}
 
 registerRunnableScriptSource({
   id: 'superjob',

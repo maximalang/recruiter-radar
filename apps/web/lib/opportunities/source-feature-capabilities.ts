@@ -111,6 +111,11 @@ export const SOURCE_FEATURE_CAPABILITIES: Record<SourceId, CapabilitySet> = {
   'transparent-business-fns': nonVacancySource({ economics: true }),
   'company-newsrooms': nonVacancySource({ corporateContact: true }),
   'industry-media': nonVacancySource(),
+  'fns-open-data': nonVacancySource({ economics: true }),
+  'government-procurement': nonVacancySource(),
+  'cbr-registry': nonVacancySource(),
+  'rosstat-open-data': nonVacancySource(),
+  'rospatent-open-data': nonVacancySource(),
 }
 
 const SOURCE_ALIASES: Readonly<Record<string, SourceId>> = {

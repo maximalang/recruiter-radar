@@ -33,6 +33,11 @@ export type SourceId =
   | 'transparent-business-fns'
   | 'company-newsrooms'
   | 'industry-media'
+  | 'fns-open-data'
+  | 'government-procurement'
+  | 'cbr-registry'
+  | 'rosstat-open-data'
+  | 'rospatent-open-data'
 
 export interface SourceConfig {
   /** Unique identifier used in API calls, DB, and n8n workflows. */
@@ -53,6 +58,8 @@ export interface SourceConfig {
   isPrimary: boolean
   /** Optional dependency-ordered daily stage for non-originating enrichment. */
   dailyStage?: 'supporting'
+  /** Optional process env gate for large snapshot-backed daily sources. */
+  dailyActivationEnvVars?: string[]
   /** Source category for routing and filtering. */
   category: 'job-board' | 'career-page' | 'registry' | 'professional-network' | 'business-signal'
   /**
@@ -461,6 +468,70 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     isPrimary: true,
     category: 'job-board',
   },
+  {
+    id: 'fns-open-data',
+    name: 'FNS open data',
+    description: 'Official FNS bulk company context selected automatically by tracked legal-entity INN',
+    script: 'source-fns-open-data.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['FNS_OPEN_DATA_', 'GOVERNMENT_ENRICHMENT_'],
+    searchEnvVars: ['GOVERNMENT_ENRICHMENT_INNS'],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['FNS_OPEN_DATA_INPUT_FILE'],
+    category: 'registry',
+  },
+  {
+    id: 'government-procurement',
+    name: 'Government procurement',
+    description: 'Official EIS/Treasury contract context selected automatically by supplier INN',
+    script: 'source-government-procurement.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['GOVERNMENT_PROCUREMENT_', 'GOVERNMENT_ENRICHMENT_'],
+    searchEnvVars: ['GOVERNMENT_ENRICHMENT_INNS'],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['GOVERNMENT_PROCUREMENT_INPUT_FILE'],
+    category: 'business-signal',
+  },
+  {
+    id: 'cbr-registry',
+    name: 'Bank of Russia registry',
+    description: 'Official financial-market participant and licence lookup by tracked INN',
+    script: 'source-cbr-registry.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['CBR_REGISTRY_', 'GOVERNMENT_ENRICHMENT_'],
+    searchEnvVars: ['GOVERNMENT_ENRICHMENT_INNS'],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    category: 'registry',
+  },
+  {
+    id: 'rosstat-open-data',
+    name: 'Rosstat open data',
+    description: 'Official aggregate industry, regional labour and market baseline context',
+    script: 'source-rosstat-open-data.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['ROSSTAT_OPEN_DATA_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['ROSSTAT_OPEN_DATA_INPUT_FILE'],
+    category: 'business-signal',
+  },
+  {
+    id: 'rospatent-open-data',
+    name: 'Rospatent open data',
+    description: 'Official weak product-expansion context selected automatically by applicant INN',
+    script: 'source-rospatent-open-data.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['ROSPATENT_OPEN_DATA_', 'GOVERNMENT_ENRICHMENT_'],
+    searchEnvVars: ['GOVERNMENT_ENRICHMENT_INNS'],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['ROSPATENT_OPEN_DATA_INPUT_FILE'],
+    category: 'registry',
+  },
 ]
 
 /** Fast lookup by source ID. */
@@ -496,7 +567,10 @@ export function getHiringEvidenceSourceIds(): SourceId[] {
 
 /** Non-originating sources run after the primary hiring stage completes. */
 export function getDailySupportingSourceIds(): SourceId[] {
-  return SOURCE_REGISTRY.filter(s => s.dailyStage === 'supporting').map(s => s.id)
+  return SOURCE_REGISTRY.filter(s =>
+    s.dailyStage === 'supporting'
+    && (!s.dailyActivationEnvVars || s.dailyActivationEnvVars.some(name => Boolean(process.env[name])))
+  ).map(s => s.id)
 }
 
 /** Get source configs for a specific category. */

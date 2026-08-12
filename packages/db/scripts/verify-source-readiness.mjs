@@ -34,6 +34,11 @@ const expectedSources = [
   'company-newsrooms',
   'industry-media',
   'regional-job-boards',
+  'fns-open-data',
+  'government-procurement',
+  'cbr-registry',
+  'rosstat-open-data',
+  'rospatent-open-data',
 ];
 // Sources whose signals are eligible to ORIGINATE a digest lead. The digest SQL
 // (source-digest-evidence.sql) admits only signal_type = 'job_posting', so this set
@@ -65,6 +70,11 @@ const digestContextSources = [
   'company-site',
   'company-newsrooms',
   'industry-media',
+  'fns-open-data',
+  'government-procurement',
+  'cbr-registry',
+  'rosstat-open-data',
+  'rospatent-open-data',
 ];
 const providerTokenSources = [
   'linkedin-company-pages',

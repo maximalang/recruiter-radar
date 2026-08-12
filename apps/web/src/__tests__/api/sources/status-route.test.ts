@@ -5,6 +5,7 @@
 
 import { GET } from '@/app/api/sources/status/route';
 import { getDashboardSourceHealth } from '@/lib/dashboard-data';
+import { getAllSourceIds } from '@/lib/sources/source-registry';
 
 jest.mock('@/lib/dashboard-data', () => ({
   getDashboardSourceHealth: jest.fn(),
@@ -54,7 +55,7 @@ describe('GET /api/sources/status', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body.sources)).toBe(true);
-    expect(body.summary.total).toBe(21);
+    expect(body.summary.total).toBe(getAllSourceIds().length);
     const cp = body.sources.find((s: { id: string }) => s.id === 'career-pages');
     expect(cp.health.recordsLast24h).toBe(5);
     expect(cp.isPrimary).toBe(true);
@@ -70,6 +71,11 @@ describe('GET /api/sources/status', () => {
       expect(source).toBeDefined();
       expect(source.isPrimary).toBe(false);
       expect(source.requiredEnvVars).toEqual([]);
+    }
+    for (const governmentSourceId of ['fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data']) {
+      const source = body.sources.find((item: { id: string }) => item.id === governmentSourceId);
+      expect(source).toBeDefined();
+      expect(source.isPrimary).toBe(false);
     }
   });
 

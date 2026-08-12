@@ -34,11 +34,16 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
   P3: Object.freeze({
     description: 'Context sources with supporting role',
     required: true,
-    sources: ['company-newsrooms', 'industry-media', 'regional-job-boards'],
+    sources: ['company-newsrooms', 'industry-media', 'regional-job-boards', 'fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data'],
     leadEligibilityRequirements: {
       'company-newsrooms': 'context-only',
       'industry-media': 'context-only',
-      'regional-job-boards': 'confidence-gated-evidence'
+      'regional-job-boards': 'confidence-gated-evidence',
+      'fns-open-data': 'context-only',
+      'government-procurement': 'context-only',
+      'cbr-registry': 'context-only',
+      'rosstat-open-data': 'context-only',
+      'rospatent-open-data': 'context-only'
     }
   })
 });

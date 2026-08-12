@@ -407,6 +407,13 @@ async function resolveHabrKeywordEnv(
  * enrichment tracks the freshest signal pool.
  */
 const MAX_EGRUL_INNS_PER_RUN = 50
+const MAX_GOVERNMENT_ENRICHMENT_INNS_PER_RUN = 50
+const GOVERNMENT_ENRICHMENT_SOURCE_IDS = new Set<SourceId>([
+  'fns-open-data',
+  'government-procurement',
+  'cbr-registry',
+  'rospatent-open-data',
+])
 
 /**
  * Resolve the egrul-fns INN list from the DB: 10-digit legal-entity INNs on
@@ -444,6 +451,30 @@ async function resolveEgrulInnsEnv(
 
   if (rows.length === 0) return {}
   return { EGRUL_FNS_INNS: rows.map(r => r.inn).join(',') }
+}
+
+async function resolveGovernmentEnrichmentInnsEnv(
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  if (dbSearchEnv.GOVERNMENT_ENRICHMENT_INNS) return {}
+  if (process.env.GOVERNMENT_ENRICHMENT_INNS) return {}
+
+  const pool = getPool()
+  if (!pool) return {}
+  const { rows } = await pool.query<{ inn: string }>(`
+    SELECT orgs.inn
+    FROM orgs
+    JOIN signals ON signals.org_id = orgs.id
+    WHERE orgs.inn ~ '^\\d{10}$'
+      AND signals.signal_type = 'job_posting'
+      AND signals.source = ANY($2::text[])
+    GROUP BY orgs.inn
+    ORDER BY MAX(signals.occurred_at) DESC, orgs.inn
+    LIMIT $1
+  `, [MAX_GOVERNMENT_ENRICHMENT_INNS_PER_RUN, getHiringEvidenceSourceIds()])
+
+  if (rows.length === 0) return {}
+  return { GOVERNMENT_ENRICHMENT_INNS: rows.map(row => row.inn).join(',') }
 }
 
 /**
@@ -680,6 +711,10 @@ export async function ingestSource(
   // .cache/ file, unless an operator pinned the targets/input/provider.
   const companyNewsroomsDerivedEnv =
     source === 'company-newsrooms' ? await resolveCompanyNewsroomsTargetsEnv(dbSearchEnv) : {}
+  const governmentDerivedEnv =
+    GOVERNMENT_ENRICHMENT_SOURCE_IDS.has(source)
+      ? await resolveGovernmentEnrichmentInnsEnv(dbSearchEnv)
+      : {}
   // Generalised profile-derived search env for the other search-capable
   // sources (hh, superjob, rabota-rossii). For habr-career,
   // funding-business-signals, egrul-fns, company-site, and company-newsrooms
@@ -689,10 +724,10 @@ export async function ingestSource(
   // Operator overrides in dbSearchEnv always win (resolver strips already-pinned
   // keys).
   const profileDerivedEnv =
-    (source === 'habr-career' || source === 'funding-business-signals' || source === 'egrul-fns' || source === 'company-site' || source === 'company-newsrooms')
+    (source === 'habr-career' || source === 'funding-business-signals' || source === 'egrul-fns' || source === 'company-site' || source === 'company-newsrooms' || GOVERNMENT_ENRICHMENT_SOURCE_IDS.has(source))
       ? {}
       : await resolveProfileSearchEnv(source, dbSearchEnv)
-  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv, ...egrulDerivedEnv, ...companySiteDerivedEnv, ...companyNewsroomsDerivedEnv }
+  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv, ...egrulDerivedEnv, ...companySiteDerivedEnv, ...companyNewsroomsDerivedEnv, ...governmentDerivedEnv }
 
   return new Promise<IngestResult>((resolvePromise) => {
     // Filter env vars through whitelist — prevent injection of

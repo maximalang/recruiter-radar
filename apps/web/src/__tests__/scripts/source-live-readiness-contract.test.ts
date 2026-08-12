@@ -37,6 +37,11 @@ const SOURCE_IDS = [
   'funding-business-signals',
   'company-newsrooms',
   'industry-media',
+  'fns-open-data',
+  'government-procurement',
+  'cbr-registry',
+  'rosstat-open-data',
+  'rospatent-open-data',
 ] as const
 
 const SOURCE_ENV_PREFIXES = [
@@ -55,6 +60,12 @@ const SOURCE_ENV_PREFIXES = [
   'FUNDING_SIGNALS_',
   'COMPANY_NEWSROOMS_',
   'INDUSTRY_MEDIA_',
+  'FNS_OPEN_DATA_',
+  'GOVERNMENT_PROCUREMENT_',
+  'GOVERNMENT_ENRICHMENT_',
+  'CBR_REGISTRY_',
+  'ROSSTAT_OPEN_DATA_',
+  'ROSPATENT_OPEN_DATA_',
 ]
 
 function sourceFreeEnv(): NodeJS.ProcessEnv {

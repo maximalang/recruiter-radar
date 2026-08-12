@@ -31,6 +31,13 @@ export const EVIDENCE_RUNTIME_SOURCE_BINDINGS = {
   'transparent-business-fns': 'official-risk-registers',
   'company-newsrooms': 'official-company-news',
   'industry-media': 'industry-media',
+  'fns-open-data': 'sme-registry',
+  'government-procurement': 'eis-procurement',
+  'cbr-registry': 'official-address-license-registers',
+  // Rosstat remains a distinct runtime provenance. This binding only selects the
+  // closest governed Evidence Radar policy family for official regional context.
+  'rosstat-open-data': 'government-regional-news',
+  'rospatent-open-data': 'official-address-license-registers',
 } as const satisfies Record<SourceId, string>
 
 export type EvidenceRuntimeSourceBinding = {

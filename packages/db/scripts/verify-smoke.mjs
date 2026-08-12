@@ -23,6 +23,7 @@ const alwaysScripts = [
   './verify-egrul-fns-smoke.mjs',
   './verify-funding-business-signals-smoke.mjs',
   './verify-rf-source-expansion-smoke.mjs',
+  './verify-government-open-data-smoke.mjs',
   './adapters/verify-adapters-smoke.mjs',
   './verify-source-readiness.mjs',
 ];
