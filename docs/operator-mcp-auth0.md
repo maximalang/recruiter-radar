@@ -22,7 +22,25 @@ https://rr-operator.eu.auth0.com/
 
 The Recruiter Radar resource server canonicalizes an origin-only value to the same trailing-slash issuer, but production configuration should still use the exact issuer shown by Auth0.
 
-## 2. Create the Auth0 API
+## 2. Enable Auth0 Resource Parameter Compatibility Profile
+
+Modern MCP OAuth uses the RFC 8707 `resource` parameter to identify the protected MCP server. Auth0 historically used its `audience` parameter, so the MCP-compatible profile must be enabled before ChatGPT authorization is tested.
+
+In Auth0 Dashboard:
+
+1. Open **Settings → Advanced**.
+2. Find **Resource Parameter Compatibility Profile**.
+3. Enable it and save.
+
+The MCP resource is the absolute URI:
+
+```text
+https://recruiter-radar.ru/api/internal/mcp
+```
+
+This ensures an authorization request containing `resource=https://recruiter-radar.ru/api/internal/mcp` produces an access token targeted to the Recruiter Radar resource server. Do not use a different Auth0 API identifier or a shortened alias.
+
+## 3. Create the Auth0 API
 
 In Auth0 Dashboard:
 
@@ -38,7 +56,7 @@ In Auth0 Dashboard:
 
 Do not add write/admin scopes to this API.
 
-## 3. Grant the minimum default permission to third-party clients
+## 4. Grant the minimum default permission to third-party clients
 
 ChatGPT may register as a third-party OAuth client. Auth0 dynamically registered clients cannot access an API unless default third-party permissions are configured first.
 
@@ -52,7 +70,7 @@ In **Applications → APIs → Recruiter Radar Operator MCP → Settings**:
 
 The MCP resource server independently checks the immutable OAuth `sub` allowlist, so an OAuth client grant alone never authorizes an arbitrary Auth0 user to read Recruiter Radar diagnostics.
 
-## 4. Configure an operator login connection
+## 5. Configure an operator login connection
 
 Use an Auth0 Database, Social or Enterprise connection for the human operator login.
 
@@ -64,7 +82,7 @@ For the selected connection:
 
 Third-party Auth0 applications can authenticate users only through domain-level connections.
 
-## 5. Create the operator identity and capture its immutable subject
+## 6. Create the operator identity and capture its immutable subject
 
 Create/sign in the single Auth0 user that will authorize ChatGPT.
 
@@ -78,13 +96,13 @@ Do not authorize by email address. Production `RR_MCP_OAUTH_ALLOWED_SUBJECTS` mu
 
 Start with one operator subject. Add more only through an explicit security review.
 
-## 6. Enable Dynamic Client Registration only for ChatGPT registration
+## 7. Enable Dynamic Client Registration only for ChatGPT registration
 
 Auth0 DCR is disabled by default. If the ChatGPT custom-app OAuth flow performs dynamic registration:
 
 1. Open **Auth0 Dashboard → Settings → Advanced**.
 2. Enable **Dynamic Client Registration (DCR)**.
-3. Confirm the API default third-party permission from step 3 is already configured.
+3. Confirm the API default third-party permission from step 4 is already configured.
 4. Continue with the ChatGPT connection flow below.
 
 Auth0 DCR clients use authorization code + PKCE and are created as strict third-party applications. The Auth0 registration endpoint is `/oidc/register`.
@@ -93,7 +111,7 @@ After ChatGPT has successfully registered and the OAuth flow has been tested, re
 
 If the ChatGPT UI instead asks for a pre-registered OAuth client ID, do not create a second overlapping integration. Stop and use the UI-specific flow; the resource-server contract above remains unchanged.
 
-## 7. Configure production runtime
+## 8. Configure production runtime
 
 On the production server, set only:
 
@@ -114,7 +132,7 @@ cd /opt/recruiter-radar
 
 The configurator fails closed if OAuth configuration is incomplete and keeps the web service bound to `127.0.0.1:3000` behind Caddy.
 
-## 8. Verify the public OAuth/MCP boundary
+## 9. Verify the public OAuth/MCP boundary
 
 Protected-resource metadata:
 
@@ -144,7 +162,7 @@ Expected: `401` and `WWW-Authenticate` pointing at Recruiter Radar protected-res
 
 A token without `rr.operator.read` must return `403` with `error="insufficient_scope"`.
 
-## 9. Connect ChatGPT
+## 10. Connect ChatGPT
 
 In the ChatGPT account where custom MCP creation is available:
 
@@ -152,7 +170,7 @@ In the ChatGPT account where custom MCP creation is available:
 2. Endpoint: `https://recruiter-radar.ru/api/internal/mcp`.
 3. Choose OAuth authentication.
 4. Run **Scan Tools**.
-5. Complete Auth0 Universal Login and consent using the exact operator identity from step 5.
+5. Complete Auth0 Universal Login and consent using the exact operator identity from step 6.
 6. Finish the tool scan and create/enable the app.
 
 Expected tool inventory — exactly four read-only tools:
@@ -162,15 +180,16 @@ Expected tool inventory — exactly four read-only tools:
 3. `get_quality_validation_state`
 4. `list_quality_review_targets`
 
-If ChatGPT asks for a refresh/offline consent, allow it. Auth0 API Offline Access must remain enabled so the connection does not die when the first access token expires.
+Auth0 API Offline Access must remain enabled. Current ChatGPT OAuth guidance requires refresh-token support to maintain connectivity after the initial access token expires.
 
-## 10. Acceptance gate
+## 11. Acceptance gate
 
 Do not call the MCP production-ready until all of these are true:
 
+- Auth0 Resource Parameter Compatibility Profile is enabled;
 - protected-resource metadata returns the exact Auth0 issuer and MCP resource;
 - unauthenticated MCP returns 401 with the OAuth challenge;
-- wrong audience is rejected;
+- wrong audience/resource is rejected;
 - wrong `sub` is rejected;
 - missing `rr.operator.read` returns 403;
 - the allowed operator completes Auth0 consent from ChatGPT;
