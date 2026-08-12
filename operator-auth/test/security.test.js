@@ -231,8 +231,6 @@ test('private operator OAuth is resource-bound, persistent and rotation-safe', a
     assert.equal(jwt.claims.sub, 'rr_owner')
     assert.match(jwt.claims.scope, /(?:^| )rr\.operator\.read(?: |$)/)
 
-    const replayCode = await httpClient.request('/operator/oauth/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form({ grant_type: 'authorization_code', client_id: clientId, code, redirect_uri: REDIRECT_URI, code_verifier: verifier, resource: RESOURCE }) })
-    assert.equal(replayCode.status, 400)
     const firstRefresh = await refresh(httpClient, clientId, tokens.refresh_token)
     assert.equal(firstRefresh.status, 200)
     const firstRotated = await firstRefresh.json(); assert.ok(firstRotated.refresh_token); assert.notEqual(firstRotated.refresh_token, tokens.refresh_token)
@@ -246,6 +244,18 @@ test('private operator OAuth is resource-bound, persistent and rotation-safe', a
     assert.equal(reuse.status, 400)
     const afterReuse = await refresh(httpClient, clientId, secondRotated.refresh_token)
     assert.equal(afterReuse.status, 400, 'reuse must revoke the refresh-token grant family')
+
+    // Authorization-code replay revokes its grant family. Keep this on a separate
+    // grant so it cannot invalidate the refresh-rotation assertions above.
+    const replayClientId = await registerPublicClient(httpClient)
+    const replayVerifier = randomBytes(48).toString('base64url')
+    const replayAuthorizationCode = await completeAuthorization(httpClient, replayClientId, replayVerifier)
+    const replayTokens = await exchangeCode(httpClient, replayClientId, replayAuthorizationCode, replayVerifier)
+    assert.ok(replayTokens.refresh_token)
+    const replayCode = await httpClient.request('/operator/oauth/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form({ grant_type: 'authorization_code', client_id: replayClientId, code: replayAuthorizationCode, redirect_uri: REDIRECT_URI, code_verifier: replayVerifier, resource: RESOURCE }) })
+    assert.equal(replayCode.status, 400)
+    const refreshAfterCodeReplay = await refresh(httpClient, replayClientId, replayTokens.refresh_token)
+    assert.equal(refreshAfterCodeReplay.status, 400, 'authorization-code replay must revoke its grant family')
   } finally {
     if (runtime.server.listening) await stop(runtime.server)
     await rm(fixture.dir, { recursive: true, force: true })
