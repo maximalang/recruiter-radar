@@ -1,4 +1,4 @@
-name: Operator MCP Security
+name: Operator MCP OAuth Security
 
 on:
   push:
@@ -12,25 +12,59 @@ permissions:
   contents: read
 
 concurrency:
-  group: operator-mcp-security-${{ github.ref }}
+  group: operator-mcp-oauth-security-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  operator-security:
+  operator-oauth-security:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16.9-bookworm
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 22.18.0
           cache: npm
 
-      - name: Install dependencies
+      - name: Install product dependencies
         run: npm ci
 
-      - name: Validate operator scripts
+      - name: Install locked operator auth dependencies
+        working-directory: operator-auth
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify pinned OAuth dependency and audit production graph
+        working-directory: operator-auth
+        run: |
+          node -e "const p=require('./package.json'); if(p.dependencies['oidc-provider']!=='9.11.1') process.exit(1)"
+          npm audit --omit=dev --audit-level=high
+
+      - name: Check operator auth source
+        working-directory: operator-auth
+        run: npm run check
+
+      - name: Run OAuth persistence and security flow
+        working-directory: operator-auth
+        run: npm test
+
+      - name: Validate operator deployment scripts
         run: |
           bash -n scripts/deploy/configure-operator-mcp.sh
           bash -n scripts/deploy/configure-operator-mcp-caddy.sh
@@ -42,10 +76,13 @@ jobs:
           bash scripts/test/operator-mcp-bootstrap-first-run.sh
           bash scripts/test/configure-caddy-production.sh
 
-      - name: Run operator MCP contract tests
+      - name: Run MCP resource-server contract tests
         run: npm test --workspace @recruiter-radar/web -- --runInBand src/__tests__/api/internal/operator-mcp-route.test.ts
 
       - name: Type and production-build checks
         run: |
           npm run check --workspace @recruiter-radar/web
           npm run build --workspace @recruiter-radar/web
+
+      - name: Build isolated operator auth image
+        run: docker build -f operator-auth/Dockerfile -t rr-operator-auth:test .
