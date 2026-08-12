@@ -1,0 +1,19 @@
+{
+  "name": "@recruiter-radar/operator-auth",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "check": "node --check src/server.js && node --check src/postgres-adapter.js && node --check test/security.test.js",
+    "test": "node --test test/security.test.js"
+  },
+  "dependencies": {
+    "argon2": "0.45.1",
+    "oidc-provider": "9.11.1",
+    "pg": "8.22.0"
+  }
+}
