@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lockfile:
+  foundation:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -23,17 +23,21 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Update dependency lock only
-        run: npm install --package-lock-only --ignore-scripts
-      - name: Commit lockfile when changed
-        shell: bash
-        run: |
-          if git diff --quiet -- package-lock.json; then
-            echo "package-lock.json already current"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "build(auth): lock Better Auth dependencies"
-          git push origin HEAD:codex/better-auth-foundation
+      - name: Verify lockfile is reproducible
+        run: npm ci
+      - name: Generate Better Auth SQL for review
+        env:
+          NODE_ENV: development
+          BETTER_AUTH_ENABLED: 'true'
+          BETTER_AUTH_MCP_OAUTH_ENABLED: 'true'
+          BETTER_AUTH_MCP_DCR_ENABLED: 'false'
+          BETTER_AUTH_SECRET: 'ci-only-better-auth-secret-32-characters-minimum'
+          BETTER_AUTH_URL: 'http://localhost:3000'
+          DATABASE_URL: 'postgres://postgres:postgres@127.0.0.1:5432/test'
+        run: npx auth@1.6.25 generate --config apps/web/lib/better-auth/auth.ts --output generated-better-auth.sql --yes
+      - uses: actions/upload-artifact@v4
+        with:
+          name: better-auth-generated-schema
+          path: generated-better-auth.sql
+          if-no-files-found: error
+          retention-days: 1
