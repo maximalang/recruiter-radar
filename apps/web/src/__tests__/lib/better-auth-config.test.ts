@@ -9,7 +9,6 @@ describe("Better Auth runtime policy", () => {
     delete process.env.BETTER_AUTH_MCP_DCR_ENABLED;
     delete process.env.BETTER_AUTH_SECRET;
     delete process.env.BETTER_AUTH_URL;
-    process.env.NODE_ENV = "test";
   });
 
   afterAll(() => {
