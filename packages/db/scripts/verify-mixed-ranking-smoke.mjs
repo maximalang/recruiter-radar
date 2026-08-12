@@ -33,6 +33,8 @@ try {
   assert.equal(rows.length, 2, 'expected two ranked rows from the smoke fixture');
   assert.equal(rows[0].source_external_id, 'career-1', 'mixed-source org should keep a direct proof identity');
   assert.deepEqual(rows[0].source_families, ['career-pages', 'hh']);
+  assert.equal(rows[0].source_signal_ids.length, 3, 'mixed-source row must preserve every selected signal id');
+  assert.equal(rows[0].source_record_urls.length, 3, 'mixed-source row must preserve every selected source URL');
   assert.equal(rows[0].vacancies_count, 3, 'mixed-source org should combine hh and career-pages vacancy evidence');
   assert.equal(rows[0].distinct_vacancy_names_count, 3, 'mixed-source org should keep distinct role counting across sources');
   assert.equal(rows[1].source_external_id, 'hh-agg-1', 'aggregated hh row should rank after direct mixed-source proof');
@@ -92,12 +94,22 @@ async function setupFixture(client) {
     ) ON COMMIT DROP;
 
     CREATE TEMP TABLE signals (
+      id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       org_id TEXT NOT NULL,
       source TEXT NOT NULL,
       signal_type TEXT NOT NULL,
+      external_id TEXT,
       headline TEXT,
+      source_url TEXT,
       occurred_at TIMESTAMPTZ,
       payload JSONB NOT NULL DEFAULT '{}'::jsonb
+    ) ON COMMIT DROP;
+
+    CREATE TEMP TABLE source_signal_evidence_lineage_v1 (
+      id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      signal_id BIGINT NOT NULL,
+      evidence_id BIGINT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     ) ON COMMIT DROP;
   `);
 
@@ -126,13 +138,15 @@ async function setupFixture(client) {
         '{"source_alias_keys": ["domain:agg.example"]}'::jsonb
       );
 
-    INSERT INTO signals (org_id, source, signal_type, headline, occurred_at, payload)
+    INSERT INTO signals (org_id, source, signal_type, external_id, headline, source_url, occurred_at, payload)
     VALUES
       (
         'org-mixed-direct',
         'hh',
         'job_posting',
+        'hh-role-1',
         'Senior Recruiter',
+        'https://hh.ru/vacancy/hh-role-1',
         NOW() - interval '5 days',
         '{"hh_employer_id": "hh-1", "employer_name": "Mixed Direct Co"}'::jsonb
       ),
@@ -140,7 +154,9 @@ async function setupFixture(client) {
         'org-mixed-direct',
         'hh',
         'job_posting',
+        'hh-role-2',
         'Talent Partner',
+        'https://hh.ru/vacancy/hh-role-2',
         NOW() - interval '5 days',
         '{"hh_employer_id": "hh-1", "employer_name": "Mixed Direct Co"}'::jsonb
       ),
@@ -148,7 +164,9 @@ async function setupFixture(client) {
         'org-mixed-direct',
         'career-pages',
         'job_posting',
+        'career-role-1',
         'People Ops Lead',
+        'https://mixed.example/careers/people-ops-lead',
         NOW() - interval '1 day',
         '{"source_entity_external_id": "career-1", "source_entity_display_name": "Mixed Direct Co"}'::jsonb
       ),
@@ -156,7 +174,9 @@ async function setupFixture(client) {
         'org-hh-agg',
         'hh',
         'job_posting',
+        'hh-role-3',
         'Recruiting Coordinator',
+        'https://hh.ru/vacancy/hh-role-3',
         NOW() - interval '1 day',
         '{"company_domain": "agg.example", "company_name": "HH Aggregated Co"}'::jsonb
       );
