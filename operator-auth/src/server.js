@@ -241,9 +241,11 @@ export async function createOperatorAuthServer() {
     clientAuthMethods: ['none'],
     clientDefaults: {
       token_endpoint_auth_method: 'none',
+      id_token_signed_response_alg: 'ES256',
       response_types: ['code'],
       grant_types: ['authorization_code', 'refresh_token'],
     },
+    allowOmittingSingleRegisteredRedirectUri: false,
     cookies: { keys: cookieKeys },
     extraClientMetadata: {
       properties: ['rr_mcp_profile'],
