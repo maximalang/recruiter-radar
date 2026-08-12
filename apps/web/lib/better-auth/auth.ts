@@ -27,9 +27,6 @@ function buildDatabaseConnectionString(connectionString: string): string {
 
 const database = new Pool({
   connectionString: buildDatabaseConnectionString(runtime.databaseUrl),
-  max: 5,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000,
 });
 
 const jwtPlugin = jwt({
