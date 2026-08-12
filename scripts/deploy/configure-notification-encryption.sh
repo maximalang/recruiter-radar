@@ -92,11 +92,14 @@ notification_key="$(read_env_value NOTIFICATION_ENCRYPTION_KEY "$env_source")"
 landing_rate_limit_salt="$(read_env_value LANDING_ANALYTICS_RATE_LIMIT_SALT "$env_source")"
 public_app_origin="$(read_env_value PUBLIC_APP_ORIGIN "$env_source")"
 file_mcp_enabled="$(read_env_value RR_MCP_ENABLED "$env_source")"
-file_mcp_token="$(read_env_value RR_MCP_TOKEN "$env_source")"
+file_mcp_oauth_issuer="$(read_env_value RR_MCP_OAUTH_ISSUER "$env_source")"
+file_mcp_oauth_allowed_subjects="$(read_env_value RR_MCP_OAUTH_ALLOWED_SUBJECTS "$env_source")"
+legacy_mcp_token="$(read_env_value RR_MCP_TOKEN "$env_source")"
 file_deploy_sha="$(read_env_value RR_DEPLOY_SHA "$env_source")"
 
 mcp_enabled="${RR_MCP_ENABLED:-${file_mcp_enabled:-false}}"
-mcp_token="${RR_MCP_TOKEN:-$file_mcp_token}"
+mcp_oauth_issuer="${RR_MCP_OAUTH_ISSUER:-$file_mcp_oauth_issuer}"
+mcp_oauth_allowed_subjects="${RR_MCP_OAUTH_ALLOWED_SUBJECTS:-$file_mcp_oauth_allowed_subjects}"
 deploy_sha="${RR_DEPLOY_SHA:-${DEPLOY_SHA:-$file_deploy_sha}}"
 
 case "$mcp_enabled" in
@@ -107,10 +110,32 @@ case "$mcp_enabled" in
     ;;
 esac
 
-if [ "$mcp_enabled" = "true" ] && [ "${#mcp_token}" -lt 32 ]; then
-  echo "RR_MCP_TOKEN must contain at least 32 characters when RR_MCP_ENABLED=true; refusing to deploy" >&2
-  exit 1
+if [ "$mcp_enabled" = "true" ] && {
+  [ -z "$mcp_oauth_issuer" ] || [ -z "$mcp_oauth_allowed_subjects" ];
+}; then
+  if [ -n "$legacy_mcp_token" ]; then
+    echo "Legacy RR_MCP_TOKEN configuration detected; disabling MCP until OAuth is configured." >&2
+    mcp_enabled=false
+  else
+    echo "RR_MCP_OAUTH_ISSUER and RR_MCP_OAUTH_ALLOWED_SUBJECTS are required when RR_MCP_ENABLED=true; refusing to deploy" >&2
+    exit 1
+  fi
 fi
+
+if [ "$mcp_enabled" = "true" ]; then
+  case "$mcp_oauth_issuer" in
+    https://*) ;;
+    *)
+      echo "RR_MCP_OAUTH_ISSUER must be an HTTPS issuer when MCP is enabled; refusing to deploy" >&2
+      exit 1
+      ;;
+  esac
+  if [[ "$mcp_oauth_issuer" =~ [[:space:]] ]]; then
+    echo "RR_MCP_OAUTH_ISSUER must not contain whitespace; refusing to deploy" >&2
+    exit 1
+  fi
+fi
+unset legacy_mcp_token
 
 if [ -n "$deploy_sha" ] && ! [[ "$deploy_sha" =~ ^[A-Fa-f0-9]{40}$ ]]; then
   echo "RR_DEPLOY_SHA must be a full 40-character commit SHA when set; refusing to deploy" >&2
@@ -171,13 +196,15 @@ awk \
   -v notification_value="$notification_key" \
   -v origin_value="$public_app_origin" \
   -v mcp_enabled_value="$mcp_enabled" \
-  -v mcp_token_value="$mcp_token" \
+  -v mcp_oauth_issuer_value="$mcp_oauth_issuer" \
+  -v mcp_oauth_allowed_subjects_value="$mcp_oauth_allowed_subjects" \
   -v deploy_sha_value="$deploy_sha" '
   BEGIN {
     notification_written = 0
     origin_written = 0
     mcp_enabled_written = 0
-    mcp_token_written = 0
+    mcp_oauth_issuer_written = 0
+    mcp_oauth_allowed_subjects_written = 0
     deploy_sha_written = 0
   }
   /^NOTIFICATION_ENCRYPTION_KEY=/ {
@@ -201,13 +228,21 @@ awk \
     }
     next
   }
-  /^RR_MCP_TOKEN=/ {
-    if (!mcp_token_written) {
-      print "RR_MCP_TOKEN=" mcp_token_value
-      mcp_token_written = 1
+  /^RR_MCP_OAUTH_ISSUER=/ {
+    if (!mcp_oauth_issuer_written) {
+      print "RR_MCP_OAUTH_ISSUER=" mcp_oauth_issuer_value
+      mcp_oauth_issuer_written = 1
     }
     next
   }
+  /^RR_MCP_OAUTH_ALLOWED_SUBJECTS=/ {
+    if (!mcp_oauth_allowed_subjects_written) {
+      print "RR_MCP_OAUTH_ALLOWED_SUBJECTS=" mcp_oauth_allowed_subjects_value
+      mcp_oauth_allowed_subjects_written = 1
+    }
+    next
+  }
+  /^RR_MCP_TOKEN=/ { next }
   /^RR_DEPLOY_SHA=/ {
     if (!deploy_sha_written) {
       print "RR_DEPLOY_SHA=" deploy_sha_value
@@ -220,12 +255,13 @@ awk \
     if (!notification_written) print "NOTIFICATION_ENCRYPTION_KEY=" notification_value
     if (!origin_written) print "PUBLIC_APP_ORIGIN=" origin_value
     if (!mcp_enabled_written) print "RR_MCP_ENABLED=" mcp_enabled_value
-    if (!mcp_token_written) print "RR_MCP_TOKEN=" mcp_token_value
+    if (!mcp_oauth_issuer_written) print "RR_MCP_OAUTH_ISSUER=" mcp_oauth_issuer_value
+    if (!mcp_oauth_allowed_subjects_written) print "RR_MCP_OAUTH_ALLOWED_SUBJECTS=" mcp_oauth_allowed_subjects_value
     if (!deploy_sha_written && deploy_sha_value != "") print "RR_DEPLOY_SHA=" deploy_sha_value
   }
 ' "$env_source" > "$env_tmp"
 chmod 600 "$env_tmp"
-unset notification_key public_app_origin mcp_token
+unset notification_key public_app_origin mcp_oauth_issuer mcp_oauth_allowed_subjects
 
 override_tmp="$(mktemp "$APP_DIR/.rr-notification-key.compose.XXXXXX")"
 cat > "$override_tmp" <<'COMPOSE_EOF'
@@ -239,7 +275,8 @@ services:
       LANDING_ANALYTICS_RATE_LIMIT_SALT: ${LANDING_ANALYTICS_RATE_LIMIT_SALT:?LANDING_ANALYTICS_RATE_LIMIT_SALT is required}
       PUBLIC_APP_ORIGIN: ${PUBLIC_APP_ORIGIN:?PUBLIC_APP_ORIGIN is required}
       RR_MCP_ENABLED: ${RR_MCP_ENABLED:-false}
-      RR_MCP_TOKEN: ${RR_MCP_TOKEN:-}
+      RR_MCP_OAUTH_ISSUER: ${RR_MCP_OAUTH_ISSUER:-}
+      RR_MCP_OAUTH_ALLOWED_SUBJECTS: ${RR_MCP_OAUTH_ALLOWED_SUBJECTS:-}
       RR_DEPLOY_SHA: ${RR_DEPLOY_SHA:-}
 COMPOSE_EOF
 chmod 600 "$override_tmp"
@@ -279,7 +316,8 @@ docker compose "${compose_args[@]}" exec -T web \
       : Buffer.from(raw, "base64");
     if (decoded.length !== 32) process.exit(1);
     const mcpEnabled = process.env.RR_MCP_ENABLED === "true";
-    const mcpToken = process.env.RR_MCP_TOKEN?.trim() || "";
-    if (mcpEnabled && mcpToken.length < 32) process.exit(1);
-    console.log("Notification encryption key and optional MCP configuration are valid");
+    const issuer = process.env.RR_MCP_OAUTH_ISSUER?.trim() || "";
+    const subjects = process.env.RR_MCP_OAUTH_ALLOWED_SUBJECTS?.trim() || "";
+    if (mcpEnabled && (!issuer.startsWith("https://") || !subjects)) process.exit(1);
+    console.log("Notification encryption key and optional OAuth MCP configuration are valid");
   '
