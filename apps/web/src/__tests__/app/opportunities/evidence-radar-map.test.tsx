@@ -47,6 +47,56 @@ function lead(cardId: string, organizationName: string, city: string): EvidenceR
 }
 
 describe('EvidenceRadarMap selection', () => {
+  it('presents the selected lead in recruiter decision order without internal English labels', () => {
+    const radarLead = lead('77', 'Альфа', 'Москва')
+    radarLead.evidence = [
+      {
+        id: 'evidence-1',
+        eventType: 'hiring_growth',
+        occurredAt: '2026-08-11T00:00:00.000Z',
+        sourceFamily: 'career-pages',
+        confidence: 0.9,
+        canonicalUrl: 'https://example.test/careers',
+        primarySource: true,
+      },
+    ]
+    radarLead.score.contributions = [
+      {
+        eventId: 'evidence-1',
+        component: 'hiring_intent',
+        delta: 0.2,
+        reason: 'verified company hiring growth',
+      },
+    ]
+
+    const { container } = render(<EvidenceRadarMap leads={[radarLead]} />)
+    const card = container.querySelector('[data-evidence-lead-card]')
+    expect(card).not.toBeNull()
+    const text = card?.textContent ?? ''
+
+    expect(text).toContain('Подтверждённая возможность')
+    expect(text).toContain('Сила возможности')
+    expect(text).toContain('Достоверность')
+    expect(text).toContain('Срочность')
+    expect(text).toContain('Доступность контакта')
+    expect(text).toContain('Рост найма')
+    expect(text).toContain('достоверность 90%')
+    expect(text).toContain('Интенсивность найма')
+    expect(text).not.toMatch(/Evidence lead|Opportunity|Confidence|Urgency|Contactability|Hiring Growth|confidence 90%|hiring_intent/)
+
+    const positions = [
+      'Альфа',
+      'Почему сейчас',
+      'Сила возможности',
+      'Доказательства',
+      'Безопасный путь контакта',
+      'Следующий шаг',
+      'Диагностика оценки',
+    ].map((label) => text.indexOf(label))
+    expect(positions.every((position) => position >= 0)).toBe(true)
+    expect(positions).toEqual([...positions].sort((left, right) => left - right))
+  })
+
   it('keeps a 44px semantic marker and updates the live detail without losing focus', () => {
     const { container } = render(
       <EvidenceRadarMap

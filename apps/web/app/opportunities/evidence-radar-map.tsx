@@ -22,7 +22,7 @@ export function EvidenceRadarMap(props: {
       <section className={styles.empty} data-evidence-radar-empty>
         <strong>Нет лидов с подтверждённой географией</strong>
         <p>
-          Evidence Radar не размещает случайные города. Маркер появляется только после
+          Карта спроса не размещает случайные города. Маркер появляется только после
           подтверждения организации, объекта присутствия, координат и доказательной цепочки.
         </p>
       </section>
@@ -36,8 +36,8 @@ export function EvidenceRadarMap(props: {
           <span><i className={styles.legendSource} /> независимый источник</span>
           <span><i className={styles.legendOrganization} /> организация</span>
           <span>яркость — свежесть</span>
-          <span>размер — hiring intent</span>
-          <span>прозрачность — confidence</span>
+          <span>размер — интенсивность найма</span>
+          <span>прозрачность — достоверность</span>
         </div>
         <p className={styles.selectedStatus} role="status" aria-live="polite" data-motion-status>
           {selected ? `Выбрано: ${selected.organizationName}, ${selected.location.city}` : ''}
@@ -86,7 +86,7 @@ export function EvidenceRadarMap(props: {
               <dl>
                 <div><dt>Организации</dt><dd>{region.organizations}</dd></div>
                 <div><dt>Источники</dt><dd>{region.sources}</dd></div>
-                <div><dt>Intent</dt><dd>{Math.round(region.hiringIntent * 100)}</dd></div>
+                <div><dt>Интенсивность</dt><dd>{Math.round(region.hiringIntent * 100)}</dd></div>
                 <div><dt>Свежесть</dt><dd>{Math.round(region.freshness * 100)}</dd></div>
               </dl>
               <small>{region.specializations.join(', ')}</small>
@@ -173,11 +173,10 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
     <article className={styles.leadCard} data-evidence-lead-card data-motion-disclosure>
       <header className={styles.leadHeader}>
         <div>
-          <span className={styles.eyebrow}>Evidence lead</span>
+          <span className={styles.eyebrow}>Подтверждённая возможность</span>
           <h2>{lead.organizationName}</h2>
           {lead.legalName && lead.legalName !== lead.organizationName ? <p>{lead.legalName}</p> : null}
         </div>
-        <strong className={styles.leadScore}>{Math.round(lead.score.leadScore)}</strong>
       </header>
 
       <div className={styles.locationLine}>
@@ -191,28 +190,12 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
         <p>{lead.whyNow}</p>
       </section>
 
-      <div className={styles.scoreGrid}>
-        <Score label="Opportunity" value={lead.score.opportunityScore} />
-        <Score label="Confidence" value={lead.score.confidenceScore} />
-        <Score label="Urgency" value={lead.score.urgencyScore} />
-        <Score label="Contactability" value={lead.score.contactabilityScore} />
-        <Score label="Risk" value={lead.score.riskScore} risk />
-      </div>
-
-      <section className={styles.leadSection}>
-        <h3>Предполагаемая кадровая потребность</h3>
-        {staffing ? (
-          <div className={styles.factStack}>
-            {functions.length > 0 ? <p><strong>Функции:</strong> {functions.join(', ')}</p> : null}
-            {professions.length > 0 ? <p><strong>Профессии:</strong> {professions.join(', ')}</p> : null}
-            {minHeadcount != null && maxHeadcount != null ? (
-              <p><strong>Объём:</strong> {minHeadcount}–{maxHeadcount} · {mode ?? 'режим не указан'}</p>
-            ) : null}
-            {decisionMakers.length > 0 ? <p><strong>Кому писать:</strong> {decisionMakers.join(', ')}</p> : null}
-          </div>
-        ) : (
-          <p className={styles.muted}>Недостаточно подтверждений для прогноза объёма. Значение не синтезируется.</p>
-        )}
+      <section className={styles.opportunityStrength} aria-label="Сила возможности">
+        <div>
+          <span>Сила возможности</span>
+          <strong>{Math.round(lead.score.leadScore)} из 100</strong>
+        </div>
+        <p>Приоритет для проверки и первого контакта по подтверждённым фактам.</p>
       </section>
 
       <section className={styles.leadSection}>
@@ -225,8 +208,8 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
             <li key={event.id}>
               <span>{formatDate(event.occurredAt)}</span>
               <div>
-                <strong>{event.eventType.replaceAll('_', ' ')}</strong>
-                <small>{event.sourceFamily} · confidence {Math.round(event.confidence * 100)}%</small>
+                <strong>{evidenceEventLabel(event.eventType)}</strong>
+                <small>{event.sourceFamily} · достоверность {Math.round(event.confidence * 100)}%</small>
                 {event.canonicalUrl ? (
                   <a href={event.canonicalUrl} target="_blank" rel="noreferrer">
                     {event.primarySource ? 'Открыть первичный источник' : 'Открыть источник'}
@@ -238,21 +221,6 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
             </li>
           ))}
         </ol>
-      </section>
-
-      <section className={styles.leadSection}>
-        <h3>Объяснение оценки</h3>
-        {lead.score.contributions.length > 0 ? (
-          <ul className={styles.contributions}>
-            {lead.score.contributions.map((item, index) => (
-              <li key={`${item.eventId}:${item.component}:${index}`}>
-                <span>{item.component.replaceAll('_', ' ')}</span>
-                <strong>{item.delta >= 0 ? '+' : ''}{item.delta}</strong>
-                <small>{item.reason}</small>
-              </li>
-            ))}
-          </ul>
-        ) : <p className={styles.muted}>Contribution ledger отсутствует — карточка требует проверки.</p>}
       </section>
 
       {lead.riskReasons.length > 0 ? (
@@ -280,6 +248,50 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
         <strong>{lead.recommendedAction}</strong>
         {lead.recommendedContactAt ? <small>Рекомендуемое окно: {formatDate(lead.recommendedContactAt)}</small> : null}
       </footer>
+
+      <details className={styles.diagnostics}>
+        <summary>Диагностика оценки</summary>
+        <div className={styles.diagnosticsBody}>
+          <div className={styles.scoreGrid}>
+            <Score label="Сила возможности" value={lead.score.opportunityScore} />
+            <Score label="Достоверность" value={lead.score.confidenceScore} />
+            <Score label="Срочность" value={lead.score.urgencyScore} />
+            <Score label="Доступность контакта" value={lead.score.contactabilityScore} />
+            <Score label="Риск" value={lead.score.riskScore} risk />
+          </div>
+
+          <section className={styles.leadSection}>
+            <h3>Предполагаемая кадровая потребность</h3>
+            {staffing ? (
+              <div className={styles.factStack}>
+                {functions.length > 0 ? <p><strong>Функции:</strong> {functions.join(', ')}</p> : null}
+                {professions.length > 0 ? <p><strong>Профессии:</strong> {professions.join(', ')}</p> : null}
+                {minHeadcount != null && maxHeadcount != null ? (
+                  <p><strong>Объём:</strong> {minHeadcount}–{maxHeadcount} · {staffingModeLabel(mode)}</p>
+                ) : null}
+                {decisionMakers.length > 0 ? <p><strong>Кому писать:</strong> {decisionMakers.join(', ')}</p> : null}
+              </div>
+            ) : (
+              <p className={styles.muted}>Недостаточно подтверждений для прогноза объёма. Значение не синтезируется.</p>
+            )}
+          </section>
+
+          <section className={styles.leadSection}>
+            <h3>Вклад подтверждённых факторов</h3>
+            {lead.score.contributions.length > 0 ? (
+              <ul className={styles.contributions}>
+                {lead.score.contributions.map((item, index) => (
+                  <li key={`${item.eventId}:${item.component}:${index}`}>
+                    <span>{scoreComponentLabel(item.component)}</span>
+                    <strong>{item.delta >= 0 ? '+' : ''}{item.delta}</strong>
+                    <small>{contributionReasonLabel(item.reason, item.component)}</small>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className={styles.muted}>Детализация вклада отсутствует — карточка требует проверки.</p>}
+          </section>
+        </div>
+      </details>
     </article>
   )
 }
@@ -291,6 +303,46 @@ function Score(props: { label: string; value: number; risk?: boolean }) {
       <strong>{Math.round(props.value)}</strong>
     </div>
   )
+}
+
+const EVIDENCE_EVENT_LABELS: Readonly<Record<string, string>> = {
+  hiring_growth: 'Рост найма',
+  funding_received: 'Получено финансирование',
+  vacancy_opened: 'Открыта вакансия',
+  vacancy_republished: 'Вакансия опубликована повторно',
+  leadership_hire: 'Открыта руководящая роль',
+}
+
+const SCORE_COMPONENT_LABELS: Readonly<Record<string, string>> = {
+  opportunity: 'Сила возможности',
+  confidence: 'Достоверность',
+  urgency: 'Срочность',
+  contactability: 'Доступность контакта',
+  risk: 'Риск',
+  hiring_intent: 'Интенсивность найма',
+  hiringIntent: 'Интенсивность найма',
+  freshness: 'Свежесть сигнала',
+}
+
+function evidenceEventLabel(value: string): string {
+  return EVIDENCE_EVENT_LABELS[value] ?? 'Подтверждённое изменение в найме'
+}
+
+function scoreComponentLabel(value: string): string {
+  return SCORE_COMPONENT_LABELS[value] ?? 'Подтверждённый фактор'
+}
+
+function contributionReasonLabel(reason: string, component: string): string {
+  const normalized = reason.trim().toLowerCase()
+  if (normalized === 'verified company hiring growth') return 'Подтверждён рост найма в компании'
+  if (normalized === 'verified company funding evidence') return 'Финансирование подтверждено источником'
+  return `Вклад в показатель «${scoreComponentLabel(component)}» подтверждён доказательством`
+}
+
+function staffingModeLabel(mode: string | null): string {
+  if (mode === 'targeted') return 'точечный найм'
+  if (mode === 'volume') return 'массовый найм'
+  return 'режим не указан'
 }
 
 function buildRegionSummaries(leads: readonly EvidenceRadarLead[]) {
