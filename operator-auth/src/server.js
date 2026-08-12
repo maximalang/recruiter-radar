@@ -557,7 +557,7 @@ export async function createOperatorAuthServer() {
 
 if (process.env.NODE_ENV !== 'test') {
   createOperatorAuthServer().then(({ server }) => {
-    server.listen(3002, '127.0.0.1', () => safeAudit('service_started', { status: 'ready' }))
+    server.listen(3002, '0.0.0.0', () => safeAudit('service_started', { status: 'ready' }))
   }).catch((error) => {
     safeAudit('service_start_failed', { reason: error instanceof Error ? error.message : 'startup_error' })
     process.exitCode = 1
