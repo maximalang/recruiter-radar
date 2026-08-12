@@ -1,0 +1,49 @@
+name: Operator Auth Source Patch
+
+on:
+  push:
+    branches: [codex/operator-mcp-local-oidc]
+    paths: [.github/workflows/operator-auth-source-patch.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/operator-mcp-local-oidc
+      - name: Apply audited path-issuer fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('operator-auth/src/server.js')
+          s = p.read_text()
+          old = """        useGrantedResource() {\n          return true\n        },"""
+          new = """        useGrantedResource() {\n          return false\n        },"""
+          assert old in s
+          s = s.replace(old, new, 1)
+
+          old = """    responseTypes: ['code'],\n    grantTypes: ['authorization_code', 'refresh_token'],"""
+          new = """    routes: {\n      authorization: `${OIDC_PREFIX}/auth`,\n      jwks: `${OIDC_PREFIX}/jwks`,\n      registration: `${OIDC_PREFIX}/reg`,\n      revocation: `${OIDC_PREFIX}/token/revocation`,\n      token: `${OIDC_PREFIX}/token`,\n    },\n    responseTypes: ['code'],\n    grantTypes: ['authorization_code', 'refresh_token'],"""
+          assert old in s
+          s = s.replace(old, new, 1)
+
+          old = """      if (url.pathname === `${OIDC_PREFIX}/.well-known/openid-configuration` || url.pathname.startsWith(`${OIDC_PREFIX}/`)) {\n        req.url = req.url.slice(OIDC_PREFIX.length) || '/'\n        providerCallback(req, res)\n        return\n      }"""
+          new = """      if (url.pathname === `${OIDC_PREFIX}/.well-known/openid-configuration`) {\n        req.url = req.url.replace(\n          `${OIDC_PREFIX}/.well-known/openid-configuration`,\n          '/.well-known/openid-configuration',\n        )\n        providerCallback(req, res)\n        return\n      }\n      if (url.pathname.startsWith(`${OIDC_PREFIX}/`)) {\n        providerCallback(req, res)\n        return\n      }"""
+          assert old in s
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          git diff --check
+      - name: Commit patch
+        run: |
+          set -euo pipefail
+          git add operator-auth/src/server.js
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'fix(operator-auth): bind provider routes to path issuer'
+          git push origin HEAD:codex/operator-mcp-local-oidc
