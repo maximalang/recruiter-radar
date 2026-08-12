@@ -61,7 +61,10 @@ jobs:
       - name: Dependency security audit
         run: npm audit --omit=dev --audit-level=high
       - name: Focused fail-dark policy tests
-        run: npm test --workspace @recruiter-radar/web -- --runInBand apps/web/src/__tests__/lib/better-auth-config.test.ts
+        run: >-
+          npm test --workspace @recruiter-radar/web -- --runInBand
+          apps/web/src/__tests__/lib/better-auth-config.test.ts
+          apps/web/src/__tests__/app/better-auth-fail-dark-routes.test.ts
       - name: Typecheck web
         run: npm run web:check
       - name: Apply complete migration chain
