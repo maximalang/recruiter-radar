@@ -21,6 +21,7 @@ const NAV_ICONS: Record<string, WorkspaceIcon> = {
   "/leads": SearchIcon,
   "/review": ShieldIcon,
   "/profile": TargetIcon,
+  "/settings/radar": TargetIcon,
   "/settings": LayersIcon,
 };
 
