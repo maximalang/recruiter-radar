@@ -400,7 +400,7 @@ function isIssuerUrl(value: string): boolean {
       !url.password &&
       !url.search &&
       !url.hash &&
-      url.toString() === value
+      url.pathname === '/'
     )
   } catch {
     return false
