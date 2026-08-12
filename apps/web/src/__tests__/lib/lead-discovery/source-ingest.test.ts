@@ -1,5 +1,5 @@
-import { ingestSource, ingestAllPrimarySources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
-import { getPrimarySourceIds, getSourceConfig } from '@/lib/sources/source-registry'
+import { ingestSource, ingestAllPrimarySources, ingestDailyRadarSources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
+import { getDailySupportingSourceIds, getHiringEvidenceSourceIds, getPrimarySourceIds, getSourceConfig } from '@/lib/sources/source-registry'
 
 // Mock the execFile accessor (production resolves execFile via
 // process.getBuiltinModule, which bypasses jest's require-cache mock —
@@ -783,7 +783,7 @@ describe('source-ingest', () => {
     })
 
     function mockPoolWithOrgs(orgRows: Array<{ id: string | number; name: string | null; domain: string | null; website_url: string | null }>) {
-      const query = jest.fn((sql: string) => {
+      const query = jest.fn((sql: string, _params?: unknown[]) => {
         if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
         if (sql.includes('FROM orgs')) {
           return Promise.resolve({ rows: orgRows })
@@ -794,12 +794,11 @@ describe('source-ingest', () => {
     }
 
     it('derives COMPANY_SITE_TARGETS_FILE from orgs with a domain + a hiring signal, writes the file', async () => {
-      mockGetPool.mockReturnValue(
-        mockPoolWithOrgs([
-          { id: 1, name: 'АО Ромашка', domain: 'romashka.ru', website_url: null },
-          { id: 2, name: 'ООО Вектор', domain: null, website_url: 'https://vector.ru' },
-        ]),
-      )
+      const pool = mockPoolWithOrgs([
+        { id: 1, name: 'АО Ромашка', domain: 'romashka.ru', website_url: null },
+        { id: 2, name: 'ООО Вектор', domain: null, website_url: 'https://vector.ru' },
+      ])
+      mockGetPool.mockReturnValue(pool)
 
       let capturedEnv: Record<string, string> | undefined
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
@@ -815,6 +814,13 @@ describe('source-ingest', () => {
       expect(written).toHaveLength(2)
       expect(written[0]).toEqual({ url: 'https://romashka.ru', company_name: 'АО Ромашка', company_domain: 'romashka.ru' })
       expect(written[1].url).toBe('https://vector.ru')
+      const targetQuery = pool.query.mock.calls.find((call) => call[0].includes('FROM orgs'))
+      expect(targetQuery?.[0]).toContain("signals.signal_type = 'job_posting'")
+      expect(targetQuery?.[0]).toContain('signals.source = ANY($4::text[])')
+      expect(targetQuery?.[0]).toContain('signals.updated_at >= NOW() - $3::interval')
+      expect(targetQuery?.[1]?.[2]).toBe('7 days')
+      expect(targetQuery?.[1]?.[3]).toContain('smartrecruiters')
+      expect(targetQuery?.[1]?.[3]).not.toContain('company-site')
     })
 
     it('lets an explicit operator DB pref override the derived targets file', async () => {
@@ -841,7 +847,7 @@ describe('source-ingest', () => {
       expect(fs.existsSync(targetsFilePath)).toBe(false)
     })
 
-    it('omits COMPANY_SITE_TARGETS_FILE when no candidate orgs exist', async () => {
+    it('writes an empty COMPANY_SITE_TARGETS_FILE when no candidate orgs exist', async () => {
       mockGetPool.mockReturnValue(mockPoolWithOrgs([]))
 
       let capturedEnv: Record<string, string> | undefined
@@ -852,8 +858,8 @@ describe('source-ingest', () => {
 
       await ingestSource('company-site')
 
-      expect(capturedEnv?.COMPANY_SITE_TARGETS_FILE).toBeUndefined()
-      expect(fs.existsSync(targetsFilePath)).toBe(false)
+      expect(capturedEnv?.COMPANY_SITE_TARGETS_FILE).toBe(targetsFilePath)
+      expect(JSON.parse(fs.readFileSync(targetsFilePath, 'utf8'))).toEqual([])
     })
 
     it('omits COMPANY_SITE_TARGETS_FILE when no pool is configured (test/dev)', async () => {
@@ -888,8 +894,9 @@ describe('source-ingest', () => {
       })
 
       // Caller-provided COMPANY_SITE_TARGETS_FILE is excluded (search var); with
-      // no candidate orgs nothing is derived either, so it is undefined.
-      expect(capturedEnv?.COMPANY_SITE_TARGETS_FILE).toBeUndefined()
+      // an empty derived target set is explicit expected-zero input.
+      expect(capturedEnv?.COMPANY_SITE_TARGETS_FILE).toBe(targetsFilePath)
+      expect(JSON.parse(fs.readFileSync(targetsFilePath, 'utf8'))).toEqual([])
       expect(capturedEnv?.NODE_OPTIONS).toBeUndefined()
     })
   })
@@ -908,7 +915,7 @@ describe('source-ingest', () => {
     })
 
     function mockPoolWithOrgs(orgRows: Array<{ id: string | number; name: string | null; domain: string | null; website_url: string | null }>) {
-      const query = jest.fn((sql: string) => {
+      const query = jest.fn((sql: string, _params?: unknown[]) => {
         if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
         if (sql.includes('FROM orgs')) {
           return Promise.resolve({ rows: orgRows })
@@ -919,12 +926,11 @@ describe('source-ingest', () => {
     }
 
     it('derives COMPANY_NEWSROOMS_TARGETS_FILE from orgs with a domain + a hiring signal, writes the file', async () => {
-      mockGetPool.mockReturnValue(
-        mockPoolWithOrgs([
-          { id: 1, name: 'АО Ромашка', domain: 'romashka.ru', website_url: null },
-          { id: 2, name: 'ООО Вектор', domain: null, website_url: 'https://vector.ru' },
-        ]),
-      )
+      const pool = mockPoolWithOrgs([
+        { id: 1, name: 'АО Ромашка', domain: 'romashka.ru', website_url: null },
+        { id: 2, name: 'ООО Вектор', domain: null, website_url: 'https://vector.ru' },
+      ])
+      mockGetPool.mockReturnValue(pool)
 
       let capturedEnv: Record<string, string> | undefined
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
@@ -941,6 +947,13 @@ describe('source-ingest', () => {
       // Reuses buildCompanySiteTargets — same object shape as company-site.
       expect(written[0]).toEqual({ url: 'https://romashka.ru', company_name: 'АО Ромашка', company_domain: 'romashka.ru' })
       expect(written[1].url).toBe('https://vector.ru')
+      const targetQuery = pool.query.mock.calls.find((call) => call[0].includes('FROM orgs'))
+      expect(targetQuery?.[0]).toContain("signals.signal_type = 'job_posting'")
+      expect(targetQuery?.[0]).toContain('signals.source = ANY($4::text[])')
+      expect(targetQuery?.[0]).toContain('signals.updated_at >= NOW() - $3::interval')
+      expect(targetQuery?.[1]?.[2]).toBe('23 hours')
+      expect(targetQuery?.[1]?.[3]).toContain('smartrecruiters')
+      expect(targetQuery?.[1]?.[3]).not.toContain('company-newsrooms')
     })
 
     it('lets an explicit operator DB pref override the derived targets file', async () => {
@@ -967,7 +980,7 @@ describe('source-ingest', () => {
       expect(fs.existsSync(targetsFilePath)).toBe(false)
     })
 
-    it('omits COMPANY_NEWSROOMS_TARGETS_FILE when no candidate orgs exist', async () => {
+    it('writes an empty COMPANY_NEWSROOMS_TARGETS_FILE when no candidate orgs exist', async () => {
       mockGetPool.mockReturnValue(mockPoolWithOrgs([]))
 
       let capturedEnv: Record<string, string> | undefined
@@ -978,8 +991,8 @@ describe('source-ingest', () => {
 
       await ingestSource('company-newsrooms')
 
-      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBeUndefined()
-      expect(fs.existsSync(targetsFilePath)).toBe(false)
+      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBe(targetsFilePath)
+      expect(JSON.parse(fs.readFileSync(targetsFilePath, 'utf8'))).toEqual([])
     })
 
     it('omits COMPANY_NEWSROOMS_TARGETS_FILE when no pool is configured (test/dev)', async () => {
@@ -1013,8 +1026,9 @@ describe('source-ingest', () => {
       })
 
       // Caller-provided COMPANY_NEWSROOMS_TARGETS_FILE is excluded (search var);
-      // with no candidate orgs nothing is derived either, so it is undefined.
-      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBeUndefined()
+      // an empty derived target set is explicit expected-zero input.
+      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBe(targetsFilePath)
+      expect(JSON.parse(fs.readFileSync(targetsFilePath, 'utf8'))).toEqual([])
       expect(capturedEnv?.NODE_OPTIONS).toBeUndefined()
     })
   })
@@ -1100,6 +1114,69 @@ describe('source-ingest', () => {
       expect(failed?.success).toBe(false)
       // Only hh is mocked to fail; every other primary source succeeds.
       expect(results.filter(r => r.success).length).toBe(primaryCount - 1)
+    })
+  })
+
+  describe('ingestDailyRadarSources', () => {
+    const path = require('node:path')
+    const fs = require('node:fs')
+    const cacheDir = path.resolve(process.cwd(), '../../packages/db/scripts/.cache')
+    const derivedFiles = [
+      path.join(cacheDir, 'company-site-derived-targets.json'),
+      path.join(cacheDir, 'company-newsrooms-derived-targets.json'),
+    ]
+
+    afterEach(() => {
+      for (const file of derivedFiles) {
+        try { fs.unlinkSync(file) } catch { /* already absent */ }
+      }
+    })
+
+    it('declares the two non-originating company-owned sources as supporting', () => {
+      expect(getDailySupportingSourceIds()).toEqual(['company-site', 'company-newsrooms'])
+      expect(getHiringEvidenceSourceIds()).toEqual(expect.arrayContaining([
+        'career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters',
+      ]))
+    })
+
+    it('starts supporting sources only after every primary source completes', async () => {
+      const events: string[] = []
+      mockGetPool.mockReturnValue({
+        query: jest.fn((sql: string) => {
+          if (sql.includes('COUNT(*)')) return Promise.resolve({ rows: [{ count: '1' }] })
+          if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
+          if (sql.includes('FROM orgs')) return Promise.resolve({ rows: [] })
+          return Promise.resolve({ rows: [] })
+        }),
+      })
+      mockExecFile.mockImplementation((_cmd, args: any, _opts: any, callback: any) => {
+        const script = String(args[0])
+        const stage = script.includes('source-company-site') || script.includes('source-company-newsrooms')
+          ? 'supporting'
+          : 'primary'
+        events.push(stage)
+        callback(null, JSON.stringify({ source: stage, recordsReceived: 0, signalUpsertsCompleted: 0, zeroReason: 'smoke-zero' }), '')
+      })
+
+      const result = await ingestDailyRadarSources()
+      if (isNoActiveProfiles(result)) throw new Error('unexpected no_active_profiles')
+
+      const primaryCount = getPrimarySourceIds().length
+      const supportingCount = getDailySupportingSourceIds().length
+      expect(result).toHaveLength(primaryCount + supportingCount)
+      expect(events.slice(0, primaryCount)).toEqual(Array(primaryCount).fill('primary'))
+      expect(events.slice(primaryCount)).toEqual(Array(supportingCount).fill('supporting'))
+    })
+
+    it('does not start supporting sources when there are no active profiles', async () => {
+      mockGetPool.mockReturnValue({
+        query: jest.fn().mockResolvedValue({ rows: [{ count: '0' }] }),
+      })
+
+      const result = await ingestDailyRadarSources()
+
+      expect(isNoActiveProfiles(result)).toBe(true)
+      expect(mockExecFile).not.toHaveBeenCalled()
     })
   })
 })

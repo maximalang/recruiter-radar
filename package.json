@@ -153,6 +153,8 @@
     "monitoring:dashboard": "node packages/db/scripts/monitoring-dashboard.mjs",
     "verify:funding-business-signals:smoke": "node packages/db/scripts/verify-funding-business-signals-smoke.mjs",
     "verify:company-site:smoke": "node packages/db/scripts/verify-company-site-smoke.mjs",
+    "verify:company-newsrooms:discovery": "node packages/db/scripts/verify-company-newsrooms-discovery-smoke.mjs",
+    "verify:company-context:live-db": "node packages/db/scripts/run-source-live-db-verifier.mjs company-context",
     "career-pages:smoke": "CAREER_PAGES_TARGETS_FILE=packages/db/scripts/career-pages-smoke-targets.json node packages/db/scripts/source-career-pages.mjs fetch",
     "verify:career-pages:smoke": "node packages/db/scripts/verify-career-pages-smoke.mjs",
     "verify:career-pages:discovery": "node packages/db/scripts/verify-career-pages-discovery-smoke.mjs",

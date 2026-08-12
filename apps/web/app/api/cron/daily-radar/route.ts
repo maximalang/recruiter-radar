@@ -3,16 +3,17 @@
  *
  * Triggered by the production cron (cron/trigger-daily-radar.mjs) to run
  * the legacy daily cycle for non-canary workspaces:
- *   1. Ingest all primary sources
- *   2. Generate digest for each active non-canary client profile
- *   3. Deliver the digest to every enabled channel
+ *   1. Ingest all primary hiring sources
+ *   2. Ingest bounded company-owned supporting/context sources
+ *   3. Generate digest for each active non-canary client profile
+ *   4. Deliver the digest to every enabled channel
  *
  * A Commercial Signal canary is executed by its separate exact-lineage cron
  * stage and is deliberately excluded from legacy digest delivery here.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { ingestAllPrimarySources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
+import { ingestDailyRadarSources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
 import { runDigestForClientProfile } from '@/lib/digest'
 import { deliverCandidatesForRun } from '@/lib/digest/deliver-candidates'
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
   const startMs = Date.now()
 
   try {
-    const ingestResults = await ingestAllPrimarySources()
+    const ingestResults = await ingestDailyRadarSources()
     if (isNoActiveProfiles(ingestResults)) {
       return NextResponse.json(
         { success: false, error: 'No active client profiles; pipeline skipped.', hint: ingestResults.hint },

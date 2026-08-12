@@ -9,8 +9,8 @@ import pg from 'pg';
 const execFileAsync = promisify(execFile);
 const { Client } = pg;
 const sourceId = process.argv[2]?.trim();
-if (!['superjob', 'rabota-rossii', 'public-ats'].includes(sourceId)) {
-  throw new Error('Usage: run-source-live-db-verifier.mjs <superjob|rabota-rossii|public-ats>');
+if (!['superjob', 'rabota-rossii', 'public-ats', 'company-context'].includes(sourceId)) {
+  throw new Error('Usage: run-source-live-db-verifier.mjs <superjob|rabota-rossii|public-ats|company-context>');
 }
 if (process.env.SOURCE_LIVE_DB_TEST_ACK !== 'isolated') {
   throw new Error('SOURCE_LIVE_DB_TEST_ACK=isolated is required before creating a disposable database.');
@@ -32,6 +32,7 @@ const testEnvironment = {
   SOURCE_ENV_FILE_DISABLED: 'true',
 };
 const admin = new Client({ connectionString: databaseUrl });
+let databaseCreated = false;
 
 function quoteIdentifier(value) {
   return `"${String(value).replaceAll('"', '""')}"`;
@@ -50,12 +51,20 @@ async function run(args) {
 await admin.connect();
 try {
   await admin.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`);
+  databaseCreated = true;
   await run([resolve(import.meta.dirname, './migrate.mjs')]);
   const verifier = sourceId === 'public-ats'
     ? './verify-public-ats-live-pipeline.mjs'
-    : './verify-job-source-live-pipeline.mjs';
-  await run([resolve(import.meta.dirname, verifier), ...(sourceId === 'public-ats' ? [] : [sourceId])]);
+    : sourceId === 'company-context'
+      ? './verify-company-owned-context-live-pipeline.mjs'
+      : './verify-job-source-live-pipeline.mjs';
+  await run([
+    resolve(import.meta.dirname, verifier),
+    ...(['public-ats', 'company-context'].includes(sourceId) ? [] : [sourceId]),
+  ]);
 } finally {
-  await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)} WITH (FORCE)`);
+  if (databaseCreated) {
+    await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)} WITH (FORCE)`);
+  }
   await admin.end();
 }

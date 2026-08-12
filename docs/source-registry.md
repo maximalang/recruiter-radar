@@ -225,7 +225,7 @@ originate leads. `egrul-fns`: 10-digit legal-entity INN only; skip 12-digit IP/p
 | **habr-career** | primary-platform / medium-signal (0.69) | confidence-gated-evidence | **blocked-from-digest-pending-confidence-tests** | public/provider path; legal and confidence gates open |
 | **tech-job-boards** | primary-platform / medium-signal (0.68) | confidence-gated-evidence | blocked-from-digest | live + provider |
 | **linkedin-company-pages** | primary-platform / medium-signal (0.72) | confidence-gated-evidence | blocked-from-digest | provider-token only |
-| **company-site** | company-surface / medium-signal (0.68) | enrichment-only | supporting-evidence-only | live-public |
+| **company-site** | company-surface / medium-signal (0.68) | enrichment-only | supporting-evidence-only | live-public; production-runtime verified |
 | **funding-business-signals** | market-signal / context-only (0.58) | context-only | never-lead-originating | live + provider |
 
 **superjob** — needs the free-registration `SUPERJOB_API_APP_ID`; anonymous API is not a
@@ -250,7 +250,9 @@ source IDs through the unified career crawler; do not add them back to this gene
 email, and phone fields. No direct scraping.
 
 **company-site** — generic company pages stay enrichment; only explicit hiring surfaces can
-corroborate lead evidence (they do not originate one — that's `career-pages`' job).
+corroborate lead evidence (they do not originate one — that's `career-pages`' job). The daily
+supporting stage derives only already-tracked companies and refreshes a company at most weekly.
+A 2026-08-12 production-runtime disposable DB run persisted the official VK page end-to-end.
 
 **funding-business-signals** — funding/growth context; must not create a lead without direct
 hiring evidence elsewhere.
@@ -261,12 +263,16 @@ hiring evidence elsewhere.
 
 | id | class / evidence tier | leadEligibility | promotionStatus | live? |
 |---|---|---|---|---|
-| **company-newsrooms** | company-surface / context-only (0.60) | context-only | never-lead-originating | live + provider |
+| **company-newsrooms** | company-surface / context-only (0.60) | context-only | never-lead-originating | live public discovery + provider; production-runtime verified |
 | **industry-media** | market-signal / context-only (0.52) | context-only | never-lead-originating | provider-token |
 | **regional-job-boards** | primary-platform / medium-signal (0.58) | confidence-gated-evidence | blocked-from-digest | provider-token |
 
-**company-newsrooms / industry-media** — curated/reviewed context only; an article publisher
-domain must **never** become company identity. Supporting context never originates a lead alone.
+**company-newsrooms / industry-media** — context only; an article publisher domain must **never**
+become company identity. `company-newsrooms` now discovers same-company listings and RSS/Atom
+feeds for already-tracked organizations, requires dated article-level records, and refreshes at
+most daily. A 2026-08-12 production-runtime disposable DB run persisted 30 official VK releases
+with one organization owner, context-only evidence, exact source URLs, and zero sensitive fields.
+Supporting context never originates a lead alone.
 
 **regional-job-boards** — each board needs its own legal/robots/provider review and confidence
 gates before digest use.

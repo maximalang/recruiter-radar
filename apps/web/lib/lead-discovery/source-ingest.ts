@@ -25,6 +25,8 @@ import { fileURLToPath } from 'node:url'
 import {
   getSourceConfig,
   getPrimarySourceIds,
+  getHiringEvidenceSourceIds,
+  getDailySupportingSourceIds,
   getAllEnvPrefixes,
   getSearchEnvVars,
   type SourceId,
@@ -464,6 +466,8 @@ interface CompanyPageTargetsConfig {
   providerApiEnv?: 'COMPANY_NEWSROOMS_PROVIDER_API_URL'
   /** Temp-file basename written under packages/db/scripts/.cache/. */
   tempFileName: 'company-site-derived-targets.json' | 'company-newsrooms-derived-targets.json'
+  /** Minimum age of the latest completed crawl before an org is eligible again. */
+  refreshInterval: string
 }
 
 /**
@@ -482,24 +486,24 @@ interface CompanyPageTargetsConfig {
  * Precedence (matches the other resolvers): an explicit operator override in
  * `dbSearchEnv` (the targets/input/provider env pinned via
  * user_search_preferences), process.env, or the source's file-mode env ALWAYS
- * wins — derivation only fills when nobody pinned the input. Returns {} when
- * there are no candidate orgs or no pool — the source then falls back to its
- * own no-input error (unchanged). On any FS write error, derivation is skipped
- * (returns {}) so the source falls back rather than crashing the whole
- * ingestion batch.
+ * wins — derivation only fills when nobody pinned the input. With a DB but no
+ * eligible orgs, an empty target file is written so the source reports an
+ * explicit expected-zero result. With no pool, or on any FS write error,
+ * derivation is skipped (returns {}) so the source falls back without crashing
+ * the whole ingestion batch.
  *
- * Both sources are non-primary and never lead-originating (company-site is
+ * Both sources are never lead-originating (company-site is
  * supporting-evidence-only; company-newsrooms is context-only, Gate D) — we
  * only target orgs the radar is ALREADY tracking (HAVING a hiring signal),
  * never cold domains, so the crawl corroborates existing leads instead of
- * originating new ones. Excludes orgs that already have a `<source>` signal so
- * a re-run doesn't re-crawl the same pages.
+ * originating new ones. A freshness guard permits recurring refresh without
+ * re-crawling the same company inside the configured interval.
  */
 async function resolveCompanyPageTargetsEnv(
   dbSearchEnv: Record<string, string>,
   cfg: CompanyPageTargetsConfig,
 ): Promise<Record<string, string>> {
-  const { source, targetsFileEnv, inputFileEnv, providerApiEnv, tempFileName } = cfg
+  const { source, targetsFileEnv, inputFileEnv, providerApiEnv, tempFileName, refreshInterval } = cfg
   if (dbSearchEnv[targetsFileEnv]) return {}
   if (dbSearchEnv[inputFileEnv]) return {}
   if (process.env[targetsFileEnv]) return {}
@@ -520,13 +524,15 @@ async function resolveCompanyPageTargetsEnv(
         SELECT 1
         FROM signals
         WHERE signals.org_id = orgs.id
-          AND signals.source IN ('hh', 'superjob', 'habr-career', 'rabota-rossii', 'career-pages')
+          AND signals.signal_type = 'job_posting'
+          AND signals.source = ANY($4::text[])
       )
       AND NOT EXISTS (
         SELECT 1
         FROM signals
         WHERE signals.org_id = orgs.id
           AND signals.source = $2
+          AND signals.updated_at >= NOW() - $3::interval
       )
     ORDER BY (
       SELECT MAX(signals.occurred_at)
@@ -534,10 +540,9 @@ async function resolveCompanyPageTargetsEnv(
       WHERE signals.org_id = orgs.id
     ) DESC NULLS LAST, orgs.id DESC
     LIMIT $1
-  `, [MAX_COMPANY_SITE_TARGETS_PER_RUN, source])
+  `, [MAX_COMPANY_SITE_TARGETS_PER_RUN, source, refreshInterval, getHiringEvidenceSourceIds()])
 
   const targets = buildCompanySiteTargets(rows)
-  if (targets.length === 0) return {}
 
   const cacheDir = resolve(getScriptDir(), '.cache')
   const targetsFilePath = resolve(cacheDir, tempFileName)
@@ -559,6 +564,7 @@ const COMPANY_SITE_TARGETS_CONFIG: CompanyPageTargetsConfig = {
   targetsFileEnv: 'COMPANY_SITE_TARGETS_FILE',
   inputFileEnv: 'COMPANY_SITE_INPUT_FILE',
   tempFileName: 'company-site-derived-targets.json',
+  refreshInterval: '7 days',
 }
 
 /** company-newsrooms config for the shared company-page targets resolver. */
@@ -568,6 +574,7 @@ const COMPANY_NEWSROOMS_TARGETS_CONFIG: CompanyPageTargetsConfig = {
   inputFileEnv: 'COMPANY_NEWSROOMS_INPUT_FILE',
   providerApiEnv: 'COMPANY_NEWSROOMS_PROVIDER_API_URL',
   tempFileName: 'company-newsrooms-derived-targets.json',
+  refreshInterval: '23 hours',
 }
 
 /** Resolve the company-site targets FILE (thin wrapper over the shared resolver). */
@@ -782,6 +789,24 @@ export async function ingestAllPrimarySources(
   }
   const sources = getPrimarySourceIds()
   return Promise.all(sources.map(source => ingestSource(source, env)))
+}
+
+/**
+ * Daily dependency-ordered source pipeline: hiring originators first, then
+ * bounded company-owned supporting/context crawls derived from the resulting
+ * organizations. Supporting failures remain visible in the combined result.
+ */
+export async function ingestDailyRadarSources(
+  env?: Record<string, string>
+): Promise<IngestResult[] | NoActiveProfilesResult> {
+  const primaryResults = await ingestAllPrimarySources(env)
+  if (isNoActiveProfiles(primaryResults)) return primaryResults
+
+  const supportingSources = getDailySupportingSourceIds()
+  const supportingResults = await Promise.all(
+    supportingSources.map(source => ingestSource(source, env)),
+  )
+  return [...primaryResults, ...supportingResults]
 }
 
 interface ParsedSourceMetrics {

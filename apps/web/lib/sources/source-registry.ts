@@ -9,6 +9,8 @@
  * Adding a new source = one entry in this file + the ingestion script.
  */
 
+import { getCanonicalSourcePolicy } from './source-policy'
+
 export type SourceId =
   | 'hh'
   | 'superjob'
@@ -49,6 +51,8 @@ export interface SourceConfig {
   searchEnvVars: string[]
   /** Whether this source is a primary source (included in daily-radar pipeline). */
   isPrimary: boolean
+  /** Optional dependency-ordered daily stage for non-originating enrichment. */
+  dailyStage?: 'supporting'
   /** Source category for routing and filtering. */
   category: 'job-board' | 'career-page' | 'registry' | 'professional-network' | 'business-signal'
   /**
@@ -282,13 +286,13 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // COMPANY_SITE_TARGETS_FILE / COMPANY_SITE_INPUT_FILE via ENV or
     // user_search_preferences; the derived default only fills when unset.
     searchEnvVars: ['COMPANY_SITE_TARGETS_FILE'],
-    // NOT primary on purpose (2026-07-15): company-site is supporting-evidence-only
+    // Not a primary/originating source: company-site is supporting-evidence-only
     // (registry policy 'supporting-evidence-only') — it corroborates existing leads
     // and surfaces direct company/contact pages, but must never originate a lead on
-    // its own. Kept out of the daily-radar auto-run so it doesn't add ambient noise
-    // or volume without direct hiring proof; the operator runs it on demand from the
-    // admin panel to enrich the org/contact surface for an existing candidate set.
+    // its own. It runs only in the dependency-ordered supporting stage after
+    // primary hiring ingestion, targeting companies that already have hiring proof.
     isPrimary: false,
+    dailyStage: 'supporting',
     category: 'career-page',
   },
   {
@@ -310,13 +314,13 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // COMPANY_NEWSROOMS_INPUT_FILE via ENV or user_search_preferences; the
     // derived default only fills when unset.
     searchEnvVars: ['COMPANY_NEWSROOMS_TARGETS_FILE'],
-    // NOT primary (2026-07-15): context-only (signal_type 'other',
+    // Not primary: context-only (signal_type 'other',
     // evidence_role 'context', contextOnly:true). Newsroom pages corroborate
     // org identity / Urgency (funding, expansion, leadership changes) but
-    // never originate a lead (Gate D). Digest lead candidacy stays
-    // job_posting-only. Run on demand from the admin panel to enrich the
-    // context surface for an existing candidate set.
+    // never originate a lead (Gate D). It runs in the supporting stage only
+    // after hiring sources establish the candidate company set.
     isPrimary: false,
+    dailyStage: 'supporting',
     category: 'career-page',
   },
   {
@@ -479,6 +483,20 @@ export function getAllSourceIds(): SourceId[] {
 /** Get primary source IDs (those included in the daily-radar pipeline). */
 export function getPrimarySourceIds(): SourceId[] {
   return SOURCE_REGISTRY.filter(s => s.isPrimary).map(s => s.id)
+}
+
+/** Source IDs whose normalized records can constitute direct hiring evidence. */
+export function getHiringEvidenceSourceIds(): SourceId[] {
+  return SOURCE_REGISTRY.filter((source) => {
+    const policy = getCanonicalSourcePolicy(source.id)
+    return policy?.leadEligibility === 'digest-lead-originating'
+      || policy?.leadEligibility === 'confidence-gated-evidence'
+  }).map(source => source.id)
+}
+
+/** Non-originating sources run after the primary hiring stage completes. */
+export function getDailySupportingSourceIds(): SourceId[] {
+  return SOURCE_REGISTRY.filter(s => s.dailyStage === 'supporting').map(s => s.id)
 }
 
 /** Get source configs for a specific category. */

@@ -267,6 +267,7 @@ export function normalizeContextEventRecord(record, { fetchedAt, lineNumber, sou
     signalType: options.signalType ?? 'other',
     evidenceRole: contextOnly ? 'context' : 'enrichment',
     sourceRecordType: options.sourceRecordType ?? 'context_event',
+    extractionMethod: toNonEmptyText(record.extraction_method),
     headline,
     recordTitle: headline,
     sourceUrl,

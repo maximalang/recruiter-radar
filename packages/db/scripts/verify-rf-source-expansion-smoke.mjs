@@ -218,9 +218,9 @@ async function verifyNewsroomsLiveMode() {
     ok: true,
     status: 200,
     statusText: 'OK',
-    url: 'https://newsroom-smoke.example/news/region-launch',
+    url: 'https://newsroom-smoke.example/news/',
     headers: { get: () => 'text/html; charset=utf-8' },
-    text: async () => '<!doctype html><html><head><title>Regional launch</title><meta name="description" content="Newsroom Smoke Co opens a regional operations hub"></head><body><main>Newsroom Smoke Co announces a regional launch and expansion.</main></body></html>',
+    text: async () => '<!doctype html><html><body><main><a href="/news/region-launch">12 августа 2026 Newsroom Smoke Co opens a regional operations hub</a></main></body></html>',
   });
 
   try {
@@ -229,9 +229,10 @@ async function verifyNewsroomsLiveMode() {
     const input = await resolveCompanyNewsroomsConfiguredInput();
     const summary = buildNewsroomsSummary(input);
     assert.equal(summary.inputMode, 'live-public');
-    assert.equal(summary.liveProvider, 'curated-company-newsrooms');
+    assert.equal(summary.liveProvider, 'company-owned-newsroom-discovery');
     assert.equal(summary.recordsReceived, 1);
     assert.equal(summary.normalizedRecords, 1);
+    assert.equal(summary.newsroomPagesDiscovered, 1);
     assert.equal(input.normalizedRecords[0].evidenceRole, 'context');
     return { inputMode: summary.inputMode, normalizedRecords: summary.normalizedRecords };
   } finally {

@@ -106,7 +106,18 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
   }
 
   if (targets.length === 0) {
-    throw new Error('COMPANY_SITE_TARGETS_FILE must contain at least one target.');
+    return {
+      inputMode: 'live-public',
+      inputFilePath: null,
+      targetsFilePath: resolvedPath,
+      recordsReceived: 0,
+      crawlSuccesses: 0,
+      crawlErrors: 0,
+      duplicateRecords: 0,
+      normalizedRecords: [],
+      skippedRecords: 0,
+      zeroReason: 'no-eligible-company-targets',
+    };
   }
 
   const crawlResults = await fetchCompanyPages(targets);
@@ -163,6 +174,7 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
     duplicateRecords: dedupeResult.duplicateRecords,
     normalizedRecords: dedupeResult.records,
     skippedRecords,
+    zeroReason: null,
   };
 }
 
@@ -466,6 +478,7 @@ export function buildFetchSummary(input) {
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    zeroReason: input.zeroReason ?? undefined,
   };
 }
 
@@ -485,6 +498,7 @@ function buildIngestSummary(input, stats) {
     evidenceUpsertsCompleted: stats.evidenceUpsertCount,
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
+    zeroReason: input.zeroReason ?? undefined,
   };
 }
 
@@ -504,6 +518,7 @@ function buildPipelineSummary(input, stats) {
     evidenceUpsertsCompleted: stats.evidenceUpsertCount,
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
+    zeroReason: input.zeroReason ?? undefined,
   };
 }
 

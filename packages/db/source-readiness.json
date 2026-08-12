@@ -126,6 +126,20 @@
       "confidence": "not-applicable",
       "opportunityEligibility": "not-applicable",
       "observability": "contract-tested"
+    },
+    "context-discovered": {
+      "discover": "contract-tested",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "contract-tested",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "contract-tested",
+      "signal": "contract-tested",
+      "confidence": "not-applicable",
+      "opportunityEligibility": "not-applicable",
+      "observability": "contract-tested"
     }
   },
   "sources": {
@@ -429,9 +443,13 @@
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["COMPANY_SITE_INPUT_FILE"], ["COMPANY_SITE_TARGETS_FILE"]]
+        "acceptedEnvSets": [["DATABASE_URL"], ["COMPANY_SITE_INPUT_FILE"], ["COMPANY_SITE_TARGETS_FILE"]]
       },
-      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-08-12T19:31:04Z",
+        "evidence": ["Production-runtime disposable DB: official VK company page produced 1 context signal/evidence/lineage row with one owner and zero sensitive payload rows."]
+      },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "supporting-evidence-only",
@@ -439,9 +457,10 @@
       "pipelineProfile": "supporting-evidence",
       "verification": {
         "fixture": ["npm run verify:company-site:smoke"],
+        "live": ["npm run verify:company-context:live-db"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["No current curated target run is verified; generic company pages cannot originate leads."]
+      "blockers": []
     },
     "funding-business-signals": {
       "implementation": "implemented",
@@ -469,19 +488,24 @@
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["COMPANY_NEWSROOMS_INPUT_FILE"], ["COMPANY_NEWSROOMS_TARGETS_FILE"], ["COMPANY_NEWSROOMS_PROVIDER_API_URL", "COMPANY_NEWSROOMS_PROVIDER_API_TOKEN"]]
+        "acceptedEnvSets": [["DATABASE_URL"], ["COMPANY_NEWSROOMS_INPUT_FILE"], ["COMPANY_NEWSROOMS_TARGETS_FILE"], ["COMPANY_NEWSROOMS_PROVIDER_API_URL", "COMPANY_NEWSROOMS_PROVIDER_API_TOKEN"]]
       },
-      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-08-12T19:31:04Z",
+        "evidence": ["Production-runtime disposable DB: official VK newsroom produced 30 same-company context signal/evidence/lineage rows, one owner, zero foreign source domains, and zero sensitive payload rows."]
+      },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
-      "pipelineProfile": "context-standard",
+      "pipelineProfile": "context-discovered",
       "verification": {
-        "fixture": ["npm run verify:rf-source-expansion:smoke"],
+        "fixture": ["npm run verify:company-newsrooms:discovery", "npm run verify:rf-source-expansion:smoke"],
+        "live": ["npm run verify:company-context:live-db"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["No current curated target/provider run is verified; context cannot originate a lead."]
+      "blockers": []
     },
     "industry-media": {
       "implementation": "implemented",

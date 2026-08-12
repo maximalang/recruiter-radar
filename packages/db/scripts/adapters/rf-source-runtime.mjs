@@ -247,6 +247,7 @@ export function createStandardSourceRuntime(config) {
       normalizedRecords: input.normalizedRecords.length,
       skippedRecords: input.skippedRecords,
       sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
+      zeroReason: input.zeroReason ?? undefined,
     };
   }
 
@@ -269,6 +270,7 @@ export function createStandardSourceRuntime(config) {
       evidenceUpsertsCompleted: stats.evidenceUpsertCount,
       evidenceCreated: stats.evidenceCreatedCount,
       lineageCreated: stats.lineageCreatedCount,
+      zeroReason: input.zeroReason ?? undefined,
     };
   }
 
@@ -291,6 +293,7 @@ export function createStandardSourceRuntime(config) {
       evidenceUpsertsCompleted: stats.evidenceUpsertCount,
       evidenceCreated: stats.evidenceCreatedCount,
       lineageCreated: stats.lineageCreatedCount,
+      zeroReason: input.zeroReason ?? undefined,
     };
   }
 
