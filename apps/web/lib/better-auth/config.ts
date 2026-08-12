@@ -1,15 +1,6 @@
 const PROD_ORIGIN = "https://recruiter-radar.ru";
 
 export const BETTER_AUTH_BASE_PATH = "/api/identity";
-export const BETTER_AUTH_MCP_RESOURCE = `${PROD_ORIGIN}/api/internal/mcp`;
-export const BETTER_AUTH_MCP_READ_SCOPE = "rr.operator.read";
-export const BETTER_AUTH_CORE_SCOPES = [
-  "openid",
-  "profile",
-  "email",
-  "offline_access",
-  BETTER_AUTH_MCP_READ_SCOPE,
-] as const;
 
 function exactTrue(value: string | undefined): boolean {
   return value?.trim() === "true";
@@ -17,14 +8,6 @@ function exactTrue(value: string | undefined): boolean {
 
 export function isBetterAuthEnabled(): boolean {
   return exactTrue(process.env.BETTER_AUTH_ENABLED);
-}
-
-export function isBetterAuthMcpEnabled(): boolean {
-  return isBetterAuthEnabled() && exactTrue(process.env.BETTER_AUTH_MCP_OAUTH_ENABLED);
-}
-
-export function isBetterAuthMcpDcrEnabled(): boolean {
-  return isBetterAuthMcpEnabled() && exactTrue(process.env.BETTER_AUTH_MCP_DCR_ENABLED);
 }
 
 export function getBetterAuthBaseOrigin(): string {
@@ -43,17 +26,10 @@ export function getBetterAuthBaseOrigin(): string {
   return url.origin;
 }
 
-export function getBetterAuthIssuer(): string {
-  return `${getBetterAuthBaseOrigin()}${BETTER_AUTH_BASE_PATH}`;
-}
-
 export type BetterAuthRuntimeConfig = {
   databaseUrl: string;
   secret: string;
   baseOrigin: string;
-  issuer: string;
-  mcpEnabled: boolean;
-  dcrEnabled: boolean;
 };
 
 export function getBetterAuthRuntimeConfig(): BetterAuthRuntimeConfig {
@@ -70,23 +46,12 @@ export function getBetterAuthRuntimeConfig(): BetterAuthRuntimeConfig {
     throw new Error("Production Better Auth origin must be https://recruiter-radar.ru.");
   }
 
-  return {
-    databaseUrl,
-    secret,
-    baseOrigin,
-    issuer: `${baseOrigin}${BETTER_AUTH_BASE_PATH}`,
-    mcpEnabled: isBetterAuthMcpEnabled(),
-    dcrEnabled: isBetterAuthMcpDcrEnabled(),
-  };
+  return { databaseUrl, secret, baseOrigin };
 }
 
 export function getBetterAuthPublicState() {
   return {
     enabled: isBetterAuthEnabled(),
-    mcpOAuthEnabled: isBetterAuthMcpEnabled(),
-    mcpDcrEnabled: isBetterAuthMcpDcrEnabled(),
     basePath: BETTER_AUTH_BASE_PATH,
-    mcpResource: BETTER_AUTH_MCP_RESOURCE,
-    scopes: [...BETTER_AUTH_CORE_SCOPES],
   } as const;
 }
