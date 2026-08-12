@@ -9,8 +9,8 @@ import pg from 'pg';
 const execFileAsync = promisify(execFile);
 const { Client } = pg;
 const sourceId = process.argv[2]?.trim();
-if (!['superjob', 'rabota-rossii'].includes(sourceId)) {
-  throw new Error('Usage: run-source-live-db-verifier.mjs <superjob|rabota-rossii>');
+if (!['superjob', 'rabota-rossii', 'public-ats'].includes(sourceId)) {
+  throw new Error('Usage: run-source-live-db-verifier.mjs <superjob|rabota-rossii|public-ats>');
 }
 if (process.env.SOURCE_LIVE_DB_TEST_ACK !== 'isolated') {
   throw new Error('SOURCE_LIVE_DB_TEST_ACK=isolated is required before creating a disposable database.');
@@ -51,7 +51,10 @@ await admin.connect();
 try {
   await admin.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`);
   await run([resolve(import.meta.dirname, './migrate.mjs')]);
-  await run([resolve(import.meta.dirname, './verify-job-source-live-pipeline.mjs'), sourceId]);
+  const verifier = sourceId === 'public-ats'
+    ? './verify-public-ats-live-pipeline.mjs'
+    : './verify-job-source-live-pipeline.mjs';
+  await run([resolve(import.meta.dirname, verifier), ...(sourceId === 'public-ats' ? [] : [sourceId])]);
 } finally {
   await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)} WITH (FORCE)`);
   await admin.end();

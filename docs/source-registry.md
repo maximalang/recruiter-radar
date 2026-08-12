@@ -15,8 +15,10 @@ Last reconciled: **2026-08-12** against `source-policy.json`, `source-readiness.
 
 ## Policy and observed-runtime snapshot (2026-08-12 reconciliation)
 
-**Digest-allowed by canonical policy: 4** — `hh`, `career-pages`, `rabota-rossii`, and
-`superjob`. `habr-career` remains `blocked-from-digest-pending-confidence-tests`.
+**Digest-allowed by canonical policy: 9** — `hh`, `career-pages`, `greenhouse`, `lever`,
+`ashby`, `recruitee`, `workable`, `rabota-rossii`, and `superjob`.
+`smartrecruiters` and `habr-career` remain
+`blocked-from-digest-pending-confidence-tests`.
 Operational health is separate from promotion status and must be verified against the current
 environment.
 
@@ -24,6 +26,12 @@ environment.
 |---|---|---|---|
 | rabota-rossii | current disposable live DB: 100 signals/evidence/lineage across 80 orgs | digest-allowed; live-verified | official public API; no credential required |
 | career-pages | current controlled crawl: 5/12 targets parsed, 381 normalized | digest-allowed; live-reachable, not full-path verified | 7 targets explicitly page-unreachable; isolated live ingest/evidence run still required |
+| greenhouse | production disposable DB: 50 signals/evidence/lineage | digest-allowed; live-verified | public board discovered from company career surface; persisted as `greenhouse` |
+| lever | production disposable DB: 130 signals/evidence/lineage | digest-allowed; live-verified | public postings discovered from company career surface; persisted as `lever` |
+| ashby | production disposable DB: 57 signals/evidence/lineage | digest-allowed; live-verified | official public Job Posting API |
+| recruitee | production disposable DB: 50 signals/evidence/lineage | digest-allowed; live-verified | official public Careers Site API; sensitive provider fields stripped |
+| workable | production disposable DB: 12 signals/evidence/lineage | digest-allowed; live-verified | public account jobs endpoint; account discovered from company page |
+| smartrecruiters | local public API: 8 normalized; production HTTP 403 | blocked from digest | adapter retained; production egress/proxy path is not currently reachable |
 | habr-career | historical HTTP 200 | blocked from digest | confidence and legal/robots gates remain open in policy |
 | superjob | current disposable live DB: 40 signals/evidence/lineage | digest-allowed; live-verified | production app-id found; 32 direct-employer eligible, 8 non-direct rejected |
 | hh | unauthenticated `/areas` HTTP 200; `/vacancies` HTTP 403 | digest-allowed; registration-required | official application OAuth implemented; `HH_CLIENT_ID`/`HH_CLIENT_SECRET` absent, so geo is not yet proven |
@@ -36,9 +44,10 @@ policy — social/personal scraping is out of product scope; see Rejected table 
 
 **Coverage improvement this cycle:** rabota-rossii went from one ~25–50-record federal page to
 region-iterated paged fetch (each of ~85 RF region codes exposes an independent offset window),
-and career-pages — the only direct high-signal surface — now runs on every daily-radar cycle
-instead of never. Net: the highest-trust source is scheduled daily, and the broadest official RF
-feed multiplies its per-run company coverage; scheduling alone is not live verification.
+and the unified career-page crawler now runs on every daily-radar cycle and enrolls supported
+hosted ATS boards under their real provider IDs. Net: direct hiring-surface coverage is scheduled
+daily, and the broadest official RF feed multiplies its per-run company coverage; scheduling
+alone is not live verification.
 
 ---
 
@@ -78,11 +87,12 @@ A source reaching the digest is gated in **two** independent places. Both must a
 
 1. **SQL whitelist** — `packages/db/scripts/source-digest-evidence.sql` line ~89:
    ```
-   signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob',
-                      'habr-career', 'tech-job-boards',
+   signal.source IN ('hh', 'career-pages', 'greenhouse', 'lever', 'ashby',
+                      'recruitee', 'workable', 'smartrecruiters',
+                      'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards',
                       'linkedin-company-pages', 'regional-job-boards')
    ```
-   Only `signal_type = 'job_posting'` rows from these 8 sources are even *considered*.
+   Only `signal_type = 'job_posting'` rows from these 14 sources are even *considered*.
 
 2. **`promotionStatus`** — even when a source is in the SQL whitelist, if its
    `promotionStatus` is `blocked-from-digest-pending-confidence-tests` it is held out of
@@ -90,15 +100,16 @@ A source reaching the digest is gated in **two** independent places. Both must a
    it lets blocked sources accumulate evidence and dedupe-overlap data while the confidence
    gate decides whether they graduate.
 
-> `exportSourceCoverageDetails()` in the registry derives
-> `inDigest` as `(source in PRIMARY_INGESTION_SOURCES) AND (promotionStatus === 'digest-allowed')`.
-> As of the 2026-08-12 policy reconciliation that set is `hh`, `career-pages`,
-> `rabota-rossii`, and `superjob`. `habr-career` and the other whitelisted sources are present in
+> `exportSourceCoverageDetails()` in the registry derives `inDigest` from the canonical
+> digest-source list and `promotionStatus === 'digest-allowed'`. Scheduling is separate: the
+> non-primary ATS aliases are fetched by the primary `career-pages` crawler but persisted and
+> reported under their real source IDs. `habr-career`, `smartrecruiters`, and other whitelisted sources are present in
 > ingestion or SQL paths but remain `blocked-from-digest-pending-confidence-tests`. Promote a
 > source only by satisfying its gates and changing the canonical machine-readable policy; never
 > by editing this document alone.
 
-**Policy-allowed digest sources today: `hh`, `career-pages`, `rabota-rossii`, and `superjob`.** Everything
+**Policy-allowed digest sources today: `hh`, `career-pages`, `greenhouse`, `lever`, `ashby`,
+`recruitee`, `workable`, `rabota-rossii`, and `superjob`.** Everything
 else is blocked-from-digest, supporting-evidence-only, or never-lead-originating. This policy
 statement does not prove that any source is currently configured or healthy in production.
 
@@ -110,6 +121,12 @@ statement does not prove that any source is currently configured or healthy in p
 |---|---|---|---|---|
 | **hh** | primary-platform / medium-signal (0.74) | digest-lead-originating | **digest-allowed** | registration-required; authenticated live path not yet verified |
 | **career-pages** | company-surface / high-signal (0.92) | digest-lead-originating | **digest-allowed** | live-reachable (partial), not live-verified |
+| **greenhouse** | company-surface / high-signal (0.90) | digest-lead-originating | **digest-allowed** | live-verified: 50 persisted |
+| **lever** | company-surface / high-signal (0.90) | digest-lead-originating | **digest-allowed** | live-verified: 130 persisted |
+| **ashby** | company-surface / high-signal (0.90) | digest-lead-originating | **digest-allowed** | live-verified: 57 persisted |
+| **recruitee** | company-surface / high-signal (0.90) | digest-lead-originating | **digest-allowed** | live-verified: 50 persisted |
+| **workable** | company-surface / high-signal (0.90) | digest-lead-originating | **digest-allowed** | live-verified: 12 persisted |
+| **smartrecruiters** | company-surface / high-signal (0.90) | digest-lead-originating | blocked-from-digest | local live 8; production egress blocked |
 | **rabota-rossii** | primary-platform / medium-signal (0.70) | confidence-gated-evidence | **digest-allowed** | live-verified |
 | **egrul-fns** | registry-reference / high-signal (0.90) | enrichment-only | never-lead-originating | live + provider |
 | **transparent-business-fns** | registry-reference / high-signal (0.86) | enrichment-only | never-lead-originating | provider/snapshot only |
@@ -126,8 +143,9 @@ statement does not prove that any source is currently configured or healthy in p
   proof in a disposable isolated DB after the missing free-registration credentials are supplied.
   RU-resident egress/`HH_PROXY_URL` is only a fallback if authenticated target-runtime access fails.
 
-**career-pages** — the highest-trust source (direct company hiring surface, default confidence
-0.92, the only source SQL classifies as `direct_hiring_proof` unconditionally). Guarded against
+**career-pages** — the unified discovery crawler for direct company hiring surfaces (default
+confidence 0.92). Same-domain pages and supported hosted ATS boards are classified as
+`direct_hiring_proof`; hosted boards retain their real provider source ID. Guarded against
 the "N records but 0 normalized" silent-zero-leads bug (commit `d43b9a7`). **Promoted to primary
 (daily-radar) on 2026-06-30**: it now ingests on every daily run, self-limited by a wall-clock
 fetch budget (`CAREER_PAGES_FETCH_BUDGET_MS`, default 90s) so a long sequential crawl stays under
@@ -157,6 +175,18 @@ and bounded `errorCategory`. A fetched page with no supported vacancy extraction
 board response is `no-vacancies-present`. Current evidence is intentionally partial: five of
 twelve targets parsed 381 records, while seven were explicitly unreachable.
 
+**Public hosted ATS enrollment (2026-08-12):** fingerprints in a company page or its resolved
+redirect select a provider adapter for Greenhouse, Lever, Ashby, Recruitee, Workable, or
+SmartRecruiters. One bounded crawler owns discovery, normalization, sensitive-field rejection,
+organization resolution, dedupe, evidence, signal, and lineage. Thin provider scripts are
+operator entry points only; they filter the unified crawler and are deliberately not independent
+daily schedulers. Local public-API verification normalized 307 postings across all six providers.
+The production-runtime disposable DB verifier then persisted 299 postings for Greenhouse (50),
+Lever (130), Ashby (57), Recruitee (50), and Workable (12), with matching evidence and lineage
+counts and no sensitive persisted payload fields. SmartRecruiters remains blocked because the
+same production runtime received HTTP 403 and its existing optional proxy could not connect;
+local success is not promoted into a production claim.
+
 **rabota-rossii** — official trudvsem open-data. In the SQL whitelist and **`digest-allowed` as
 of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
 `source-review/trudvsem-review.md` and memory `project_rabota_rossii_live`).
@@ -177,8 +207,8 @@ of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
   signals, evidence items, and lineage rows across 80 organizations, so the source is now
   `live-verified`. Do **not** relax the 60% freshness threshold; filter the fetch to recent postings instead.
 - For `rabota-rossii`, an INN-based `org_external_id` *is* org-level → but INN-match is now
-  classified as `platform_aggregation` (gate C), not `direct_hiring_proof` — only career-pages is
-  a direct surface (see memory `project_trudvsem_platform_aggregation`).
+  classified as `platform_aggregation` (gate C), not `direct_hiring_proof` — only a verified
+  company-controlled career or enrolled hosted-ATS surface is direct.
 
 **egrul-fns / transparent-business-fns / fedresurs** — registry/context enrichment. Never
 originate leads. `egrul-fns`: 10-digit legal-entity INN only; skip 12-digit IP/person records.
@@ -212,9 +242,9 @@ Keyword breadth is derived from active profiles' roles at ingest time
 (`deriveHabrKeywordsFromProfiles`); was a contributor to the leads=0 pipeline gap (see memory
 `project_leads_pipeline_gaps`). Live probe 200 as of 2026-06-30.
 
-**tech-job-boards** — API-mega-list providers + greenhouse/lever ATS adapters. Must pass fixture
-shape, sensitive-field rejection, freshness, region, salary, and org-identity gates before digest
-use. No RF greenhouse/lever tokens configured, so contributes nothing in production today.
+**tech-job-boards** — legacy curated/provider shell for generic technology boards. Concrete
+Greenhouse, Lever, Ashby, Recruitee, Workable, and SmartRecruiters boards now use individual
+source IDs through the unified career crawler; do not add them back to this generic family.
 
 **linkedin-company-pages** — **compliant provider snapshots only.** Discard employee, profile,
 email, and phone fields. No direct scraping.

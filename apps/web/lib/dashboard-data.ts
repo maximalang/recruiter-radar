@@ -422,7 +422,7 @@ export async function getDashboardSourcePerformance(): Promise<SourcePerformance
 // also surfaces the average recency (days since latest_published_at) so
 // staleness is visible per source. This is the analytics layer that makes the
 // RF evidence layer inspectable: the HTML-card fallback's contribution shows
-// up as more direct_hiring_proof leads under `career-pages`.
+// up as more direct_hiring_proof leads under their real career/ATS source ids.
 
 export interface SourceEvidenceQualityItem {
   source: string;
@@ -435,7 +435,8 @@ export interface SourceEvidenceQualityItem {
   gateC: number;
   gateD: number;
   /** Evidence-quality distribution counts. direct_hiring_proof = company-owned
-   * surface (career-pages); platform_aggregation = platform/registry match;
+   * surface (same-domain career page or enrolled hosted ATS);
+   * platform_aggregation = platform/registry match;
    * enrichment_context = background only. */
   directHiringProof: number;
   platformAggregation: number;
@@ -457,7 +458,8 @@ export async function getDashboardSourceEvidenceQuality(): Promise<SourceEvidenc
     // both spellings so this stays correct regardless of which writer produced
     // the row. evidence_quality is NOT persisted to payload today, so derive it
     // from source_families with the SAME classification source-digest-evidence.sql
-    // uses (career-pages present → direct_hiring_proof; else platform_aggregation;
+    // uses (company career/hosted ATS present → direct_hiring_proof;
+    // else platform_aggregation;
     // a lead that reached digest_candidates is never enrichment_context because
     // the SQL scorer filters that out). This keeps the analytics view truthful
     // without a payload-shape change. unnest source_families so a lead backed by
@@ -482,8 +484,8 @@ export async function getDashboardSourceEvidenceQuality(): Promise<SourceEvidenc
         COUNT(*) FILTER (WHERE COALESCE(dc.payload->>'confidence_gate', dc.payload->>'confidenceGate') = 'B')::TEXT AS gate_b,
         COUNT(*) FILTER (WHERE COALESCE(dc.payload->>'confidence_gate', dc.payload->>'confidenceGate') = 'C')::TEXT AS gate_c,
         COUNT(*) FILTER (WHERE COALESCE(dc.payload->>'confidence_gate', dc.payload->>'confidenceGate') = 'D')::TEXT AS gate_d,
-        COUNT(*) FILTER (WHERE 'career-pages' = ANY(dc.source_families))::TEXT AS direct,
-        COUNT(*) FILTER (WHERE 'career-pages' <> ALL(dc.source_families))::TEXT AS platform,
+        COUNT(*) FILTER (WHERE dc.source_families && ARRAY['career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters']::TEXT[])::TEXT AS direct,
+        COUNT(*) FILTER (WHERE NOT (dc.source_families && ARRAY['career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters']::TEXT[]))::TEXT AS platform,
         COUNT(*) FILTER (WHERE array_length(dc.source_families, 1) IS NULL)::TEXT AS context,
         ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - dc.latest_published_at)) / 86400.0), 1) AS avg_age_days
       FROM digest_candidates dc

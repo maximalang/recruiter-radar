@@ -2967,7 +2967,10 @@ const OPPORTUNITY_BUILD_QUERY = `
         'title', s.headline,
         'region', COALESCE(s.payload->>'area_name', s.payload->>'location'),
         'occurredAt', s.occurred_at::TEXT,
-        'tier', CASE WHEN s.source = 'career-pages' THEN 'direct' ELSE 'corroboration' END
+        'tier', CASE
+          WHEN s.source IN ('career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters') THEN 'direct'
+          ELSE 'corroboration'
+        END
       )) FILTER (WHERE s.id IS NOT NULL) AS signals,
       JSONB_AGG(DISTINCT JSONB_BUILD_OBJECT(
         'id', ei.id::TEXT,

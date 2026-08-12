@@ -126,6 +126,11 @@ describe('MultiSourceLeadGenerator', () => {
       expect(sourceIdToEvidenceType('unregistered-source')).toBe('news')
       expect(sourceIdToEvidenceType('fedresurs')).toBe('registry')
     })
+
+    it('classifies enrolled hosted ATS sources as direct career-page evidence', () => {
+      expect(sourceIdToEvidenceType('greenhouse')).toBe('career-page')
+      expect(sourceIdToEvidenceType('smartrecruiters')).toBe('career-page')
+    })
   })
 
   describe('deduplication', () => {
@@ -174,6 +179,11 @@ describe('MultiSourceLeadGenerator', () => {
         'hh',
         'superjob',
         'career-pages',
+        'greenhouse',
+        'lever',
+        'ashby',
+        'recruitee',
+        'workable',
         'egrul-fns',
         'rabota-rossii',
       ])

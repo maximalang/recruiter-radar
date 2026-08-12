@@ -43,6 +43,16 @@ const leverHtml = `
     </body>
   </html>
 `;
+const publicAtsHtml = `
+  <html>
+    <body>
+      <a href="https://jobs.ashbyhq.com/Ashby">Ashby jobs</a>
+      <a href="https://framestore.recruitee.com/o/animator-2033">Framestore jobs</a>
+      <a href="https://apply.workable.com/blue-altair/">Blue Altair jobs</a>
+      <a href="https://careers.smartrecruiters.com/smartrecruiters">SmartRecruiters jobs</a>
+    </body>
+  </html>
+`;
 const sameDomainHtml = `
   <html>
     <body>
@@ -86,6 +96,60 @@ assert.deepEqual(leverDetection.targets[0], {
   source_url: 'https://api.lever.co/v0/postings/zenhire?mode=json',
 });
 
+const publicAtsDetection = detectCareerPageTargetFromHtml(publicAtsHtml, {
+  baseUrl: 'https://example.org/',
+  orgName: 'Example Org',
+  domain: 'example.org',
+  websiteUrl: 'https://example.org/',
+});
+assert.deepEqual(publicAtsDetection.targets, [
+  {
+    id: 'example.org-ashby-job-board',
+    adapter: 'ashby-job-board',
+    company_name: 'Example Org',
+    company_domain: 'example.org',
+    company_website_url: 'https://example.org/',
+    career_page_url: 'https://jobs.ashbyhq.com/Ashby',
+    source_url: 'https://api.ashbyhq.com/posting-api/job-board/Ashby?includeCompensation=true',
+  },
+  {
+    id: 'example.org-recruitee-careers',
+    adapter: 'recruitee-careers',
+    company_name: 'Example Org',
+    company_domain: 'example.org',
+    company_website_url: 'https://example.org/',
+    career_page_url: 'https://framestore.recruitee.com',
+    source_url: 'https://framestore.recruitee.com/api/offers/',
+  },
+  {
+    id: 'example.org-workable-public-jobs',
+    adapter: 'workable-public-jobs',
+    company_name: 'Example Org',
+    company_domain: 'example.org',
+    company_website_url: 'https://example.org/',
+    career_page_url: 'https://apply.workable.com/blue-altair/',
+    source_url: 'https://www.workable.com/api/accounts/blue-altair?details=true',
+  },
+  {
+    id: 'example.org-smartrecruiters-postings',
+    adapter: 'smartrecruiters-postings',
+    company_name: 'Example Org',
+    company_domain: 'example.org',
+    company_website_url: 'https://example.org/',
+    career_page_url: 'https://careers.smartrecruiters.com/smartrecruiters',
+    source_url: 'https://api.smartrecruiters.com/v1/companies/smartrecruiters/postings?limit=100&offset=0',
+  },
+]);
+
+const redirectedAtsDetection = detectCareerPageTargetFromHtml('', {
+  baseUrl: 'https://jobs.ashbyhq.com/Ashby',
+  orgName: 'Ashby',
+  domain: 'ashbyhq.com',
+  websiteUrl: 'https://www.ashbyhq.com/',
+});
+assert.equal(redirectedAtsDetection.targets.length, 1, 'a direct redirect to an ATS board must be discoverable');
+assert.equal(redirectedAtsDetection.targets[0].adapter, 'ashby-job-board');
+
 const sameDomainDetection = detectCareerPageTargetFromHtml(sameDomainHtml, {
   baseUrl: 'https://same.example/',
   orgName: 'Same',
@@ -106,6 +170,19 @@ assert.deepEqual(sameDomainDetection.targets[0], {
 });
 assert.equal(sameDomainDetection.sameDomainCareerPageUrl, 'https://same.example/careers');
 assert.deepEqual(sameDomainDetection.notes, ['same-domain-careers:https://same.example/careers']);
+
+const assetOnlyDetection = detectCareerPageTargetFromHtml(`
+  <html><body>
+    <img src="https://careers.example/assets/careers-social-image.jpg" />
+    <a href="https://careers.example/assets/jobs-banner.png">About us</a>
+  </body></html>
+`, {
+  baseUrl: 'https://careers.example/',
+  orgName: 'Asset Only',
+  domain: 'example',
+  websiteUrl: 'https://example/',
+});
+assert.deepEqual(assetOnlyDetection.targets, [], 'career-named image assets must not become vacancy targets');
 
 // JSON-LD JobPosting extraction: RU career pages emit schema.org markup for
 // Яндекс.Работа / Google Jobs. Verify we walk @graph + arrays and map only

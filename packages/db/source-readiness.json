@@ -185,6 +185,54 @@
         "The controlled crawl is partially reachable, but 7 of 12 targets are stale or unreachable and live ingest/evidence/lineage still requires a disposable isolated database run."
       ]
     },
+    "greenhouse": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T18:52:42Z", "evidence": ["2026-08-12 production-runtime disposable DB verifier: official public Greenhouse Job Board API produced 50 signals, 50 evidence items, and 50 lineage rows with direct evidence, source ownership, URL, namespace, and extraction-method consistency."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "lever": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T18:52:42Z", "evidence": ["2026-08-12 production-runtime disposable DB verifier: official public Lever postings endpoint produced 130 signals, 130 evidence items, and 130 lineage rows with direct evidence, source ownership, URL, namespace, and extraction-method consistency."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "ashby": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T18:52:42Z", "evidence": ["2026-08-12 production-runtime disposable DB verifier: official Ashby public Job Posting API produced 57 signals, 57 evidence items, and 57 lineage rows with direct evidence, source ownership, URL, namespace, and extraction-method consistency."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "recruitee": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T18:52:42Z", "evidence": ["2026-08-12 production-runtime disposable DB verifier: official Recruitee Careers Site API produced 50 signals, 50 evidence items, and 50 lineage rows with direct evidence, source ownership, URL, namespace, and extraction-method consistency; 100 sensitive provider fields were stripped before persistence across the ATS batch."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "workable": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T18:52:42Z", "evidence": ["2026-08-12 production-runtime disposable DB verifier: official Workable public account endpoint produced 12 signals, 12 evidence items, and 12 lineage rows with direct evidence, source ownership, URL, namespace, and extraction-method consistency; corporate-page discovery resolved the account automatically."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "smartrecruiters": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": ["2026-08-12 local official SmartRecruiters public Posting API fetch returned and normalized 8 current postings without credentials.", "2026-08-12 production-runtime verification received Cloudflare HTTP 403 from api.smartrecruiters.com; the existing optional SOCKS egress could not connect to that host, so no production DB/evidence claim is made."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": ["Production egress to api.smartrecruiters.com is blocked; retain the adapter but do not promote it until an approved reachable egress or provider-side allowlisting is verified."]
+    },
     "rabota-rossii": {
       "implementation": "implemented",
       "fixture": "tested",

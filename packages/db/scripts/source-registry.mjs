@@ -9,6 +9,7 @@ import {
   defineSource,
 } from './source-contract.mjs';
 import {
+  DIGEST_SOURCES,
   SOURCE_COVERAGE_TIERS,
   validateSourceCoverage,
 } from './source-coverage-requirements.mjs';
@@ -28,6 +29,14 @@ const hhFetchAbsoluteScriptPath = resolve(scriptDir, './fetch-hh.mjs');
 const hhIngestAbsoluteScriptPath = resolve(scriptDir, './ingest-hh.mjs');
 const careerPagesScriptPath = './packages/db/scripts/source-career-pages.mjs';
 const careerPagesAbsoluteScriptPath = resolve(scriptDir, './source-career-pages.mjs');
+const publicAtsSources = Object.freeze([
+  ['greenhouse', './packages/db/scripts/source-greenhouse.mjs', './source-greenhouse.mjs', 'Greenhouse public job boards discovered from company career pages.'],
+  ['lever', './packages/db/scripts/source-lever.mjs', './source-lever.mjs', 'Lever public postings discovered from company career pages.'],
+  ['ashby', './packages/db/scripts/source-ashby.mjs', './source-ashby.mjs', 'Ashby public Job Posting API boards discovered from company career pages.'],
+  ['recruitee', './packages/db/scripts/source-recruitee.mjs', './source-recruitee.mjs', 'Recruitee public Careers Site API boards discovered from company career pages.'],
+  ['workable', './packages/db/scripts/source-workable.mjs', './source-workable.mjs', 'Workable public account jobs discovered from company career pages.'],
+  ['smartrecruiters', './packages/db/scripts/source-smartrecruiters.mjs', './source-smartrecruiters.mjs', 'SmartRecruiters public Posting API boards discovered from company career pages.'],
+]);
 const companySiteScriptPath = './packages/db/scripts/source-company-site.mjs';
 const companySiteAbsoluteScriptPath = resolve(scriptDir, './source-company-site.mjs');
 const linkedinScriptPath = './packages/db/scripts/source-linkedin-company-pages.mjs';
@@ -59,8 +68,10 @@ const sourceReadinessContract = getSourceReadinessContract();
 // Mirrors the TS registry `isPrimary: true` set (apps/web/lib/sources/source-registry.ts):
 // sources enrolled in the daily-radar ingestion pipeline. Kept in sync manually
 // because the TS registry is not importable from this .mjs build context.
-// `inDigest` below is derived as (primary ingestion) AND (promotionStatus 'digest-allowed'),
-// so a source that regresses out of digest-allowed auto-drops from the digest.
+// Scheduling and digest eligibility are separate: hosted ATS aliases are
+// ingested by the unified career-pages scheduler but persist under their real
+// provider ids. `inDigest` therefore uses the canonical digest list + policy,
+// not membership in this scheduler set.
 const PRIMARY_INGESTION_SOURCES = Object.freeze(
   new Set(['hh', 'superjob', 'habr-career', 'rabota-rossii', 'career-pages'])
 );
@@ -153,6 +164,20 @@ registerSource(
     },
   }),
 );
+
+for (const [id, scriptPath, localScriptPath, description] of publicAtsSources) {
+  registerRunnableScriptSource({
+    id,
+    kind: 'career-page',
+    sourceClass: 'company-surface',
+    evidenceTier: 'high-signal',
+    defaultConfidence: 0.9,
+    fetchModes: ['live-public'],
+    description,
+    scriptPath,
+    absoluteScriptPath: resolve(scriptDir, localScriptPath),
+  });
+}
 
 registerSource(
   defineSource({
@@ -745,7 +770,7 @@ export function exportSourceCoverageDetails() {
         )?.[0] || 'none',
         // Runtime capability and policy eligibility do not establish live readiness.
         inDigest:
-          PRIMARY_INGESTION_SOURCES.has(source.id) &&
+          DIGEST_SOURCES.includes(source.id) &&
           source.promotionStatus === 'digest-allowed',
       };
     }),

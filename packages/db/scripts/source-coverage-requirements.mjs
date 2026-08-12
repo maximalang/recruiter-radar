@@ -2,11 +2,17 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
   P1: Object.freeze({
     description: 'Core production-ready sources for MVP',
     required: true,
-    sources: ['hh', 'rabota-rossii', 'career-pages', 'egrul-fns', 'transparent-business-fns', 'fedresurs'],
+    sources: ['hh', 'rabota-rossii', 'career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters', 'egrul-fns', 'transparent-business-fns', 'fedresurs'],
     leadEligibilityRequirements: {
       hh: 'digest-lead-originating',
       'rabota-rossii': 'confidence-gated-evidence',
       'career-pages': 'digest-lead-originating',
+      'greenhouse': 'digest-lead-originating',
+      'lever': 'digest-lead-originating',
+      'ashby': 'digest-lead-originating',
+      'recruitee': 'digest-lead-originating',
+      'workable': 'digest-lead-originating',
+      'smartrecruiters': 'digest-lead-originating',
       'egrul-fns': 'enrichment-only',
       'transparent-business-fns': 'enrichment-only',
       'fedresurs': 'context-only'
@@ -37,7 +43,7 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
   })
 });
 
-export const DIGEST_SOURCES = Object.freeze(['hh', 'career-pages', 'rabota-rossii', 'superjob']);
+export const DIGEST_SOURCES = Object.freeze(['hh', 'career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'rabota-rossii', 'superjob']);
 
 export const PROMOTION_STATUSES = Object.freeze({
   'digest-allowed': 'Allowed in digest selection',

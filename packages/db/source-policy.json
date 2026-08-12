@@ -1,6 +1,12 @@
 {
   "hh": { "priority": "P1", "defaultConfidence": 0.74, "leadEligibility": "digest-lead-originating", "promotionStatus": "digest-allowed" },
   "career-pages": { "priority": "P1", "defaultConfidence": 0.92, "leadEligibility": "digest-lead-originating", "promotionStatus": "digest-allowed" },
+  "greenhouse": { "priority": "P1", "defaultConfidence": 0.9, "leadEligibility": "digest-lead-originating", "promotionStatus": "digest-allowed" },
+  "lever": { "priority": "P1", "defaultConfidence": 0.9, "leadEligibility": "digest-lead-originating", "promotionStatus": "digest-allowed" },
+  "ashby": { "priority": "P1", "defaultConfidence": 0.9, "leadEligibility": "digest-lead-originating", "promotionStatus": "digest-allowed" },
+  "recruitee": { "priority": "P1", "defaultConfidence": 0.9, "leadEligibility": "digest-lead-originating", "promotionStatus": "digest-allowed" },
+  "workable": { "priority": "P1", "defaultConfidence": 0.9, "leadEligibility": "digest-lead-originating", "promotionStatus": "digest-allowed" },
+  "smartrecruiters": { "priority": "P1", "defaultConfidence": 0.9, "leadEligibility": "digest-lead-originating", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
   "rabota-rossii": { "priority": "P1", "defaultConfidence": 0.7, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "digest-allowed" },
   "egrul-fns": { "priority": "P1", "defaultConfidence": 0.9, "leadEligibility": "enrichment-only", "promotionStatus": "never-lead-originating" },
   "transparent-business-fns": { "priority": "P1", "defaultConfidence": 0.86, "leadEligibility": "enrichment-only", "promotionStatus": "never-lead-originating" },

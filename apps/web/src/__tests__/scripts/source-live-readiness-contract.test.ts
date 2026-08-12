@@ -18,6 +18,12 @@ const credentialVerifierPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'v
 const SOURCE_IDS = [
   'hh',
   'career-pages',
+  'greenhouse',
+  'lever',
+  'ashby',
+  'recruitee',
+  'workable',
+  'smartrecruiters',
   'rabota-rossii',
   'habr-career',
   'superjob',
@@ -156,6 +162,15 @@ describe('source live readiness contract', () => {
       providerRequired: true,
       finalState: 'provider-required',
     }))
+
+    for (const sourceId of ['greenhouse', 'lever', 'ashby', 'recruitee', 'workable']) {
+      expect(report.sources.find((source: { id: string }) => source.id === sourceId)).toEqual(
+        expect.objectContaining({ configured: true, liveVerified: true, finalState: 'digest-eligible' }),
+      )
+    }
+    expect(report.sources.find((source: { id: string }) => source.id === 'smartrecruiters')).toEqual(
+      expect.objectContaining({ configured: true, liveVerified: false, finalState: 'blocked' }),
+    )
   })
 
   it('never derives live verification from an env variable or HTTP capability', () => {
@@ -229,7 +244,7 @@ describe('source live readiness contract', () => {
         leadEligibility: readReadinessContract().sources[id].eligibility === 'digest-eligible'
           ? (id === 'rabota-rossii' ? 'confidence-gated-evidence' : 'digest-lead-originating')
           : readReadinessContract().sources[id].eligibility,
-        promotionStatus: ['hh', 'career-pages', 'rabota-rossii'].includes(id)
+        promotionStatus: ['hh', 'career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'rabota-rossii', 'superjob'].includes(id)
           ? 'digest-allowed'
           : readReadinessContract().sources[id].eligibility === 'supporting-evidence-only'
             ? 'supporting-evidence-only'
@@ -283,13 +298,16 @@ describe('source live readiness contract', () => {
     expect(ingest).toContain("process.env.SOURCE_ENV_FILE_DISABLED === 'true'")
   })
 
-  it('provides disposable live DB verification for SuperJob and Rabota Rossii', () => {
+  it('provides disposable live DB verification for job APIs and public ATS sources', () => {
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
     expect(packageJson.scripts['verify:superjob:live-db']).toBe(
       'node packages/db/scripts/run-source-live-db-verifier.mjs superjob',
     )
     expect(packageJson.scripts['verify:rabota-rossii:live-db']).toBe(
       'node packages/db/scripts/run-source-live-db-verifier.mjs rabota-rossii',
+    )
+    expect(packageJson.scripts['verify:career-pages:public-ats-live-db']).toBe(
+      'node packages/db/scripts/run-source-live-db-verifier.mjs public-ats',
     )
 
     expect(existsSync(jobSourceLiveVerifierPath)).toBe(true)
@@ -309,6 +327,7 @@ describe('source live readiness contract', () => {
     expect(runner).toContain('CREATE DATABASE')
     expect(runner).toContain('DROP DATABASE IF EXISTS')
     expect(runner).toContain('WITH (FORCE)')
+    expect(runner).toContain("'public-ats'")
   })
 
   it('classifies source access and credential availability without storing secret values', () => {

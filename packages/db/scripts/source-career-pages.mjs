@@ -150,6 +150,7 @@ function loadCareerPagesInputFromFile(inputFilePath, inputMode = 'file') {
 
 export async function fetchCareerPagesInput({ persistSnapshot }) {
   const targetsConfig = await resolveCareerPagesTargetsConfig({ persistSnapshot });
+  const targets = filterCareerPageTargets(targetsConfig.targets);
   const targetResults = [];
   const records = [];
 
@@ -164,7 +165,7 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
   const fetchStartedAt = Date.now();
   let budgetExhausted = false;
 
-  for (const [index, target] of targetsConfig.targets.entries()) {
+  for (const [index, target] of targets.entries()) {
     if (fetchBudgetMs > 0 && index > 0 && Date.now() - fetchStartedAt >= fetchBudgetMs) {
       budgetExhausted = true;
       break;
@@ -201,7 +202,7 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
     fetchOutputPath: null,
     targetResults,
     discoverySummary: targetsConfig.discoverySummary ?? null,
-    targetsTotal: targetsConfig.targets.length,
+    targetsTotal: targets.length,
     budgetExhausted,
     rejectAllSkipped: true,
   });
@@ -517,7 +518,20 @@ function buildCareerPageProbeUrls(seed) {
     new URL('/ru/jobs', baseUrl).toString(),
     new URL('/ru/vacancies', baseUrl).toString(),
     new URL('/jobs/list', baseUrl).toString(),
+    new URL('/work-with-us', baseUrl).toString(),
+    new URL('/company/jobs', baseUrl).toString(),
+    new URL('/about/jobs', baseUrl).toString(),
   ])];
+}
+
+function filterCareerPageTargets(targets) {
+  const adapterFilter = process.env.CAREER_PAGES_ADAPTER_FILTER?.trim();
+
+  if (!adapterFilter) {
+    return targets;
+  }
+
+  return targets.filter((target) => toNonEmptyText(target?.adapter ?? target?.type) === adapterFilter);
 }
 
 async function fetchHtmlPage(url) {
@@ -594,15 +608,35 @@ function classifyCareerPageFetchError(error) {
 
 export function detectCareerPageTargetFromHtml(html, seed) {
   const text = typeof html === 'string' ? html : '';
+  // A company career URL may redirect directly to a hosted ATS board. The
+  // resolved URL is then a stronger fingerprint than the board HTML, which
+  // often contains no link back to itself.
+  const fingerprintText = `${toNonEmptyText(seed?.baseUrl) ?? ''}\n${text}`;
   const targets = [];
   const notes = [];
   const greenhouseLink = matchFirstUrl(
-    text,
+    fingerprintText,
     /https?:\/\/(?:boards\.)?greenhouse\.io\/[A-Za-z0-9_-]+|https?:\/\/boards-api\.greenhouse\.io\/v1\/boards\/[A-Za-z0-9_-]+\/jobs\?content=true/gi,
   );
   const leverLink = matchFirstUrl(
-    text,
+    fingerprintText,
     /https?:\/\/jobs\.lever\.co\/[A-Za-z0-9_-]+|https?:\/\/api\.lever\.co\/v0\/postings\/[A-Za-z0-9_-]+\?mode=json/gi,
+  );
+  const ashbyLink = matchFirstUrl(
+    fingerprintText,
+    /https?:\/\/(?:jobs\.ashbyhq\.com\/[A-Za-z0-9_-]+|api\.ashbyhq\.com\/posting-api\/job-board\/[A-Za-z0-9_-]+(?:\?[^"'\s<>]*)?)/gi,
+  );
+  const recruiteeLink = matchFirstUrl(
+    fingerprintText,
+    /https?:\/\/[A-Za-z0-9-]+\.recruitee\.com(?:\/(?:api\/offers\/?|o\/[A-Za-z0-9_-]+)?)?/gi,
+  );
+  const workableLink = matchFirstUrl(
+    fingerprintText,
+    /https?:\/\/(?:apply\.workable\.com\/[A-Za-z0-9_-]+\/?|www\.workable\.com\/api\/accounts\/[A-Za-z0-9_-]+(?:\?[^"'\s<>]*)?)/gi,
+  );
+  const smartRecruitersLink = matchFirstUrl(
+    fingerprintText,
+    /https?:\/\/(?:careers\.smartrecruiters\.com\/[A-Za-z0-9_-]+|api\.smartrecruiters\.com\/v1\/companies\/[A-Za-z0-9_-]+\/postings(?:\?[^"'\s<>]*)?)/gi,
   );
   const sameDomainCareerPageUrl = extractSameDomainCareerPageUrl(text, seed.baseUrl ?? seed.websiteUrl ?? null);
 
@@ -638,7 +672,71 @@ export function detectCareerPageTargetFromHtml(html, seed) {
     }
   }
 
-  if (!greenhouseLink && !leverLink && sameDomainCareerPageUrl) {
+  if (ashbyLink) {
+    const slug = extractAshbySlug(ashbyLink);
+
+    if (slug) {
+      targets.push(buildDiscoveredTarget({
+        adapter: 'ashby-job-board',
+        providerSlug: slug,
+        companyName: seed.orgName,
+        companyDomain: seed.domain,
+        companyWebsiteUrl: seed.websiteUrl,
+        careerPageUrl: `https://jobs.ashbyhq.com/${slug}`,
+        sourceUrl: `https://api.ashbyhq.com/posting-api/job-board/${slug}?includeCompensation=true`,
+      }));
+    }
+  }
+
+  if (recruiteeLink) {
+    const slug = extractRecruiteeSlug(recruiteeLink);
+
+    if (slug) {
+      targets.push(buildDiscoveredTarget({
+        adapter: 'recruitee-careers',
+        providerSlug: slug,
+        companyName: seed.orgName,
+        companyDomain: seed.domain,
+        companyWebsiteUrl: seed.websiteUrl,
+        careerPageUrl: `https://${slug}.recruitee.com`,
+        sourceUrl: `https://${slug}.recruitee.com/api/offers/`,
+      }));
+    }
+  }
+
+  if (workableLink) {
+    const slug = extractWorkableSlug(workableLink);
+
+    if (slug) {
+      targets.push(buildDiscoveredTarget({
+        adapter: 'workable-public-jobs',
+        providerSlug: slug,
+        companyName: seed.orgName,
+        companyDomain: seed.domain,
+        companyWebsiteUrl: seed.websiteUrl,
+        careerPageUrl: `https://apply.workable.com/${slug}/`,
+        sourceUrl: `https://www.workable.com/api/accounts/${slug}?details=true`,
+      }));
+    }
+  }
+
+  if (smartRecruitersLink) {
+    const slug = extractSmartRecruitersSlug(smartRecruitersLink);
+
+    if (slug) {
+      targets.push(buildDiscoveredTarget({
+        adapter: 'smartrecruiters-postings',
+        providerSlug: slug,
+        companyName: seed.orgName,
+        companyDomain: seed.domain,
+        companyWebsiteUrl: seed.websiteUrl,
+        careerPageUrl: `https://careers.smartrecruiters.com/${slug}`,
+        sourceUrl: `https://api.smartrecruiters.com/v1/companies/${slug}/postings?limit=100&offset=0`,
+      }));
+    }
+  }
+
+  if (targets.length === 0 && sameDomainCareerPageUrl) {
     // The company's OWN career page (same host as its website) is a direct,
     // company-owned hiring surface — exactly the RU-native case foreign ATS
     // detection (Greenhouse/Lever) misses. Emit a target that reads schema.org
@@ -784,7 +882,7 @@ export function mapJsonLdJobPostings(postings, seed) {
  * card carries a vacancy title inside a link that points to a same-domain
  * vacancy detail page. `extractJobPostingsFromHtml` (JSON-LD only) returns []
  * for these pages, so without this fallback the company's direct hiring proof
- * — the ONLY gate-A/B originator — is silently lost after the page was already
+ * — a gate-A/B originator — is silently lost after the page was already
  * discovered + fetched (a real cost).
  *
  * Evidence-first guardrails (non-negotiable):
@@ -1037,6 +1135,26 @@ function extractLeverSlug(value) {
   return match?.[1]?.toLowerCase() ?? match?.[2]?.toLowerCase() ?? null;
 }
 
+function extractAshbySlug(value) {
+  const match = value.match(/(?:jobs\.ashbyhq\.com\/|posting-api\/job-board\/)([A-Za-z0-9_-]+)/i);
+  return match?.[1] ?? null;
+}
+
+function extractRecruiteeSlug(value) {
+  const match = value.match(/https?:\/\/([A-Za-z0-9-]+)\.recruitee\.com/i);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function extractWorkableSlug(value) {
+  const match = value.match(/apply\.workable\.com\/([A-Za-z0-9_-]+)|workable\.com\/api\/accounts\/([A-Za-z0-9_-]+)/i);
+  return match?.[1]?.toLowerCase() ?? match?.[2]?.toLowerCase() ?? null;
+}
+
+function extractSmartRecruitersSlug(value) {
+  const match = value.match(/careers\.smartrecruiters\.com\/([A-Za-z0-9_-]+)|api\.smartrecruiters\.com\/v1\/companies\/([A-Za-z0-9_-]+)/i);
+  return match?.[1] ?? match?.[2] ?? null;
+}
+
 function normalizeGreenhouseCareerPageUrl(url, slug) {
   return /boards-api\.greenhouse\.io/i.test(url) ? `https://boards.greenhouse.io/${slug}` : url;
 }
@@ -1063,7 +1181,10 @@ function extractSameDomainCareerPageUrl(value, baseUrl) {
       continue;
     }
 
-    if (/career|jobs|vacanc/i.test(absoluteUrl)) {
+    const parsedUrl = new URL(absoluteUrl);
+    const hasCareerPathSegment = /\/(?:careers?|jobs?|vacanc(?:y|ies))(?:\/|$)/i.test(parsedUrl.pathname);
+
+    if (hasCareerPathSegment && !/\.(?:avif|gif|jpe?g|png|svg|webp|css|js|map|ico)$/i.test(parsedUrl.pathname)) {
       return absoluteUrl;
     }
   }
@@ -1145,6 +1266,14 @@ async function fetchCareerPageTarget(target, index) {
     records = await fetchGreenhouseBoardRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'lever-postings') {
     records = await fetchLeverPostingsRecords(normalizedTarget);
+  } else if (normalizedTarget.adapter === 'ashby-job-board') {
+    records = await fetchAshbyJobBoardRecords(normalizedTarget);
+  } else if (normalizedTarget.adapter === 'recruitee-careers') {
+    records = await fetchRecruiteeCareersRecords(normalizedTarget);
+  } else if (normalizedTarget.adapter === 'workable-public-jobs') {
+    records = await fetchWorkablePublicJobsRecords(normalizedTarget);
+  } else if (normalizedTarget.adapter === 'smartrecruiters-postings') {
+    records = await fetchSmartRecruitersPostingsRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'same-domain-jsonld') {
     const fetched = await fetchSameDomainJsonLdRecords(normalizedTarget);
     records = fetched.records;
@@ -1211,6 +1340,10 @@ function resolveExtractionMethodForSummary(records, adapter) {
     if (typeof method === 'string' && method.trim() !== '') return method;
     if (adapter === 'greenhouse-board') return 'greenhouse-api';
     if (adapter === 'lever-postings') return 'lever-api';
+    if (adapter === 'ashby-job-board') return 'ashby-public-api';
+    if (adapter === 'recruitee-careers') return 'recruitee-careers-api';
+    if (adapter === 'workable-public-jobs') return 'workable-public-api';
+    if (adapter === 'smartrecruiters-postings') return 'smartrecruiters-posting-api';
     if (adapter === 'json-feed') return 'json-feed';
     if (adapter === 'static-records') return 'static-records';
     return adapter ?? 'unknown';
@@ -1291,6 +1424,7 @@ export function mapGreenhouseBoardPayload(payload, target) {
     employment_type: toNonEmptyText(job?.metadata?.find((entry) => /employment/i.test(entry?.name ?? ''))?.value),
     occurred_at: toTimestampOrNull(job?.updated_at ?? job?.created_at),
     source_record_type: 'job_posting',
+    extraction_method: 'greenhouse-api',
     raw_target_id: target.id,
     raw_target_adapter: target.adapter,
     raw: job,
@@ -1317,10 +1451,174 @@ export function mapLeverPostingsPayload(payload, target) {
     employment_type: toNonEmptyText(job?.categories?.commitment),
     occurred_at: toTimestampOrNull(job?.updatedAt ?? job?.createdAt),
     source_record_type: 'job_posting',
+    extraction_method: 'lever-api',
     raw_target_id: target.id,
     raw_target_adapter: target.adapter,
     raw: job,
   }));
+}
+
+async function fetchAshbyJobBoardRecords(target) {
+  const payload = await fetchJson(target.sourceUrl, target.id);
+  return mapAshbyJobBoardPayload(payload, target);
+}
+
+export function mapAshbyJobBoardPayload(payload, target) {
+  const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
+
+  return jobs
+    .filter((job) => job?.isListed !== false)
+    .map((job, index) => ({
+      company_name: target.companyName,
+      company_domain: target.companyDomain,
+      company_website_url: target.companyWebsiteUrl,
+      career_page_url: target.careerPageUrl,
+      job_posting_url: toUrlOrNull(job?.jobUrl ?? job?.applyUrl),
+      job_title: toNonEmptyText(job?.title),
+      external_id: stringifyExternalId(job?.id, target.id, index),
+      location: toNonEmptyText(job?.location),
+      employment_type: toNonEmptyText(job?.employmentType),
+      occurred_at: toTimestampOrNull(job?.publishedAt),
+      tags: [job?.department, job?.team, job?.workplaceType].map(toNonEmptyText).filter(Boolean),
+      source_record_type: 'job_posting',
+      extraction_method: 'ashby-public-api',
+      raw_target_id: target.id,
+      raw_target_adapter: target.adapter,
+      raw: job,
+    }));
+}
+
+async function fetchRecruiteeCareersRecords(target) {
+  const payload = await fetchJson(target.sourceUrl, target.id);
+  return mapRecruiteeCareersPayload(payload, target);
+}
+
+export function mapRecruiteeCareersPayload(payload, target) {
+  const offers = Array.isArray(payload?.offers) ? payload.offers : [];
+
+  return offers.map((offer, index) => ({
+    company_name: target.companyName ?? toNonEmptyText(offer?.company_name),
+    company_domain: target.companyDomain,
+    company_website_url: target.companyWebsiteUrl,
+    career_page_url: target.careerPageUrl,
+    job_posting_url: toUrlOrNull(offer?.careers_url ?? offer?.careers_apply_url),
+    job_title: toNonEmptyText(offer?.title),
+    external_id: stringifyExternalId(offer?.id ?? offer?.slug, target.id, index),
+    location: formatRecruiteeLocation(offer),
+    employment_type: toNonEmptyText(offer?.employment_type_code),
+    occurred_at: toTimestampOrNull(offer?.published_at ?? offer?.updated_at ?? offer?.created_at),
+    tags: [offer?.department, ...(Array.isArray(offer?.tags) ? offer.tags : [])].map(toNonEmptyText).filter(Boolean),
+    source_record_type: 'job_posting',
+    extraction_method: 'recruitee-careers-api',
+    raw_target_id: target.id,
+    raw_target_adapter: target.adapter,
+    raw: offer,
+  }));
+}
+
+async function fetchWorkablePublicJobsRecords(target) {
+  const payload = await fetchJson(target.sourceUrl, target.id);
+  return mapWorkablePublicJobsPayload(payload, target);
+}
+
+export function mapWorkablePublicJobsPayload(payload, target) {
+  const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
+
+  return jobs.map((job, index) => ({
+    company_name: target.companyName ?? toNonEmptyText(payload?.name),
+    company_domain: target.companyDomain,
+    company_website_url: target.companyWebsiteUrl,
+    career_page_url: target.careerPageUrl,
+    job_posting_url: toUrlOrNull(job?.url ?? job?.shortlink ?? job?.application_url),
+    job_title: toNonEmptyText(job?.title),
+    external_id: stringifyExternalId(job?.shortcode ?? job?.id, target.id, index),
+    location: formatWorkableLocation(job),
+    employment_type: toNonEmptyText(job?.employment_type),
+    occurred_at: toTimestampOrNull(job?.published_on ?? job?.created_at),
+    tags: [job?.department, job?.function, job?.industry].map(toNonEmptyText).filter(Boolean),
+    source_record_type: 'job_posting',
+    extraction_method: 'workable-public-api',
+    raw_target_id: target.id,
+    raw_target_adapter: target.adapter,
+    raw: job,
+  }));
+}
+
+async function fetchSmartRecruitersPostingsRecords(target) {
+  const records = [];
+  let sourceUrl = target.sourceUrl;
+
+  while (sourceUrl) {
+    const payload = await fetchJson(sourceUrl, target.id);
+    records.push(...mapSmartRecruitersPostingsPayload(payload, target));
+    const offset = Number(payload?.offset);
+    const limit = Number(payload?.limit);
+    const totalFound = Number(payload?.totalFound);
+    const nextOffset = offset + limit;
+
+    if (!Number.isFinite(offset) || !Number.isFinite(limit) || limit <= 0
+      || !Number.isFinite(totalFound) || nextOffset >= totalFound) {
+      sourceUrl = null;
+    } else {
+      const nextUrl = new URL(sourceUrl);
+      nextUrl.searchParams.set('offset', String(nextOffset));
+      sourceUrl = nextUrl.toString();
+    }
+  }
+
+  return records;
+}
+
+export function mapSmartRecruitersPostingsPayload(payload, target) {
+  const postings = Array.isArray(payload?.content) ? payload.content : [];
+
+  return postings.map((posting, index) => ({
+    company_name: target.companyName ?? toNonEmptyText(posting?.company?.name),
+    company_domain: target.companyDomain,
+    company_website_url: target.companyWebsiteUrl,
+    career_page_url: target.careerPageUrl,
+    job_posting_url: toUrlOrNull(posting?.postingUrl ?? posting?.ref),
+    job_title: toNonEmptyText(posting?.name),
+    external_id: stringifyExternalId(posting?.id ?? posting?.uuid, target.id, index),
+    location: toNonEmptyText(posting?.location?.fullLocation)
+      ?? joinLocationParts(posting?.location?.city, posting?.location?.region, posting?.location?.country),
+    employment_type: toNonEmptyText(posting?.typeOfEmployment?.label),
+    occurred_at: toTimestampOrNull(posting?.releasedDate),
+    tags: [posting?.department?.label, posting?.function?.label, posting?.industry?.label]
+      .map(toNonEmptyText)
+      .filter(Boolean),
+    source_record_type: 'job_posting',
+    extraction_method: 'smartrecruiters-posting-api',
+    raw_target_id: target.id,
+    raw_target_adapter: target.adapter,
+    raw: posting,
+  }));
+}
+
+function formatRecruiteeLocation(offer) {
+  const locations = Array.isArray(offer?.locations)
+    ? offer.locations.map((location) => toNonEmptyText(location?.name)
+      ?? joinLocationParts(location?.city, location?.state, location?.country)).filter(Boolean)
+    : [];
+  return locations.join(' | ')
+    || toNonEmptyText(offer?.location)
+    || joinLocationParts(offer?.city, offer?.state_name, offer?.country);
+}
+
+function formatWorkableLocation(job) {
+  const locations = Array.isArray(job?.locations)
+    ? job.locations.map((location) => joinLocationParts(
+      location?.city,
+      location?.region ?? location?.state,
+      location?.country,
+    )).filter(Boolean)
+    : [];
+  return locations.join(' | ') || joinLocationParts(job?.city, job?.state, job?.country);
+}
+
+function joinLocationParts(...parts) {
+  const values = parts.map(toNonEmptyText).filter(Boolean);
+  return [...new Set(values)].join(', ') || null;
 }
 
 async function fetchSameDomainJsonLdRecords(target) {
@@ -1403,15 +1701,31 @@ async function fetchJsonFeedRecords(target) {
 }
 
 async function fetchJson(url, targetId) {
+  const requestOptions = {
+    sourceName: `career-pages target ${targetId}`,
+    headers: {
+      accept: 'application/json, text/plain;q=0.9, */*;q=0.1',
+      'user-agent': 'RecruiterRadarCareerPages/1.0',
+    },
+  };
   try {
-    return await fetchJsonWithPolicy(url, {
-      sourceName: `career-pages target ${targetId}`,
-      headers: {
-        accept: 'application/json, text/plain;q=0.9, */*;q=0.1',
-        'user-agent': 'RecruiterRadarCareerPages/1.0',
-      },
-    });
+    return await fetchJsonWithPolicy(url, requestOptions);
   } catch (error) {
+    const proxyUrl = process.env.PUBLIC_ATS_PROXY_URL?.trim() || process.env.HH_PROXY_URL?.trim();
+
+    // Some otherwise-public ATS endpoints reject the production datacenter IP
+    // while remaining accessible through the already-configured compliant
+    // source egress. Retry only an explicit 403, never hide other failures.
+    if (error?.status === 403 && proxyUrl) {
+      const { resolveHhProxyDispatcher, resolveHhProxyFetch } = await import('./adapters/hh.mjs');
+      const proxyEnv = { HH_PROXY_URL: proxyUrl };
+      return fetchJsonWithPolicy(url, {
+        ...requestOptions,
+        dispatcher: resolveHhProxyDispatcher(proxyEnv),
+        fetchImpl: resolveHhProxyFetch(proxyEnv),
+      });
+    }
+
     throw new Error(
       `career-pages target ${targetId} fetch failed: ${error instanceof Error ? error.message : String(error)}`,
       { cause: error },
@@ -1528,7 +1842,7 @@ async function ingestCareerPages({ connectionString, input }) {
       const lineage = await upsertSignalEvidenceLineage(client, {
         orgId: orgUpsertResult.orgId,
         signalType: 'job_posting',
-        source: SOURCE_ID,
+        source: record.sourceId,
         sourceFamily: 'company-owned-career',
         externalId: record.signalExternalId,
         headline: record.jobTitle,
@@ -1569,7 +1883,7 @@ async function ingestCareerPages({ connectionString, input }) {
 async function upsertOrgSourceRef(client, record) {
   // The shared resolver acquires deterministic source-local and validated
   // strong-key locks before it selects an existing owner or permits creation.
-  const resolution = await resolveOrganizationOwner(client, SOURCE_ID, record);
+  const resolution = await resolveOrganizationOwner(client, record.sourceId, record);
   let orgId = resolution.orgId;
   let insertedOrg = false;
 
@@ -1615,14 +1929,14 @@ async function upsertOrgSourceRef(client, record) {
       `,
       [
         orgId,
-        SOURCE_ID,
+        record.sourceId,
         sourceKey,
         sourceKey === record.primarySourceKey ? record.orgExternalId : null,
         record.orgDisplayName,
         buildOrgSourceMetadata(record, sourceKey),
       ],
     );
-    await assertOrgSourceRefOwner(client, SOURCE_ID, sourceKey, orgId);
+    await assertOrgSourceRefOwner(client, record.sourceId, sourceKey, orgId);
   }
 
   // Name / website_url / career_page_url are conflict-free (no unique index on
@@ -1719,6 +2033,7 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
   const occurrenceInput = record.occurred_at ?? record.published_at ?? record.detected_at;
   const occurredAt = toTimestampOrNull(occurrenceInput) ?? fetchedAt;
   const sourceRecordType = toNonEmptyText(record.source_record_type) ?? 'job_posting';
+  const sourceId = resolveCareerPageSourceId(record.raw_target_adapter);
   const extractionMethod = toNonEmptyText(record.extraction_method) ?? 'unknown';
   const location = toNonEmptyText(record.location ?? record.city ?? record.area_name);
   const pageTitle = toNonEmptyText(record.page_title);
@@ -1787,6 +2102,7 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
     fetchedAt,
     occurredAt,
     sourceRecordType,
+    sourceId,
     extractionMethod,
     orgExternalId,
     companyName,
@@ -1815,6 +2131,18 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
     signalExternalId,
     contactPaths,
   };
+}
+
+function resolveCareerPageSourceId(adapter) {
+  const sourceByAdapter = {
+    'greenhouse-board': 'greenhouse',
+    'lever-postings': 'lever',
+    'ashby-job-board': 'ashby',
+    'recruitee-careers': 'recruitee',
+    'workable-public-jobs': 'workable',
+    'smartrecruiters-postings': 'smartrecruiters',
+  };
+  return sourceByAdapter[toNonEmptyText(adapter)] ?? SOURCE_ID;
 }
 
 export function buildFetchSummary(input) {
@@ -1927,7 +2255,7 @@ function buildPrimarySourceKey({ orgExternalId, inferredDomain, companyName, car
 
 function buildOrgSourceMetadata(record, sourceKey) {
   return {
-    source: SOURCE_ID,
+    source: record.sourceId,
     source_key: sourceKey,
     source_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, sourceKey),
     external_id: sourceKey === record.primarySourceKey ? record.orgExternalId : null,
@@ -1941,7 +2269,7 @@ function buildOrgSourceMetadata(record, sourceKey) {
 
 function buildSignalPayload(record) {
   return {
-    source: SOURCE_ID,
+    source: record.sourceId,
     source_entity_type: 'company',
     source_entity_key: record.primarySourceKey,
     source_entity_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, record.primarySourceKey),

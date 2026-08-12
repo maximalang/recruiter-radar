@@ -88,10 +88,10 @@ WITH source_signal_rows AS (
     ) AS payload_source_keys,
     NULLIF(signal.payload ->> 'employer_id', '') AS payload_employer_id,
     NULLIF(signal.payload ->> 'hh_employer_id', '') AS payload_hh_employer_id,
-    -- Auto-discovered contact surface (career-pages only): the HR/careers
+    -- Auto-discovered contact surface: the HR/careers
     -- email, phone, Telegram, contact-form the crawler extracted from the
     -- company's OWN career-page HTML. Stored as a JSONB array in
-    -- signals.payload -> 'contact_paths'. Non-career-pages signals carry none,
+    -- signals.payload -> 'contact_paths'. Signals without discovered paths carry none,
     -- so we coalesce to '[]' for a stable shape downstream. Read here so the
     -- digest query can aggregate the corporate surface per lead without a join.
     COALESCE(signal.payload -> 'contact_paths', '[]'::jsonb) AS payload_contact_paths,
@@ -120,7 +120,7 @@ WITH source_signal_rows AS (
       -- Lead originators: company-owned or platform hiring surfaces. Only these
       -- originate a lead candidate (Gate A/B/C). signal_type='job_posting'.
       signal.signal_type = 'job_posting'
-        AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages', 'regional-job-boards')
+        AND signal.source IN ('hh', 'career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages', 'regional-job-boards')
         AND COALESCE(signal.payload ->> 'candidate_eligible', 'true') = 'true'
         AND (signal.source <> 'superjob' OR signal.payload ->> 'candidate_eligible' = 'true')
     )
@@ -266,7 +266,8 @@ normalized_signal_rows AS (
     signal.is_context_evidence,
     -- evidence_quality: classifies how close this signal is to a company-controlled hiring surface.
     --
-    -- direct_hiring_proof  — a COMPANY-OWNED hiring surface, i.e. career-pages. This is the only
+    -- direct_hiring_proof  — a COMPANY-CONTROLLED hiring surface: same-domain career page or
+    --                        hosted ATS board enrolled from that verified company domain. This is the only
     --                        signal class that proves the company itself is publishing the role on
     --                        its own surface. An external ID match (INN, company_id, employer_id,
     --                        registry org id) only proves entity identity on a third-party platform
@@ -292,7 +293,7 @@ normalized_signal_rows AS (
     CASE
       WHEN signal.is_context_evidence
         THEN 'enrichment_context'
-      WHEN signal.source = 'career-pages'
+      WHEN signal.source IN ('career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters')
         THEN 'direct_hiring_proof'
       WHEN source_ref.matched_by IS NOT NULL
         THEN 'platform_aggregation'
@@ -368,7 +369,7 @@ aggregated AS (
         WHEN 'platform_aggregation' THEN 1
         ELSE 0
       END DESC,
-      (source = 'career-pages') DESC,
+      (source IN ('career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters')) DESC,
       published_at DESC NULLS LAST,
       org_id ASC
     ))[1] AS org_id,
@@ -386,7 +387,7 @@ aggregated AS (
           WHEN 'platform_aggregation' THEN 1
           ELSE 0
         END DESC,
-        (source = 'career-pages') DESC,
+        (source IN ('career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters')) DESC,
         published_at DESC NULLS LAST,
         source_external_id ASC NULLS LAST
       ) FILTER (WHERE source_external_id IS NOT NULL)
@@ -398,7 +399,7 @@ aggregated AS (
           WHEN 'platform_aggregation' THEN 1
           ELSE 0
         END DESC,
-        (source = 'career-pages') DESC,
+        (source IN ('career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters')) DESC,
         published_at DESC NULLS LAST,
         source_display_name ASC NULLS LAST
       ) FILTER (WHERE source_display_name IS NOT NULL)

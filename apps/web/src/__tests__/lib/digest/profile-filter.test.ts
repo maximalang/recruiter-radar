@@ -83,6 +83,12 @@ describe('matchesClientProfile — contactPolicy gate', () => {
     expect(matchesClientProfile(item, profile)).toBe(true)
   })
 
+  it('corporate_only passes a gate C candidate when an enrolled hosted ATS source is present', () => {
+    const item = mockItem({ confidence_gate: 'C', source_families: ['hh', 'ashby'] })
+    const profile = mockProfile({ contactPolicy: 'corporate_only' })
+    expect(matchesClientProfile(item, profile)).toBe(true)
+  })
+
   it('corporate_only DROPS a gate C platform-only candidate (no corporate surface)', () => {
     const item = mockItem({ confidence_gate: 'C', source_families: ['hh'] })
     const profile = mockProfile({ contactPolicy: 'corporate_only' })

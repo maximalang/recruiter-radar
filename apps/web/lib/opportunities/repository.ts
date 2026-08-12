@@ -827,7 +827,7 @@ const OPPORTUNITY_SELECT = `
       LEFT JOIN evidence_items direct_evidence ON direct_evidence.id = direct_row.evidence_id
       WHERE direct_row.hiring_episode_id = he.id
         AND (
-          direct_signal.source = 'career-pages'
+          direct_signal.source IN ('career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters')
           OR direct_evidence.tier = 'direct'
         )
     ) AS "directEvidenceCount"

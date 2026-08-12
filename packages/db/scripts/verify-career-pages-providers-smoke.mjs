@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 
-import { mapGreenhouseBoardPayload, mapLeverPostingsPayload } from './source-career-pages.mjs';
+import {
+  mapAshbyJobBoardPayload,
+  mapGreenhouseBoardPayload,
+  mapLeverPostingsPayload,
+  mapRecruiteeCareersPayload,
+  mapSmartRecruitersPostingsPayload,
+  mapWorkablePublicJobsPayload,
+} from './source-career-pages.mjs';
 
 // Offline coverage for the greenhouse-board / lever-postings response mappers.
 // These adapters used to be exercised only by hitting the live boards in the
@@ -94,10 +101,102 @@ assert.equal(leverRecords[0].source_record_type, 'job_posting');
 assert.deepEqual(mapLeverPostingsPayload(null, leverTarget), []);
 assert.deepEqual(mapLeverPostingsPayload({}, leverTarget), []);
 
+const sharedTarget = {
+  id: 'example-public-ats',
+  companyName: 'Example Org',
+  companyDomain: 'example.org',
+  companyWebsiteUrl: 'https://example.org/',
+};
+
+const ashbyRecords = mapAshbyJobBoardPayload({
+  jobs: [{
+    id: 'ashby-1',
+    title: 'Engineering Manager',
+    department: 'Engineering',
+    team: 'Platform',
+    employmentType: 'FullTime',
+    location: 'Remote - EU',
+    publishedAt: '2026-08-01T10:00:00.000Z',
+    isListed: true,
+    jobUrl: 'https://jobs.ashbyhq.com/Example/ashby-1',
+  }, {
+    id: 'ashby-hidden',
+    title: 'Hidden role',
+    isListed: false,
+    jobUrl: 'https://jobs.ashbyhq.com/Example/ashby-hidden',
+  }],
+}, { ...sharedTarget, adapter: 'ashby-job-board', careerPageUrl: 'https://jobs.ashbyhq.com/Example' });
+assert.equal(ashbyRecords.length, 1, 'Ashby must keep only publicly listed jobs');
+assert.equal(ashbyRecords[0].external_id, 'ashby-1');
+assert.equal(ashbyRecords[0].employment_type, 'FullTime');
+assert.equal(ashbyRecords[0].raw_target_adapter, 'ashby-job-board');
+
+const recruiteeRecords = mapRecruiteeCareersPayload({
+  offers: [{
+    id: 2705873,
+    title: 'Animator',
+    company_name: 'Framestore',
+    department: 'Film',
+    employment_type_code: 'fulltime_fixed_term',
+    locations: [{ name: 'Melbourne' }],
+    published_at: '2026-08-11 02:57:45 UTC',
+    careers_url: 'https://framestore.recruitee.com/o/animator-2033',
+  }],
+}, { ...sharedTarget, adapter: 'recruitee-careers', careerPageUrl: 'https://framestore.recruitee.com' });
+assert.equal(recruiteeRecords.length, 1);
+assert.equal(recruiteeRecords[0].company_name, 'Example Org', 'seed ownership must win over provider display data');
+assert.equal(recruiteeRecords[0].location, 'Melbourne');
+assert.equal(recruiteeRecords[0].external_id, '2705873');
+
+const workableRecords = mapWorkablePublicJobsPayload({
+  jobs: [{
+    shortcode: 'DCE4E00CFF',
+    title: 'Fullstack Developer',
+    employment_type: 'Full-time',
+    department: 'Engineering',
+    url: 'https://apply.workable.com/j/DCE4E00CFF',
+    published_on: '2026-01-06',
+    locations: [{ city: 'Pune', region: 'Maharashtra', country: 'India' }],
+  }],
+}, { ...sharedTarget, adapter: 'workable-public-jobs', careerPageUrl: 'https://apply.workable.com/example/' });
+assert.equal(workableRecords.length, 1);
+assert.equal(workableRecords[0].external_id, 'DCE4E00CFF');
+assert.equal(workableRecords[0].location, 'Pune, Maharashtra, India');
+
+const smartRecruitersRecords = mapSmartRecruitersPostingsPayload({
+  content: [{
+    id: '744000143115219',
+    name: 'Senior Information Security Engineer',
+    ref: 'https://api.smartrecruiters.com/v1/companies/example/postings/744000143115219',
+    releasedDate: '2026-08-12T14:04:56.128Z',
+    location: { fullLocation: 'Poland, REMOTE, Poland' },
+    department: { label: 'Engineering' },
+    typeOfEmployment: { label: 'Full-time' },
+  }],
+}, { ...sharedTarget, adapter: 'smartrecruiters-postings', careerPageUrl: 'https://careers.smartrecruiters.com/example' });
+assert.equal(smartRecruitersRecords.length, 1);
+assert.equal(smartRecruitersRecords[0].external_id, '744000143115219');
+assert.equal(smartRecruitersRecords[0].location, 'Poland, REMOTE, Poland');
+assert.equal(smartRecruitersRecords[0].job_posting_url, 'https://api.smartrecruiters.com/v1/companies/example/postings/744000143115219');
+
+for (const mapper of [
+  mapAshbyJobBoardPayload,
+  mapRecruiteeCareersPayload,
+  mapWorkablePublicJobsPayload,
+  mapSmartRecruitersPostingsPayload,
+]) {
+  assert.deepEqual(mapper(null, sharedTarget), []);
+  assert.deepEqual(mapper({}, sharedTarget), []);
+}
+
 console.log(JSON.stringify({
   ok: true,
   smoke: 'career-pages-providers',
   mode: 'offline-parse',
   greenhouseRecords: greenhouseRecords.length,
   leverRecords: leverRecords.length,
+  ashbyRecords: ashbyRecords.length,
+  recruiteeRecords: recruiteeRecords.length,
+  workableRecords: workableRecords.length,
+  smartRecruitersRecords: smartRecruitersRecords.length,
 }, null, 2));

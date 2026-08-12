@@ -54,7 +54,7 @@ describe('GET /api/sources/status', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body.sources)).toBe(true);
-    expect(body.summary.total).toBe(15);
+    expect(body.summary.total).toBe(21);
     const cp = body.sources.find((s: { id: string }) => s.id === 'career-pages');
     expect(cp.health.recordsLast24h).toBe(5);
     expect(cp.isPrimary).toBe(true);
@@ -65,6 +65,12 @@ describe('GET /api/sources/status', () => {
     }
     const superjob = body.sources.find((item: { id: string }) => item.id === 'superjob');
     expect(superjob.requiredEnvVars).toEqual([]);
+    for (const atsSourceId of ['greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters']) {
+      const source = body.sources.find((item: { id: string }) => item.id === atsSourceId);
+      expect(source).toBeDefined();
+      expect(source.isPrimary).toBe(false);
+      expect(source.requiredEnvVars).toEqual([]);
+    }
   });
 
   it('still returns registry when health computation fails', async () => {

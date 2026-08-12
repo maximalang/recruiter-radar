@@ -15,6 +15,12 @@ export type SourceId =
   | 'habr-career'
   | 'linkedin-company-pages'
   | 'career-pages'
+  | 'greenhouse'
+  | 'lever'
+  | 'ashby'
+  | 'recruitee'
+  | 'workable'
+  | 'smartrecruiters'
   | 'egrul-fns'
   | 'rabota-rossii'
   | 'company-site'
@@ -144,8 +150,8 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     requiredEnvVars: [],
     envPrefixes: ['CRAWLER_', 'FIRECRAWL_', 'CAREER_PAGES_'],
     searchEnvVars: [],
-    // Promoted to primary on 2026-06-30: career-pages is the only DIRECT
-    // company-surface, high-signal source (Gate A/B evidence). It was previously
+    // Promoted to primary on 2026-06-30: this unified crawler discovers direct
+    // same-domain and hosted-ATS company hiring surfaces (Gate A/B evidence). It was previously
     // excluded from the daily-radar pipeline, so the highest-quality lead surface
     // never ran automatically. The sequential crawl self-limits via a wall-clock
     // fetch budget (CAREER_PAGES_FETCH_BUDGET_MS, default 90s) so partial batches
@@ -168,6 +174,78 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // script (deferred — see memory); until then this timeout + the 90s fetch
     // budget bound the batch so crawl+write fits.
     isPrimary: true,
+    category: 'career-page',
+    timeoutMs: 420_000,
+  },
+  {
+    id: 'greenhouse',
+    name: 'Greenhouse',
+    description: 'Auto-discovered public Greenhouse company job boards',
+    script: 'source-greenhouse.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['CAREER_PAGES_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'career-page',
+    timeoutMs: 420_000,
+  },
+  {
+    id: 'lever',
+    name: 'Lever',
+    description: 'Auto-discovered public Lever company postings',
+    script: 'source-lever.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['CAREER_PAGES_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'career-page',
+    timeoutMs: 420_000,
+  },
+  {
+    id: 'ashby',
+    name: 'Ashby',
+    description: 'Auto-discovered Ashby public Job Posting API boards',
+    script: 'source-ashby.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['CAREER_PAGES_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'career-page',
+    timeoutMs: 420_000,
+  },
+  {
+    id: 'recruitee',
+    name: 'Recruitee',
+    description: 'Auto-discovered Recruitee public Careers Site API boards',
+    script: 'source-recruitee.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['CAREER_PAGES_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'career-page',
+    timeoutMs: 420_000,
+  },
+  {
+    id: 'workable',
+    name: 'Workable',
+    description: 'Auto-discovered Workable public account job boards',
+    script: 'source-workable.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['CAREER_PAGES_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'career-page',
+    timeoutMs: 420_000,
+  },
+  {
+    id: 'smartrecruiters',
+    name: 'SmartRecruiters',
+    description: 'Auto-discovered SmartRecruiters public Posting API boards',
+    script: 'source-smartrecruiters.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['CAREER_PAGES_'],
+    searchEnvVars: [],
+    isPrimary: false,
     category: 'career-page',
     timeoutMs: 420_000,
   },
