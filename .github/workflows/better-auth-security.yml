@@ -1,0 +1,72 @@
+name: Better Auth Security
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/app/api/identity/**'
+      - 'apps/web/app/.well-known/oauth-authorization-server/**'
+      - 'apps/web/lib/better-auth/**'
+      - 'apps/web/src/__tests__/**better-auth**'
+      - 'packages/db/migrations/*better_auth*'
+      - 'packages/db/scripts/verify-better-auth-foundation.mjs'
+      - 'apps/web/package.json'
+      - 'package-lock.json'
+      - '.github/workflows/better-auth-security.yml'
+      - '.env.better-auth.example'
+      - 'docs/better-auth-rollout.md'
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/web/app/api/identity/**'
+      - 'apps/web/app/.well-known/oauth-authorization-server/**'
+      - 'apps/web/lib/better-auth/**'
+      - 'packages/db/migrations/*better_auth*'
+      - 'packages/db/scripts/verify-better-auth-foundation.mjs'
+      - 'apps/web/package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  better-auth-security:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: recruiter_radar_better_auth_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d recruiter_radar_better_auth_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/recruiter_radar_better_auth_test
+      BETTER_AUTH_DB_CONTRACT_ALLOW: '1'
+      BETTER_AUTH_ENABLED: 'false'
+      BETTER_AUTH_MCP_OAUTH_ENABLED: 'false'
+      BETTER_AUTH_MCP_DCR_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install reproducibly
+        run: npm ci
+      - name: Dependency security audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Focused fail-dark policy tests
+        run: npm test --workspace @recruiter-radar/web -- --runInBand apps/web/src/__tests__/lib/better-auth-config.test.ts
+      - name: Typecheck web
+        run: npm run web:check
+      - name: Apply complete migration chain
+        run: npm run db:migrate
+      - name: Verify Better Auth schema isolation and rollback
+        run: node packages/db/scripts/verify-better-auth-foundation.mjs
+      - name: Production build with Better Auth dark
+        run: npm run web:build
