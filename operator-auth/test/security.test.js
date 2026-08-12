@@ -23,10 +23,7 @@ function decodeJwt(token) {
   }
 }
 
-function form(values) {
-  return new URLSearchParams(values).toString()
-}
-
+function form(values) { return new URLSearchParams(values).toString() }
 function extractCsrf(html) {
   const match = html.match(/name="csrf" value="([^"]+)"/)
   assert.ok(match, 'CSRF field must be rendered')
@@ -46,9 +43,7 @@ function makeCookieJar() {
         if (index > 0) values.set(first.slice(0, index), first.slice(index + 1))
       }
     },
-    header() {
-      return [...values.entries()].map(([key, value]) => `${key}=${value}`).join('; ')
-    },
+    header() { return [...values.entries()].map(([key, value]) => `${key}=${value}`).join('; ') },
   }
 }
 
@@ -58,14 +53,8 @@ async function prepareStorage() {
   await pool.query('CREATE SCHEMA operator_auth')
   await pool.query(`
     CREATE TABLE operator_auth.oidc_store (
-      model text NOT NULL,
-      id text NOT NULL,
-      payload jsonb NOT NULL,
-      expires_at timestamptz,
-      consumed_at timestamptz,
-      grant_id text,
-      user_code text,
-      uid text,
+      model text NOT NULL, id text NOT NULL, payload jsonb NOT NULL,
+      expires_at timestamptz, consumed_at timestamptz, grant_id text, user_code text, uid text,
       PRIMARY KEY (model, id)
     );
     CREATE INDEX oidc_store_grant_idx ON operator_auth.oidc_store(model, grant_id) WHERE grant_id IS NOT NULL;
@@ -73,10 +62,8 @@ async function prepareStorage() {
     CREATE INDEX oidc_store_uid_idx ON operator_auth.oidc_store(model, uid) WHERE uid IS NOT NULL;
     CREATE INDEX oidc_store_expires_idx ON operator_auth.oidc_store(expires_at) WHERE expires_at IS NOT NULL;
     CREATE TABLE operator_auth.login_throttle (
-      throttle_key text PRIMARY KEY,
-      failures integer NOT NULL DEFAULT 0,
-      locked_until timestamptz,
-      updated_at timestamptz NOT NULL DEFAULT now()
+      throttle_key text PRIMARY KEY, failures integer NOT NULL DEFAULT 0,
+      locked_until timestamptz, updated_at timestamptz NOT NULL DEFAULT now()
     );
   `)
   await pool.end()
@@ -88,29 +75,18 @@ async function createFixtureFiles() {
   const privateJwk = privateKey.export({ format: 'jwk' })
   const jwksFile = join(dir, 'jwks.json')
   const cookieFile = join(dir, 'cookie-keys.json')
-  await writeFile(jwksFile, JSON.stringify({
-    keys: [{ ...privateJwk, kid: 'test-es256-1', alg: 'ES256', use: 'sig' }],
-  }), { mode: 0o600 })
-  await writeFile(cookieFile, JSON.stringify([
-    randomBytes(32).toString('base64url'),
-    randomBytes(32).toString('base64url'),
-  ]), { mode: 0o600 })
+  await writeFile(jwksFile, JSON.stringify({ keys: [{ ...privateJwk, kid: 'test-es256-1', alg: 'ES256', use: 'sig' }] }), { mode: 0o600 })
+  await writeFile(cookieFile, JSON.stringify([randomBytes(32).toString('base64url'), randomBytes(32).toString('base64url')]), { mode: 0o600 })
   return { dir, jwksFile, cookieFile }
 }
 
 async function listen(server) {
-  await new Promise((resolve, reject) => {
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', resolve)
-  })
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
   const address = server.address()
   assert.ok(address && typeof address === 'object')
   return `http://127.0.0.1:${address.port}`
 }
-
-async function stop(server) {
-  await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
-}
+async function stop(server) { await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())) }
 
 function client(base, jar = makeCookieJar()) {
   return {
@@ -118,6 +94,7 @@ function client(base, jar = makeCookieJar()) {
     async request(path, options = {}) {
       const headers = new Headers(options.headers || {})
       headers.set('host', 'recruiter-radar.ru')
+      headers.set('x-forwarded-host', 'recruiter-radar.ru')
       headers.set('x-forwarded-proto', 'https')
       headers.set('x-real-ip', '203.0.113.10')
       if (jar.header()) headers.set('cookie', jar.header())
@@ -130,15 +107,8 @@ function client(base, jar = makeCookieJar()) {
 
 async function registerPublicClient(httpClient) {
   const response = await httpClient.request('/operator/oauth/reg', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      client_name: 'ChatGPT MCP test client',
-      redirect_uris: [REDIRECT_URI],
-      token_endpoint_auth_method: 'none',
-      response_types: ['code'],
-      grant_types: ['authorization_code', 'refresh_token'],
-    }),
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ client_name: 'ChatGPT MCP test client', redirect_uris: [REDIRECT_URI], token_endpoint_auth_method: 'none', response_types: ['code'], grant_types: ['authorization_code', 'refresh_token'] }),
   })
   assert.equal(response.status, 201)
   const body = await response.json()
@@ -150,17 +120,7 @@ async function registerPublicClient(httpClient) {
 
 function authorizationPath(clientId, verifier, overrides = {}) {
   const challenge = createHash('sha256').update(verifier).digest('base64url')
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: REDIRECT_URI,
-    response_type: 'code',
-    scope: 'openid offline_access rr.operator.read',
-    resource: RESOURCE,
-    state: 'state-123',
-    code_challenge: challenge,
-    code_challenge_method: 'S256',
-    ...overrides,
-  })
+  const params = new URLSearchParams({ client_id: clientId, redirect_uri: REDIRECT_URI, response_type: 'code', scope: 'openid offline_access rr.operator.read', resource: RESOURCE, state: 'state-123', code_challenge: challenge, code_challenge_method: 'S256', ...overrides })
   return `/operator/oauth/auth?${params}`
 }
 
@@ -169,86 +129,50 @@ async function completeAuthorization(httpClient, clientId, verifier) {
   assert.ok([302, 303].includes(response.status))
   let location = response.headers.get('location')
   assert.ok(location?.startsWith('/operator/oauth/interaction/'))
-
   response = await httpClient.request(location)
   assert.equal(response.status, 200)
   let html = await response.text()
   let csrf = extractCsrf(html)
-  const loginPath = location.replace(/\/$/, '') + '/login'
-  response = await httpClient.request(loginPath, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: form({ csrf, password: PASSWORD }),
-  })
+  response = await httpClient.request(location.replace(/\/$/, '') + '/login', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form({ csrf, password: PASSWORD }) })
   assert.ok([302, 303].includes(response.status))
-
-  location = response.headers.get('location')
-  assert.ok(location)
-  response = await httpClient.request(new URL(location, 'https://recruiter-radar.ru').pathname + new URL(location, 'https://recruiter-radar.ru').search)
+  location = response.headers.get('location'); assert.ok(location)
+  let follow = new URL(location, ISSUER)
+  response = await httpClient.request(follow.pathname + follow.search)
   assert.ok([302, 303].includes(response.status))
-  location = response.headers.get('location')
-  assert.ok(location?.startsWith('/operator/oauth/interaction/'))
-
+  location = response.headers.get('location'); assert.ok(location?.startsWith('/operator/oauth/interaction/'))
   response = await httpClient.request(location)
   assert.equal(response.status, 200)
-  html = await response.text()
-  csrf = extractCsrf(html)
-  response = await httpClient.request(location.replace(/\/$/, '') + '/confirm', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: form({ csrf }),
-  })
+  html = await response.text(); csrf = extractCsrf(html)
+  response = await httpClient.request(location.replace(/\/$/, '') + '/confirm', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form({ csrf }) })
   assert.ok([302, 303].includes(response.status))
-
-  location = response.headers.get('location')
-  assert.ok(location)
-  response = await httpClient.request(new URL(location, 'https://recruiter-radar.ru').pathname + new URL(location, 'https://recruiter-radar.ru').search)
+  location = response.headers.get('location'); assert.ok(location)
+  follow = new URL(location, ISSUER)
+  response = await httpClient.request(follow.pathname + follow.search)
   assert.ok([302, 303].includes(response.status))
   const callback = new URL(response.headers.get('location'))
   assert.equal(callback.origin + callback.pathname, REDIRECT_URI)
   assert.equal(callback.searchParams.get('state'), 'state-123')
   assert.equal(callback.searchParams.get('iss'), ISSUER)
-  const code = callback.searchParams.get('code')
-  assert.ok(code)
+  const code = callback.searchParams.get('code'); assert.ok(code)
   return code
 }
 
 async function exchangeCode(httpClient, clientId, code, verifier) {
   const response = await httpClient.request('/operator/oauth/token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: form({
-      grant_type: 'authorization_code',
-      client_id: clientId,
-      code,
-      redirect_uri: REDIRECT_URI,
-      code_verifier: verifier,
-      resource: RESOURCE,
-    }),
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: form({ grant_type: 'authorization_code', client_id: clientId, code, redirect_uri: REDIRECT_URI, code_verifier: verifier, resource: RESOURCE }),
   })
   assert.equal(response.status, 200)
   return response.json()
 }
-
 async function refresh(httpClient, clientId, refreshToken) {
-  const response = await httpClient.request('/operator/oauth/token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: form({
-      grant_type: 'refresh_token',
-      client_id: clientId,
-      refresh_token: refreshToken,
-      resource: RESOURCE,
-    }),
-  })
-  return response
+  return httpClient.request('/operator/oauth/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form({ grant_type: 'refresh_token', client_id: clientId, refresh_token: refreshToken, resource: RESOURCE }) })
 }
 
 test('private operator OAuth is resource-bound, persistent and rotation-safe', async () => {
   await prepareStorage()
   const fixture = await createFixtureFiles()
   const passwordHash = await argon2.hash(PASSWORD, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 })
-
   process.env.NODE_ENV = 'test'
   process.env.RR_OPERATOR_AUTH_PROVIDER = 'local_oidc'
   process.env.RR_MCP_OAUTH_ISSUER = ISSUER
@@ -263,7 +187,6 @@ test('private operator OAuth is resource-bound, persistent and rotation-safe', a
   let runtime = await createOperatorAuthServer()
   let base = await listen(runtime.server)
   let httpClient = client(base)
-
   try {
     const discovery = await httpClient.request('/operator/oauth/.well-known/openid-configuration')
     assert.equal(discovery.status, 200)
@@ -284,42 +207,19 @@ test('private operator OAuth is resource-bound, persistent and rotation-safe', a
     assert.equal(rfc8414.status, 200)
     assert.equal((await rfc8414.json()).issuer, ISSUER)
 
-    const confidential = await httpClient.request('/operator/oauth/reg', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ redirect_uris: [REDIRECT_URI], token_endpoint_auth_method: 'client_secret_basic' }),
-    })
+    const confidential = await httpClient.request('/operator/oauth/reg', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ redirect_uris: [REDIRECT_URI], token_endpoint_auth_method: 'client_secret_basic' }) })
     assert.equal(confidential.status, 400)
-
-    const insecureRedirect = await httpClient.request('/operator/oauth/reg', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ redirect_uris: ['http://client.example/callback'], token_endpoint_auth_method: 'none' }),
-    })
+    const insecureRedirect = await httpClient.request('/operator/oauth/reg', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ redirect_uris: ['http://client.example/callback'], token_endpoint_auth_method: 'none' }) })
     assert.equal(insecureRedirect.status, 400)
 
     const clientId = await registerPublicClient(httpClient)
     const verifier = randomBytes(48).toString('base64url')
-
-    const missingPkce = await httpClient.request(authorizationPath(clientId, verifier, {
-      code_challenge: '',
-      code_challenge_method: '',
-    }))
-    assert.ok([302, 303, 400].includes(missingPkce.status))
-    assert.ok(missingPkce.status === 400 || String(missingPkce.headers.get('location')).includes('error='))
-
-    const plainPkce = await httpClient.request(authorizationPath(clientId, verifier, {
-      code_challenge: verifier,
-      code_challenge_method: 'plain',
-    }))
-    assert.ok([302, 303, 400].includes(plainPkce.status))
-    assert.ok(plainPkce.status === 400 || String(plainPkce.headers.get('location')).includes('error='))
-
-    const wrongResource = await httpClient.request(authorizationPath(clientId, verifier, {
-      resource: 'https://recruiter-radar.ru/',
-    }))
-    assert.ok([302, 303, 400].includes(wrongResource.status))
-    assert.ok(wrongResource.status === 400 || String(wrongResource.headers.get('location')).includes('error='))
+    const missingPkce = await httpClient.request(authorizationPath(clientId, verifier, { code_challenge: '', code_challenge_method: '' }))
+    assert.ok([302, 303, 400].includes(missingPkce.status)); assert.ok(missingPkce.status === 400 || String(missingPkce.headers.get('location')).includes('error='))
+    const plainPkce = await httpClient.request(authorizationPath(clientId, verifier, { code_challenge: verifier, code_challenge_method: 'plain' }))
+    assert.ok([302, 303, 400].includes(plainPkce.status)); assert.ok(plainPkce.status === 400 || String(plainPkce.headers.get('location')).includes('error='))
+    const wrongResource = await httpClient.request(authorizationPath(clientId, verifier, { resource: 'https://recruiter-radar.ru/' }))
+    assert.ok([302, 303, 400].includes(wrongResource.status)); assert.ok(wrongResource.status === 400 || String(wrongResource.headers.get('location')).includes('error='))
 
     const code = await completeAuthorization(httpClient, clientId, verifier)
     const tokens = await exchangeCode(httpClient, clientId, code, verifier)
@@ -331,32 +231,17 @@ test('private operator OAuth is resource-bound, persistent and rotation-safe', a
     assert.equal(jwt.claims.sub, 'rr_owner')
     assert.match(jwt.claims.scope, /(?:^| )rr\.operator\.read(?: |$)/)
 
-    const replayCode = await httpClient.request('/operator/oauth/token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: form({
-        grant_type: 'authorization_code', client_id: clientId, code,
-        redirect_uri: REDIRECT_URI, code_verifier: verifier, resource: RESOURCE,
-      }),
-    })
+    const replayCode = await httpClient.request('/operator/oauth/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form({ grant_type: 'authorization_code', client_id: clientId, code, redirect_uri: REDIRECT_URI, code_verifier: verifier, resource: RESOURCE }) })
     assert.equal(replayCode.status, 400)
-
     const firstRefresh = await refresh(httpClient, clientId, tokens.refresh_token)
     assert.equal(firstRefresh.status, 200)
-    const firstRotated = await firstRefresh.json()
-    assert.ok(firstRotated.refresh_token)
-    assert.notEqual(firstRotated.refresh_token, tokens.refresh_token)
+    const firstRotated = await firstRefresh.json(); assert.ok(firstRotated.refresh_token); assert.notEqual(firstRotated.refresh_token, tokens.refresh_token)
 
     await stop(runtime.server)
-    runtime = await createOperatorAuthServer()
-    base = await listen(runtime.server)
-    httpClient = client(base)
-
+    runtime = await createOperatorAuthServer(); base = await listen(runtime.server); httpClient = client(base)
     const afterRestart = await refresh(httpClient, clientId, firstRotated.refresh_token)
     assert.equal(afterRestart.status, 200)
-    const secondRotated = await afterRestart.json()
-    assert.ok(secondRotated.refresh_token)
-
+    const secondRotated = await afterRestart.json(); assert.ok(secondRotated.refresh_token)
     const reuse = await refresh(httpClient, clientId, firstRotated.refresh_token)
     assert.equal(reuse.status, 400)
     const afterReuse = await refresh(httpClient, clientId, secondRotated.refresh_token)
