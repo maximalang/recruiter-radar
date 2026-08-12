@@ -14,8 +14,8 @@ jobs:
   lint-and-types:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -44,8 +44,8 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -156,7 +156,7 @@ jobs:
           npm run verify:source:confidence
       - name: Upload contract reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: contract-reports
           path: |
@@ -187,8 +187,8 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -205,8 +205,8 @@ jobs:
     needs: lint-and-types
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -217,7 +217,7 @@ jobs:
           NEXT_PUBLIC_YANDEX_METRIKA_ID: '12345678'
         run: npm run web:build
       - name: Upload standalone build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-build-output
           path: |
@@ -258,8 +258,8 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -268,7 +268,7 @@ jobs:
       - name: Apply database migrations
         run: node packages/db/scripts/migrate.mjs
       - name: Download standalone build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: web-build-output
           path: apps/web
@@ -320,7 +320,7 @@ jobs:
         run: node scripts/verify-production-server-log.mjs /tmp/landing-server.log
       - name: Upload Playwright screenshots and traces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: landing-playwright-artifacts
           path: |
@@ -366,8 +366,8 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -427,7 +427,7 @@ jobs:
           npm audit --omit=dev --audit-level=high
       - name: Upload Auth v2 browser evidence
         if: always() && (matrix.gate == 'e2e' || matrix.gate == 'accessibility')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: auth-v2-${{ matrix.gate }}-evidence
           path: |
@@ -440,7 +440,7 @@ jobs:
   security-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
@@ -448,7 +448,7 @@ jobs:
     needs: [unit-tests, web-build, production-acceptance]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build Docker image
         run: docker build -f apps/web/Dockerfile -t ${{ github.repository }}:${{ github.sha }} .
       - name: Caddy landing events smoke
