@@ -37,4 +37,8 @@ grep -Fq 'RR_MCP_RESOURCE=https://recruiter-radar.ru/api/internal/mcp' "$env_exa
 ! grep -Eq '(^|[^A-Za-z])eval[[:space:]]' "$workflow"
 ! grep -Fq 'RR_MCP_OWNER_PASSWORD=' "$workflow"
 
+# Argon2 PHC strings contain '$' delimiters. Keep the env-file value single-quoted so Compose passes it literally.
+grep -Fq "RR_MCP_OWNER_PASSWORD_HASH='\${owner_password_hash}'" "$bootstrap"
+! grep -Fq 'RR_MCP_OWNER_PASSWORD_HASH=${owner_password_hash}' "$bootstrap"
+
 printf '%s\n' '{"ok":true,"operatorBootstrapBoundary":"validated"}'
