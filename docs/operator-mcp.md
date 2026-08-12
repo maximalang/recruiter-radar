@@ -1,190 +1,214 @@
-# Recruiter Radar private operator MCP
+# Recruiter Radar private Operator MCP
 
-`https://recruiter-radar.ru/api/internal/mcp` is a private production operator resource server for the owner of Recruiter Radar. It is not a customer-facing MCP and it is not an alternative development workflow.
+This is the production runbook for the single-owner Recruiter Radar Operator MCP. It is a separate security domain from customer authentication, Better Auth, billing, workspaces and normal Recruiter Radar users.
 
-Code changes remain:
+## Canonical endpoints
 
-```text
-ChatGPT -> GitHub branch/PR -> CI -> merge -> tested-sha autodeploy
-```
+- MCP resource: `https://recruiter-radar.ru/api/internal/mcp`
+- OAuth issuer: `https://recruiter-radar.ru/operator/oauth`
+- owner subject: `rr_owner`
+- first-rollout scope: `rr.operator.read`
+- RFC 9728 metadata: `https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/internal/mcp`
 
-Production operations are:
+## Architecture
 
 ```text
 ChatGPT
-  -> OAuth authorization server (WorkOS AuthKit)
-  -> Caddy public TLS boundary
-  -> isolated operator container on 127.0.0.1:3001
-       -> read-only PostgreSQL role
-       -> /run/recruiter-radar-operator/agent.sock
-            -> fixed host adapters only
+  -> Caddy TLS boundary
+       -> exact OAuth routes -> 127.0.0.1:3002 -> operator-auth
+       -> MCP + RFC9728     -> 127.0.0.1:3001 -> operator resource server
+                                                   -> rr_operator_ro PostgreSQL
+                                                   -> bounded Unix host-agent
 ```
 
-The public application remains on `127.0.0.1:3000` and has no operator-agent socket or operator database credential.
+`operator-auth` uses `oidc-provider@9.11.1` and a PostgreSQL adapter. OAuth state is stored only in schema `operator_auth` through login `rr_operator_auth`. That role has no product-table grants and no CREATE privilege on `public`.
 
-## Decision record: WorkOS AuthKit
+The MCP resource server remains a separate Next.js runtime with `rr_operator_ro`. It does not receive OAuth write credentials. The customer-facing web runtime does not receive the host-agent socket or operator DB credentials.
 
-The operator MCP resource server is provider-neutral at the JWT-validation layer, but production activation is intentionally gated on `RR_OPERATOR_AUTH_PROVIDER=workos` so an old Auth0 configuration cannot accidentally reactivate the endpoint.
+## OAuth profile
 
-| Candidate | Current MCP fit | Owner maintenance | Important constraint | Decision |
-| --- | --- | --- | --- | --- |
-| WorkOS AuthKit | Excellent: OAuth authorization server metadata, S256 PKCE, refresh tokens, CIMD, optional DCR, Resource Indicators | Low | External SaaS dependency | **Chosen** |
-| Auth0 | Good | Low/medium | Resource Parameter Compatibility Profile plus careful DCR setup adds MCP-specific complexity | Replaced |
-| Keycloak | Partial for this target | High | Self-hosting/patching burden; strict current Resource Indicator compatibility is not the best fit | Rejected |
-| Cloudflare Access Managed OAuth | Good as a separate OAuth front door | Medium | It owns the OAuth challenge/boundary; layering it in front of AuthKit would create two authorization authorities | Rejected as primary auth; edge/WAF remains optional |
-| Recruiter Radar customer auth / custom AS | Would require building an authorization server | Very high | Adds OAuth 2.1, client metadata/registration, refresh/revocation and security-critical maintenance to the product | Rejected |
+The production profile intentionally keeps the attack surface small:
 
-Why an external IdP is justified even for one owner: the existing Recruiter Radar authentication stack is an application session/passkey system, not an OAuth authorization server. Implementing an authorization server solely for one private MCP creates more security-critical code than delegating authorization while keeping authorization enforcement (`aud`, `sub`, scopes) local to Recruiter Radar.
+- Authorization Code only;
+- PKCE required, S256 only;
+- `offline_access` + rotating refresh tokens;
+- refresh-token reuse revokes the associated grant family;
+- RFC 8707 resource indicator bound to the exact MCP resource;
+- JWT access tokens signed with persistent ES256 P-256 key(s);
+- `iss`, exact single `aud`, `exp`, `nbf`, sane `iat`, `sub` and scopes validated by the resource server;
+- RFC 9207 authorization-response issuer supported by the provider;
+- revocation endpoint enabled;
+- DCR enabled only as a compatibility fallback for public clients; no client secret, wildcard redirect URI or non-HTTPS redirect is accepted;
+- CIMD disabled for the first rollout because the provider implementation is experimental and therefore not a stable production dependency for this private MCP.
 
-Primary references:
+Implicit, hybrid, password, client-credentials, device flow, CIBA and generic admin scopes are not part of this profile.
 
-- OpenAI Developer mode and MCP apps in ChatGPT: https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
-- WorkOS AuthKit MCP guide: https://workos.com/docs/authkit/mcp
-- MCP authorization specification: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
+## Owner model
 
-## Threat model
+There is exactly one principal: `rr_owner`.
 
-### Assets
+There is no signup, registration UI, password reset, organization, invitation, social login or linkage to normal Recruiter Radar users. The subject is immutable and is not a secret.
 
-- production availability and deployment integrity;
-- production PostgreSQL data and tenant separation;
-- credentials, cookies, access/refresh tokens and application secrets;
-- Docker/Caddy/host control;
-- operational logs that may contain hostile or sensitive text;
-- Commercial Signal quality truth, especially `HUMAN_REVIEWED` and `QUALITY_VALIDATED`.
+The owner password is never stored. `operator-auth` requires an Argon2id encoded hash supplied through the GitHub Actions secret `RR_MCP_OWNER_PASSWORD_HASH`. The hash is staged as a root-only file during bootstrap and is never printed by the workflow.
 
-### Actors
+### Initial owner password bootstrap
 
-- the explicitly allowlisted owner through ChatGPT;
-- unauthenticated Internet clients;
-- an attacker with a stolen OAuth token/session;
-- prompt/tool-injection content inside application logs or database-derived diagnostics;
-- a compromised public web container;
-- a compromised operator container;
-- a compromised CI/SSH/deployment credential.
+Run this on a trusted local machine from the exact repository revision you are about to deploy:
 
-### Trust boundaries and blast radius
+```bash
+cd operator-auth
+npm ci --no-audit --no-fund
+read -rsp 'Owner password: ' RR_OWNER_PASSWORD; printf '\n'
+printf '%s' "$RR_OWNER_PASSWORD" | node --input-type=module -e '
+  import argon2 from "argon2";
+  let input="";
+  for await (const chunk of process.stdin) input += chunk;
+  process.stdout.write(await argon2.hash(input, {
+    type: argon2.argon2id,
+    memoryCost: 19456,
+    timeCost: 2,
+    parallelism: 1,
+  }));
+' > /tmp/rr-owner-password.hash
+unset RR_OWNER_PASSWORD
+cat /tmp/rr-owner-password.hash | gh secret set RR_MCP_OWNER_PASSWORD_HASH --repo maximalang/recruiter-radar
+rm -f /tmp/rr-owner-password.hash
+```
 
-1. **Internet -> Caddy.** Caddy terminates TLS and overwrites forwarding headers. No OpenAI IP allowlist is assumed.
-2. **Caddy -> operator container.** Only MCP and RFC 9728 metadata paths route to loopback `:3001`. The public app stays on `:3000`.
-3. **WorkOS -> MCP resource server.** Access tokens must have an exact configured `iss`, exact MCP `aud`, non-expired validity, `rr.operator.read`, and an immutable `sub` in the explicit allowlist. Tool-specific scopes are enforced before tool execution.
-4. **Operator -> PostgreSQL.** A dedicated `rr_operator_ro` login has read-only defaults and SELECT-only grants. Each diagnostic transaction still begins with `BEGIN READ ONLY` and bounded statement/lock timeouts.
-5. **Operator -> host agent.** A root-owned Unix socket is accessible only to the operator group. The agent maps a small action enum to fixed argv subprocesses. The operator container never receives `/var/run/docker.sock`.
-6. **GitHub -> production.** Source deploy and rollback remain the existing exact-tested-SHA workflow. No second generic deployment engine is exposed through MCP.
+Do not paste the plaintext password into GitHub, a shell command argument, a ticket, ChatGPT, logs or this repository.
 
-A stolen read token therefore cannot write to the database or call mutation tools. A compromised public web container has neither the operator socket nor the read-only operator credential. A compromised operator container can reach only the read-only database credential and the allowlisted Unix agent, not a generic root shell.
+When the secret is absent, `Operator MCP Bootstrap` leaves the MCP fail-dark rather than inventing a credential or falling back to unauthenticated access.
 
-## MCP protocol contract
+## Persistent signing and session secrets
 
-The preferred protocol is `2026-07-28` stateless HTTP POST with `MCP-Protocol-Version`, `Mcp-Method`, and `Mcp-Name` for tool calls. A single bounded `2025-11-25` initialize fallback remains temporarily for clients that have not yet migrated; older protocol branches were removed.
+Bootstrap creates these only on the production host when missing:
 
-- `GET /api/internal/mcp`: `405`;
-- `POST /api/internal/mcp`: JSON-RPC only, maximum 64 KiB;
-- no generic SSE/session state;
-- current discovery: `server/discover`;
-- tools: `tools/list`, `tools/call`;
-- RFC 9728 path-specific metadata: `/.well-known/oauth-protected-resource/api/internal/mcp`;
-- compatibility root metadata: `/.well-known/oauth-protected-resource`;
-- cache: private/no-store for MCP responses;
-- request correlation: `X-Request-ID` generated or bounded from the caller;
-- unauthenticated coarse per-IP rate limit plus authenticated per-subject rate limit.
+- `/var/lib/recruiter-radar-operator/auth-secrets/jwks.json`
+- `/var/lib/recruiter-radar-operator/auth-secrets/cookie-keys.json`
 
-The endpoint is invisible (`404`) unless both `RR_OPERATOR_MODE=true` and `RR_MCP_ENABLED=true`.
+They are root/service-group readable only and mounted read-only into `operator-auth`. They are not regenerated on container restart.
 
-## Tool taxonomy
+### Signing-key rotation
 
-### Read plane — `rr.operator.read`
+1. Generate a new ES256 P-256 private JWK with a unique `kid` on the host without logging it.
+2. Add it to the private JWK set while retaining the previous active key.
+3. Restart only `operator-auth` through the normal controlled operator bootstrap/deploy path.
+4. Verify JWKS exposes both public keys and new tokens use the new `kid`.
+5. Keep the previous public key until every access token signed with it has exceeded the maximum access-token lifetime plus clock skew.
+6. Remove the old private/public JWK and verify discovery/JWKS again.
 
-1. `get_production_state` — deployment SHA, safe runtime state and boolean feature gates; never raw environment values.
-2. `get_system_health` — uptime/load/memory/swap/disk/process count.
-3. `get_service_state` — fixed allowlist: `web`, `db`, `n8n`, `redis`, `firecrawl`.
-4. `get_recent_logs` — fixed service allowlist, 60 seconds–24 hours, maximum 500 lines, server-side secret/PII scrubbing. Returned log text is explicitly marked untrusted.
-5. `get_resource_usage` — bounded Docker stats for allowlisted services.
-6. `get_reverse_proxy_state` — Caddy active/config-valid/version only; no arbitrary Caddyfile read.
-7. `get_database_state` — connectivity/version/read-only state/migration metadata.
-8. `get_quality_validation_state` — aggregate Quality v2 state only.
-9. `list_quality_review_targets` — anonymized IDs/counts for independent human-labeling preparation.
+Never rotate by deleting the only key before old access tokens expire.
 
-No read tool exposes arbitrary SQL, filesystem paths, URLs, Docker commands, environment dumps, raw evidence, customer email/phone data, or credentials.
+### Cookie-key rotation
 
-### Controlled mutation plane
+Prepend a new high-entropy key to `cookie-keys.json`, retain at least the immediately previous key during the session transition, then recreate `operator-auth`. Do not rotate keys on every deploy.
 
-Mutation tools do not appear in `tools/list` unless `RR_MCP_MUTATIONS_ENABLED=true`.
+## Password rotation
 
-- `restart_service({service,idempotencyKey})`
-  - scopes: `rr.operator.read rr.operator.restart`;
-  - enum: only `web` or `n8n`;
-  - running-state precondition;
-  - bounded restart timeout;
-  - running-state postcondition;
-  - idempotency record.
+Create a new Argon2id hash using the local procedure above, replace `RR_MCP_OWNER_PASSWORD_HASH`, and rerun `Operator MCP Bootstrap` for the current production SHA. Existing OAuth grants should be revoked after a password rotation if credential compromise is suspected.
 
-- `reload_proxy({idempotencyKey})`
-  - scopes: `rr.operator.read rr.operator.proxy`;
-  - validates `/etc/caddy/Caddyfile` first;
-  - reload only, never edit;
-  - postcondition checks Caddy active + configuration valid;
-  - idempotency record.
+## Refresh-token revocation
 
-The MCP deliberately does **not** expose deploy, rollback, migration execution, database writes, arbitrary maintenance commands or generic HTTP fetch. Deploy/rollback already have a stronger GitHub Actions implementation with tested-SHA, deployment lock, health verification and rollback guard. Database migrations remain part of the tested deployment lifecycle rather than becoming an operator shortcut.
+The authorization server exposes its revocation endpoint and persists grants/refresh tokens in `operator_auth`. Rotation is enabled. Reuse of a consumed refresh token causes the provider to revoke the grant family. For an emergency global owner reset, clear the owner’s OAuth grants from the isolated `operator_auth` store through a controlled server administration procedure; do not mutate product tables.
 
-## Audit trail
+## Login security
 
-Every MCP tool call emits one JSON audit event to operator stdout:
+The owner login interaction is server-side and uses:
 
-- UTC timestamp;
-- OAuth subject;
-- tool;
-- sanitized/allowlisted arguments only;
-- status;
-- duration;
-- request/correlation ID;
-- deployment SHA;
-- mutation target where applicable;
-- sanitized error code.
+- Argon2id verification;
+- a `Secure`, `HttpOnly`, `SameSite=Strict` CSRF cookie;
+- per-interaction CSRF token;
+- generic invalid-credential response;
+- IP + account failure counters in persistent `operator_auth.login_throttle`;
+- bounded exponential lockout;
+- `Cache-Control: no-store`, frame denial and restrictive CSP;
+- structured audit events with an allowlist of fields.
 
-Denied mutation-scope checks are audited too. Raw JWTs, cookies, passwords, database URLs, idempotency values and PII are not logged.
+Passwords, password hashes, authorization codes, JWTs, refresh tokens, private JWKs, cookies and full Authorization headers are not audit fields.
 
-The host agent independently emits its own action audit event. Docker log retention therefore contains an application-level and host-adapter-level trail without giving the read-only operator database a hidden write path.
+## Resource server and read tools
 
-## Commercial Signal quality invariant
+Unauthenticated MCP requests return HTTP `401` with `WWW-Authenticate` pointing at the path-specific RFC 9728 metadata document. Missing/invalid read scope returns `403`.
 
-The MCP can report `CONTRACT_TESTED` and can identify whether real snapshot/lineage data is ready for independent labeling. It **never** infers `HUMAN_REVIEWED` or `QUALITY_VALIDATED` from model-generated labels. Those remain false until independent human labels and the existing frozen evaluation workflow prove them.
+With `RR_MCP_MUTATIONS_ENABLED=false`, `tools/list` exposes only:
 
-## Production deployment boundary
+1. `get_production_state`
+2. `get_system_health`
+3. `get_service_state`
+4. `get_recent_logs`
+5. `get_resource_usage`
+6. `get_reverse_proxy_state`
+7. `get_database_state`
+8. `get_quality_validation_state`
+9. `list_quality_review_targets`
 
-The standard application Deploy workflow remains responsible only for the customer-facing release. After a successful Deploy, `Operator MCP Bootstrap` configures the isolated operator runtime from that exact SHA. Operator bootstrap failure does not roll back a healthy public application.
+No read tool exposes arbitrary shell, SQL, filesystem, HTTP fetch, environment dump, Docker API or secrets. Database diagnostics execute in explicit read-only transactions.
 
-The bootstrap creates/maintains:
+## Mutation rollout
 
-- host group `rr-operator`;
-- dedicated PostgreSQL login `rr_operator_ro` with read-only defaults;
-- root-only generated database credential in `/var/lib/recruiter-radar-operator/`;
-- root-owned allowlisted Python host agent as a systemd unit;
-- Unix socket `/run/recruiter-radar-operator/agent.sock` with group ACL;
-- separate Compose `operator` service on `127.0.0.1:3001`;
-- read-only container filesystem, dropped Linux capabilities and `no-new-privileges`;
-- Caddy route limited to the MCP + protected-resource metadata paths.
+Keep `RR_MCP_MUTATIONS_ENABLED=false` until real ChatGPT read-only E2E has succeeded.
 
-No production OAuth values are committed. The activation source is GitHub repository settings:
+The only mutation capabilities already designed are:
 
-- variable `RR_OPERATOR_AUTH_PROVIDER=workos`;
-- variable `RR_MCP_ENABLED=false|true`;
-- variable `RR_MCP_MUTATIONS_ENABLED=false|true`;
-- variable `RR_MCP_OAUTH_ISSUER=<exact AuthKit issuer>`;
-- secret `RR_MCP_OAUTH_ALLOWED_SUBJECTS=<exact immutable owner sub>`.
+- `restart_service(web|n8n)` with `rr.operator.restart`;
+- `reload_proxy` with `rr.operator.proxy`.
 
-The default absence of these settings resolves to a dark MCP (`404`). An old Auth0 value in the server `.env` cannot enable the isolated MCP through this workflow.
+Before enabling them, separately verify ChatGPT confirmation behavior, scope issuance, audit, idempotency and postconditions. Do not add arbitrary shell/SQL/filesystem/fetch, `docker.sock`, DB/Redis/Firecrawl restart, migrations, deploy or rollback. Deploy/rollback remain GitHub Actions operations.
 
-## Activation sequence
+## Deployment
 
-1. Configure WorkOS/AuthKit using `docs/operator-mcp-workos.md`.
-2. Keep `RR_MCP_MUTATIONS_ENABLED=false`.
-3. Add the WorkOS GitHub settings above and set `RR_MCP_ENABLED=true`.
-4. Let an ordinary tested `main` deploy finish; the separate operator bootstrap will configure the host and assert public `metadata=200` plus unauthenticated MCP `401`.
-5. In ChatGPT, add `https://recruiter-radar.ru/api/internal/mcp`, select OAuth, complete login/consent, and run **Scan Tools**.
-6. Prove read-only acceptance first: reconnect/refresh, production SHA, service health, sanitized logs, DB read-only, wrong subject/scope denial and audit trail.
-7. Only after that decide whether the user’s actual ChatGPT plan/UI supports write actions. Official OpenAI plan documentation can lag or differ from observed rollout; the real Scan Tools/action flow is the release gate.
-8. Only if write support is proven, add the two mutation scopes in WorkOS and set `RR_MCP_MUTATIONS_ENABLED=true`. Re-scan/recreate the ChatGPT app so its tool snapshot and permissions are reviewed.
+`Deploy` remains the customer-facing tested-SHA deployment. After a successful `main` Deploy, `Operator MCP Bootstrap` consumes exactly that SHA.
 
-Until step 6 is proven end-to-end, this MCP must not be described as production-ready.
+The bootstrap:
+
+- builds the exact-SHA `operator-auth` image in GitHub Actions;
+- transfers it and audited bootstrap scripts over the existing SSH deployment channel;
+- maintains `rr_operator_ro` and `rr_operator_auth` as distinct PostgreSQL roles;
+- creates `operator_auth` persistence only;
+- recreates operator services on loopback ports only;
+- preserves the bounded host-agent;
+- installs only the exact Caddy routes needed by MCP/OAuth;
+- validates external RFC 9728, OIDC/RFC 8414/JWKS and unauthenticated MCP behavior when enabled.
+
+A bootstrap failure does not roll back or patch the already-verified public product release.
+
+## ChatGPT setup and acceptance
+
+In ChatGPT Developer mode, create a custom MCP/app with:
+
+```text
+https://recruiter-radar.ru/api/internal/mcp
+```
+
+Then complete OAuth owner login and authorization and run Scan Tools.
+
+Do not call the system production-ready until the real account/UI has proven:
+
+- Scan Tools succeeds;
+- `tools/list` contains only the nine read tools above;
+- `get_production_state` reports the expected production SHA;
+- `get_system_health`, service status and resource usage return bounded diagnostics;
+- bounded logs remain sanitized/untrusted content;
+- `get_database_state` proves the read-only DB transaction/role;
+- refresh/reconnect works after initial authorization;
+- secrets do not appear in tool output or audit.
+
+If the actual ChatGPT plan/UI cannot complete a supported mode, record that exact product limitation. Do not loosen OAuth or MCP security to work around it.
+
+## Fail-dark / rollback
+
+MCP is visible only when the isolated operator runtime has both `RR_OPERATOR_MODE=true` and a complete valid OAuth configuration. Missing owner hash, signing state, auth persistence or invalid issuer/resource/sub configuration must not result in anonymous MCP access.
+
+To disable the subsystem, remove/rotate the owner hash secret and rerun the normal bootstrap/deploy path so the operator MCP is configured dark. Do not introduce a temporary no-auth path.
+
+## Troubleshooting
+
+- **MCP `404`:** verify bootstrap intentionally enabled the MCP; absence of the owner hash leaves it dark.
+- **MCP `401`:** inspect RFC 9728 metadata, issuer discovery and JWT `iss/aud/sub/scope` without logging the token.
+- **OAuth discovery wrong host/scheme:** verify Caddy `Host`, `X-Forwarded-Host` and `X-Forwarded-Proto=https`; the provider trusts only the loopback proxy boundary.
+- **DCR rejected:** client must be public and use exact HTTPS redirect URIs with Authorization Code.
+- **PKCE rejected:** only S256 is supported.
+- **Refresh rejected after reuse:** expected; refresh-token reuse revokes the grant family and requires fresh authorization.
+- **OAuth state lost after restart:** treat as a persistence incident; `MemoryAdapter` is not a production fallback. Verify `operator_auth` connectivity/role and do not enable anonymous access.
+- **JWT key not found:** verify persistent JWKS and safe overlapping key rotation; do not regenerate keys automatically.
+- **mutations missing:** expected in the read-only rollout.

@@ -1,11 +1,13 @@
 import {
-  constants as cryptoConstants,
   createPublicKey,
   verify as verifySignature,
 } from 'node:crypto'
 
 export const OPERATOR_MCP_RESOURCE =
   'https://recruiter-radar.ru/api/internal/mcp'
+export const OPERATOR_MCP_OAUTH_ISSUER =
+  'https://recruiter-radar.ru/operator/oauth'
+export const OPERATOR_MCP_OWNER_SUBJECT = 'rr_owner'
 export const OPERATOR_MCP_PROTECTED_RESOURCE_METADATA_URL =
   'https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/internal/mcp'
 export const OPERATOR_MCP_COMPAT_PROTECTED_RESOURCE_METADATA_URL =
@@ -32,7 +34,8 @@ export const OPERATOR_MCP_RATE_WINDOW_MS = 60_000
 const OAUTH_CACHE_TTL_MS = 5 * 60_000
 const OAUTH_FETCH_TIMEOUT_MS = 5_000
 const JWT_CLOCK_SKEW_SECONDS = 30
-const SUPPORTED_JWT_ALGORITHMS = new Set(['RS256', 'PS256', 'ES256'])
+const JWT_IAT_MAX_AGE_SECONDS = 24 * 60 * 60
+const SUPPORTED_JWT_ALGORITHMS = new Set(['ES256'])
 
 type JsonObject = Record<string, unknown>
 
@@ -74,9 +77,10 @@ export function getOperatorMcpOAuthConfig(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): OAuthConfig | null {
   const issuer = env.RR_MCP_OAUTH_ISSUER?.trim() ?? ''
-  const rawAllowedSubjects = env.RR_MCP_OAUTH_ALLOWED_SUBJECTS?.trim() ?? ''
+  const rawAllowedSubjects = env.RR_MCP_ALLOWED_SUBJECTS?.trim() ?? ''
 
   if (!issuer || !rawAllowedSubjects || !isIssuerUrl(issuer)) return null
+  if (issuer !== OPERATOR_MCP_OAUTH_ISSUER) return null
 
   const allowedSubjects = new Set(
     rawAllowedSubjects
@@ -84,7 +88,7 @@ export function getOperatorMcpOAuthConfig(
       .map((value) => value.trim())
       .filter(Boolean),
   )
-  if (allowedSubjects.size === 0) return null
+  if (allowedSubjects.size !== 1 || !allowedSubjects.has(OPERATOR_MCP_OWNER_SUBJECT)) return null
 
   return { issuer, allowedSubjects }
 }
@@ -109,7 +113,7 @@ export function getOperatorMcpProtectedResourceMetadata(
     resource: OPERATOR_MCP_RESOURCE,
     authorization_servers: [config.issuer],
     bearer_methods_supported: ['header'],
-    scopes_supported: getOperatorMcpSupportedScopes(env),
+    scopes_supported: [OPERATOR_MCP_READ_SCOPE],
   }
 }
 
@@ -180,7 +184,7 @@ export async function verifyOperatorMcpAccessToken(
   if (claims.iss !== config.issuer) {
     return { ok: false, reason: 'issuer_mismatch' }
   }
-  if (!hasAudience(claims.aud, OPERATOR_MCP_RESOURCE)) {
+  if (!hasExactAudience(claims.aud, OPERATOR_MCP_RESOURCE)) {
     return { ok: false, reason: 'audience_mismatch' }
   }
   if (
@@ -189,6 +193,15 @@ export async function verifyOperatorMcpAccessToken(
     claims.exp <= nowSeconds - JWT_CLOCK_SKEW_SECONDS
   ) {
     return { ok: false, reason: 'token_expired' }
+  }
+  if (
+    typeof claims.iat !== 'number' ||
+    !Number.isFinite(claims.iat) ||
+    claims.iat > nowSeconds + JWT_CLOCK_SKEW_SECONDS ||
+    claims.iat < nowSeconds - JWT_IAT_MAX_AGE_SECONDS ||
+    claims.iat >= claims.exp
+  ) {
+    return { ok: false, reason: 'invalid_issued_at' }
   }
   if (
     claims.nbf !== undefined &&
@@ -202,6 +215,9 @@ export async function verifyOperatorMcpAccessToken(
   const scopes = getTokenScopes(claims)
   if (!scopes.has(OPERATOR_MCP_READ_SCOPE)) {
     return { ok: false, reason: 'insufficient_scope' }
+  }
+  if (scopes.has('rr.operator.admin') || scopes.has('rr.operator.*')) {
+    return { ok: false, reason: 'unsupported_scope' }
   }
 
   const subject = typeof claims.sub === 'string' ? claims.sub.trim() : ''
@@ -258,10 +274,12 @@ async function loadOAuthMetadata(
   const cached = metadataCache.get(issuer)
   if (cached && cached.expiresAt > nowMs) return cached.value
 
+  const issuerUrl = new URL(issuer)
   const issuerBase = issuer.endsWith('/') ? issuer.slice(0, -1) : issuer
+  const rfc8414Path = `/.well-known/oauth-authorization-server${issuerUrl.pathname}`
   const candidates = [
     `${issuerBase}/.well-known/openid-configuration`,
-    `${issuerBase}/.well-known/oauth-authorization-server`,
+    `${issuerUrl.origin}${rfc8414Path}`,
   ]
 
   let lastError: unknown = new Error('OAuth discovery failed')
@@ -272,6 +290,9 @@ async function loadOAuthMetadata(
       const jwksUri = typeof body.jwks_uri === 'string' ? body.jwks_uri : ''
       if (!isSecureHttpsUrl(jwksUri)) {
         throw new Error('OAuth metadata does not expose a secure JWKS URL')
+      }
+      if (jwksUri !== `${issuerBase}/jwks`) {
+        throw new Error('OAuth metadata exposes an unexpected JWKS URL')
       }
       const value = { issuer, jwksUri }
       metadataCache.set(issuer, { expiresAt: nowMs + OAUTH_CACHE_TTL_MS, value })
@@ -320,8 +341,13 @@ function findSigningKey(
 ): JsonWebKeyRecord | undefined {
   return keys.find((key) =>
     key.kid === kid &&
-    (key.use === undefined || key.use === 'sig') &&
-    (key.alg === undefined || key.alg === alg),
+    key.kty === 'EC' &&
+    key.crv === 'P-256' &&
+    key.use === 'sig' &&
+    key.alg === alg &&
+    typeof key.x === 'string' && key.x.length > 0 &&
+    typeof key.y === 'string' && key.y.length > 0 &&
+    key.d === undefined,
   )
 }
 
@@ -338,21 +364,6 @@ function verifyJwtSignature(
     return false
   }
 
-  if (alg === 'RS256') {
-    return verifySignature('RSA-SHA256', signingInput, key, signature)
-  }
-  if (alg === 'PS256') {
-    return verifySignature(
-      'sha256',
-      signingInput,
-      {
-        key,
-        padding: cryptoConstants.RSA_PKCS1_PSS_PADDING,
-        saltLength: 32,
-      },
-      signature,
-    )
-  }
   if (alg === 'ES256') {
     return verifySignature(
       'sha256',
@@ -370,9 +381,9 @@ function decodeJsonSegment(segment: string): JsonObject {
   return parsed
 }
 
-function hasAudience(value: unknown, expected: string): boolean {
+function hasExactAudience(value: unknown, expected: string): boolean {
   if (typeof value === 'string') return value === expected
-  return Array.isArray(value) && value.some((item) => item === expected)
+  return Array.isArray(value) && value.length === 1 && value[0] === expected
 }
 
 function getTokenScopes(claims: JsonObject): Set<string> {
@@ -400,7 +411,7 @@ function isIssuerUrl(value: string): boolean {
       !url.password &&
       !url.search &&
       !url.hash &&
-      url.pathname === '/'
+      !url.pathname.endsWith('/')
     )
   } catch {
     return false

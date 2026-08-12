@@ -44,19 +44,12 @@ recruiter-radar.ru {
 EOF
 
 run_operator() {
-  PATH="$mock_bin:$PATH" \
-    MOCK_COMMAND_LOG="$commands" \
-    RR_CADDY_CONFIG_PATH="$config" \
-    RR_CADDY_OPERATOR_BACKUP_PATH="$temporary_dir/operator.backup" \
-    bash "$operator_configurator"
+  PATH="$mock_bin:$PATH" MOCK_COMMAND_LOG="$commands" RR_CADDY_CONFIG_PATH="$config" \
+    RR_CADDY_OPERATOR_BACKUP_PATH="$temporary_dir/operator.backup" bash "$operator_configurator"
 }
-
 run_real_ip() {
-  PATH="$mock_bin:$PATH" \
-    MOCK_COMMAND_LOG="$commands" \
-    RR_CADDY_CONFIG_PATH="$config" \
-    RR_CADDY_BACKUP_PATH="$temporary_dir/real-ip.backup" \
-    sh "$real_ip_configurator"
+  PATH="$mock_bin:$PATH" MOCK_COMMAND_LOG="$commands" RR_CADDY_CONFIG_PATH="$config" \
+    RR_CADDY_BACKUP_PATH="$temporary_dir/real-ip.backup" sh "$real_ip_configurator"
 }
 
 cp "$config" "$temporary_dir/original"
@@ -64,30 +57,38 @@ run_operator >/dev/null
 
 grep -Fq '# BEGIN Recruiter Radar operator MCP (managed)' "$config"
 grep -Fq '@rr_operator_mcp path /api/internal/mcp /api/internal/mcp/* /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/*' "$config"
-grep -Fq 'reverse_proxy localhost:3001 {' "$config"
+grep -Fq 'reverse_proxy 127.0.0.1:3001 {' "$config"
+grep -Fq '@rr_operator_oauth path \' "$config"
+grep -Fq '/operator/oauth/auth/* \' "$config"
+grep -Fq '/operator/oauth/token \' "$config"
+grep -Fq '/operator/oauth/token/revocation \' "$config"
+grep -Fq '/operator/oauth/jwks \' "$config"
+grep -Fq '/operator/oauth/reg \' "$config"
+grep -Fq '/operator/oauth/interaction/* \' "$config"
+grep -Fq '/operator/oauth/.well-known/openid-configuration \' "$config"
+grep -Fq '/.well-known/oauth-authorization-server/operator/oauth' "$config"
+grep -Fq 'reverse_proxy 127.0.0.1:3002 {' "$config"
 grep -Fq 'reverse_proxy localhost:3000 {' "$config"
-test "$(grep -Fc 'reverse_proxy localhost:3001' "$config")" = "1"
+test "$(grep -Fc 'reverse_proxy 127.0.0.1:3001' "$config")" = "1"
+test "$(grep -Fc 'reverse_proxy 127.0.0.1:3002' "$config")" = "1"
 test "$(grep -Fc 'reverse_proxy localhost:3000' "$config")" = "1"
+! grep -Fq '/operator/*' "$config"
+! grep -Fq 'reverse_proxy 127.0.0.1:3002' <(sed -n '/# END Recruiter Radar operator MCP/,$p' "$config")
 cmp "$temporary_dir/original" "$temporary_dir/operator.backup"
 test "$(grep -c '^reload ' "$commands")" = "1"
 
-# The public trust-boundary configurator must tolerate only this exact managed
-# block on all future deploys instead of treating it as an unknown proxy.
 : > "$commands"
 cp "$config" "$temporary_dir/with-operator"
 run_real_ip >/dev/null
 cmp "$temporary_dir/with-operator" "$config"
 test "$(grep -c '^reload ' "$commands" || true)" = "0"
 
-# Re-running the operator configurator is idempotent and performs validation
-# without a second reload.
 : > "$commands"
 run_operator >/dev/null
 test "$(grep -c '^reload ' "$commands" || true)" = "0"
 test "$(grep -c '^validate ' "$commands")" = "1"
 
-# A manually modified managed block fails closed rather than being overwritten.
-sed -i 's/reverse_proxy localhost:3001/reverse_proxy localhost:3999/' "$config"
+sed -i 's/reverse_proxy 127.0.0.1:3001/reverse_proxy 127.0.0.1:3999/' "$config"
 cp "$config" "$temporary_dir/tampered"
 set +e
 run_operator >/dev/null 2> "$temporary_dir/tampered.err"

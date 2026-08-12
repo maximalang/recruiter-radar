@@ -50,8 +50,27 @@ cat > "$expected_block" <<'CADDY_EOF'
     # BEGIN Recruiter Radar operator MCP (managed)
     @rr_operator_mcp path /api/internal/mcp /api/internal/mcp/* /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/*
     handle @rr_operator_mcp {
-        # Same ingress trust boundary as the public app; never preserve client-supplied forwarding headers.
-        reverse_proxy localhost:3001 {
+        reverse_proxy 127.0.0.1:3001 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-Proto https
+            header_up Host recruiter-radar.ru
+        }
+    }
+
+    # OAuth issuer has a path component. Expose only the endpoints required by the private MCP client.
+    @rr_operator_oauth path \
+        /operator/oauth/auth \
+        /operator/oauth/auth/* \
+        /operator/oauth/token \
+        /operator/oauth/token/revocation \
+        /operator/oauth/jwks \
+        /operator/oauth/reg \
+        /operator/oauth/interaction/* \
+        /operator/oauth/.well-known/openid-configuration \
+        /.well-known/oauth-authorization-server/operator/oauth
+    handle @rr_operator_oauth {
+        header Cache-Control "no-store"
+        reverse_proxy 127.0.0.1:3002 {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-Proto https
             header_up Host recruiter-radar.ru
@@ -74,7 +93,7 @@ if [ "$begin_count" -eq 1 ]; then
   fi
   rm -f "$existing_block"
   caddy validate --config "$config_path" --adapter caddyfile
-  echo "Caddy already routes only managed operator MCP paths to loopback port 3001."
+  echo "Caddy already routes the bounded MCP and OAuth paths to loopback services."
   exit 0
 fi
 
@@ -91,9 +110,7 @@ awk -v target="$main_proxy_marker" -v block="$expected_block" '
     inserted = 1
   }
   { print }
-  END {
-    if (!inserted) exit 42
-  }
+  END { if (!inserted) exit 42 }
 ' "$config_path" > "$temporary_path"
 
 caddy validate --config "$temporary_path" --adapter caddyfile
@@ -140,4 +157,4 @@ if [ "$reload_status" -ne 0 ]; then
   exit "$reload_status"
 fi
 
-echo "Caddy now routes only Recruiter Radar operator MCP paths to 127.0.0.1:3001."
+echo "Caddy now routes MCP to 127.0.0.1:3001 and only required OAuth paths to 127.0.0.1:3002."
