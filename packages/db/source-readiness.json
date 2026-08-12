@@ -1,0 +1,385 @@
+{
+  "version": 1,
+  "pipelineProfiles": {
+    "hiring-primary": {
+      "discover": "contract-tested",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "blocked",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "blocked",
+      "signal": "contract-tested",
+      "confidence": "contract-tested",
+      "opportunityEligibility": "contract-tested",
+      "observability": "blocked"
+    },
+    "hiring-gated": {
+      "discover": "contract-tested",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "blocked",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "blocked",
+      "signal": "contract-tested",
+      "confidence": "blocked",
+      "opportunityEligibility": "blocked",
+      "observability": "blocked"
+    },
+    "enrichment-only": {
+      "discover": "not-applicable",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "blocked",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "blocked",
+      "signal": "contract-tested",
+      "confidence": "not-applicable",
+      "opportunityEligibility": "not-applicable",
+      "observability": "blocked"
+    },
+    "supporting-evidence": {
+      "discover": "contract-tested",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "blocked",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "blocked",
+      "signal": "contract-tested",
+      "confidence": "not-applicable",
+      "opportunityEligibility": "not-applicable",
+      "observability": "blocked"
+    },
+    "context-only": {
+      "discover": "not-applicable",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "blocked",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "blocked",
+      "signal": "contract-tested",
+      "confidence": "not-applicable",
+      "opportunityEligibility": "not-applicable",
+      "observability": "blocked"
+    }
+  },
+  "sources": {
+    "hh": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "launch-required",
+        "acceptedEnvSets": [["HH_USER_AGENT"]]
+      },
+      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": true,
+      "confidence": "approved",
+      "eligibility": "digest-eligible",
+      "legalReview": "not-required",
+      "pipelineProfile": "hiring-primary",
+      "verification": {
+        "fixture": ["node packages/db/scripts/verify-hh-smoke.mjs"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": [
+        "Current target-runtime HH fetch has not been verified.",
+        "Source ingestion does not yet materialize evidence_items lineage.",
+        "Cross-source organization resolution is not canonical at write time."
+      ]
+    },
+    "career-pages": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "launch-required",
+        "acceptedEnvSets": [["CAREER_PAGES_INPUT_FILE"], ["CAREER_PAGES_TARGETS_FILE"], ["DATABASE_URL"]]
+      },
+      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": true,
+      "confidence": "approved",
+      "eligibility": "digest-eligible",
+      "legalReview": "not-required",
+      "pipelineProfile": "hiring-primary",
+      "verification": {
+        "fixture": ["npm run verify:career-pages:smoke", "npm run verify:career-pages:html-card-fallback"],
+        "contract": ["npm run verify:career-pages:ingest", "npm run verify:source:readiness"]
+      },
+      "blockers": [
+        "Current controlled live crawl has not been verified.",
+        "Zero-record and partial-crawl outcomes are not fully classified.",
+        "Source ingestion does not yet materialize evidence_items lineage."
+      ]
+    },
+    "rabota-rossii": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": true,
+      "confidence": "approved",
+      "eligibility": "digest-eligible",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-primary",
+      "verification": {
+        "fixture": ["npm run verify:rabota-rossii:smoke"],
+        "contract": ["npm run verify:rabota-rossii:confidence", "npm run verify:source:readiness"]
+      },
+      "blockers": [
+        "The historical 2026-06-23 live probe is stale and is not current verification.",
+        "Source ingestion does not yet materialize evidence_items lineage."
+      ]
+    },
+    "habr-career": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "launch-required",
+        "acceptedEnvSets": [["HABR_CAREER_INPUT_FILE"], ["HABR_CAREER_KEYWORD"], ["HABR_CAREER_PROVIDER_API_URL", "HABR_CAREER_PROVIDER_API_TOKEN"]]
+      },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "required",
+      "pipelineProfile": "hiring-gated",
+      "verification": {
+        "fixture": ["npm run verify:habr-career:smoke"],
+        "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
+      },
+      "blockers": ["Robots/legal review and confidence approval are pending."]
+    },
+    "superjob": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "provider-required",
+        "acceptedEnvSets": [["SUPERJOB_INPUT_FILE"], ["SUPERJOB_API_APP_ID"], ["SUPERJOB_PROVIDER_API_URL", "SUPERJOB_API_APP_ID"]]
+      },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated",
+      "verification": {
+        "fixture": ["npm run verify:source:confidence"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": ["SUPERJOB_API_APP_ID or a compliant provider snapshot is required for production use."]
+    },
+    "tech-job-boards": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "launch-required",
+        "acceptedEnvSets": [["TECH_JOB_BOARDS_INPUT_FILE"], ["TECH_JOB_BOARDS_GREENHOUSE_TOKENS"], ["TECH_JOB_BOARDS_LEVER_SLUGS"], ["TECH_JOB_BOARDS_PROVIDER_API_URL", "TECH_JOB_BOARDS_PROVIDER_API_TOKEN"]]
+      },
+      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated",
+      "verification": {
+        "fixture": ["npm run verify:tech-job-boards:smoke"],
+        "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
+      },
+      "blockers": ["Production configuration and confidence approval are absent."]
+    },
+    "linkedin-company-pages": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "provider-required",
+        "acceptedEnvSets": [["LINKEDIN_INPUT_FILE"], ["LINKEDIN_PROVIDER_API_URL", "LINKEDIN_PROVIDER_API_TOKEN"]]
+      },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated",
+      "verification": {
+        "fixture": ["npm run verify:linkedin-company-pages:smoke"],
+        "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
+      },
+      "blockers": ["A compliant provider or reviewed company-level snapshot is required; personal-profile data is prohibited."]
+    },
+    "regional-job-boards": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "provider-required",
+        "acceptedEnvSets": [["REGIONAL_JOB_BOARDS_INPUT_FILE"], ["REGIONAL_JOB_BOARDS_PROVIDER_API_URL", "REGIONAL_JOB_BOARDS_PROVIDER_API_TOKEN"]]
+      },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "required",
+      "pipelineProfile": "hiring-gated",
+      "verification": {
+        "fixture": ["npm run verify:rf-source-expansion:smoke"],
+        "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
+      },
+      "blockers": ["Each board needs a reviewed provider/legal path and confidence approval."]
+    },
+    "egrul-fns": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "launch-required",
+        "acceptedEnvSets": [["EGRUL_FNS_INPUT_FILE"], ["EGRUL_FNS_INNS"], ["EGRUL_FNS_PROVIDER_API_URL", "EGRUL_FNS_PROVIDER_API_TOKEN"]]
+      },
+      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "enrichment-only",
+      "legalReview": "approved",
+      "pipelineProfile": "enrichment-only",
+      "verification": {
+        "fixture": ["npm run verify:egrul-fns:smoke"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": ["Only 10-digit legal-entity INNs are allowed; cross-source canonical identity remains incomplete."]
+    },
+    "transparent-business-fns": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "provider-required",
+        "acceptedEnvSets": [["TRANSPARENT_BUSINESS_FNS_INPUT_FILE"], ["TRANSPARENT_BUSINESS_FNS_PROVIDER_API_URL", "TRANSPARENT_BUSINESS_FNS_PROVIDER_API_TOKEN"]]
+      },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "enrichment-only",
+      "legalReview": "approved",
+      "pipelineProfile": "enrichment-only",
+      "verification": {
+        "fixture": ["npm run verify:rf-source-expansion:smoke"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": ["No approved stable public API exists; direct pb.nalog.ru scraping is prohibited."]
+    },
+    "fedresurs": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "provider-required",
+        "acceptedEnvSets": [["FEDRESURS_INPUT_FILE"], ["FEDRESURS_PROVIDER_API_URL", "FEDRESURS_PROVIDER_API_TOKEN"]]
+      },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-only",
+      "verification": {
+        "fixture": ["npm run verify:rf-source-expansion:smoke"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": ["The public site is not an approved stable runtime path; use a compliant provider or reviewed snapshot."]
+    },
+    "company-site": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "launch-required",
+        "acceptedEnvSets": [["COMPANY_SITE_INPUT_FILE"], ["COMPANY_SITE_TARGETS_FILE"]]
+      },
+      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "supporting-evidence",
+      "verification": {
+        "fixture": ["npm run verify:company-site:smoke"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": ["No current curated target run is verified; generic company pages cannot originate leads."]
+    },
+    "funding-business-signals": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "launch-required",
+        "acceptedEnvSets": [["FUNDING_BUSINESS_SIGNALS_INPUT_FILE"], ["FUNDING_SIGNALS_GDELT_QUERIES"], ["FUNDING_SIGNALS_GDELT_QUERIES_JSON"], ["FUNDING_SIGNALS_PROVIDER_API_URL", "FUNDING_SIGNALS_PROVIDER_API_TOKEN"]]
+      },
+      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-only",
+      "verification": {
+        "fixture": ["npm run verify:funding-business-signals:smoke"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": ["Publisher-versus-subject identity and source evidence lineage require hardening."]
+    },
+    "company-newsrooms": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "launch-required",
+        "acceptedEnvSets": [["COMPANY_NEWSROOMS_INPUT_FILE"], ["COMPANY_NEWSROOMS_TARGETS_FILE"], ["COMPANY_NEWSROOMS_PROVIDER_API_URL", "COMPANY_NEWSROOMS_PROVIDER_API_TOKEN"]]
+      },
+      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-only",
+      "verification": {
+        "fixture": ["npm run verify:rf-source-expansion:smoke"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": ["No current curated target/provider run is verified; context cannot originate a lead."]
+    },
+    "industry-media": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "provider-required",
+        "acceptedEnvSets": [["INDUSTRY_MEDIA_INPUT_FILE"], ["INDUSTRY_MEDIA_PROVIDER_API_URL", "INDUSTRY_MEDIA_PROVIDER_API_TOKEN"]]
+      },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "required",
+      "pipelineProfile": "context-only",
+      "verification": {
+        "fixture": ["npm run verify:rf-source-expansion:smoke"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": ["A reviewed provider/input is required and publisher identity must never become subject-company identity."]
+    }
+  }
+}

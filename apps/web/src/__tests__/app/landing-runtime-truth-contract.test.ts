@@ -54,15 +54,21 @@ describe("landing runtime truth contract", () => {
   test("compact source copy stays truthful while the FAQ explains runtime roles", () => {
     const evidence = webSource("app/landing/evidence-scene.tsx");
     const faq = webSource("app/landing/landing-faq.ts");
-    const registry = repoSource("packages/db/scripts/source-registry.mjs");
+    const policy = JSON.parse(repoSource("packages/db/source-policy.json"));
+    const readiness = JSON.parse(repoSource("packages/db/source-readiness.json"));
 
-    expect(registry).toContain("hh: sourcePolicy");
-    expect(registry).toContain("'rabota-rossii': sourcePolicy");
-    expect(registry).toContain("'career-pages': sourcePolicy");
-    expect(registry).toContain("promotionStatus: 'digest-allowed'");
-    expect(registry).toContain("blocked-from-digest-pending-confidence-tests");
-    expect(registry).toContain("supporting-evidence-only");
-    expect(registry).toContain("never-lead-originating");
+    for (const sourceId of ["hh", "rabota-rossii", "career-pages"]) {
+      expect(policy[sourceId].promotionStatus).toBe("digest-allowed");
+      expect(readiness.sources[sourceId].eligibility).toBe("digest-eligible");
+      expect(readiness.sources[sourceId].live.state).not.toBe("verified");
+    }
+    expect(Object.values(policy).map((source: any) => source.promotionStatus)).toEqual(
+      expect.arrayContaining([
+        "blocked-from-digest-pending-confidence-tests",
+        "supporting-evidence-only",
+        "never-lead-originating",
+      ]),
+    );
 
     expect(evidence).toContain("Почему сейчас");
     expect(evidence).toContain("Карьерная страница");

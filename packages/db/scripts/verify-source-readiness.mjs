@@ -6,6 +6,7 @@ import ts from 'typescript';
 
 import { SOURCE_ACTIONS } from './source-contract.mjs';
 import { listPrimaryIngestionSourceIds, listSources } from './source-registry.mjs';
+import { listEvaluatedSourceReadiness } from './source-readiness.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '../../..');
@@ -70,71 +71,9 @@ const requireLiveConfig = process.argv.includes('--require-live-config')
   || process.env.SOURCE_READINESS_REQUIRE_LIVE_CONFIG === '1';
 const includeProviderRequired = process.argv.includes('--include-provider-required')
   || process.env.SOURCE_READINESS_INCLUDE_PROVIDER_REQUIRED === '1';
-const liveConfigRules = {
-  hh: [
-    liveRule(['HH_USER_AGENT']),
-  ],
-  'rabota-rossii': [
-    liveRule(['RABOTA_ROSSII_SEARCH_TEXT']),
-    liveRule(['RABOTA_ROSSII_INPUT_FILE']),
-  ],
-  'career-pages': [
-    liveRule(['CAREER_PAGES_INPUT_FILE']),
-    liveRule(['CAREER_PAGES_TARGETS_FILE']),
-    liveRule(['DATABASE_URL']),
-  ],
-  'linkedin-company-pages': [
-    providerRule(['LINKEDIN_PROVIDER_API_URL', 'LINKEDIN_PROVIDER_API_TOKEN']),
-  ],
-  'tech-job-boards': [
-    liveRule(['TECH_JOB_BOARDS_GREENHOUSE_TOKENS']),
-    liveRule(['TECH_JOB_BOARDS_LEVER_SLUGS']),
-    providerRule(['TECH_JOB_BOARDS_PROVIDER_API_URL', 'TECH_JOB_BOARDS_PROVIDER_API_TOKEN']),
-  ],
-  'egrul-fns': [
-    liveRule(['EGRUL_FNS_INNS']),
-    providerRule(['EGRUL_FNS_PROVIDER_API_URL', 'EGRUL_FNS_PROVIDER_API_TOKEN']),
-  ],
-  'company-site': [
-    liveRule(['COMPANY_SITE_TARGETS_FILE']),
-  ],
-  'funding-business-signals': [
-    liveRule(['FUNDING_SIGNALS_GDELT_QUERIES']),
-    liveRule(['FUNDING_SIGNALS_GDELT_QUERIES_JSON']),
-    providerRule(['FUNDING_SIGNALS_PROVIDER_API_URL', 'FUNDING_SIGNALS_PROVIDER_API_TOKEN']),
-  ],
-  'transparent-business-fns': [
-    providerRule(['TRANSPARENT_BUSINESS_FNS_PROVIDER_API_URL', 'TRANSPARENT_BUSINESS_FNS_PROVIDER_API_TOKEN']),
-    liveRule(['TRANSPARENT_BUSINESS_FNS_INPUT_FILE']),
-  ],
-  fedresurs: [
-    providerRule(['FEDRESURS_PROVIDER_API_URL', 'FEDRESURS_PROVIDER_API_TOKEN']),
-    liveRule(['FEDRESURS_INPUT_FILE']),
-  ],
-  superjob: [
-    providerRule(['SUPERJOB_PROVIDER_API_URL', 'SUPERJOB_API_APP_ID']),
-    liveRule(['SUPERJOB_INPUT_FILE']),
-  ],
-  'habr-career': [
-    providerRule(['HABR_CAREER_PROVIDER_API_URL', 'HABR_CAREER_PROVIDER_API_TOKEN']),
-    liveRule(['HABR_CAREER_INPUT_FILE']),
-  ],
-  'company-newsrooms': [
-    providerRule(['COMPANY_NEWSROOMS_PROVIDER_API_URL', 'COMPANY_NEWSROOMS_PROVIDER_API_TOKEN']),
-    liveRule(['COMPANY_NEWSROOMS_INPUT_FILE']),
-    liveRule(['COMPANY_NEWSROOMS_TARGETS_FILE']),
-  ],
-  'industry-media': [
-    providerRule(['INDUSTRY_MEDIA_PROVIDER_API_URL', 'INDUSTRY_MEDIA_PROVIDER_API_TOKEN']),
-    liveRule(['INDUSTRY_MEDIA_INPUT_FILE']),
-  ],
-  'regional-job-boards': [
-    providerRule(['REGIONAL_JOB_BOARDS_PROVIDER_API_URL', 'REGIONAL_JOB_BOARDS_PROVIDER_API_TOKEN']),
-    liveRule(['REGIONAL_JOB_BOARDS_INPUT_FILE']),
-  ],
-};
-
 const sources = listSources();
+const evaluatedReadiness = listEvaluatedSourceReadiness();
+const readinessById = new Map(evaluatedReadiness.map((readiness) => [readiness.id, readiness]));
 const sourceIds = sources.map((source) => source.id).sort();
 const webSources = readWebSourceRegistry(webSourceRegistryPath);
 const webSourceIds = webSources.map((source) => source.id).sort();
@@ -152,9 +91,12 @@ assert.deepEqual(
 );
 
 for (const source of sources) {
+  const readiness = readinessById.get(source.id);
   assert.equal(source.status, 'active', `${source.id} must be active`);
   assert.equal(source.runnable, true, `${source.id} must be runnable`);
-  assert.equal(source.liveCapable, true, `${source.id} must expose a live-capable fetch mode`);
+  assert.ok(readiness, `${source.id} must expose explicit readiness`);
+  assert.equal(readiness.implementation, 'implemented', `${source.id} must be implemented`);
+  assert.equal(readiness.contractTested, true, `${source.id} must be contract-tested`);
   assert.deepEqual(source.capabilities, SOURCE_ACTIONS, `${source.id} must support all source actions`);
 
   for (const action of SOURCE_ACTIONS) {
@@ -234,25 +176,17 @@ assert.deepEqual(
   'source HTTP calls must go through adapters/source-http.mjs',
 );
 
-const liveConfigSummary = expectedSources.map((sourceId) => {
-  const rules = liveConfigRules[sourceId] ?? [];
-  const configured = rules.some((rule) => isRuleConfigured(rule));
-  const launchRequired = rules.some((rule) => rule.kind === 'launch');
-  const providerRequired = rules.some((rule) => rule.kind === 'provider');
-  const providerConfigured = rules.some((rule) => rule.kind === 'provider' && isRuleConfigured(rule));
-  const acceptedEnvSets = rules.map((rule) => formatRule(rule));
-  const status = configured ? 'configured' : launchRequired ? 'missing' : 'provider-required';
-
-  return {
-    sourceId,
-    status,
-    configured,
-    launchRequired,
-    providerRequired,
-    providerConfigured,
-    acceptedEnvSets,
-  };
-});
+const liveConfigSummary = evaluatedReadiness.map((readiness) => ({
+  sourceId: readiness.id,
+  status: readiness.configured
+    ? 'configured'
+    : readiness.providerRequired ? 'provider-required' : 'missing',
+  configured: readiness.configured,
+  launchRequired: readiness.configurationMode === 'launch-required',
+  providerRequired: readiness.providerRequired,
+  providerConfigured: readiness.providerRequired && readiness.configured,
+  acceptedEnvSets: readiness.acceptedEnvSets.map((envSet) => envSet.join(' + ')),
+}));
 const missingLiveConfig = liveConfigSummary.filter((item) => item.status === 'missing');
 const providerRequiredLiveConfig = liveConfigSummary.filter((item) => item.status === 'provider-required');
 const blockingLiveConfig = includeProviderRequired
@@ -271,7 +205,9 @@ console.log(JSON.stringify({
   ok: true,
   smoke: 'source-readiness',
   sources: expectedSources.length,
-  liveCapableSources: sources.filter((source) => source.liveCapable).length,
+  runtimeLiveCapableSources: sources.filter((source) => source.liveCapable).length,
+  liveReachableSources: evaluatedReadiness.filter((source) => source.liveReachable).length,
+  liveVerifiedSources: evaluatedReadiness.filter((source) => source.liveVerified).length,
   digestLeadSources,
   digestContextSources,
   providerTokenSources,
@@ -290,24 +226,9 @@ console.log(JSON.stringify({
       status: item.status,
       acceptedEnvSets: item.acceptedEnvSets,
     })),
+  readiness: evaluatedReadiness,
   directFetchCallers,
 }, null, 2));
-
-function liveRule(envNames) {
-  return { kind: 'launch', envNames };
-}
-
-function providerRule(envNames) {
-  return { kind: 'provider', envNames };
-}
-
-function isRuleConfigured(rule) {
-  return rule.envNames.every((envName) => hasEnvValue(envName));
-}
-
-function formatRule(rule) {
-  return rule.envNames.join(' + ');
-}
 
 function findMjsFiles(dirPath) {
   const results = [];
@@ -327,10 +248,6 @@ function findMjsFiles(dirPath) {
   }
 
   return results;
-}
-
-function hasEnvValue(envName) {
-  return typeof process.env[envName] === 'string' && process.env[envName].trim() !== '';
 }
 
 function readWebSourceRegistry(filePath) {
