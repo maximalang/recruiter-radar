@@ -184,9 +184,10 @@ fi
 
 operator_env_tmp="$(mktemp "$APP_DIR/.rr-operator.env.XXXXXX")"
 override_tmp="$(mktemp "$APP_DIR/.rr-operator.compose.XXXXXX")"
+preflight_override_tmp="$(mktemp "$APP_DIR/.rr-operator.preflight.compose.XXXXXX")"
 unit_tmp="$(mktemp "$APP_DIR/.rr-operator-agent.service.XXXXXX")"
 cleanup() {
-  rm -f "$operator_env_tmp" "$override_tmp" "$unit_tmp"
+  rm -f "$operator_env_tmp" "$override_tmp" "$preflight_override_tmp" "$unit_tmp"
 }
 trap cleanup EXIT
 
@@ -204,7 +205,10 @@ RR_DEPLOY_SHA=${deploy_sha}
 EOF
 chmod 0600 "$operator_env_tmp"
 
-cat > "$override_tmp" <<EOF
+write_operator_override() {
+  local target="$1"
+  local env_path="$2"
+  cat > "$target" <<EOF
 services:
   operator:
     image: ${operator_image}
@@ -212,7 +216,7 @@ services:
     ports:
       - "127.0.0.1:3001:3000"
     env_file:
-      - ${OPERATOR_ENV}
+      - ${env_path}
     environment:
       RR_OPERATOR_MODE: "true"
       MIGRATE_ON_START: "false"
@@ -228,7 +232,14 @@ services:
     security_opt:
       - no-new-privileges:true
 EOF
-chmod 0600 "$override_tmp"
+  chmod 0600 "$target"
+}
+
+# Compose validates env_file existence while rendering the configuration. Use
+# the generated temporary credential file for preflight so a first bootstrap
+# does not depend on permanent operator state that has not been installed yet.
+write_operator_override "$preflight_override_tmp" "$operator_env_tmp"
+write_operator_override "$override_tmp" "$OPERATOR_ENV"
 
 cat > "$unit_tmp" <<EOF
 [Unit]
@@ -268,7 +279,7 @@ WantedBy=multi-user.target
 EOF
 chmod 0600 "$unit_tmp"
 
-preflight_args=("${compose_args[@]}" -f "$override_tmp")
+preflight_args=("${compose_args[@]}" -f "$preflight_override_tmp")
 docker compose --env-file "$ENV_FILE" "${preflight_args[@]}" config >/dev/null
 python3 -m py_compile "$APP_DIR/scripts/operator-mcp/rr-operator-agent.py"
 
@@ -371,5 +382,5 @@ fi
 
 systemctl is-active --quiet rr-operator-agent.service
 trap - EXIT
-rm -f "$unit_tmp"
+rm -f "$preflight_override_tmp" "$unit_tmp"
 echo "Operator MCP runtime configured with isolated DB role, loopback service and allowlisted host agent."
