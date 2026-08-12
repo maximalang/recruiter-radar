@@ -110,8 +110,8 @@ async function registerPublicClient(httpClient) {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ client_name: 'ChatGPT MCP test client', redirect_uris: [REDIRECT_URI], token_endpoint_auth_method: 'none', response_types: ['code'], grant_types: ['authorization_code', 'refresh_token'] }),
   })
-  assert.equal(response.status, 201)
   const body = await response.json()
+  assert.equal(response.status, 201, JSON.stringify(body))
   assert.equal(body.token_endpoint_auth_method, 'none')
   assert.equal(body.client_secret, undefined)
   assert.equal(body.rr_mcp_profile, 'read-only')
