@@ -17,12 +17,17 @@ const expectedTables = [
   "session",
   "account",
   "verification",
+  "rateLimit",
+];
+
+const forbiddenOAuthTables = [
   "jwks",
   "oauthClient",
   "oauthRefreshToken",
   "oauthAccessToken",
   "oauthConsent",
-  "rateLimit",
+  "oauthResource",
+  "oauthClientResource",
 ];
 
 const client = new Client({ connectionString: databaseUrl });
@@ -37,9 +42,8 @@ try {
   const schemas = await client.query(
     `SELECT table_schema, table_name
        FROM information_schema.tables
-      WHERE (table_schema = 'better_auth' AND table_name = ANY($1::text[]))
-         OR (table_schema = 'public' AND table_name = ANY($1::text[]))`,
-    [expectedTables],
+      WHERE table_name = ANY($1::text[])`,
+    [[...expectedTables, ...forbiddenOAuthTables]],
   );
   const betterAuthTables = new Set(
     schemas.rows
@@ -47,7 +51,10 @@ try {
       .map((row) => row.table_name),
   );
   const leakedPublicTables = schemas.rows
-    .filter((row) => row.table_schema === "public")
+    .filter((row) => row.table_schema === "public" && expectedTables.includes(row.table_name))
+    .map((row) => row.table_name);
+  const forbiddenPresent = schemas.rows
+    .filter((row) => row.table_schema === "better_auth" && forbiddenOAuthTables.includes(row.table_name))
     .map((row) => row.table_name);
 
   for (const table of expectedTables) {
@@ -57,6 +64,9 @@ try {
   }
   if (leakedPublicTables.length > 0) {
     throw new Error(`Better Auth tables leaked into public schema: ${leakedPublicTables.join(", ")}`);
+  }
+  if (forbiddenPresent.length > 0) {
+    throw new Error(`OAuth Provider tables must not exist in foundation: ${forbiddenPresent.join(", ")}`);
   }
 
   if ((await scalar("SELECT to_regclass('public.users')::text AS value")) !== "users") {
