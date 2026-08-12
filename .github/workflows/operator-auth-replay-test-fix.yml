@@ -1,0 +1,48 @@
+name: Operator Auth Replay Test Fix
+
+on:
+  push:
+    branches: [codex/operator-mcp-local-oidc]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/operator-mcp-local-oidc
+          fetch-depth: 0
+      - name: Separate refresh rotation and authorization-code replay grants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('operator-auth/test/security.test.js')
+          text = path.read_text()
+          old = """    const replayCode = await httpClient.request('/operator/oauth/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form({ grant_type: 'authorization_code', client_id: clientId, code, redirect_uri: REDIRECT_URI, code_verifier: verifier, resource: RESOURCE }) })\n    assert.equal(replayCode.status, 400)\n    const firstRefresh = await refresh(httpClient, clientId, tokens.refresh_token)\n"""
+          new = """    const firstRefresh = await refresh(httpClient, clientId, tokens.refresh_token)\n"""
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one pre-refresh replay block, found {text.count(old)}')
+          text = text.replace(old, new, 1)
+          anchor = """    const afterReuse = await refresh(httpClient, clientId, secondRotated.refresh_token)\n    assert.equal(afterReuse.status, 400, 'reuse must revoke the refresh-token grant family')\n"""
+          addition = anchor + """\n    // Authorization-code replay revokes its grant family. Keep this on a separate\n    // grant so it cannot invalidate the refresh-rotation assertions above.\n    const replayClientId = await registerPublicClient(httpClient)\n    const replayVerifier = randomBytes(48).toString('base64url')\n    const replayAuthorizationCode = await completeAuthorization(httpClient, replayClientId, replayVerifier)\n    const replayTokens = await exchangeCode(httpClient, replayClientId, replayAuthorizationCode, replayVerifier)\n    assert.ok(replayTokens.refresh_token)\n    const replayCode = await httpClient.request('/operator/oauth/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form({ grant_type: 'authorization_code', client_id: replayClientId, code: replayAuthorizationCode, redirect_uri: REDIRECT_URI, code_verifier: replayVerifier, resource: RESOURCE }) })\n    assert.equal(replayCode.status, 400)\n    const refreshAfterCodeReplay = await refresh(httpClient, replayClientId, replayTokens.refresh_token)\n    assert.equal(refreshAfterCodeReplay.status, 400, 'authorization-code replay must revoke its grant family')\n"""
+          if text.count(anchor) != 1:
+              raise SystemExit(f'expected one refresh-family anchor, found {text.count(anchor)}')
+          path.write_text(text.replace(anchor, addition, 1))
+          PY
+          git diff --check
+          git diff --exit-code >/dev/null && { echo 'patch produced no diff' >&2; exit 1; } || true
+      - name: Commit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add operator-auth/test/security.test.js
+          git commit -m 'test(operator-auth): isolate replay revocation semantics'
+          git push origin HEAD:codex/operator-mcp-local-oidc
