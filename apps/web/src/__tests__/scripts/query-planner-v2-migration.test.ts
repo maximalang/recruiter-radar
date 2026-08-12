@@ -182,6 +182,18 @@ describe('Query Planner v2 migration', () => {
     expect(productionDockerfile).toContain(
       "await import('./packages/db/scripts/adapters/hh.mjs')",
     )
+    expect(productionDockerfile).toContain(
+      "accessSync('./packages/db/scripts/ingest-hh.mjs')",
+    )
+    expect(productionDockerfile).toContain(
+      "accessSync('./packages/db/scripts/verify-hh-live-pipeline.mjs')",
+    )
+    expect(productionDockerfile).toContain(
+      'COPY --from=builder /app/packages/db/scripts/verify-hh-live-pipeline.mjs',
+    )
+    expect(productionDockerfile).toContain(
+      "await import('./packages/db/scripts/lib/source-lineage-writer.mjs')",
+    )
     for (const dependency of ['socks', 'ip-address', 'smart-buffer', 'undici']) {
       expect(productionDockerfile).toContain(
         `/app/node_modules/${dependency} ./node_modules/${dependency}`,

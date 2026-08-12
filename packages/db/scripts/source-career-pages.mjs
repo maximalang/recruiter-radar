@@ -185,6 +185,9 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
         companyName: toNonEmptyText(target?.company_name ?? target?.companyName) ?? null,
         sourceUrl: toUrlOrNull(target?.source_url ?? target?.sourceUrl ?? target?.url),
         recordsFetched: 0,
+        outcome: 'page-unreachable',
+        pageFetched: false,
+        errorCategory: classifyCareerPageFetchError(error),
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -518,6 +521,10 @@ function buildCareerPageProbeUrls(seed) {
 }
 
 async function fetchHtmlPage(url) {
+  return (await fetchHtmlPageDetailed(url)).page;
+}
+
+async function fetchHtmlPageDetailed(url) {
   try {
     const { response, body: html } = await fetchText(url, {
       sourceName: 'career-pages discovery',
@@ -529,22 +536,60 @@ async function fetchHtmlPage(url) {
     });
 
     if (!response.ok) {
-      return null;
+      return {
+        page: null,
+        diagnostics: {
+          pageFetched: false,
+          fetchFailure: true,
+          errorCategory: `http-${response.status}`,
+        },
+      };
     }
 
     const contentType = response.headers.get('content-type') ?? '';
 
     if (!/html|text\//i.test(contentType)) {
-      return null;
+      return {
+        page: null,
+        diagnostics: {
+          pageFetched: true,
+          contentUnsupported: true,
+          resolvedUrl: response.url,
+          errorCategory: 'unsupported-content-type',
+        },
+      };
     }
 
     return {
-      url: response.url,
-      html,
+      page: {
+        url: response.url,
+        html,
+      },
+      diagnostics: {
+        pageFetched: true,
+        resolvedUrl: response.url,
+        errorCategory: null,
+      },
     };
-  } catch {
-    return null;
+  } catch (error) {
+    return {
+      page: null,
+      diagnostics: {
+        pageFetched: false,
+        fetchFailure: true,
+        errorCategory: classifyCareerPageFetchError(error),
+      },
+    };
   }
+}
+
+function classifyCareerPageFetchError(error) {
+  const status = Number(error?.status);
+  if (Number.isInteger(status) && status >= 400 && status <= 599) return `http-${status}`;
+  const code = typeof error?.code === 'string' ? error.code.trim().toLowerCase() : '';
+  if (code) return code;
+  if (error?.name === 'AbortError' || /timeout/i.test(error?.message ?? '')) return 'timeout';
+  return 'network-error';
 }
 
 export function detectCareerPageTargetFromHtml(html, seed) {
@@ -1094,13 +1139,16 @@ export function resolveCareerPagesDiscoveryReviewOutputPath() {
 async function fetchCareerPageTarget(target, index) {
   const normalizedTarget = normalizeFetchTarget(target, index);
   let records;
+  let fetchDiagnostics = {};
 
   if (normalizedTarget.adapter === 'greenhouse-board') {
     records = await fetchGreenhouseBoardRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'lever-postings') {
     records = await fetchLeverPostingsRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'same-domain-jsonld') {
-    records = await fetchSameDomainJsonLdRecords(normalizedTarget);
+    const fetched = await fetchSameDomainJsonLdRecords(normalizedTarget);
+    records = fetched.records;
+    fetchDiagnostics = fetched.diagnostics;
   } else if (normalizedTarget.adapter === 'json-feed') {
     records = await fetchJsonFeedRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'static-records') {
@@ -1123,6 +1171,14 @@ async function fetchCareerPageTarget(target, index) {
       companyName: normalizedTarget.companyName,
       sourceUrl: normalizedTarget.sourceUrl,
       recordsFetched: records.length,
+      outcome: resolveCareerPageTargetOutcome({
+        adapter: normalizedTarget.adapter,
+        recordsFetched: records.length,
+        ...fetchDiagnostics,
+      }),
+      pageFetched: fetchDiagnostics.pageFetched ?? true,
+      resolvedUrl: fetchDiagnostics.resolvedUrl ?? normalizedTarget.sourceUrl,
+      errorCategory: fetchDiagnostics.errorCategory ?? null,
       // Per-target extraction diagnostics. For same-domain targets this names
       // which extractor produced the records ('jsonld' vs 'html-card-fallback')
       // so a discovered target that fetched a page but yielded 0 is inspectable
@@ -1132,6 +1188,21 @@ async function fetchCareerPageTarget(target, index) {
       extractionMethod: resolveExtractionMethodForSummary(records, normalizedTarget.adapter),
     },
   };
+}
+
+export function resolveCareerPageTargetOutcome({
+  adapter,
+  recordsFetched,
+  pageFetched = false,
+  fetchFailure = false,
+  contentUnsupported = false,
+}) {
+  if (fetchFailure) return 'page-unreachable';
+  if (contentUnsupported) return 'extractor-unsupported';
+  if (recordsFetched > 0) return 'parsed';
+  if (adapter === 'same-domain-jsonld' && pageFetched) return 'extraction-zero-unexpected';
+  if (pageFetched) return 'no-vacancies-present';
+  return 'page-unreachable';
 }
 
 function resolveExtractionMethodForSummary(records, adapter) {
@@ -1253,10 +1324,11 @@ export function mapLeverPostingsPayload(payload, target) {
 }
 
 async function fetchSameDomainJsonLdRecords(target) {
-  const page = await fetchHtmlPage(target.sourceUrl);
+  const fetchResult = await fetchHtmlPageDetailed(target.sourceUrl);
+  const page = fetchResult.page;
 
   if (!page) {
-    return [];
+    return { records: [], diagnostics: fetchResult.diagnostics };
   }
 
   const careerPageUrl = target.careerPageUrl ?? target.sourceUrl;
@@ -1288,7 +1360,10 @@ async function fetchSameDomainJsonLdRecords(target) {
 
   if (jsonLdRecords.length > 0) {
     tagRecordsWithExtractionMethod(jsonLdRecords, 'jsonld');
-    return jsonLdRecords;
+    return {
+      records: jsonLdRecords,
+      diagnostics: { pageFetched: true, resolvedUrl: page.url },
+    };
   }
 
   // HTML-card fallback: many RU corporate career pages (Bitrix/1C-Bitrix,
@@ -1297,7 +1372,10 @@ async function fetchSameDomainJsonLdRecords(target) {
   // — is silently lost after the page was already fetched. The fallback is
   // guarded: title + same-domain URL required, no fabricated fields.
   const htmlCardRecords = extractVacancyCardsFromSameDomainHtml(page.html, seed);
-  return htmlCardRecords;
+  return {
+    records: htmlCardRecords,
+    diagnostics: { pageFetched: true, resolvedUrl: page.url },
+  };
 }
 
 function tagRecordsWithExtractionMethod(records, method) {

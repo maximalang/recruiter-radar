@@ -136,6 +136,8 @@
     "source:pipeline:regional-job-boards": "node packages/db/scripts/run-source-action.mjs pipeline regional-job-boards",
     "verify:rabota-rossii:smoke": "node packages/db/scripts/verify-rabota-rossii-smoke.mjs",
     "verify:rabota-rossii:confidence": "node packages/db/scripts/verify-rabota-rossii-confidence.mjs",
+    "verify:hh:smoke": "node packages/db/scripts/verify-hh-smoke.mjs",
+    "verify:hh:live-pipeline": "node packages/db/scripts/verify-hh-live-pipeline.mjs",
     "verify:rf-source-expansion:smoke": "node packages/db/scripts/verify-rf-source-expansion-smoke.mjs",
     "verify:linkedin-company-pages:smoke": "node packages/db/scripts/verify-linkedin-company-pages-smoke.mjs",
     "verify:tech-job-boards:smoke": "node packages/db/scripts/verify-tech-job-boards-smoke.mjs",

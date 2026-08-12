@@ -12,6 +12,10 @@ import { join } from 'node:path';
  * @returns {Object|undefined} Parsed environment variables
  */
 export function loadEnvFile(filePath) {
+  if (process.env.SOURCE_ENV_FILE_DISABLED === 'true') {
+    return;
+  }
+
   if (!existsSync(filePath)) {
     return;
   }

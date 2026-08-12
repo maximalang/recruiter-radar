@@ -538,6 +538,10 @@ function buildFallbackEmployerName(hhEmployerId) {
 }
 
 function loadEnvFile(filePath) {
+  if (process.env.SOURCE_ENV_FILE_DISABLED === 'true') {
+    return;
+  }
+
   if (!existsSync(filePath)) {
     return;
   }

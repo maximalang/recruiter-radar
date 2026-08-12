@@ -8,6 +8,8 @@ const verifierPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'verify-sour
 const sourceActionPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'run-source-action.mjs')
 const coveragePath = resolve(repoRoot, 'packages', 'db', 'scripts', 'source-coverage-requirements.mjs')
 const packageJsonPath = resolve(repoRoot, 'package.json')
+const hhIngestPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'ingest-hh.mjs')
+const hhLiveVerifierPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'verify-hh-live-pipeline.mjs')
 
 const SOURCE_IDS = [
   'hh',
@@ -122,7 +124,7 @@ describe('source live readiness contract', () => {
     const rabotaRossii = report.sources.find((source: { id: string }) => source.id === 'rabota-rossii')
     expect(rabotaRossii).toEqual(expect.objectContaining({
       configured: true,
-      liveReachable: false,
+      liveReachable: true,
       liveVerified: false,
       finalState: 'blocked',
     }))
@@ -247,5 +249,22 @@ describe('source live readiness contract', () => {
     const runner = readFileSync(sourceActionPath, 'utf8')
     expect(runner).toContain("requestedSourceId === 'primary'")
     expect(runner).toContain('listPrimaryIngestionSourceIds')
+  })
+
+  it('keeps HH live verification isolated, explicit, and independent of local env files', () => {
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+    expect(packageJson.scripts['verify:hh:smoke']).toBe('node packages/db/scripts/verify-hh-smoke.mjs')
+    expect(packageJson.scripts['verify:hh:live-pipeline']).toBe('node packages/db/scripts/verify-hh-live-pipeline.mjs')
+
+    expect(existsSync(hhLiveVerifierPath)).toBe(true)
+    const verifier = readFileSync(hhLiveVerifierPath, 'utf8')
+    expect(verifier).toContain("HH_LIVE_VERIFY !== '1'")
+    expect(verifier).toContain("SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK !== 'isolated'")
+    expect(verifier).toContain("SOURCE_ENV_FILE_DISABLED: 'true'")
+    expect(verifier).toContain('source_signal_evidence_lineage_v1')
+    expect(verifier).toContain("source = 'hh'")
+
+    const ingest = readFileSync(hhIngestPath, 'utf8')
+    expect(ingest).toContain("process.env.SOURCE_ENV_FILE_DISABLED === 'true'")
   })
 })
