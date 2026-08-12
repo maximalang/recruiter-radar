@@ -185,13 +185,14 @@ function checkSourceContracts(sources) {
     }
   });
 
-  // Check evidence tier (allow context-only for specific sources)
+  // Check evidence tier. A source may deliberately be weaker than its kind
+  // default only when the canonical policy also makes it context-only.
   sources.forEach(source => {
     const expectedTier = inferExpectedTier(source.kind);
-    // Allow context-only for business-signal and specific company-site variants
     if (source.evidenceTier !== expectedTier &&
         !(source.kind === 'company-site' && source.evidenceTier === 'context-only') &&
-        !(source.kind === 'business-signal' && source.evidenceTier === 'context-only')) {
+        !(source.kind === 'business-signal' && source.evidenceTier === 'context-only') &&
+        !(source.leadEligibility === 'context-only' && source.evidenceTier === 'context-only')) {
       issues.push(`Expected evidence tier ${expectedTier} for ${source.id}, got ${source.evidenceTier}`);
     }
   });
@@ -225,9 +226,20 @@ function checkDigestBoundaries(sources) {
   // Verify no non-digest sources are in active digest
   // Keep this allowlist deliberately explicit: promotion is a production
   // decision, not something inferred from a source being runnable. Rabota
-  // Rossii cleared its recorded live confidence gate on 2026-06-23, while
-  // SuperJob and Habr Career still have provider/legal confidence blockers.
-  const expectedDigestSources = ['hh', 'rabota-rossii', 'career-pages'];
+  // Rossii, the five production-verified public ATS sources, and SuperJob have
+  // cleared their recorded gates. SmartRecruiters, Habr Career, and the other
+  // job-board families remain explicitly blocked in source-policy.json.
+  const expectedDigestSources = [
+    'hh',
+    'career-pages',
+    'greenhouse',
+    'lever',
+    'ashby',
+    'recruitee',
+    'workable',
+    'rabota-rossii',
+    'superjob',
+  ];
   activeDigest.forEach(id => {
     if (!expectedDigestSources.includes(id)) {
       issues.push(`${id} should not be in digest with current promotionStatus`);

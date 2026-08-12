@@ -128,7 +128,7 @@ statement does not prove that any source is currently configured or healthy in p
 | **workable** | company-surface / high-signal (0.90) | digest-lead-originating | **digest-allowed** | live-verified: 12 persisted |
 | **smartrecruiters** | company-surface / high-signal (0.90) | digest-lead-originating | blocked-from-digest | local live 8; production egress blocked |
 | **rabota-rossii** | primary-platform / medium-signal (0.70) | confidence-gated-evidence | **digest-allowed** | live-verified |
-| **egrul-fns** | registry-reference / high-signal (0.90) | enrichment-only | never-lead-originating | live + provider |
+| **egrul-fns** | registry-reference / high-signal (0.90) | enrichment-only | never-lead-originating | official FNS snapshot only; Class C blocked |
 | **transparent-business-fns** | registry-reference / high-signal (0.86) | enrichment-only | never-lead-originating | provider/snapshot only |
 | **fedresurs** | market-signal / context-only (0.62) | context-only | never-lead-originating | provider/snapshot only |
 
@@ -211,7 +211,9 @@ of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
   company-controlled career or enrolled hosted-ATS surface is direct.
 
 **egrul-fns / transparent-business-fns / fedresurs** — registry/context enrichment. Never
-originate leads. `egrul-fns`: 10-digit legal-entity INN only; skip 12-digit IP/person records.
+originate leads. `egrul-fns` accepts only reviewed exports from the official FNS integration,
+requires an official FNS `source_url` for evidence lineage, and handles 10-digit legal-entity
+INNs only; third-party mirrors, arbitrary endpoints, and 12-digit IP/person records are rejected.
 `transparent-business-fns`: no approved stable public API — do **not** scrape pb.nalog.ru.
 `fedresurs`: public site blocked by Qrator/401 — official/compliant provider only.
 

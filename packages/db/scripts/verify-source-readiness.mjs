@@ -79,7 +79,6 @@ const digestContextSources = [
 const providerTokenSources = [
   'linkedin-company-pages',
   'tech-job-boards',
-  'egrul-fns',
   'funding-business-signals',
   'transparent-business-fns',
   'fedresurs',

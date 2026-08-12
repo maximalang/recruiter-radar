@@ -50,12 +50,12 @@
 
 ---
 
-## 3. Fixture-or-env (можно гонять на free fixture, опционально provider)
+## 3. Snapshot/provider sources (нужен отдельный доступ или reviewed export)
 
 ### `egrul-fns` 🟡
-- **Free path:** `EGRUL_FNS_INNS="7707083893,7728168971"` (whitelist ИНН для прямых запросов).
-- **Provider path:** `EGRUL_FNS_PROVIDER_API_URL=...` + `EGRUL_FNS_PROVIDER_API_TOKEN=...` (Контур.Фокус, Spark, Spark-Marketing).
-- **Coверкаст:** ФНС официальный egrul.org возвращает 404 в части RU IP — нужен либо fallback provider, либо whitelist.
+- **Access class:** C; официальная интеграция ФНС требует отдельного доступа/абонентского обслуживания.
+- **Runtime path:** `EGRUL_FNS_INPUT_FILE=path/to/reviewed-official-fns-export.json`.
+- **Boundary:** каждая запись обязана содержать официальный URL ФНС; сторонние зеркала и произвольные provider endpoint отключены.
 
 ### `funding-business-signals` 🟡
 - **Free path:** `FUNDING_SIGNALS_GDELT_QUERIES="russia funding,seed round russia"` (GDELT public API).

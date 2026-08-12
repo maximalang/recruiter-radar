@@ -127,20 +127,14 @@ describe('source-ingest', () => {
       expect(result.upsertedCount).toBe(3)
     })
 
-    it('passes EGRUL/FNS NON-search config through the env whitelist (search vars excluded)', async () => {
-      // EGRUL_FNS_INNS is now a searchEnvVar → excluded from caller env (it is
-      // derived from the DB orgs needing verification, not passed by callers).
-      // EGRUL_FNS_PUBLIC_BASE_URL is NOT a search var (prefix EGRUL_FNS_ is
-      // whitelisted) → still passes through the caller env whitelist.
+    it('passes only the configured official EGRUL/FNS snapshot input to the source', async () => {
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        expect(opts.env.EGRUL_FNS_INNS).toBeUndefined()
-        expect(opts.env.EGRUL_FNS_PUBLIC_BASE_URL).toBe('https://egrul.example/api')
+        expect(opts.env.EGRUL_FNS_INPUT_FILE).toBe('C:\\snapshots\\egrul-official.json')
         callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
       })
 
       const result = await ingestSource('egrul-fns', {
-        EGRUL_FNS_INNS: '7707083893',
-        EGRUL_FNS_PUBLIC_BASE_URL: 'https://egrul.example/api',
+        EGRUL_FNS_INPUT_FILE: 'C:\\snapshots\\egrul-official.json',
       })
 
       expect(result.success).toBe(true)
@@ -685,88 +679,6 @@ describe('source-ingest', () => {
       await ingestSource('funding-business-signals')
 
       expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES).toBeUndefined()
-    })
-  })
-
-  describe('egrul-fns INNs (live-public from DB orgs needing verification)', () => {
-    function mockPoolWithInns(innRows: Array<{ inn: string }>) {
-      const query = jest.fn((sql: string) => {
-        if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
-        if (sql.includes("inn ~") || sql.includes('FROM orgs')) {
-          return Promise.resolve({ rows: innRows })
-        }
-        return Promise.resolve({ rows: [] })
-      })
-      return { query }
-    }
-
-    it('derives EGRUL_FNS_INNS from orgs with 10-digit INNs and no ogrn', async () => {
-      mockGetPool.mockReturnValue(
-        mockPoolWithInns([{ inn: '7707083893' }, { inn: '7701234567' }]),
-      )
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 2, signalUpsertsCompleted: 2 }), '')
-      })
-
-      await ingestSource('egrul-fns')
-
-      expect(capturedEnv?.EGRUL_FNS_INNS).toBeDefined()
-      const inns = (capturedEnv?.EGRUL_FNS_INNS ?? '').split(',')
-      expect(inns).toContain('7707083893')
-      expect(inns).toContain('7701234567')
-    })
-
-    it('lets an explicit operator DB pref override the derived INN list', async () => {
-      const mockPoolWithOverride = {
-        query: jest.fn((sql: string) => {
-          if (sql.includes('user_search_preferences')) {
-            return Promise.resolve({ rows: [{ params: { EGRUL_FNS_INNS: '1111111111' } }] })
-          }
-          return Promise.resolve({ rows: [] })
-        }),
-      }
-      mockGetPool.mockReturnValue(mockPoolWithOverride)
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
-      })
-
-      await ingestSource('egrul-fns')
-
-      expect(capturedEnv?.EGRUL_FNS_INNS).toBe('1111111111')
-    })
-
-    it('omits EGRUL_FNS_INNS when no orgs need verification', async () => {
-      mockGetPool.mockReturnValue(mockPoolWithInns([]))
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
-      })
-
-      await ingestSource('egrul-fns')
-
-      expect(capturedEnv?.EGRUL_FNS_INNS).toBeUndefined()
-    })
-
-    it('omits EGRUL_FNS_INNS when no pool is configured (test/dev)', async () => {
-      mockGetPool.mockReturnValue(null)
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
-      })
-
-      await ingestSource('egrul-fns')
-
-      expect(capturedEnv?.EGRUL_FNS_INNS).toBeUndefined()
     })
   })
 

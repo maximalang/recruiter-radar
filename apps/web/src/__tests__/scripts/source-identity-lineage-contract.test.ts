@@ -108,7 +108,7 @@ describe('source identity and evidence lineage contract', () => {
     const egrul = readFileSync(resolve(repoRoot, 'packages', 'db', 'scripts', 'source-egrul-fns.mjs'), 'utf8')
     expect(egrul).toContain('resolveOrganizationOwner')
     expect(egrul).toContain('assertOrgSourceRefOwner')
-    expect(egrul).not.toContain('upsertSignalEvidenceLineage')
+    expect(egrul).toContain('upsertSignalEvidenceLineage')
 
     const hh = readFileSync(resolve(repoRoot, 'packages', 'db', 'scripts', 'ingest-hh.mjs'), 'utf8')
     expect(hh).toContain('`domain:${vacancy.employerDomain}`')

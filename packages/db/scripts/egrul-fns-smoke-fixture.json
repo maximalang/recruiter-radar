@@ -2,6 +2,7 @@
   "records": [
     {
       "external_id": "egrul-smoke-1",
+      "source_url": "https://www.nalog.gov.ru/rn77/service/egrip2/",
       "company_name": "ООО Технологии Будущего",
       "inn": "7701234567",
       "ogrn": "1027700123456",
@@ -18,6 +19,7 @@
     },
     {
       "external_id": "egrul-smoke-2",
+      "source_url": "https://www.nalog.gov.ru/rn77/service/egrip2/",
       "company_name": "АО Дата Системс",
       "inn": "7702345678",
       "ogrn": "1027700234567",
@@ -32,10 +34,19 @@
     {
       "company_name": "ИП Петров",
       "inn": "770312345678",
+      "source_url": "https://www.nalog.gov.ru/rn77/service/egrip2/",
       "status": "active",
       "legal_address": "г. Казань, ул. Баумана, д. 5",
       "okved": "62.02",
       "detected_at": "2026-05-03T00:00:00.000Z"
+    },
+    {
+      "external_id": "unofficial-mirror-record",
+      "source_url": "https://egrul.org/7704455667.json",
+      "company_name": "Unofficial mirror record",
+      "inn": "7704455667",
+      "status": "active",
+      "detected_at": "2026-05-04T00:00:00.000Z"
     }
   ]
 }

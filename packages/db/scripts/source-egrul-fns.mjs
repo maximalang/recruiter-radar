@@ -1,59 +1,22 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import pg from 'pg';
 
-import {
-  assertProviderNormalization,
-  extractProviderRecords,
-} from './adapters/provider-contract.mjs';
 import {
   buildRussianLegalNameSourceKey,
   buildSourceKeyAliases,
   dedupeNormalizedRecords,
   stripBom,
 } from './adapters/source-records.mjs';
-import { loadEnvFile, normalizeDomain } from './lib/common-utils.mjs';
-import { fetchJson } from './adapters/source-http.mjs';
+import { normalizeDomain } from './lib/common-utils.mjs';
 import { assertOrgSourceRefOwner, resolveOrganizationOwner } from './adapters/organization-resolution.mjs';
+import { upsertSignalEvidenceLineage } from './lib/source-lineage-writer.mjs';
 
 const { Client } = pg;
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const rootEnvPath = resolve(scriptDir, '../../../.env');
 const SOURCE_ID = 'egrul-fns';
 const SIGNAL_TYPE = 'other';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
-const DEFAULT_PUBLIC_BASE_URL = 'https://egrul.org/';
-const PUBLIC_PROVIDER = 'egrul-public-json';
-const EGRUL_ATTRS = '@attributes';
-const EGRUL_KEYS = Object.freeze({
-  legalEntity: '\u0421\u0432\u042e\u041b',
-  ceasedLegalEntity: '\u0421\u0432\u041f\u0440\u0435\u043a\u0440\u042e\u041b',
-  issueDate: '\u0414\u0430\u0442\u0430\u0412\u044b\u043f',
-  ogrn: '\u041e\u0413\u0420\u041d',
-  ogrnDate: '\u0414\u0430\u0442\u0430\u041e\u0413\u0420\u041d',
-  inn: '\u0418\u041d\u041d',
-  kpp: '\u041a\u041f\u041f',
-  name: '\u0421\u0432\u041d\u0430\u0438\u043c\u042e\u041b',
-  fullName: '\u041d\u0430\u0438\u043c\u042e\u041b\u041f\u043e\u043b\u043d',
-  shortNameBlock: '\u0421\u0432\u041d\u0430\u0438\u043c\u042e\u041b\u0421\u043e\u043a\u0440',
-  shortName: '\u041d\u0430\u0438\u043c\u0421\u043e\u043a\u0440',
-  address: '\u0421\u0432\u0410\u0434\u0440\u0435\u0441\u042e\u041b',
-  addressRf: '\u0410\u0434\u0440\u0435\u0441\u0420\u0424',
-  postalCode: '\u0418\u043d\u0434\u0435\u043a\u0441',
-  region: '\u0420\u0435\u0433\u0438\u043e\u043d',
-  regionName: '\u041d\u0430\u0438\u043c\u0420\u0435\u0433\u0438\u043e\u043d',
-  street: '\u0423\u043b\u0438\u0446\u0430',
-  streetType: '\u0422\u0438\u043f\u0423\u043b\u0438\u0446\u0430',
-  streetName: '\u041d\u0430\u0438\u043c\u0423\u043b\u0438\u0446\u0430',
-  house: '\u0414\u043e\u043c',
-  okvedReport: '\u0421\u0432\u041e\u041a\u0412\u042d\u0414\u041e\u0442\u0447',
-  okvedReportMain: '\u0421\u0432\u041e\u041a\u0412\u042d\u0414\u041e\u0442\u0447\u041e\u0441\u043d',
-  okved: '\u0421\u0432\u041e\u041a\u0412\u042d\u0414',
-  okvedMain: '\u0421\u0432\u041e\u041a\u0412\u042d\u0414\u041e\u0441\u043d',
-  okvedCode: '\u041a\u043e\u0434\u041e\u041a\u0412\u042d\u0414',
-  okvedName: '\u041d\u0430\u0438\u043c\u041e\u041a\u0412\u042d\u0414',
-});
 
 
 export async function runEgrulFnsCli(argv = process.argv.slice(2)) {
@@ -69,13 +32,7 @@ export async function runEgrulFnsCli(argv = process.argv.slice(2)) {
   }
 
   try {
-    let input = resolveEgrulFnsInput();
-
-    if (input.inputMode === 'provider-pending') {
-      input = await resolveEgrulProviderInput(input);
-    } else if (input.inputMode === 'public-pending') {
-      input = await resolveEgrulPublicInput(input);
-    }
+    const input = resolveEgrulFnsInput();
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
@@ -114,202 +71,11 @@ export function resolveEgrulFnsInput() {
     return resolveEgrulFileInput(inputFilePath);
   }
 
-  const providerUrl = process.env.EGRUL_FNS_PROVIDER_API_URL?.trim();
-  const providerToken = process.env.EGRUL_FNS_PROVIDER_API_TOKEN?.trim();
-
-  if (providerUrl && providerToken) {
-    return { inputMode: 'provider-pending', providerUrl, providerToken };
-  }
-
-  const inns = parsePublicInns();
-
-  if (inns.length > 0) {
-    return {
-      inputMode: 'public-pending',
-      inns,
-      publicBaseUrl: process.env.EGRUL_FNS_PUBLIC_BASE_URL?.trim() || DEFAULT_PUBLIC_BASE_URL,
-    };
-  }
-
   throw new Error(
-    'No input configured for egrul-fns.\n'
-      + 'Set EGRUL_FNS_INPUT_FILE for file mode, or\n'
-      + 'set EGRUL_FNS_INNS for public JSON mirror mode, or\n'
-      + 'set EGRUL_FNS_PROVIDER_API_URL and EGRUL_FNS_PROVIDER_API_TOKEN for provider mode. '
-      + 'Direct FNS scraping is not supported.',
+    'No official FNS integration snapshot configured for egrul-fns.\n'
+      + 'Set EGRUL_FNS_INPUT_FILE to a reviewed export from the official FNS integration. '
+      + 'Third-party mirrors and arbitrary provider endpoints are not accepted.',
   );
-}
-
-export async function resolveEgrulProviderInput({ providerUrl, providerToken }) {
-  let body;
-
-  try {
-    body = await fetchJson(providerUrl, {
-      sourceName: 'egrul-fns provider',
-      headers: {
-        authorization: `Bearer ${providerToken}`,
-      },
-    });
-  } catch (error) {
-    throw new Error(
-      `${error instanceof Error ? error.message : String(error)}\n`
-        + 'Verify EGRUL_FNS_PROVIDER_API_URL and EGRUL_FNS_PROVIDER_API_TOKEN are correct.',
-      { cause: error },
-    );
-  }
-
-  const records = extractProviderRecords(body, SOURCE_ID);
-  const fetchedAt = new Date().toISOString();
-  const normalizedRecords = [];
-  let skippedRecords = 0;
-
-  for (const [index, record] of records.entries()) {
-    const normalized = normalizeEgrulRecord(record, fetchedAt, index + 1);
-
-    if (!normalized) {
-      skippedRecords += 1;
-      continue;
-    }
-
-    normalizedRecords.push(normalized);
-  }
-
-  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
-
-  assertProviderNormalization({
-    sourceId: SOURCE_ID,
-    recordsReceived: records.length,
-    normalizedRecords: dedupeResult.records,
-    skippedRecords,
-  });
-
-  return {
-    inputMode: 'provider-token',
-    inputFilePath: null,
-    recordsReceived: records.length,
-    duplicateRecords: dedupeResult.duplicateRecords,
-    normalizedRecords: dedupeResult.records,
-    skippedRecords,
-  };
-}
-
-export async function resolveEgrulPublicInput({ inns, publicBaseUrl = DEFAULT_PUBLIC_BASE_URL }) {
-  const records = [];
-
-  for (const inn of inns) {
-    const body = await fetchPublicEgrulRecord({ inn, publicBaseUrl });
-    records.push(mapPublicEgrulRecord(body, inn));
-  }
-
-  const fetchedAt = new Date().toISOString();
-  const normalizedRecords = [];
-  let skippedRecords = 0;
-
-  for (const [index, record] of records.entries()) {
-    const normalized = normalizeEgrulRecord(record, fetchedAt, index + 1);
-
-    if (!normalized) {
-      skippedRecords += 1;
-      continue;
-    }
-
-    normalizedRecords.push(normalized);
-  }
-
-  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
-
-  if (records.length > 0 && dedupeResult.records.length === 0) {
-    throw new Error(
-      `${SOURCE_ID} public EGRUL returned ${records.length} records but 0 normalized records`
-        + ` (${skippedRecords} skipped). Check public EGRUL mapping and INN list.`,
-    );
-  }
-
-  return {
-    inputMode: 'live-public',
-    inputFilePath: null,
-    liveProvider: PUBLIC_PROVIDER,
-    innsRequested: inns.length,
-    recordsReceived: records.length,
-    duplicateRecords: dedupeResult.duplicateRecords,
-    normalizedRecords: dedupeResult.records,
-    skippedRecords,
-  };
-}
-
-async function fetchPublicEgrulRecord({ inn, publicBaseUrl }) {
-  const url = new URL(`${inn}.json`, ensureTrailingSlash(publicBaseUrl));
-
-  return fetchJson(url, {
-    sourceName: 'egrul-fns public json',
-    timeoutMs: 30000,
-    retries: 2,
-    retryDelayMs: 1000,
-    headers: {
-      'user-agent': 'RecruiterRadar/1.0 (egrul-fns)',
-    },
-  });
-}
-
-function mapPublicEgrulRecord(body, requestedInn) {
-  const legalEntity = body?.[EGRUL_KEYS.legalEntity] ?? body?.[EGRUL_KEYS.ceasedLegalEntity];
-
-  if (!legalEntity || typeof legalEntity !== 'object') {
-    return null;
-  }
-
-  const attrs = attrsOf(legalEntity);
-  const nameBlock = legalEntity[EGRUL_KEYS.name] ?? {};
-  const nameAttrs = attrsOf(nameBlock);
-  const shortNameAttrs = attrsOf(nameBlock[EGRUL_KEYS.shortNameBlock]);
-  const okvedAttrs = attrsOf(
-    legalEntity[EGRUL_KEYS.okvedReport]?.[EGRUL_KEYS.okvedReportMain]
-      ?? legalEntity[EGRUL_KEYS.okved]?.[EGRUL_KEYS.okvedMain],
-  );
-  const inn = toNonEmptyText(attrs[EGRUL_KEYS.inn]) ?? requestedInn;
-  const ogrn = toNonEmptyText(attrs[EGRUL_KEYS.ogrn]);
-
-  return {
-    external_id: ogrn ? `egrul:ogrn:${ogrn}` : `egrul:inn:${inn}`,
-    company_name: toNonEmptyText(shortNameAttrs[EGRUL_KEYS.shortName])
-      ?? toNonEmptyText(nameAttrs[EGRUL_KEYS.fullName]),
-    inn,
-    ogrn,
-    kpp: toNonEmptyText(attrs[EGRUL_KEYS.kpp]),
-    registration_date: toNonEmptyText(attrs[EGRUL_KEYS.ogrnDate]),
-    status: body?.[EGRUL_KEYS.ceasedLegalEntity] ? 'inactive' : 'active',
-    legal_address: buildPublicEgrulAddress(legalEntity),
-    okved: toNonEmptyText(okvedAttrs[EGRUL_KEYS.okvedCode]),
-    okved_description: toNonEmptyText(okvedAttrs[EGRUL_KEYS.okvedName]),
-    detected_at: toTimestampOrNull(attrs[EGRUL_KEYS.issueDate]) ?? new Date().toISOString(),
-  };
-}
-
-function buildPublicEgrulAddress(legalEntity) {
-  const addressRf = legalEntity[EGRUL_KEYS.address]?.[EGRUL_KEYS.addressRf];
-  const addressAttrs = attrsOf(addressRf);
-  const regionAttrs = attrsOf(addressRf?.[EGRUL_KEYS.region]);
-  const streetAttrs = attrsOf(addressRf?.[EGRUL_KEYS.street]);
-  const street = [streetAttrs[EGRUL_KEYS.streetType], streetAttrs[EGRUL_KEYS.streetName]]
-    .map(toNonEmptyText)
-    .filter(Boolean)
-    .join(' ');
-  const parts = [
-    addressAttrs[EGRUL_KEYS.postalCode],
-    regionAttrs[EGRUL_KEYS.regionName],
-    street,
-    addressAttrs[EGRUL_KEYS.house],
-  ]
-    .map(toNonEmptyText)
-    .filter(Boolean);
-
-  return parts.length > 0 ? parts.join(', ') : null;
-}
-
-function attrsOf(value) {
-  return value?.[EGRUL_ATTRS] && typeof value[EGRUL_ATTRS] === 'object'
-    ? value[EGRUL_ATTRS]
-    : {};
 }
 
 function resolveEgrulFileInput(inputFilePath) {
@@ -346,25 +112,6 @@ function resolveEgrulFileInput(inputFilePath) {
     normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
-}
-
-function parsePublicInns() {
-  const rawInns = process.env.EGRUL_FNS_INNS?.trim();
-
-  if (!rawInns) {
-    return [];
-  }
-
-  return rawInns
-    .split(/\r?\n|,|;/)
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map((value) => value.replace(/\D/g, ''))
-    .filter((value, index, values) => value.length === 10 && values.indexOf(value) === index);
-}
-
-function ensureTrailingSlash(value) {
-  return value.endsWith('/') ? value : `${value}/`;
 }
 
 function parseInputRecords(rawContent, inputFilePath) {
@@ -406,9 +153,10 @@ function normalizeEgrulRecord(record, fetchedAt, lineNumber) {
   const okved = toNonEmptyText(record.okved ?? record.main_okved);
   const okvedDescription = toNonEmptyText(record.okved_description ?? record.activity_description);
   const externalId = toNonEmptyText(record.external_id ?? record.id);
+  const sourceUrl = normalizeOfficialFnsSourceUrl(record.source_url ?? record.url);
   const detectedAt = toTimestampOrNull(record.detected_at ?? record.occurred_at ?? record.fetched_at) ?? fetchedAt;
 
-  if (!inn && !ogrn) {
+  if ((!inn && !ogrn) || !sourceUrl) {
     return null;
   }
 
@@ -448,6 +196,7 @@ function normalizeEgrulRecord(record, fetchedAt, lineNumber) {
     legalAddress,
     okved,
     okvedDescription,
+    sourceUrl,
     orgName,
     orgDisplayName: companyName ?? fallbackName,
     primarySourceKey,
@@ -508,6 +257,26 @@ function normalizeLegalOgrn(value) {
   return digits?.length === 13 ? digits : null;
 }
 
+export function normalizeOfficialFnsSourceUrl(value) {
+  const normalizedUrl = toUrlOrNull(value);
+
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  const url = new URL(normalizedUrl);
+  const officialHosts = new Set([
+    'nalog.gov.ru',
+    'www.nalog.gov.ru',
+    'data.nalog.gov.ru',
+    'file.nalog.ru',
+  ]);
+
+  return url.protocol === 'https:' && officialHosts.has(url.hostname.toLowerCase())
+    ? url.toString()
+    : null;
+}
+
 function toDigits(value) {
   const text = toNonEmptyText(value);
   return text ? text.replace(/\D/g, '') : null;
@@ -531,31 +300,11 @@ async function ingestEgrulFns({ connectionString, input }) {
     connectionTimeoutMillis: resolveDbConnectionTimeoutMillis(),
   });
 
-  const signalUpsertQuery = `
-    INSERT INTO signals (
-      org_id,
-      signal_type,
-      source,
-      external_id,
-      headline,
-      summary,
-      source_url,
-      occurred_at,
-      payload
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    ON CONFLICT (source, external_id) DO UPDATE
-    SET
-      org_id = EXCLUDED.org_id,
-      headline = EXCLUDED.headline,
-      summary = EXCLUDED.summary,
-      source_url = EXCLUDED.source_url,
-      occurred_at = EXCLUDED.occurred_at,
-      payload = EXCLUDED.payload
-  `;
-
   let orgUpsertCount = 0;
   let signalUpsertCount = 0;
+  let evidenceUpsertCount = 0;
+  let evidenceCreatedCount = 0;
+  let lineageCreatedCount = 0;
 
   await client.connect();
 
@@ -566,24 +315,34 @@ async function ingestEgrulFns({ connectionString, input }) {
       const orgResult = await upsertOrgSourceRef(client, record);
       orgUpsertCount += orgResult.insertedOrg ? 1 : 0;
 
-      const signalResult = await client.query(signalUpsertQuery, [
-        orgResult.orgId,
-        SIGNAL_TYPE,
-        SOURCE_ID,
-        record.signalExternalId,
-        buildSignalHeadline(record),
-        buildSignalSummaryText(record),
-        null,
-        record.detectedAt,
-        buildSignalPayload(record),
-      ]);
+      const lineage = await upsertSignalEvidenceLineage(client, {
+        orgId: orgResult.orgId,
+        signalType: SIGNAL_TYPE,
+        source: SOURCE_ID,
+        sourceFamily: 'fns-official-registry',
+        externalId: record.signalExternalId,
+        headline: buildSignalHeadline(record),
+        summary: buildSignalSummaryText(record),
+        sourceUrl: record.sourceUrl,
+        publishedAt: record.detectedAt,
+        normalizedAt: record.fetchedAt,
+        payload: buildSignalPayload(record),
+        sourceRecordType: 'registry_entry',
+        evidenceTier: 'context',
+        confidence: 0.9,
+        extractionMethod: 'official-fns-integration-snapshot',
+        organizationResolutionReason: orgResult.resolutionReason,
+      });
 
-      signalUpsertCount += signalResult.rowCount ?? 0;
+      signalUpsertCount += lineage.signalUpsertCount;
+      evidenceUpsertCount += lineage.evidenceUpsertCount;
+      evidenceCreatedCount += lineage.evidenceCreatedCount;
+      lineageCreatedCount += lineage.lineageCreatedCount;
     }
 
     await client.query('COMMIT');
 
-    return { orgUpsertCount, signalUpsertCount };
+    return { orgUpsertCount, signalUpsertCount, evidenceUpsertCount, evidenceCreatedCount, lineageCreatedCount };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -678,7 +437,6 @@ export function buildFetchSummary(input) {
     action: 'fetch',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
-    ...buildLiveEgrulSummary(input),
     recordsReceived: input.recordsReceived,
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
@@ -692,13 +450,15 @@ function buildIngestSummary(input, stats) {
     action: 'ingest',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
-    ...buildLiveEgrulSummary(input),
     recordsReceived: input.recordsReceived,
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
+    evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+    evidenceCreated: stats.evidenceCreatedCount,
+    lineageCreated: stats.lineageCreatedCount,
   };
 }
 
@@ -708,24 +468,15 @@ function buildPipelineSummary(input, stats) {
     action: 'pipeline',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
-    ...buildLiveEgrulSummary(input),
     recordsReceived: input.recordsReceived,
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
-  };
-}
-
-function buildLiveEgrulSummary(input) {
-  if (input.inputMode !== 'live-public') {
-    return {};
-  }
-
-  return {
-    liveProvider: input.liveProvider,
-    innsRequested: input.innsRequested,
+    evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+    evidenceCreated: stats.evidenceCreatedCount,
+    lineageCreated: stats.lineageCreatedCount,
   };
 }
 
@@ -780,6 +531,9 @@ function buildSignalPayload(record) {
     source_record_type: 'registry_entry',
     source_record_id: record.signalExternalId,
     source_record_published_at: record.detectedAt,
+    source_url: record.sourceUrl,
+    context_only: true,
+    hiring_proof: false,
     org_source_key: record.primarySourceKey,
     company_name: record.companyName,
     company_domain: record.companyDomain,
@@ -807,6 +561,7 @@ function buildOrgSourceMetadata(record, sourceKey) {
     company_domain: record.companyDomain,
     inn: record.inn,
     ogrn: record.ogrn,
+    source_url: record.sourceUrl,
   };
 }
 

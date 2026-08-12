@@ -383,19 +383,19 @@
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["EGRUL_FNS_INPUT_FILE"], ["EGRUL_FNS_INNS"], ["EGRUL_FNS_PROVIDER_API_URL", "EGRUL_FNS_PROVIDER_API_TOKEN"]]
+        "acceptedEnvSets": [["EGRUL_FNS_INPUT_FILE"]]
       },
       "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "enrichment-only",
-      "legalReview": "approved",
+      "legalReview": "required",
       "pipelineProfile": "enrichment-only",
       "verification": {
         "fixture": ["npm run verify:egrul-fns:smoke"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["Registry records do not currently expose a stable original source URL, so evidence_items lineage remains blocked."]
+      "blockers": ["Official FNS integration access/subscription and a reviewed snapshot are unavailable in the production runtime. Third-party mirrors and arbitrary provider endpoints are disabled; every accepted record must carry an official FNS source URL."]
     },
     "transparent-business-fns": {
       "implementation": "implemented",

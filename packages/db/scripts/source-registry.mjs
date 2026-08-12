@@ -260,8 +260,8 @@ registerSource(
     evidenceTier: 'high-signal',
     defaultConfidence: 0.9,
     status: 'active',
-    fetchModes: ['file', 'live-public', 'provider-token'],
-    description: 'EGRUL/FNS company registry data for legal entity verification and enrichment.',
+    fetchModes: ['file'],
+    description: 'Reviewed snapshots from the official FNS integration for legal entity verification and enrichment.',
     capabilities: SOURCE_ACTIONS,
     scripts: {
       fetch: egrulFnsScriptPath,
