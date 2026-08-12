@@ -1,0 +1,39 @@
+name: Better Auth Lock Bootstrap
+
+on:
+  push:
+    branches: [ 'codex/better-auth-foundation' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: better-auth-lock-bootstrap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/better-auth-foundation
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Update dependency lock only
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit lockfile when changed
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "build(auth): lock Better Auth dependencies"
+          git push origin HEAD:codex/better-auth-foundation
