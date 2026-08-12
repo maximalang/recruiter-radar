@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -41,7 +41,7 @@ jobs:
           bash scripts/test/configure-caddy-production.sh
 
       - name: Run operator MCP contract tests
-        run: npm test --workspace @recruiter-radar/web -- --runInBand apps/web/src/__tests__/api/internal/operator-mcp-route.test.ts
+        run: npm test --workspace @recruiter-radar/web -- --runInBand src/__tests__/api/internal/operator-mcp-route.test.ts
 
       - name: Type and production-build checks
         run: |
