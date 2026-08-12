@@ -1,9 +1,9 @@
 # Recruiter Radar — текущее состояние
 
-**Обновлено:** 2026-08-11
+**Обновлено:** 2026-08-12
 **Назначение:** единая runtime-grounded точка входа для архитектуры, доступа, платежей, доставки, Commercial Signal quality и production readiness.
 
-При конфликте применяются `AGENTS.md` и `CLAUDE.md`, затем фактический runtime-код и миграции. Датированные планы, отчёты и rollout notes являются историческими. Этот документ не подтверждает состояние production без отдельной проверки deployed SHA и окружения.
+При конфликте применяются `AGENTS.md` и `CLAUDE.md`, затем фактический runtime-код и миграции. Датированные планы, отчёты и rollout notes являются историческими. Production-статусы ниже относятся только к явно указанным SHA, workflow run и live-проверкам; один статус не выводится из другого.
 
 ## Архитектура
 
@@ -74,7 +74,7 @@
 
 - `CODE_VERIFIED`: **да** — #176, #177 и #178 находятся в `main`; exact-head CI #178 прошёл, включая Tests, Commercial Signal/Evidence Radar contracts, full Jest, PostgreSQL runtime/rollback, production acceptance, web build, responsive Playwright и Docker/Caddy smoke.
 - `QUALITY_VALIDATED`: **нет** — достаточного frozen human-reviewed validation/temporal holdout пока не подтверждено.
-- `DEPLOYED`: **не подтверждено** — deployed SHA и production flags в рамках этого snapshot не проверялись.
+- `DEPLOYED`: **код приложения подтверждён для `f85f3dd12bdfa28b420ef0cf0f2bceecc84d9a65`**, но Quality flags отдельно не проверены и из application deploy не выводятся.
 - `LIVE_VERIFIED`: **нет подтверждения** — real production source/provider/runtime behavior требует отдельной live проверки.
 
 Stage 2 operational states:
@@ -121,6 +121,40 @@ Promotion разрешается только registry policy и live verifier. 
 
 ## Current production status
 
+### Application
+
+- `CODE_MERGED`: **да** — PR #188 и #189 объединены в `main`; проверенный snapshot `main` — `f85f3dd12bdfa28b420ef0cf0f2bceecc84d9a65`.
+- `CI_VERIFIED`: **да** — push-to-main workflow `Tests` run `31528854942` завершился успешно для exact SHA `f85f3dd12bdfa28b420ef0cf0f2bceecc84d9a65`.
+- `DEPLOYED_SHA`: **`f85f3dd12bdfa28b420ef0cf0f2bceecc84d9a65`** — workflow `Deploy` run `31529443967` загрузил immutable image с этим тегом, переключил healthy web container и финализировал rollback guard.
+- `PUBLIC_HEALTH_VERIFIED`: **да** — тот же Deploy run получил HTTP 200 от публичного `/api/health` 11 августа 2026 года.
+- `LANDING_LIVE_VERIFIED`: **да** — тот же Deploy run подтвердил landing anchor, brand layout, favicon assets и dry-run `POST /api/landing-events`.
+
+### Commercial Signal
+
+- `CODE_VERIFIED`: **да** — contracts и authenticated browser fixture прошли на PR #189 и на push-to-main SHA выше.
+- `FLAGS_ENABLED`: **не подтверждено** — application deploy не доказывает значения production flags.
+- `CANARY_ENABLED`: **нет подтверждения** — текущий pass не включал canary и не менял rollout state.
+- `LIVE_SOURCE_VERIFIED`: **нет подтверждения** — fixture/contracts и публичный health не доказывают production source ingestion.
+
+### Quality
+
+- `HUMAN_REVIEWED`: **нет подтверждения**.
+- `QUALITY_VALIDATED`: **нет**.
+- Quality v2 и planner feedback не должны включаться глобально или через canary без отдельного решения на основании независимых human labels.
+
+### Providers
+
+- `PAYMENT_LIVE_VERIFIED`: **нет подтверждения** — конфигурационная readiness и contract tests не заменяют реальный test/live payment, refund и НПД receipt/correction evidence.
+- `EMAIL_LIVE_VERIFIED`: **нет подтверждения в этом pass** — provider runtime evidence должно проверяться отдельно для актуального configuration fingerprint.
+- `SOURCE_MATRIX_LIVE_VERIFIED`: **нет подтверждения**.
+
+### Production host
+
+- Read-only inventory 11 августа 2026 года: Ubuntu 18.04.6 LTS, kernel 4.15, Docker 24.0.2, Compose 2.18.1, Caddy 2.7.6, PostgreSQL 16.14; root filesystem использован на 53%.
+- Host не подключён к Ubuntu Pro/ESM. UFW неактивен; SSH допускает root login и password authentication. Это P1 operational debt, а не application outage.
+- На host присутствуют ежедневные локальные gzip SQL backups за 4–11 августа и rollback image для `247861527be364c1b5d4ab0a0327979e3171e7a1`; off-host copy и успешный restore drill не подтверждены.
+- Миграция host не авторизована. Безопасный inventory/backup/restore/cutover plan: `docs/production-host-upgrade.md`.
+
 - Production-readiness изменения PR #174 объединены в `main`: merge SHA `9e1231521c80a78687d17d49278a9d15a78fb6ad`.
 - Quality v2 correctness PR #176 объединён: merge SHA `d67f2e32a4ca5ad823a700e11d8388e89af4ef10`.
 - Search Preferences Isolation PR #177 объединён: merge SHA `01f459ee31d1a58d15c29a98fd956a900dc1e11e`.
@@ -129,8 +163,9 @@ Promotion разрешается только registry policy и live verifier. 
 - Evidence Radar rollout/healthcheck correction PR #185 объединён: merge SHA `df4adb96`.
 - Landing copy refresh PR #186 объединён: merge SHA `f1d83e5e`.
 - Product Motion System PR #187 объединён: текущий snapshot `main` начинается с merge SHA `35a1d2d44f2914b5c1567b6b37615ab5d606083e`.
-- Текущий deployed SHA, production env flags, credentials, provider availability, migrations и live health в рамках этого snapshot не проверены.
-- Поэтому текущая production формулировка: **code merged/verified where stated; production rollout not authorized; real Commercial Signal quality not validated by human-reviewed data**.
+- Technical/product consolidation PR #188 объединён: merge SHA `247861527be364c1b5d4ab0a0327979e3171e7a1`.
+- Premium visual/motion и correctness PR #189 объединён: merge/deployed SHA `f85f3dd12bdfa28b420ef0cf0f2bceecc84d9a65`.
+- Поэтому текущая production формулировка: **application code/CI/deploy/public health подтверждены для указанного exact SHA; production flags, live providers/source matrix и real Commercial Signal quality отдельно не подтверждены**.
 
 ## External blockers
 
