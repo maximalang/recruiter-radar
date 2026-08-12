@@ -10,6 +10,10 @@ const coveragePath = resolve(repoRoot, 'packages', 'db', 'scripts', 'source-cove
 const packageJsonPath = resolve(repoRoot, 'package.json')
 const hhIngestPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'ingest-hh.mjs')
 const hhLiveVerifierPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'verify-hh-live-pipeline.mjs')
+const jobSourceLiveVerifierPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'verify-job-source-live-pipeline.mjs')
+const sourceLiveDbRunnerPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'run-source-live-db-verifier.mjs')
+const credentialManifestPath = resolve(repoRoot, 'packages', 'db', 'source-credentials.json')
+const credentialVerifierPath = resolve(repoRoot, 'packages', 'db', 'scripts', 'verify-source-credentials.mjs')
 
 const SOURCE_IDS = [
   'hh',
@@ -77,7 +81,7 @@ describe('source live readiness contract', () => {
         fixture: expect.stringMatching(/^(tested|not-applicable)$/),
         contract: 'tested',
         configuration: expect.objectContaining({
-          mode: expect.stringMatching(/^(not-required|launch-required|provider-required)$/),
+          mode: expect.stringMatching(/^(not-required|launch-required|registration-required|provider-required)$/),
           acceptedEnvSets: expect.any(Array),
         }),
         live: expect.objectContaining({
@@ -125,15 +129,25 @@ describe('source live readiness contract', () => {
     expect(rabotaRossii).toEqual(expect.objectContaining({
       configured: true,
       liveReachable: true,
-      liveVerified: false,
-      finalState: 'blocked',
+      liveVerified: true,
+      finalState: 'digest-eligible',
+    }))
+
+    const superjob = report.sources.find((source: { id: string }) => source.id === 'superjob')
+    expect(superjob).toEqual(expect.objectContaining({
+      configured: false,
+      liveVerified: true,
+      registrationRequired: true,
+      providerRequired: false,
+      finalState: 'registration-required',
     }))
 
     const hh = report.sources.find((source: { id: string }) => source.id === 'hh')
     expect(hh).toEqual(expect.objectContaining({
       configured: false,
       liveVerified: false,
-      finalState: 'blocked',
+      registrationRequired: true,
+      finalState: 'registration-required',
     }))
 
     const linkedin = report.sources.find((source: { id: string }) => source.id === 'linkedin-company-pages')
@@ -157,7 +171,7 @@ describe('source live readiness contract', () => {
     const report = JSON.parse(result.stdout)
 
     expect(report.sources.find((source: { id: string }) => source.id === 'hh')).toEqual(
-      expect.objectContaining({ configured: true, liveVerified: false }),
+      expect.objectContaining({ configured: false, registrationRequired: true, liveVerified: false }),
     )
     expect(report.sources.find((source: { id: string }) => source.id === 'career-pages')).toEqual(
       expect.objectContaining({ configured: true, liveVerified: false }),
@@ -254,6 +268,7 @@ describe('source live readiness contract', () => {
   it('keeps HH live verification isolated, explicit, and independent of local env files', () => {
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
     expect(packageJson.scripts['verify:hh:smoke']).toBe('node packages/db/scripts/verify-hh-smoke.mjs')
+    expect(packageJson.scripts['verify:hh:oauth']).toBe('node packages/db/scripts/verify-hh-oauth-smoke.mjs')
     expect(packageJson.scripts['verify:hh:live-pipeline']).toBe('node packages/db/scripts/verify-hh-live-pipeline.mjs')
 
     expect(existsSync(hhLiveVerifierPath)).toBe(true)
@@ -266,5 +281,75 @@ describe('source live readiness contract', () => {
 
     const ingest = readFileSync(hhIngestPath, 'utf8')
     expect(ingest).toContain("process.env.SOURCE_ENV_FILE_DISABLED === 'true'")
+  })
+
+  it('provides disposable live DB verification for SuperJob and Rabota Rossii', () => {
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+    expect(packageJson.scripts['verify:superjob:live-db']).toBe(
+      'node packages/db/scripts/run-source-live-db-verifier.mjs superjob',
+    )
+    expect(packageJson.scripts['verify:rabota-rossii:live-db']).toBe(
+      'node packages/db/scripts/run-source-live-db-verifier.mjs rabota-rossii',
+    )
+
+    expect(existsSync(jobSourceLiveVerifierPath)).toBe(true)
+    expect(existsSync(sourceLiveDbRunnerPath)).toBe(true)
+
+    const verifier = readFileSync(jobSourceLiveVerifierPath, 'utf8')
+    expect(verifier).toContain("SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK !== 'isolated'")
+    expect(verifier).toContain("SOURCE_ENV_FILE_DISABLED: 'true'")
+    expect(verifier).toContain('source_signal_evidence_lineage_v1')
+    expect(verifier).toContain("candidate_eligible")
+    expect(verifier).toContain("publisher_type' = 'direct-employer")
+    expect(verifier).toContain("INTERVAL '30 days'")
+    expect(verifier).toContain('sensitive_payload_rows')
+
+    const runner = readFileSync(sourceLiveDbRunnerPath, 'utf8')
+    expect(runner).toContain("SOURCE_LIVE_DB_TEST_ACK !== 'isolated'")
+    expect(runner).toContain('CREATE DATABASE')
+    expect(runner).toContain('DROP DATABASE IF EXISTS')
+    expect(runner).toContain('WITH (FORCE)')
+  })
+
+  it('classifies source access and credential availability without storing secret values', () => {
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+    expect(packageJson.scripts['verify:source:credentials']).toBe(
+      'node packages/db/scripts/verify-source-credentials.mjs',
+    )
+    expect(existsSync(credentialManifestPath)).toBe(true)
+    expect(existsSync(credentialVerifierPath)).toBe(true)
+
+    const manifest = JSON.parse(readFileSync(credentialManifestPath, 'utf8'))
+    expect(Object.keys(manifest.classes).sort()).toEqual(['A', 'B', 'C', 'D'])
+    expect(Object.keys(manifest.sources).sort()).toEqual([...SOURCE_IDS].sort())
+    expect(manifest.sources.superjob).toEqual(expect.objectContaining({
+      accessClass: 'B',
+      registration: 'free',
+      runtimeAvailability: expect.objectContaining({ state: 'configured' }),
+    }))
+    expect(manifest.sources.superjob.credentialSets).toContainEqual(
+      expect.objectContaining({ names: ['SUPERJOB_API_APP_ID'] }),
+    )
+    expect(manifest.sources['rabota-rossii']).toEqual(expect.objectContaining({
+      accessClass: 'A',
+      credentialSets: [],
+    }))
+
+    const serialized = JSON.stringify(manifest)
+    expect(serialized).not.toMatch(/(secretValue|tokenValue|credentialValue)/i)
+
+    const verified = spawnSync(process.execPath, [credentialVerifierPath, '--json'], {
+      cwd: repoRoot,
+      env: sourceFreeEnv(),
+      encoding: 'utf8',
+    })
+    expect(verified.status).toBe(0)
+    const report = JSON.parse(verified.stdout)
+    expect(report.sources.find((source: { id: string }) => source.id === 'superjob')).toEqual(
+      expect.objectContaining({ accessClass: 'B', configuredNow: false }),
+    )
+    expect(report.sources.find((source: { id: string }) => source.id === 'rabota-rossii')).toEqual(
+      expect.objectContaining({ accessClass: 'A', configuredNow: true }),
+    )
   })
 })

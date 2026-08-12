@@ -350,7 +350,7 @@ registerRunnableScriptSource({
   evidenceTier: 'medium-signal',
   defaultConfidence: 0.66,
   fetchModes: ['file', 'provider-token'],
-  description: 'SuperJob vacancy coverage through app-key/provider mode; not promoted to digest until confidence gates pass.',
+  description: 'SuperJob vacancy coverage through the official app-key API with explicit direct-employer eligibility.',
   scriptPath: superjobScriptPath,
   absoluteScriptPath: superjobAbsoluteScriptPath,
 });

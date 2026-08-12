@@ -1,0 +1,49 @@
+[
+  {
+    "id": 1001,
+    "profession": "Backend Developer",
+    "firm_name": "Direct Product Company",
+    "company_domain": "direct-product.example",
+    "link": "https://example.test/superjob/1001",
+    "date_published": 1786532400,
+    "town": { "title": "Москва" },
+    "payment_from": 180000,
+    "payment_to": 250000,
+    "currency": "rub",
+    "type_of_work": { "title": "Полный рабочий день" },
+    "agency": { "id": 1, "title": "прямой работодатель" }
+  },
+  {
+    "id": 1002,
+    "profession": "Frontend Developer",
+    "firm_name": "Recruitment Agency",
+    "company_domain": "recruitment-agency.example",
+    "link": "https://example.test/superjob/1002",
+    "date_published": 1786532400,
+    "town": { "title": "Санкт-Петербург" },
+    "type_of_work": { "title": "Полный рабочий день" },
+    "agency": { "id": 2, "title": "кадровое агентство" }
+  },
+  {
+    "id": 1003,
+    "profession": "QA Engineer",
+    "firm_name": "Outstaff Publisher",
+    "company_domain": "outstaff.example",
+    "link": "https://example.test/superjob/1003",
+    "date_published": 1786532400,
+    "town": { "title": "Казань" },
+    "type_of_work": { "title": "Полный рабочий день" },
+    "agency": { "id": 3, "title": "аутсорс/аутстаф" }
+  },
+  {
+    "id": 1004,
+    "profession": "DevOps Engineer",
+    "firm_name": "Aggregator Publisher",
+    "company_domain": "aggregator.example",
+    "link": "https://example.test/superjob/1004",
+    "date_published": 1786532400,
+    "town": { "title": "Екатеринбург" },
+    "type_of_work": { "title": "Полный рабочий день" },
+    "agency": { "id": 4, "title": "Сервис-агрегатор" }
+  }
+]

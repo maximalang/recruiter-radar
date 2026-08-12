@@ -180,17 +180,21 @@ const liveConfigSummary = evaluatedReadiness.map((readiness) => ({
   sourceId: readiness.id,
   status: readiness.configured
     ? 'configured'
-    : readiness.providerRequired ? 'provider-required' : 'missing',
+    : readiness.registrationRequired
+      ? 'registration-required'
+      : readiness.providerRequired ? 'provider-required' : 'missing',
   configured: readiness.configured,
   launchRequired: readiness.configurationMode === 'launch-required',
   providerRequired: readiness.providerRequired,
+  registrationRequired: readiness.registrationRequired,
   providerConfigured: readiness.providerRequired && readiness.configured,
   acceptedEnvSets: readiness.acceptedEnvSets.map((envSet) => envSet.join(' + ')),
 }));
 const missingLiveConfig = liveConfigSummary.filter((item) => item.status === 'missing');
 const providerRequiredLiveConfig = liveConfigSummary.filter((item) => item.status === 'provider-required');
+const registrationRequiredLiveConfig = liveConfigSummary.filter((item) => item.status === 'registration-required');
 const blockingLiveConfig = includeProviderRequired
-  ? [...missingLiveConfig, ...providerRequiredLiveConfig]
+  ? [...missingLiveConfig, ...registrationRequiredLiveConfig, ...providerRequiredLiveConfig]
   : missingLiveConfig;
 
 if (requireLiveConfig && blockingLiveConfig.length > 0) {
@@ -221,6 +225,12 @@ console.log(JSON.stringify({
       acceptedEnvSets: item.acceptedEnvSets,
     })),
   liveConfigProviderRequired: providerRequiredLiveConfig
+    .map((item) => ({
+      sourceId: item.sourceId,
+      status: item.status,
+      acceptedEnvSets: item.acceptedEnvSets,
+    })),
+  liveConfigRegistrationRequired: registrationRequiredLiveConfig
     .map((item) => ({
       sourceId: item.sourceId,
       status: item.status,

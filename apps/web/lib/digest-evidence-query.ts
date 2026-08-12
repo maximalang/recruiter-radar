@@ -127,6 +127,8 @@ export const DIGEST_EVIDENCE_QUERY = String.raw`WITH source_signal_rows AS (
       -- originate a lead candidate (Gate A/B/C). signal_type='job_posting'.
       signal.signal_type = 'job_posting'
         AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages', 'regional-job-boards')
+        AND COALESCE(signal.payload ->> 'candidate_eligible', 'true') = 'true'
+        AND (signal.source <> 'superjob' OR signal.payload ->> 'candidate_eligible' = 'true')
     )
     OR
     (

@@ -37,7 +37,7 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
   })
 });
 
-export const DIGEST_SOURCES = Object.freeze(['hh', 'career-pages', 'rabota-rossii']);
+export const DIGEST_SOURCES = Object.freeze(['hh', 'career-pages', 'rabota-rossii', 'superjob']);
 
 export const PROMOTION_STATUSES = Object.freeze({
   'digest-allowed': 'Allowed in digest selection',

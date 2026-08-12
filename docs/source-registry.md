@@ -15,19 +15,18 @@ Last reconciled: **2026-08-12** against `source-policy.json`, `source-readiness.
 
 ## Policy and observed-runtime snapshot (2026-08-12 reconciliation)
 
-**Digest-allowed by canonical policy: 3** — `hh`, `career-pages`, and `rabota-rossii`.
-`superjob` and `habr-career` remain
-`blocked-from-digest-pending-confidence-tests`: runnable or historically healthy probes do not
-make either source digest-delivering. Operational health is separate from promotion status and
-must be verified against the current environment.
+**Digest-allowed by canonical policy: 4** — `hh`, `career-pages`, `rabota-rossii`, and
+`superjob`. `habr-career` remains `blocked-from-digest-pending-confidence-tests`.
+Operational health is separate from promotion status and must be verified against the current
+environment.
 
 | source | live probe | status | note |
 |---|---|---|---|
-| rabota-rossii | current live fetch+normalize: 200/200 records | digest-allowed; live-reachable, not full-path verified | isolated live ingest/evidence run still required |
+| rabota-rossii | current disposable live DB: 100 signals/evidence/lineage across 80 orgs | digest-allowed; live-verified | official public API; no credential required |
 | career-pages | current controlled crawl: 5/12 targets parsed, 381 normalized | digest-allowed; live-reachable, not full-path verified | 7 targets explicitly page-unreachable; isolated live ingest/evidence run still required |
 | habr-career | historical HTTP 200 | blocked from digest | confidence and legal/robots gates remain open in policy |
-| superjob | historical HTTP 301 without app-id | blocked from digest | app-id/provider path still requires confidence promotion |
-| hh | current `/areas` HTTP 200; `/vacancies` HTTP 403 | digest-allowed; operationally blocked | requires verified RU egress or `HH_PROXY_URL`, then the isolated live-pipeline verifier |
+| superjob | current disposable live DB: 40 signals/evidence/lineage | digest-allowed; live-verified | production app-id found; 32 direct-employer eligible, 8 non-direct rejected |
+| hh | unauthenticated `/areas` HTTP 200; `/vacancies` HTTP 403 | digest-allowed; registration-required | official application OAuth implemented; `HH_CLIENT_ID`/`HH_CLIENT_SECRET` absent, so geo is not yet proven |
 | egrul-fns / transparent-business / fedresurs | n/a | enrichment/context only | never originate leads |
 | tech-job-boards / linkedin / regional / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set |
 
@@ -93,13 +92,13 @@ A source reaching the digest is gated in **two** independent places. Both must a
 
 > `exportSourceCoverageDetails()` in the registry derives
 > `inDigest` as `(source in PRIMARY_INGESTION_SOURCES) AND (promotionStatus === 'digest-allowed')`.
-> As of the 2026-08-11 policy reconciliation that set is `hh`, `career-pages`, and
-> `rabota-rossii`. `superjob`, `habr-career`, and the other whitelisted sources are present in
+> As of the 2026-08-12 policy reconciliation that set is `hh`, `career-pages`,
+> `rabota-rossii`, and `superjob`. `habr-career` and the other whitelisted sources are present in
 > ingestion or SQL paths but remain `blocked-from-digest-pending-confidence-tests`. Promote a
 > source only by satisfying its gates and changing the canonical machine-readable policy; never
 > by editing this document alone.
 
-**Policy-allowed digest sources today: `hh`, `career-pages`, and `rabota-rossii`.** Everything
+**Policy-allowed digest sources today: `hh`, `career-pages`, `rabota-rossii`, and `superjob`.** Everything
 else is blocked-from-digest, supporting-evidence-only, or never-lead-originating. This policy
 statement does not prove that any source is currently configured or healthy in production.
 
@@ -109,24 +108,23 @@ statement does not prove that any source is currently configured or healthy in p
 
 | id | class / evidence tier | leadEligibility | promotionStatus | live? |
 |---|---|---|---|---|
-| **hh** | primary-platform / medium-signal (0.74) | digest-lead-originating | **digest-allowed** | blocked: search API returns 403 from current egress |
+| **hh** | primary-platform / medium-signal (0.74) | digest-lead-originating | **digest-allowed** | registration-required; authenticated live path not yet verified |
 | **career-pages** | company-surface / high-signal (0.92) | digest-lead-originating | **digest-allowed** | live-reachable (partial), not live-verified |
-| **rabota-rossii** | primary-platform / medium-signal (0.70) | confidence-gated-evidence | **digest-allowed** | live-reachable, not live-verified |
+| **rabota-rossii** | primary-platform / medium-signal (0.70) | confidence-gated-evidence | **digest-allowed** | live-verified |
 | **egrul-fns** | registry-reference / high-signal (0.90) | enrichment-only | never-lead-originating | live + provider |
 | **transparent-business-fns** | registry-reference / high-signal (0.86) | enrichment-only | never-lead-originating | provider/snapshot only |
 | **fedresurs** | market-signal / context-only (0.62) | context-only | never-lead-originating | provider/snapshot only |
 
 **hh** — primary platform. Code paths: `fetch-hh.mjs` → `ingest-hh.mjs` → `report-hh-digest.mjs`.
-- Blocker (policy): `HH_USER_AGENT` must identify a real registered app/contact before broad
-  production live checks; controlled live matrix (roles × regions × pages) must be recorded.
-- **Operational blocker (current):** `/areas` returns HTTP 200 but `/vacancies` returns HTTP 403
-  from the current egress. The transport no longer mixes `fetch-socks`, global fetch, and a
+- Blocker (policy): official application OAuth now supports `HH_CLIENT_ID` + `HH_CLIENT_SECRET`,
+  Bearer token caching/expiry, one refresh after HTTP 401, and mandatory HH/User-Agent headers.
+- **Operational blocker (current):** only the unauthenticated `/vacancies` probe returned HTTP 403.
+  This is not treated as proof of a geo block. The transport no longer mixes `fetch-socks`, global fetch, and a
   dispatcher from different Undici copies: the adapter builds the SOCKS connector and Agent
   with the installed Undici package and pairs it with that package's `fetch`. This removes the
-  `invalid onRequestStart` architecture bug, but it cannot remove HH's geo/IP restriction.
-  `npm run verify:hh:live-pipeline` is the required proof in a disposable isolated DB after a
-  verified RU-resident runner or `HH_PROXY_URL` is available. Until it passes, HH is blocked,
-  not live-verified.
+  `invalid onRequestStart` architecture bug. `npm run verify:hh:live-pipeline` is the required
+  proof in a disposable isolated DB after the missing free-registration credentials are supplied.
+  RU-resident egress/`HH_PROXY_URL` is only a fallback if authenticated target-runtime access fails.
 
 **career-pages** — the highest-trust source (direct company hiring surface, default confidence
 0.92, the only source SQL classifies as `direct_hiring_proof` unconditionally). Guarded against
@@ -175,8 +173,9 @@ of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
   (needs `RABOTA_ROSSII_LIVE=1`; optional `DATABASE_URL` adds HH-overlap dedupe). Live verifier
   **PASSES** as of 2026-08-12: 200 records received and 200 normalized across Moscow, Saint
   Petersburg, and federal queries. This proves current fetch/normalization reachability, not the
-  DB evidence path; an isolated live ingest is still required before `live-verified`. Do **not**
-  relax the 60% freshness threshold; filter the fetch to recent postings instead.
+  DB evidence path. A second 2026-08-12 disposable production-runtime verifier persisted 100
+  signals, evidence items, and lineage rows across 80 organizations, so the source is now
+  `live-verified`. Do **not** relax the 60% freshness threshold; filter the fetch to recent postings instead.
 - For `rabota-rossii`, an INN-based `org_external_id` *is* org-level → but INN-match is now
   classified as `platform_aggregation` (gate C), not `direct_hiring_proof` — only career-pages is
   a direct surface (see memory `project_trudvsem_platform_aggregation`).
@@ -192,17 +191,18 @@ originate leads. `egrul-fns`: 10-digit legal-entity INN only; skip 12-digit IP/p
 
 | id | class / evidence tier | leadEligibility | promotionStatus | live? |
 |---|---|---|---|---|
-| **superjob** | primary-platform / medium-signal (0.66) | confidence-gated-evidence | **blocked-from-digest-pending-confidence-tests** | app-id / provider path |
+| **superjob** | primary-platform / medium-signal (0.66) | confidence-gated-evidence | **digest-allowed** | free-registration app-id; live-verified |
 | **habr-career** | primary-platform / medium-signal (0.69) | confidence-gated-evidence | **blocked-from-digest-pending-confidence-tests** | public/provider path; legal and confidence gates open |
 | **tech-job-boards** | primary-platform / medium-signal (0.68) | confidence-gated-evidence | blocked-from-digest | live + provider |
 | **linkedin-company-pages** | primary-platform / medium-signal (0.72) | confidence-gated-evidence | blocked-from-digest | provider-token only |
 | **company-site** | company-surface / medium-signal (0.68) | enrichment-only | supporting-evidence-only | live-public |
 | **funding-business-signals** | market-signal / context-only (0.58) | context-only | never-lead-originating | live + provider |
 
-**superjob** — needs `SUPERJOB_API_APP_ID` (live API) or a compliant provider snapshot;
-anonymous API is not a production path. It may participate in primary ingestion, but policy
-holds it out of digest delivery until confidence tests justify promotion. Pagination is built in
-(5 pages × 100 = 500-result cap, the API's own ceiling).
+**superjob** — needs the free-registration `SUPERJOB_API_APP_ID`; anonymous API is not a
+production path. The 2026-08-12 production-runtime disposable DB verifier persisted 40 live
+vacancies end-to-end. Explicit publisher attribution admitted 32 direct-employer postings and
+rejected 8 recruitment-agency/outsourcing/aggregator postings from candidate origination, with
+zero eligibility mismatches and no sensitive payload fields. Pagination remains built in.
 
 **habr-career** — public HTML/provider paths exist, but policy holds the source out of digest
 delivery until the outstanding legal/robots review and confidence tests are complete. Only

@@ -2,7 +2,7 @@ import sourceReadinessContract from '../source-readiness.json' with { type: 'jso
 
 const IMPLEMENTATION_STATES = new Set(['implemented']);
 const TEST_STATES = new Set(['tested', 'not-applicable']);
-const CONFIGURATION_MODES = new Set(['not-required', 'launch-required', 'provider-required']);
+const CONFIGURATION_MODES = new Set(['not-required', 'launch-required', 'registration-required', 'provider-required']);
 const LIVE_STATES = new Set(['unverified', 'reachable', 'verified', 'blocked']);
 const CONFIDENCE_STATES = new Set(['approved', 'pending', 'not-applicable']);
 const ELIGIBILITY_STATES = new Set([
@@ -37,7 +37,8 @@ export function evaluateSourceReadiness(id, source, pipelineProfiles, env = proc
     && source.live.verifiedAt.trim() !== ''
     && source.live.evidence.length > 0;
   const providerRequired = source.configuration.mode === 'provider-required';
-  const finalState = resolveFinalState({ source, configured, liveVerified, providerRequired });
+  const registrationRequired = source.configuration.mode === 'registration-required';
+  const finalState = resolveFinalState({ source, configured, liveVerified, providerRequired, registrationRequired });
   const states = [
     'implemented',
     source.fixture === 'tested' ? 'fixture-tested' : null,
@@ -48,6 +49,7 @@ export function evaluateSourceReadiness(id, source, pipelineProfiles, env = proc
     source.confidence === 'approved' ? 'confidence-approved' : null,
     source.eligibility,
     providerRequired ? 'provider-required' : null,
+    registrationRequired ? 'registration-required' : null,
     source.legalReview === 'required' ? 'legal-review-required' : null,
     finalState === 'blocked' ? 'blocked' : null,
   ].filter(Boolean);
@@ -69,6 +71,7 @@ export function evaluateSourceReadiness(id, source, pipelineProfiles, env = proc
     confidenceApproved: source.confidence === 'approved',
     eligibility: source.eligibility,
     providerRequired,
+    registrationRequired,
     legalReview: source.legalReview,
     requiresLiveVerification: source.requiresLiveVerification,
     finalState,
@@ -124,8 +127,11 @@ export function validateSourceReadinessContract(contract) {
   return true;
 }
 
-function resolveFinalState({ source, configured, liveVerified, providerRequired }) {
-  if (!configured) return providerRequired ? 'provider-required' : 'blocked';
+function resolveFinalState({ source, configured, liveVerified, providerRequired, registrationRequired }) {
+  if (!configured) {
+    if (registrationRequired) return 'registration-required';
+    return providerRequired ? 'provider-required' : 'blocked';
+  }
   if (source.legalReview === 'required') return 'legal-review-required';
   if (source.live.state === 'blocked') return 'blocked';
   if (source.requiresLiveVerification && !liveVerified) return 'blocked';

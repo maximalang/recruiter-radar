@@ -172,11 +172,11 @@ describe('MultiSourceLeadGenerator', () => {
 
       expect(activeSources).toEqual([
         'hh',
+        'superjob',
         'career-pages',
         'egrul-fns',
         'rabota-rossii',
       ])
-      expect(activeSources).not.toContain('superjob')
       expect(activeSources).not.toContain('linkedin-company-pages')
       expect(activeSources).not.toContain('funding-business-signals')
     })
@@ -254,12 +254,11 @@ describe('MultiSourceLeadGenerator', () => {
     })
 
     it.each([
-      ['superjob'],
       ['habr-career'],
       ['linkedin-company-pages'],
       ['tech-job-boards'],
       ['regional-job-boards'],
-    ])('does not enable provider-gated source %s in the canonical default set', (source) => {
+    ])('does not enable blocked source %s in the canonical default set', (source) => {
       expect(generator['activeSources']).not.toContain(source)
     })
 

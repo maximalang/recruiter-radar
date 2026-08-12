@@ -19,7 +19,7 @@ describe('canonical source policy adapter', () => {
 
   it('admits only digest-allowed hiring evidence as actionable origins', () => {
     expect(getSourceRegistry().filter(source => canOriginateActionableLead(source.id)).map(source => source.id))
-      .toEqual(['hh', 'career-pages', 'rabota-rossii'])
+      .toEqual(['hh', 'superjob', 'career-pages', 'rabota-rossii'])
   })
 
   it('keeps entity enrichment in defaults without allowing it to originate a lead', () => {

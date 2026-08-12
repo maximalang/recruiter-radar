@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
 import {
+  describeHhFailure,
   fetchHhVacancyPages,
   resolveHhVacancySearchConfig,
 } from './adapters/hh.mjs';
@@ -100,6 +101,7 @@ try {
     error instanceof Error && error.cause instanceof Error ? error.cause.message : '';
 
   console.error(`HH ingestion failed: ${message}`);
+  console.error(`HH diagnostic: ${JSON.stringify(describeHhFailure(error))}`);
 
   if (causeMessage) {
     console.error(`cause: ${causeMessage}`);

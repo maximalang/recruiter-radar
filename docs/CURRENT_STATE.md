@@ -99,11 +99,13 @@ Stage 2 operational states:
 
 `status: active` означает runnable contract, а не одновременно live-configured, legally approved и digest-allowed. Machine-readable source of truth для priority, confidence, lead eligibility и promotion status — `packages/db/source-policy.json`; `packages/db/scripts/source-registry.mjs` проецирует эту policy в runtime readiness и coverage report.
 
-Operational readiness отдельно зафиксирован в `packages/db/source-readiness.json`. На 2026-08-12
-все 15 источников имеют implemented/fixture-tested/contract-tested состояние; только
-`career-pages` и `rabota-rossii` подтверждены как live-reachable, ни один источник не заявлен
-live-verified. Для остальных явно перечислены provider/config, legal, confidence или внешний
-network blocker. Policy eligibility нельзя трактовать как текущее runtime health.
+Operational readiness отдельно зафиксирован в `packages/db/source-readiness.json`, а классы
+доступа A/B/C/D и credential names без значений — в `packages/db/source-credentials.json`.
+На 2026-08-12 `rabota-rossii` и `superjob` имеют production-runtime disposable-DB
+live verification. `career-pages` остаётся частично live-reachable. HH application OAuth
+реализован, но authenticated live proof ждёт `HH_CLIENT_ID`/`HH_CLIENT_SECRET`; прежний
+анонимный HTTP 403 не считается доказанным geo blocker. Policy eligibility нельзя
+трактовать как текущее runtime health.
 
 Source ingestion сохраняет append-only `source_signal_evidence_lineage_v1`: signal и evidence
 привязаны к одной organization вместе с source family, original URL/external ID,
@@ -111,7 +113,9 @@ fetch/publish/normalize timestamps, extraction method, confidence snapshot и or
 resolution reason. Payload digest candidate хранит точные signal/evidence/source-record IDs и
 URLs, выбранные для candidate, вместо восстановления provenance из изменяемого состояния.
 
-На 2026-08-11 `superjob` и `habr-career` имеют `blocked-from-digest-pending-confidence-tests`. Наличие runnable ingestion path или исторически успешного live probe не делает их digest-delivering; документация не должна опережать canonical promotion status.
+На 2026-08-12 `superjob` переведён в `digest-allowed` только после live
+fetch/normalize/DB/evidence/lineage и direct-employer eligibility proof. `habr-career` остаётся
+`blocked-from-digest-pending-confidence-tests` до legal/robots и live verification.
 
 Зарегистрированные source IDs:
 

@@ -2,6 +2,11 @@ import { SocksClient } from 'socks';
 import { Agent, buildConnector, fetch as undiciFetch } from 'undici';
 
 import { fetchJson, SourceHttpError } from './source-http.mjs';
+import {
+  HhOAuthError,
+  resetHhApplicationTokenCache,
+  resolveHhApplicationAuthorization,
+} from './hh-oauth.mjs';
 import { RateLimiter } from './rate-limiter.mjs';
 
 const HH_VACANCIES_URL = 'https://api.hh.ru/vacancies';
@@ -27,10 +32,9 @@ const MAX_PAGES = 20;
 export class HhAccessForbiddenError extends Error {
   constructor(safeUrl, cause) {
     super(
-      'HH search API returned HTTP 403 forbidden. The dictionary endpoints '
-        + 'answer 200, so this is an IP/geo restriction on HH search — not an '
-        + 'adapter bug or a bad user agent. Run the HH ingest from an '
-        + 'RU-resident runner or proxy.',
+      'HH search API returned HTTP 403 forbidden. This response alone does not '
+        + 'prove a geo restriction; inspect the safe HH diagnostic after trying '
+        + 'official application OAuth before considering an RU-resident egress fallback.',
       { cause },
     );
     this.name = 'HhAccessForbiddenError';
@@ -251,7 +255,12 @@ export function buildHhVacanciesUrl(config, page = 0) {
   return url;
 }
 
-export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancySearchConfig() }) {
+export async function fetchHhVacancyPages({
+  userAgent,
+  config = resolveHhVacancySearchConfig(),
+  env = process.env,
+  oauthFetchImpl,
+}) {
   const normalizedUserAgent = toNonEmptyText(userAgent);
 
   if (!normalizedUserAgent) {
@@ -266,6 +275,10 @@ export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancy
   // Pair the dispatcher with undici's own fetchImpl (same undici copy) — see
   // resolveHhProxyFetch. null when no proxy: the direct path stays on global fetch.
   const proxyFetch = resolveHhProxyFetch();
+  const oauthEnv = { ...env, HH_USER_AGENT: normalizedUserAgent };
+  let authorization = await resolveHhApplicationAuthorization(oauthEnv, {
+    ...(oauthFetchImpl ? { fetchImpl: oauthFetchImpl } : {}),
+  });
 
   for (let page = 0; page < config.pages; page += 1) {
     // Rate limiting: wait if we've exceeded 30 req/min
@@ -278,21 +291,37 @@ export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancy
       }
     }
     let payload;
-    try {
-      payload = await fetchJson(url, {
+    const fetchPage = () => fetchJson(url, {
         sourceName: 'hh',
         headers: {
           accept: 'application/json',
           'hh-user-agent': normalizedUserAgent,
           'user-agent': normalizedUserAgent,
+          ...(authorization ? { authorization } : {}),
         },
         ...(proxyDispatcher ? { dispatcher: proxyDispatcher, fetchImpl: proxyFetch } : {}),
       });
+    try {
+      payload = await fetchPage();
     } catch (error) {
-      if (isForbiddenError(error)) {
+      if (authorization && error instanceof SourceHttpError && error.status === 401) {
+        resetHhApplicationTokenCache();
+        authorization = await resolveHhApplicationAuthorization(oauthEnv, {
+          ...(oauthFetchImpl ? { fetchImpl: oauthFetchImpl } : {}),
+        });
+        try {
+          payload = await fetchPage();
+        } catch (retryError) {
+          if (isForbiddenError(retryError)) {
+            throw new HhAccessForbiddenError(retryError.url, retryError);
+          }
+          throw retryError;
+        }
+      } else if (isForbiddenError(error)) {
         throw new HhAccessForbiddenError(error.url, error);
+      } else {
+        throw error;
       }
-      throw error;
     }
     const pageItems = Array.isArray(payload.items) ? payload.items : [];
     const payloadFound = Number(payload.found);
@@ -329,6 +358,30 @@ export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancy
     items,
     config: summarizeHhSearchConfig(config),
   };
+}
+
+export function describeHhFailure(error) {
+  const status = Number.isInteger(error?.status)
+    ? error.status
+    : Number.isInteger(error?.cause?.status) ? error.cause.status : null;
+  const message = error instanceof Error ? error.message : String(error);
+  const errorType = error instanceof HhOAuthError
+    ? error.type
+    : extractHhErrorType(message) ?? (error instanceof HhAccessForbiddenError ? 'forbidden' : 'unknown');
+
+  return {
+    status,
+    errorType,
+    captcha: /captcha/i.test(errorType) || /captcha/i.test(message),
+    oauthFailure: error instanceof HhOAuthError || status === 401,
+    rateLimit: status === 429 || /rate.?limit/i.test(errorType),
+    networkOrGeoFailure: error instanceof HhAccessForbiddenError || status === null,
+  };
+}
+
+function extractHhErrorType(message) {
+  const match = String(message).match(/(?:"type"\s*:\s*"|\btype[=: ]+)([a-z0-9_.-]{1,80})/i);
+  return match?.[1] ?? null;
 }
 
 export function summarizeHhSearchConfig(config) {

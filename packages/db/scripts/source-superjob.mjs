@@ -152,6 +152,7 @@ function normalizeSuperjobRecord(record, { fetchedAt, lineNumber }) {
   // Prefer SuperJob-native fields (live API mode), but fall back to the
   // generic names so file mode (SUPERJOB_INPUT_FILE) and provider mode —
   // both of which carry generically-shaped records — normalize correctly.
+  const publisher = classifySuperjobPublisher(record.agency);
   const mapped = {
     // Company
     company_name: record.firm_name ?? record.company_name,
@@ -179,7 +180,10 @@ function normalizeSuperjobRecord(record, { fetchedAt, lineNumber }) {
     // Experience
     experience: record.experience?.title ?? record.experience,
     // Agency (direct employer vs recruitment agency)
-    agency: record.agency?.title ?? record.agency,
+    publisher_type: publisher.type,
+    publisher_type_id: publisher.id,
+    publisher_type_label: publisher.label,
+    candidate_eligible: publisher.candidateEligible,
     // Address
     address: record.address?.city ?? record.address?.street ?? record.address,
     // Tags
@@ -189,6 +193,26 @@ function normalizeSuperjobRecord(record, { fetchedAt, lineNumber }) {
   };
 
   return normalizeJobPostingRecord(mapped, { fetchedAt, lineNumber, sourceId: SOURCE_ID }, { defaultBoard: 'superjob' });
+}
+
+function classifySuperjobPublisher(agency) {
+  const id = Number.isInteger(Number(agency?.id)) ? Number(agency.id) : null;
+  const label = typeof agency?.title === 'string' && agency.title.trim() !== ''
+    ? agency.title.trim()
+    : null;
+  const type = new Map([
+    [1, 'direct-employer'],
+    [2, 'recruitment-agency'],
+    [3, 'outsourcing'],
+    [4, 'aggregator'],
+  ]).get(id) ?? 'unknown';
+
+  return {
+    id,
+    label,
+    type,
+    candidateEligible: type === 'direct-employer',
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
