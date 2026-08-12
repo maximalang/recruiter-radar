@@ -5,11 +5,6 @@ DROP TABLE IF EXISTS public.better_auth_identity_links;
 
 SET LOCAL search_path = better_auth, public;
 
-DROP TABLE IF EXISTS "oauthConsent";
-DROP TABLE IF EXISTS "oauthAccessToken";
-DROP TABLE IF EXISTS "oauthRefreshToken";
-DROP TABLE IF EXISTS "oauthClient";
-DROP TABLE IF EXISTS "jwks";
 DROP TABLE IF EXISTS "verification";
 DROP TABLE IF EXISTS "account";
 DROP TABLE IF EXISTS "session";
