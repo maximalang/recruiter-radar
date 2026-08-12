@@ -49,13 +49,16 @@ COPY --from=builder /app/node_modules/undici ./node_modules/undici
 # Copy migration tooling for startup migrations
 COPY --from=builder /app/packages/db/scripts/migrate.mjs ./packages/db/scripts/migrate.mjs
 COPY --from=builder /app/packages/db/scripts/reconcile-payment-success-telemetry.mjs ./packages/db/scripts/reconcile-payment-success-telemetry.mjs
+COPY --from=builder /app/packages/db/scripts/verify-hh-live-pipeline.mjs ./packages/db/scripts/verify-hh-live-pipeline.mjs
 COPY --from=builder /app/packages/db/schema ./packages/db/schema
 COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
 
 # The Commercial Signal route launches this script as a child process. Import
-# both its default path and the operator-gated HH adapter in the final image so
-# missing standalone dependencies fail the build rather than a production run.
-RUN node --input-type=module -e "await import('./packages/db/scripts/execute-query-planner-v2.mjs'); await import('./packages/db/scripts/adapters/hh.mjs')"
+# its default path and every import-safe HH runtime dependency in the final
+# image. The CLI itself executes at module load, so assert its traced path and
+# import the adapter + lineage writer separately; missing standalone files or
+# dependencies then fail the image build rather than a production run.
+RUN node --input-type=module -e "const { accessSync } = await import('node:fs'); accessSync('./packages/db/scripts/ingest-hh.mjs'); accessSync('./packages/db/scripts/verify-hh-live-pipeline.mjs'); await import('./packages/db/scripts/execute-query-planner-v2.mjs'); await import('./packages/db/scripts/adapters/hh.mjs'); await import('./packages/db/scripts/lib/source-lineage-writer.mjs')"
 
 # Startup script: run migrations, then start server
 COPY --from=builder /app/apps/web/docker-entrypoint.sh ./docker-entrypoint.sh

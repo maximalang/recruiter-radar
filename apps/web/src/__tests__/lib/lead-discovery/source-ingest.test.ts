@@ -50,13 +50,14 @@ describe('source-ingest', () => {
 
       const result = await ingestSource('hh')
 
-      expect(result).toEqual({
+      expect(result).toEqual(expect.objectContaining({
         source: 'hh',
         success: true,
+        outcome: 'ingested',
         fetchedCount: 25,
         upsertedCount: 20,
         log: expect.any(String),
-      })
+      }))
     })
 
     it('returns error for unknown source', async () => {
@@ -154,6 +155,109 @@ describe('source-ingest', () => {
 
       expect(result.fetchedCount).toBe(3)
       expect(result.upsertedCount).toBe(15)
+    })
+
+    it('parses a pretty-printed JSON runtime summary', async () => {
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        callback(null, JSON.stringify({
+          source: 'career-pages',
+          action: 'pipeline',
+          recordsReceived: 3,
+          parsedRecords: 3,
+          normalizedRecords: 2,
+          duplicateRecords: 1,
+          skippedRecords: 0,
+          signalUpsertsCompleted: 2,
+        }, null, 2) + '\npost-summary diagnostic', '')
+      })
+
+      const result = await ingestSource('career-pages')
+
+      expect(result).toEqual(expect.objectContaining({
+        success: true,
+        outcome: 'ingested-with-duplicates',
+        fetchedCount: 3,
+        upsertedCount: 2,
+        diagnostics: expect.objectContaining({
+          parsedCount: 3,
+          normalizedCount: 2,
+          duplicateCount: 1,
+          skippedCount: 0,
+        }),
+      }))
+    })
+
+    it('fails closed when a successful process emits no runtime summary', async () => {
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        callback(null, 'crawl completed', '')
+      })
+
+      const result = await ingestSource('career-pages')
+
+      expect(result).toEqual(expect.objectContaining({
+        success: false,
+        outcome: 'missing-summary',
+        error: expect.stringContaining('structured runtime summary'),
+      }))
+    })
+
+    it('distinguishes an unexplained zero from an expected zero', async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd, _args, opts: any, callback: any) => {
+          callback(null, JSON.stringify({
+            source: 'rabota-rossii',
+            recordsReceived: 0,
+            parsedRecords: 0,
+            normalizedRecords: 0,
+            signalUpsertsCompleted: 0,
+          }), '')
+        })
+        .mockImplementationOnce((_cmd, _args, opts: any, callback: any) => {
+          callback(null, JSON.stringify({
+            source: 'rabota-rossii',
+            recordsReceived: 0,
+            parsedRecords: 0,
+            normalizedRecords: 0,
+            signalUpsertsCompleted: 0,
+            zeroReason: 'no-records-for-query',
+          }), '')
+        })
+
+      const unexplained = await ingestSource('rabota-rossii')
+      const expected = await ingestSource('rabota-rossii')
+
+      expect(unexplained).toEqual(expect.objectContaining({ success: false, outcome: 'unexpected-zero' }))
+      expect(expected).toEqual(expect.objectContaining({ success: true, outcome: 'expected-zero' }))
+    })
+
+    it('distinguishes normalization-zero from ingestion-zero', async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd, _args, opts: any, callback: any) => {
+          callback(null, JSON.stringify({
+            source: 'hh',
+            recordsReceived: 4,
+            parsedRecords: 4,
+            normalizedRecords: 0,
+            skippedRecords: 4,
+            signalUpsertsCompleted: 0,
+          }), '')
+        })
+        .mockImplementationOnce((_cmd, _args, opts: any, callback: any) => {
+          callback(null, JSON.stringify({
+            source: 'hh',
+            recordsReceived: 4,
+            parsedRecords: 4,
+            normalizedRecords: 4,
+            skippedRecords: 0,
+            signalUpsertsCompleted: 0,
+          }), '')
+        })
+
+      const normalizationZero = await ingestSource('hh')
+      const ingestionZero = await ingestSource('hh')
+
+      expect(normalizationZero).toEqual(expect.objectContaining({ success: false, outcome: 'normalization-zero' }))
+      expect(ingestionZero).toEqual(expect.objectContaining({ success: false, outcome: 'ingestion-zero' }))
     })
   })
 
@@ -927,6 +1031,8 @@ describe('source-ingest', () => {
           callback(null, JSON.stringify({ source: 'habr-career', recordsReceived: 5, signalUpsertsCompleted: 4 }), '')
         } else if (script.includes('rabota-rossii')) {
           callback(null, JSON.stringify({ source: 'rabota-rossii', recordsReceived: 7, signalUpsertsCompleted: 6 }), '')
+        } else if (script.includes('career-pages')) {
+          callback(null, JSON.stringify({ source: 'career-pages', recordsReceived: 4, signalUpsertsCompleted: 4 }), '')
         } else {
           callback(null, '', '')
         }

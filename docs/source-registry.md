@@ -8,12 +8,12 @@
 > policy; never relax policy to preserve prose. Per-source legal/robots reviews live in
 > `docs/source-review/`; cross-cutting policy in `docs/source-priority-policy.md`.
 
-Last reconciled: **2026-08-11** against `source-policy.json`, `source-registry.mjs`,
-`source-digest-evidence.sql`, and `docs/source-review/`.
+Last reconciled: **2026-08-12** against `source-policy.json`, `source-readiness.json`,
+`source-registry.mjs`, `source-digest-evidence.sql`, and `docs/source-review/`.
 
 ---
 
-## Policy and observed-runtime snapshot (2026-08-11 reconciliation)
+## Policy and observed-runtime snapshot (2026-08-12 reconciliation)
 
 **Digest-allowed by canonical policy: 3** — `hh`, `career-pages`, and `rabota-rossii`.
 `superjob` and `habr-career` remain
@@ -23,11 +23,11 @@ must be verified against the current environment.
 
 | source | live probe | status | note |
 |---|---|---|---|
-| rabota-rossii | historical HTTP 200 | digest-allowed | trudvsem open-data; multi-region + paged |
-| career-pages | historical HTTP 200 | digest-allowed | direct company surface; daily-radar primary |
+| rabota-rossii | current live fetch+normalize: 200/200 records | digest-allowed; live-reachable, not full-path verified | isolated live ingest/evidence run still required |
+| career-pages | current controlled crawl: 5/12 targets parsed, 381 normalized | digest-allowed; live-reachable, not full-path verified | 7 targets explicitly page-unreachable; isolated live ingest/evidence run still required |
 | habr-career | historical HTTP 200 | blocked from digest | confidence and legal/robots gates remain open in policy |
 | superjob | historical HTTP 301 without app-id | blocked from digest | app-id/provider path still requires confidence promotion |
-| hh | historical HTTP 403 (search) | digest-allowed; operationally unverified | requires a currently verified compliant runner |
+| hh | current `/areas` HTTP 200; `/vacancies` HTTP 403 | digest-allowed; operationally blocked | requires verified RU egress or `HH_PROXY_URL`, then the isolated live-pipeline verifier |
 | egrul-fns / transparent-business / fedresurs | n/a | enrichment/context only | never originate leads |
 | tech-job-boards / linkedin / regional / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set |
 
@@ -38,8 +38,8 @@ policy — social/personal scraping is out of product scope; see Rejected table 
 **Coverage improvement this cycle:** rabota-rossii went from one ~25–50-record federal page to
 region-iterated paged fetch (each of ~85 RF region codes exposes an independent offset window),
 and career-pages — the only direct high-signal surface — now runs on every daily-radar cycle
-instead of never. Net: the highest-trust source is live daily, and the broadest official RF feed
-multiplies its per-run company coverage.
+instead of never. Net: the highest-trust source is scheduled daily, and the broadest official RF
+feed multiplies its per-run company coverage; scheduling alone is not live verification.
 
 ---
 
@@ -109,9 +109,9 @@ statement does not prove that any source is currently configured or healthy in p
 
 | id | class / evidence tier | leadEligibility | promotionStatus | live? |
 |---|---|---|---|---|
-| **hh** | primary-platform / medium-signal (0.74) | digest-lead-originating | **digest-allowed** | live-public — see operational blocker ⚠️ |
-| **career-pages** | company-surface / high-signal (0.92) | digest-lead-originating | **digest-allowed** | live-public ✅ — **primary since 2026-06-30** |
-| **rabota-rossii** | primary-platform / medium-signal (0.70) | confidence-gated-evidence | **digest-allowed** | live-public ✅ |
+| **hh** | primary-platform / medium-signal (0.74) | digest-lead-originating | **digest-allowed** | blocked: search API returns 403 from current egress |
+| **career-pages** | company-surface / high-signal (0.92) | digest-lead-originating | **digest-allowed** | live-reachable (partial), not live-verified |
+| **rabota-rossii** | primary-platform / medium-signal (0.70) | confidence-gated-evidence | **digest-allowed** | live-reachable, not live-verified |
 | **egrul-fns** | registry-reference / high-signal (0.90) | enrichment-only | never-lead-originating | live + provider |
 | **transparent-business-fns** | registry-reference / high-signal (0.86) | enrichment-only | never-lead-originating | provider/snapshot only |
 | **fedresurs** | market-signal / context-only (0.62) | context-only | never-lead-originating | provider/snapshot only |
@@ -119,12 +119,14 @@ statement does not prove that any source is currently configured or healthy in p
 **hh** — primary platform. Code paths: `fetch-hh.mjs` → `ingest-hh.mjs` → `report-hh-digest.mjs`.
 - Blocker (policy): `HH_USER_AGENT` must identify a real registered app/contact before broad
   production live checks; controlled live matrix (roles × regions × pages) must be recorded.
-- ⚠️ **Operational blocker (live, prod):** HH returns geo-403 from the Railway region. The
-  SOCKS5-proxy fix (commits `a0b236c`, `30b13c1`) is **not** confirmed working — it throws
-  `invalid onRequestStart` due to an undici-version mismatch (`fetch-socks` bundles undici 8,
-  Node `fetch` is undici 6/7). See memory `project_hh_proxy_undici_mismatch`. Treat HH live
-  ingestion as **not yet unblocked in production** until a verifier passes in-container
-  (not via `railway run`, which executes locally).
+- **Operational blocker (current):** `/areas` returns HTTP 200 but `/vacancies` returns HTTP 403
+  from the current egress. The transport no longer mixes `fetch-socks`, global fetch, and a
+  dispatcher from different Undici copies: the adapter builds the SOCKS connector and Agent
+  with the installed Undici package and pairs it with that package's `fetch`. This removes the
+  `invalid onRequestStart` architecture bug, but it cannot remove HH's geo/IP restriction.
+  `npm run verify:hh:live-pipeline` is the required proof in a disposable isolated DB after a
+  verified RU-resident runner or `HH_PROXY_URL` is available. Until it passes, HH is blocked,
+  not live-verified.
 
 **career-pages** — the highest-trust source (direct company hiring surface, default confidence
 0.92, the only source SQL classifies as `direct_hiring_proof` unconditionally). Guarded against
@@ -151,6 +153,12 @@ average freshness, so the fallback's contribution is visible as more `direct_hir
 leads under `career-pages`. Confidence gates are unchanged: HTML-card signals are still
 `direct_hiring_proof` (company-owned surface); only the extraction path broadened.
 
+The 2026-08-12 controlled crawl also records per-target `outcome`, `pageFetched`, resolved URL,
+and bounded `errorCategory`. A fetched page with no supported vacancy extraction is
+`extraction-zero-unexpected`; HTTP/network failure is `page-unreachable`; a successful empty
+board response is `no-vacancies-present`. Current evidence is intentionally partial: five of
+twelve targets parsed 381 records, while seven were explicitly unreachable.
+
 **rabota-rossii** — official trudvsem open-data. In the SQL whitelist and **`digest-allowed` as
 of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
 `source-review/trudvsem-review.md` and memory `project_rabota_rossii_live`).
@@ -165,8 +173,10 @@ of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
   a ~6× per-run company-coverage gain. Single-region signature preserved for the confidence verifier.
 - Re-check freshness/contract with `npm run verify:rabota-rossii:confidence`
   (needs `RABOTA_ROSSII_LIVE=1`; optional `DATABASE_URL` adds HH-overlap dedupe). Live verifier
-  **PASSES** as of 2026-06-30. Do **not** relax the 60% freshness threshold; filter the fetch to
-  recent postings instead.
+  **PASSES** as of 2026-08-12: 200 records received and 200 normalized across Moscow, Saint
+  Petersburg, and federal queries. This proves current fetch/normalization reachability, not the
+  DB evidence path; an isolated live ingest is still required before `live-verified`. Do **not**
+  relax the 60% freshness threshold; filter the fetch to recent postings instead.
 - For `rabota-rossii`, an INN-based `org_external_id` *is* org-level → but INN-match is now
   classified as `platform_aggregation` (gate C), not `direct_hiring_proof` — only career-pages is
   a direct surface (see memory `project_trudvsem_platform_aggregation`).

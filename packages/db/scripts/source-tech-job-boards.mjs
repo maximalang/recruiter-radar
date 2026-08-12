@@ -19,7 +19,9 @@ import {
   stripBom,
 } from './adapters/source-records.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
+import { assertOrgSourceRefOwner, resolveOrganizationOwner } from './adapters/organization-resolution.mjs';
 import { loadEnvFile, normalizeDomain, runScriptCli } from './lib/common-utils.mjs';
+import { upsertSignalEvidenceLineage } from './lib/source-lineage-writer.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -338,6 +340,10 @@ function normalizeTechJobBoardRecord(record, fetchedAt, lineNumber) {
     return null;
   }
 
+  if (!jobPostingUrl) {
+    return null;
+  }
+
   const orgName = companyName ?? inferredDomain ?? `Tech Board Org ${lineNumber}`;
   const primarySourceKey = buildPrimarySourceKey({ inferredDomain, companyName });
   const domainSourceKey = inferredDomain ? `domain:${inferredDomain}` : null;
@@ -419,31 +425,11 @@ async function ingestTechJobBoards({ connectionString, input }) {
     connectionTimeoutMillis: resolveDbConnectionTimeoutMillis(),
   });
 
-  const signalUpsertQuery = `
-    INSERT INTO signals (
-      org_id,
-      signal_type,
-      source,
-      external_id,
-      headline,
-      summary,
-      source_url,
-      occurred_at,
-      payload
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    ON CONFLICT (source, external_id) DO UPDATE
-    SET
-      org_id = EXCLUDED.org_id,
-      headline = EXCLUDED.headline,
-      summary = EXCLUDED.summary,
-      source_url = EXCLUDED.source_url,
-      occurred_at = EXCLUDED.occurred_at,
-      payload = EXCLUDED.payload
-  `;
-
   let orgUpsertCount = 0;
   let signalUpsertCount = 0;
+  let evidenceUpsertCount = 0;
+  let evidenceCreatedCount = 0;
+  let lineageCreatedCount = 0;
 
   await client.connect();
 
@@ -454,24 +440,33 @@ async function ingestTechJobBoards({ connectionString, input }) {
       const orgResult = await upsertOrgSourceRef(client, record);
       orgUpsertCount += orgResult.insertedOrg ? 1 : 0;
 
-      const signalResult = await client.query(signalUpsertQuery, [
-        orgResult.orgId,
-        SIGNAL_TYPE,
-        SOURCE_ID,
-        record.signalExternalId,
-        record.jobTitle,
-        buildSignalSummaryText(record),
-        record.jobPostingUrl,
-        record.occurredAt,
-        buildSignalPayload(record),
-      ]);
+      const lineage = await upsertSignalEvidenceLineage(client, {
+        orgId: orgResult.orgId,
+        signalType: SIGNAL_TYPE,
+        source: SOURCE_ID,
+        sourceFamily: 'ats-job-board',
+        externalId: record.signalExternalId,
+        headline: record.jobTitle,
+        summary: buildSignalSummaryText(record),
+        sourceUrl: record.jobPostingUrl,
+        publishedAt: record.occurredAt,
+        normalizedAt: record.fetchedAt,
+        payload: buildSignalPayload(record),
+        sourceRecordType: 'job_posting',
+        evidenceTier: 'corroboration',
+        extractionMethod: input.inputMode,
+        organizationResolutionReason: orgResult.resolutionReason,
+      });
 
-      signalUpsertCount += signalResult.rowCount ?? 0;
+      signalUpsertCount += lineage.signalUpsertCount;
+      evidenceUpsertCount += lineage.evidenceUpsertCount;
+      evidenceCreatedCount += lineage.evidenceCreatedCount;
+      lineageCreatedCount += lineage.lineageCreatedCount;
     }
 
     await client.query('COMMIT');
 
-    return { orgUpsertCount, signalUpsertCount };
+    return { orgUpsertCount, signalUpsertCount, evidenceUpsertCount, evidenceCreatedCount, lineageCreatedCount };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -481,34 +476,8 @@ async function ingestTechJobBoards({ connectionString, input }) {
 }
 
 async function upsertOrgSourceRef(client, record) {
-  await lockOrgSourceKeys(client, record.orgSourceKeys);
-
-  const existingRefResult = await client.query(
-    `
-      SELECT org_id
-      FROM org_source_refs
-      WHERE source = $1::text
-        AND source_key = ANY($2::text[])
-      ORDER BY
-        CASE
-          WHEN source_key = $3 THEN 0
-          WHEN source_key = $4 THEN 1
-          WHEN source_key = $5 THEN 2
-          ELSE 3
-        END,
-        id ASC
-      LIMIT 1
-    `,
-    [
-      SOURCE_ID,
-      record.orgSourceKeys,
-      record.primarySourceKey,
-      record.domainSourceKey,
-      record.companyNameSourceKey,
-    ],
-  );
-
-  let orgId = existingRefResult.rows[0]?.org_id;
+  const resolution = await resolveOrganizationOwner(client, SOURCE_ID, record);
+  let orgId = resolution.orgId;
   let insertedOrg = false;
 
   if (!orgId) {
@@ -556,6 +525,7 @@ async function upsertOrgSourceRef(client, record) {
         buildOrgSourceMetadata(record, sourceKey),
       ],
     );
+    await assertOrgSourceRefOwner(client, SOURCE_ID, sourceKey, orgId);
   }
 
   await client.query(
@@ -582,16 +552,7 @@ async function upsertOrgSourceRef(client, record) {
     [orgId, record.orgDisplayName, record.companyDomain, record.companyWebsiteUrl],
   );
 
-  return { orgId, insertedOrg };
-}
-
-async function lockOrgSourceKeys(client, sourceKeys) {
-  for (const sourceKey of [...sourceKeys].sort()) {
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext($2::text))', [
-      SOURCE_ID,
-      sourceKey,
-    ]);
-  }
+  return { orgId, insertedOrg, resolutionReason: resolution.resolutionReason };
 }
 
 export function buildFetchSummary(input) {
@@ -623,6 +584,9 @@ function buildIngestSummary(input, stats) {
     sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
+    evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+    evidenceCreated: stats.evidenceCreatedCount,
+    lineageCreated: stats.lineageCreatedCount,
   };
 }
 
@@ -640,6 +604,9 @@ function buildPipelineSummary(input, stats) {
     sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
+    evidenceUpsertsCompleted: stats.evidenceUpsertCount,
+    evidenceCreated: stats.evidenceCreatedCount,
+    lineageCreated: stats.lineageCreatedCount,
   };
 }
 

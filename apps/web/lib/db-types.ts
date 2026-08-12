@@ -168,6 +168,14 @@ export interface DigestItem {
   source_external_id: string;
   source_display_name: string;
   source_families: string[];
+  /** Exact signal ids contributing to this candidate. BIGINT values are preserved as strings. */
+  source_signal_ids?: Array<string | number>;
+  /** Evidence ids bound to those signals by the append-only lineage ledger. */
+  source_evidence_ids?: Array<string | number>;
+  /** Source-native record ids contributing to this candidate. */
+  source_record_external_ids?: string[];
+  /** Original source record URLs contributing to this candidate. */
+  source_record_urls?: string[];
   evidence_titles: string[];
   candidate_source_keys: string[];
   location_names: string[];
@@ -211,7 +219,8 @@ export interface DigestItem {
    * under which fragmented orgs (same employer, different org_id per source)
    * merge at digest-assembly time. Derived from the strongest shared strong
    * key: 'inn:<inn>' | 'ogrn:<ogrn>' | 'domain:<domain>' | 'org:<org_id>'.
-   * Read-side only — does NOT touch the hot upsert WHERE source=$1 path.
+   * Current writers resolve validated strong keys globally before upsert; this
+   * read-side projection also keeps historical fragmented rows auditable.
    * Query-projection field; null on legacy rows.
    */
   corroboration_key?: string | null;

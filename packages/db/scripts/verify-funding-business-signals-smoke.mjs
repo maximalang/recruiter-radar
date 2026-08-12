@@ -24,8 +24,8 @@ assert.equal(summary.inputMode, 'file');
 assert.equal(summary.inputFilePath, fixturePath);
 assert.equal(summary.recordsReceived, 5);
 assert.equal(summary.duplicateRecords, 0);
-assert.equal(summary.normalizedRecords, 5);
-assert.equal(summary.skippedRecords, 0);
+assert.equal(summary.normalizedRecords, 4);
+assert.equal(summary.skippedRecords, 1);
 
 const rec1 = input.normalizedRecords.find((r) => r.signalExternalId === 'fund-smoke-1');
 assert.ok(rec1, 'missing normalized record fund-smoke-1');
@@ -52,9 +52,7 @@ assert.equal(rec3.amount, '50000000');
 assert.equal(rec3.currency, 'RUB');
 
 const rec4 = input.normalizedRecords.find((r) => r.companyName === 'NoType Signal Corp');
-assert.ok(rec4, 'missing normalized record for NoType Signal Corp');
-assert.equal(rec4.eventType, 'press_mention');
-assert.equal(rec4.signalType, 'other', 'press_mention must not produce signal_type=funding');
+assert.equal(rec4, undefined, 'record without an original article URL must be rejected before ingest');
 
 const rec5 = input.normalizedRecords.find((r) => r.signalExternalId === 'fund-smoke-5');
 assert.ok(rec5, 'missing normalized record fund-smoke-5');
@@ -95,7 +93,7 @@ console.log(JSON.stringify({
     funding: input.normalizedRecords.filter((r) => r.signalType === 'funding').length,
     other: input.normalizedRecords.filter((r) => r.signalType === 'other').length,
   },
-  verifiedExternalIds: ['fund-smoke-1', 'fund-smoke-2', 'fund-smoke-3', 'NoType Signal Corp', 'fund-smoke-5'],
+  verifiedExternalIds: ['fund-smoke-1', 'fund-smoke-2', 'fund-smoke-3', 'fund-smoke-5'],
   sideEffects: { databaseUrlUsed: false },
 }, null, 2));
 
@@ -115,6 +113,7 @@ async function runProviderModeSmoke() {
           company_domain: 'funding-provider.example',
           event_type: 'series_a',
           headline: 'Funding Provider Co raises Series A',
+          source_url: 'https://funding-provider.example/events/series-a',
           amount: '12000000',
           currency: 'USD',
           published_at: '2026-05-01T00:00:00.000Z',

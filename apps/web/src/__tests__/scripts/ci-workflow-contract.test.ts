@@ -9,6 +9,10 @@ const productionAcceptance = readFileSync(
   resolve(process.cwd(), '..', '..', 'scripts', 'run-production-acceptance.mjs'),
   'utf8',
 )
+const hardeningSmokeWorkflow = readFileSync(
+  resolve(process.cwd(), '..', '..', '.github', 'workflows', 'hardening-smoke.yml'),
+  'utf8',
+)
 
 describe('pull request CI workflow contract', () => {
   it('runs the complete release gate for codex pushes and integration pull requests', () => {
@@ -38,6 +42,16 @@ describe('pull request CI workflow contract', () => {
     expect(productionAcceptance).toContain('run-workspace-billing-db-tests.mjs')
     expect(workflow).toContain("ENTITLEMENT_DISPOSABLE_DB_CONFIRMED: 'true'")
     expect(workflow).toContain("WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED: 'true'")
+  })
+
+  it('acknowledges source lineage writes only on the disposable hardening database', () => {
+    expect(hardeningSmokeWorkflow).toContain('POSTGRES_DB: test')
+    expect(hardeningSmokeWorkflow).toContain(
+      'DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test',
+    )
+    expect(hardeningSmokeWorkflow).toContain(
+      'SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK: isolated',
+    )
   })
 
   it('runs landing and responsive browser audits and retains evidence artifacts', () => {

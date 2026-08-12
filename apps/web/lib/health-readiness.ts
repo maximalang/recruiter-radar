@@ -1,5 +1,5 @@
 export const EXPECTED_LATEST_MIGRATION =
-  '20260811010000_add_aggregate_delivery_status'
+  '20260812150000_add_source_signal_evidence_lineage'
 
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/
 

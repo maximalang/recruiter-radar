@@ -42,6 +42,8 @@ describe("production observability contract", () => {
     const delivery = source("lib/digest/deliver-candidates.ts");
     expect(radar).toContain("daily_radar.run");
     expect(radar).toContain("daily_radar.pipeline_failed");
+    expect(radar).toContain("daily_radar.source_ingest_completed");
+    expect(radar).toContain("daily_radar.source_ingest_failed");
     expect(radar).toContain("daily_radar.zero_opportunity_anomaly");
     expect(delivery).toContain("digest.delivery_attempted");
     expect(delivery).toContain("digest.telegram_sent");

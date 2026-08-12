@@ -21,6 +21,11 @@ const databaseUrl = process.env.DATABASE_URL?.trim();
 const dbConnectionTimeoutMillis = 5000;
 
 assert.ok(databaseUrl, 'DATABASE_URL must be set for verify:career-pages:ingest');
+assert.equal(
+  process.env.SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK,
+  'isolated',
+  'SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK=isolated is required; lineage verification must never use a user database',
+);
 
 const runId = `verify-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 const companyDomain = `${runId}.example`;
@@ -57,11 +62,6 @@ const tempDir = mkdtempSync(resolve(tmpdir(), 'career-pages-ingest-verify-'));
 const fixturePath = resolve(tempDir, 'career-pages-ingest-fixture.json');
 writeFileSync(fixturePath, `${JSON.stringify({ records: fixtureRecords }, null, 2)}\n`, 'utf8');
 
-const cleanupClient = new Client({
-  connectionString: databaseUrl,
-  connectionTimeoutMillis: dbConnectionTimeoutMillis,
-});
-
 async function assertRequiredTablesExist() {
   const client = new Client({
     connectionString: databaseUrl,
@@ -92,31 +92,6 @@ async function assertRequiredTablesExist() {
   }
 }
 
-async function cleanup() {
-  await cleanupClient.connect();
-  try {
-    await cleanupClient.query('BEGIN');
-    await cleanupClient.query(
-      `DELETE FROM signals WHERE source = $1 AND external_id = ANY($2)`,
-      ['career-pages', [externalId]],
-    );
-    await cleanupClient.query(
-      `DELETE FROM org_source_refs WHERE source = $1 AND source_key = ANY($2)`,
-      ['career-pages', cleanupSourceKeys],
-    );
-    await cleanupClient.query(
-      `DELETE FROM orgs WHERE domain = $1`,
-      [companyDomain],
-    );
-    await cleanupClient.query('COMMIT');
-  } catch (error) {
-    await cleanupClient.query('ROLLBACK');
-    throw error;
-  } finally {
-    await cleanupClient.end();
-  }
-}
-
 async function queryVerificationState() {
   const client = new Client({
     connectionString: databaseUrl,
@@ -136,11 +111,19 @@ async function queryVerificationState() {
       `SELECT org_id, source_key, external_id, display_name, metadata FROM org_source_refs WHERE source = $1 AND source_key = ANY($2) ORDER BY source_key ASC`,
       ['career-pages', cleanupSourceKeys],
     );
+    const lineageResult = await client.query(
+      `SELECT lineage.evidence_tier, lineage.extraction_method, evidence.url
+       FROM source_signal_evidence_lineage_v1 lineage
+       JOIN evidence_items evidence ON evidence.id = lineage.evidence_id
+       WHERE lineage.source = $1 AND lineage.external_id = $2`,
+      ['career-pages', externalId],
+    );
 
     return {
       orgRows: orgResult.rows,
       signalRows: signalResult.rows,
       refRows: refResult.rows,
+      lineageRows: lineageResult.rows,
     };
   } finally {
     await client.end();
@@ -166,6 +149,7 @@ function runIngest() {
   assert.equal(summary.recordsReceived, fixtureRecords.length);
   assert.equal(summary.normalizedRecords, fixtureRecords.length);
   assert.equal(summary.signalUpsertsCompleted, fixtureRecords.length);
+  assert.equal(summary.evidenceUpsertsCompleted, fixtureRecords.length);
   return summary;
 }
 
@@ -187,8 +171,6 @@ function assertIdentityState(state) {
   );
 }
 
-let verifyError = null;
-
 try {
   await assertRequiredTablesExist();
 
@@ -203,6 +185,11 @@ try {
   assert.equal(firstState.signalRows[0].headline, 'Platform Engineer');
   assert.equal(firstState.signalRows[0].source_url, jobPostingUrl);
   assertIdentityState(firstState);
+  assert.deepEqual(firstState.lineageRows, [{
+    evidence_tier: 'direct',
+    extraction_method: 'unknown',
+    url: jobPostingUrl,
+  }]);
 
   const secondSummary = runIngest();
   const secondState = await queryVerificationState();
@@ -211,6 +198,8 @@ try {
   assert.equal(secondState.signalRows.length, 1);
   assertIdentityState(secondState);
   assert.equal(secondSummary.signalUpsertsCompleted, fixtureRecords.length);
+  assert.equal(secondSummary.evidenceCreated, 0);
+  assert.equal(secondSummary.lineageCreated, 0);
 
   console.log(JSON.stringify({
     ok: true,
@@ -231,22 +220,14 @@ try {
       orgRows: secondState.orgRows.length,
       signalRows: secondState.signalRows.length,
       canonicalSourceRefRows: secondState.refRows.length,
+      lineageRows: secondState.lineageRows.length,
       weakCompanyNameAliasPreserved: true,
       idempotent: true,
     },
-    cleanup: 'performed',
+    cleanup: 'isolated-database-retained-for-audit',
   }, null, 2));
 } catch (error) {
-  verifyError = error;
   throw error;
 } finally {
-  try {
-    await cleanup();
-  } catch (cleanupError) {
-    if (!verifyError) {
-      throw cleanupError;
-    }
-  } finally {
-    rmSync(tempDir, { recursive: true, force: true });
-  }
+  rmSync(tempDir, { recursive: true, force: true });
 }

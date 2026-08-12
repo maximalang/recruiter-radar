@@ -12,6 +12,10 @@ import {
   SOURCE_COVERAGE_TIERS,
   validateSourceCoverage,
 } from './source-coverage-requirements.mjs';
+import {
+  evaluateSourceReadiness,
+  getSourceReadinessContract,
+} from './source-readiness.mjs';
 import sourcePolicyContract from '../source-policy.json' with { type: 'json' };
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -51,6 +55,7 @@ const industryMediaAbsoluteScriptPath = resolve(scriptDir, './source-industry-me
 const regionalJobBoardsScriptPath = './packages/db/scripts/source-regional-job-boards.mjs';
 const regionalJobBoardsAbsoluteScriptPath = resolve(scriptDir, './source-regional-job-boards.mjs');
 const registry = new Map();
+const sourceReadinessContract = getSourceReadinessContract();
 // Mirrors the TS registry `isPrimary: true` set (apps/web/lib/sources/source-registry.ts):
 // sources enrolled in the daily-radar ingestion pipeline. Kept in sync manually
 // because the TS registry is not importable from this .mjs build context.
@@ -59,145 +64,6 @@ const registry = new Map();
 const PRIMARY_INGESTION_SOURCES = Object.freeze(
   new Set(['hh', 'superjob', 'habr-career', 'rabota-rossii', 'career-pages'])
 );
-const sourceReadinessPolicy = Object.freeze({
-  hh: sourcePolicy({
-    priority: 'P1',
-    leadEligibility: 'digest-lead-originating',
-    maturity: 'controlled-live-ready',
-    productionBlockers: [
-      'HH_USER_AGENT must identify a real registered app/contact before production live checks.',
-      'Controlled live matrix for roles, regions, and pages must be recorded before broad expansion.',
-    ],
-    promotionStatus: 'digest-allowed',
-  }),
-  'rabota-rossii': sourcePolicy({
-    priority: 'P1',
-    leadEligibility: 'confidence-gated-evidence',
-    maturity: 'official-live-public-gated',
-    productionBlockers: [
-      'Freshness gate cleared 2026-06-23: `npm run verify:rabota-rossii:confidence` (RABOTA_ROSSII_LIVE=1) passed with >=60% within active-30d by date_modify (75 live records, moscow/spb/federal matrix) plus region/salary/identity/privacy contracts. Re-run to re-verify if the live feed regresses.',
-    ],
-    promotionStatus: 'digest-allowed',
-  }),
-  'career-pages': sourcePolicy({
-    priority: 'P1',
-    leadEligibility: 'digest-lead-originating',
-    maturity: 'controlled-live-ready',
-    productionBlockers: [
-      'RF discovery targets, JobPosting/HTML extraction, stale-page warnings, and direct-company proof scoring need controlled live coverage.',
-    ],
-    promotionStatus: 'digest-allowed',
-  }),
-  'egrul-fns': sourcePolicy({
-    priority: 'P1',
-    leadEligibility: 'enrichment-only',
-    maturity: 'entity-enrichment-ready',
-    productionBlockers: [
-      'Use only 10-digit legal entity INN inputs; 12-digit IP/person records must stay skipped.',
-    ],
-    promotionStatus: 'never-lead-originating',
-  }),
-  'transparent-business-fns': sourcePolicy({
-    priority: 'P1',
-    leadEligibility: 'enrichment-only',
-    maturity: 'provider-or-snapshot-only',
-    productionBlockers: [
-      'No confirmed stable lawful public API is approved; do not scrape pb.nalog.ru.',
-    ],
-    promotionStatus: 'never-lead-originating',
-  }),
-  fedresurs: sourcePolicy({
-    priority: 'P1',
-    leadEligibility: 'context-only',
-    maturity: 'provider-or-snapshot-only',
-    productionBlockers: [
-      'Public site is blocked by Qrator/401 patterns; use an official or compliant provider endpoint.',
-    ],
-    promotionStatus: 'never-lead-originating',
-  }),
-  'company-site': sourcePolicy({
-    priority: 'P2',
-    leadEligibility: 'enrichment-only',
-    maturity: 'curated-live-ready',
-    productionBlockers: [
-      'Generic company pages remain enrichment; only explicit hiring surfaces can corroborate lead evidence.',
-    ],
-    promotionStatus: 'supporting-evidence-only',
-  }),
-  'funding-business-signals': sourcePolicy({
-    priority: 'P2',
-    leadEligibility: 'context-only',
-    maturity: 'curated-live-ready',
-    productionBlockers: [
-      'Funding/news context must not create leads without direct hiring evidence.',
-    ],
-    promotionStatus: 'never-lead-originating',
-  }),
-  'linkedin-company-pages': sourcePolicy({
-    priority: 'P2',
-    leadEligibility: 'confidence-gated-evidence',
-    maturity: 'provider-or-snapshot-only',
-    productionBlockers: [
-      'Use compliant provider snapshots only; discard employee, profile, email, and phone fields.',
-    ],
-    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
-  }),
-  'tech-job-boards': sourcePolicy({
-    priority: 'P2',
-    leadEligibility: 'confidence-gated-evidence',
-    maturity: 'provider-fixture-ready',
-    productionBlockers: [
-      'API-mega-list providers must pass fixture shape, sensitive-field rejection, freshness, region, salary, and org-identity gates.',
-    ],
-    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
-  }),
-  superjob: sourcePolicy({
-    priority: 'P2',
-    leadEligibility: 'confidence-gated-evidence',
-    maturity: 'provider-or-snapshot-only',
-    productionBlockers: [
-      'SUPERJOB_API_APP_ID or compliant provider snapshot is required; anonymous API is not a production path.',
-    ],
-    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
-  }),
-  'habr-career': sourcePolicy({
-    priority: 'P2',
-    leadEligibility: 'confidence-gated-evidence',
-    maturity: 'official-live-public-gated',
-    productionBlockers: [
-      'Robots/legal review of career.habr.com direct HTML access is in progress; live-public stays out of digest until that review signs off and confidence tests pass.',
-    ],
-    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
-  }),
-  'company-newsrooms': sourcePolicy({
-    priority: 'P3',
-    leadEligibility: 'context-only',
-    maturity: 'curated-context-only',
-    productionBlockers: [
-      'Curated targets only; supporting context must never originate a lead alone.',
-    ],
-    promotionStatus: 'never-lead-originating',
-  }),
-  'industry-media': sourcePolicy({
-    priority: 'P3',
-    leadEligibility: 'context-only',
-    maturity: 'provider-or-curated-context-only',
-    productionBlockers: [
-      'Article publisher domains must never become company identity; source review is required.',
-    ],
-    promotionStatus: 'never-lead-originating',
-  }),
-  'regional-job-boards': sourcePolicy({
-    priority: 'P3',
-    leadEligibility: 'confidence-gated-evidence',
-    maturity: 'provider-or-snapshot-only',
-    productionBlockers: [
-      'Each board requires legal/robots/provider review and confidence gates before digest use.',
-    ],
-    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
-  }),
-});
-
 registerSource(
   defineSource({
     id: 'hh',
@@ -556,26 +422,33 @@ export function getSource(sourceId) {
 }
 
 export function listSourceSummaries() {
-  return listSources().map((source) => ({
-    id: source.id,
-    kind: source.kind,
-    sourceClass: source.sourceClass,
-    evidenceTier: source.evidenceTier,
-    defaultConfidence: source.defaultConfidence,
-    priority: source.priority,
-    leadEligibility: source.leadEligibility,
-    maturity: source.maturity,
-    productionBlockers: source.productionBlockers,
-    promotionStatus: source.promotionStatus,
-    status: source.status,
-    runnable: source.runnable,
-    fetchModes: source.fetchModes,
-    liveCapable: source.liveCapable,
-    statusDescription: SOURCE_STATUS_SEMANTICS[source.status].description,
-    description: source.description ?? null,
-    capabilities: source.capabilities,
-    actionMap: source.actionMap,
-  }));
+  return listSources().map((source) => {
+    const readiness = evaluateSourceReadiness(
+      source.id,
+      source.readiness,
+      sourceReadinessContract.pipelineProfiles,
+    );
+
+    return {
+      id: source.id,
+      kind: source.kind,
+      sourceClass: source.sourceClass,
+      evidenceTier: source.evidenceTier,
+      defaultConfidence: source.defaultConfidence,
+      priority: source.priority,
+      leadEligibility: source.leadEligibility,
+      promotionStatus: source.promotionStatus,
+      status: source.status,
+      runnable: source.runnable,
+      fetchModes: source.fetchModes,
+      liveCapable: source.liveCapable,
+      statusDescription: SOURCE_STATUS_SEMANTICS[source.status].description,
+      description: source.description ?? null,
+      capabilities: source.capabilities,
+      actionMap: source.actionMap,
+      readiness,
+    };
+  });
 }
 
 export async function executeSourceAction(sourceId, action) {
@@ -604,11 +477,11 @@ function registerSource(source) {
     throw new Error(`Duplicate source registration: ${source.id}`);
   }
 
-  const policy = sourceReadinessPolicy[source.id];
+  const readiness = sourceReadinessContract.sources[source.id];
   const canonicalPolicy = sourcePolicyContract[source.id];
 
-  if (!policy) {
-    throw new Error(`Missing source readiness policy metadata: ${source.id}`);
+  if (!readiness) {
+    throw new Error(`Missing source readiness metadata: ${source.id}`);
   }
 
   if (!canonicalPolicy) {
@@ -617,19 +490,9 @@ function registerSource(source) {
 
   registry.set(source.id, Object.freeze({
     ...source,
-    ...policy,
     ...canonicalPolicy,
+    readiness,
   }));
-}
-
-function sourcePolicy({ priority, leadEligibility, maturity, productionBlockers, promotionStatus }) {
-  return Object.freeze({
-    priority,
-    leadEligibility,
-    maturity,
-    productionBlockers: Object.freeze([...productionBlockers]),
-    promotionStatus,
-  });
 }
 
 function registerRunnableScriptSource({
@@ -854,34 +717,38 @@ export function exportSourceCoverageDetails() {
   const coverageReport = validateSourceCoverage(allSources);
 
   return {
-    sources: allSources.map(source => ({
-      id: source.id,
-      kind: source.kind,
-      sourceClass: source.sourceClass,
-      evidenceTier: source.evidenceTier,
-      defaultConfidence: source.defaultConfidence,
-      priority: source.priority,
-      leadEligibility: source.leadEligibility,
-      maturity: source.maturity,
-      productionBlockers: source.productionBlockers,
-      promotionStatus: source.promotionStatus,
-      status: source.status,
-      runnable: source.runnable,
-      fetchModes: source.fetchModes,
-      liveCapable: source.liveCapable,
-      description: source.description,
-      requiredTier: Object.entries(SOURCE_COVERAGE_TIERS).find(([_, config]) =>
-        config.sources.includes(source.id)
-      )?.[0] || 'none',
-      // A source is in the digest iff it is in the primary ingestion set AND its
-      // promotionStatus is 'digest-allowed'. As of 2026-06-30 career-pages is both
-      // (primary + digest-allowed), so the direct company-surface evidence now
-      // reaches the digest; if any primary source regresses out of 'digest-allowed'
-      // it auto-drops from the digest.
-      inDigest:
-        PRIMARY_INGESTION_SOURCES.has(source.id) &&
-        source.promotionStatus === 'digest-allowed',
-    })),
+    sources: allSources.map(source => {
+      const readiness = evaluateSourceReadiness(
+        source.id,
+        source.readiness,
+        sourceReadinessContract.pipelineProfiles,
+      );
+
+      return {
+        id: source.id,
+        kind: source.kind,
+        sourceClass: source.sourceClass,
+        evidenceTier: source.evidenceTier,
+        defaultConfidence: source.defaultConfidence,
+        priority: source.priority,
+        leadEligibility: source.leadEligibility,
+        promotionStatus: source.promotionStatus,
+        status: source.status,
+        runnable: source.runnable,
+        fetchModes: source.fetchModes,
+        liveCapable: source.liveCapable,
+        description: source.description,
+        readiness,
+        productionBlockers: readiness.blockers,
+        requiredTier: Object.entries(SOURCE_COVERAGE_TIERS).find(([_, config]) =>
+          config.sources.includes(source.id)
+        )?.[0] || 'none',
+        // Runtime capability and policy eligibility do not establish live readiness.
+        inDigest:
+          PRIMARY_INGESTION_SOURCES.has(source.id) &&
+          source.promotionStatus === 'digest-allowed',
+      };
+    }),
     coverage: coverageReport,
     requirements: SOURCE_COVERAGE_TIERS,
   };
