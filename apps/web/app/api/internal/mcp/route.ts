@@ -5,11 +5,16 @@ import {
   OPERATOR_MCP_PROTOCOL_VERSION,
   handleOperatorMcpRequest,
   isAllowedOperatorMcpOrigin,
-  isAuthorizedOperatorMcpRequest,
   isOperatorMcpEnabled,
   isSupportedOperatorMcpProtocolVersion,
   validateModernMcpHeaders,
 } from '../../../../lib/operator-mcp'
+import {
+  OPERATOR_MCP_REQUIRED_SCOPE,
+  checkOperatorMcpRateLimit,
+  getOperatorMcpAuthenticateChallenge,
+  verifyOperatorMcpAccessToken,
+} from '../../../../lib/operator-mcp-auth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -60,17 +65,35 @@ export async function POST(request: Request) {
     )
   }
 
-  if (!isAuthorizedOperatorMcpRequest(
+  const rateKey = request.headers.get('x-real-ip')?.trim() || 'unknown'
+  const rateLimit = checkOperatorMcpRateLimit(rateKey)
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'rate_limited' },
+      {
+        status: 429,
+        headers: {
+          ...JSON_HEADERS,
+          'Retry-After': String(rateLimit.retryAfterSeconds),
+        },
+      },
+    )
+  }
+
+  const auth = await verifyOperatorMcpAccessToken(
     request.headers.get('authorization'),
-    process.env.RR_MCP_TOKEN,
-  )) {
+  )
+  if (!auth.ok) {
+    const challengeError = auth.reason === 'insufficient_scope'
+      ? 'insufficient_scope'
+      : 'invalid_token'
     return NextResponse.json(
       { error: 'unauthorized' },
       {
         status: 401,
         headers: {
           ...JSON_HEADERS,
-          'WWW-Authenticate': 'Bearer realm="recruiter-radar-operator"',
+          'WWW-Authenticate': getOperatorMcpAuthenticateChallenge(challengeError),
         },
       },
     )
@@ -145,11 +168,24 @@ export async function POST(request: Request) {
     })
   }
 
-  if (protocolHeader === OPERATOR_MCP_PROTOCOL_VERSION) {
-    const result = outcome.body.result
-    if (result && typeof result === 'object' && !Array.isArray(result)) {
-      const resultRecord = result as Record<string, unknown>
-      if (typeof resultRecord.resultType !== 'string') resultRecord.resultType = 'complete'
+  const result = outcome.body.result
+  if (result && typeof result === 'object' && !Array.isArray(result)) {
+    const resultRecord = result as Record<string, unknown>
+    if (protocolHeader === OPERATOR_MCP_PROTOCOL_VERSION &&
+        typeof resultRecord.resultType !== 'string') {
+      resultRecord.resultType = 'complete'
+    }
+
+    if (body.method === 'tools/list' && Array.isArray(resultRecord.tools)) {
+      resultRecord.tools = resultRecord.tools.map((tool) => {
+        if (!tool || typeof tool !== 'object' || Array.isArray(tool)) return tool
+        return {
+          ...(tool as Record<string, unknown>),
+          securitySchemes: [
+            { type: 'oauth2', scopes: [OPERATOR_MCP_REQUIRED_SCOPE] },
+          ],
+        }
+      })
     }
   }
 

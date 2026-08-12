@@ -66,7 +66,9 @@ grep -q '^PUBLIC_APP_ORIGIN=https://recruiter-radar.ru$' "$app_dir/.env"
 run_configurator
 grep -q '^PUBLIC_APP_ORIGIN=https://recruiter-radar.ru$' "$app_dir/.env"
 grep -q '^RR_MCP_ENABLED=false$' "$app_dir/.env"
-grep -q '^RR_MCP_TOKEN=$' "$app_dir/.env"
+grep -q '^RR_MCP_OAUTH_ISSUER=$' "$app_dir/.env"
+grep -q '^RR_MCP_OAUTH_ALLOWED_SUBJECTS=$' "$app_dir/.env"
+! grep -q '^RR_MCP_TOKEN=' "$app_dir/.env"
 config_line="$(grep -n ' config$' "$docker_log" | cut -d: -f1)"
 up_line="$(grep -n ' up -d --force-recreate web$' "$docker_log" | cut -d: -f1)"
 port_line="$(grep -n ' port web 3000$' "$docker_log" | cut -d: -f1)"
@@ -158,7 +160,7 @@ test ! -s "$docker_log"
 write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru"
 : > "$docker_log"
 if RR_MCP_ENABLED=true run_configurator --preflight; then
-  echo "Enabled MCP without a token unexpectedly passed" >&2
+  echo "Enabled MCP without OAuth configuration unexpectedly passed" >&2
   exit 1
 fi
 test ! -s "$docker_log"
@@ -166,18 +168,46 @@ test ! -s "$docker_log"
 write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru"
 : > "$docker_log"
 RR_MCP_ENABLED=true \
-RR_MCP_TOKEN="0123456789abcdef0123456789abcdef0123456789abcdef" \
+RR_MCP_OAUTH_ISSUER="https://tenant.example.auth0.com" \
+RR_MCP_OAUTH_ALLOWED_SUBJECTS="auth0|operator-123" \
   run_configurator --preflight
 grep -q ' config$' "$docker_log"
 
 write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru"
 : > "$docker_log"
-if RR_MCP_ENABLED=yes RR_MCP_TOKEN="0123456789abcdef0123456789abcdef" \
+if RR_MCP_ENABLED=true \
+  RR_MCP_OAUTH_ISSUER="http://tenant.example.auth0.com" \
+  RR_MCP_OAUTH_ALLOWED_SUBJECTS="auth0|operator-123" \
+  run_configurator --preflight; then
+  echo "Non-HTTPS MCP OAuth issuer unexpectedly passed" >&2
+  exit 1
+fi
+test ! -s "$docker_log"
+
+write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru"
+: > "$docker_log"
+if RR_MCP_ENABLED=yes \
+  RR_MCP_OAUTH_ISSUER="https://tenant.example.auth0.com" \
+  RR_MCP_OAUTH_ALLOWED_SUBJECTS="auth0|operator-123" \
   run_configurator --preflight; then
   echo "Non-boolean RR_MCP_ENABLED unexpectedly passed" >&2
   exit 1
 fi
 test ! -s "$docker_log"
 
+# Migrate the old static Bearer configuration fail-closed: do not block a normal
+# production deploy, remove the obsolete secret from the rewritten env, and
+# force MCP off until OAuth is configured.
+write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru"
+cat >> "$app_dir/.env" <<'ENV_EOF'
+RR_MCP_ENABLED=true
+RR_MCP_TOKEN=0123456789abcdef0123456789abcdef0123456789abcdef
+ENV_EOF
+: > "$docker_log"
+run_configurator
+grep -q '^RR_MCP_ENABLED=false$' "$app_dir/.env"
+! grep -q '^RR_MCP_TOKEN=' "$app_dir/.env"
+grep -q '^RR_MCP_OAUTH_ISSUER=$' "$app_dir/.env"
+
 printf '%s\n' \
-  '{"ok":true,"composeOrder":["config","up","runtime-validation"],"preflightFailureMutatedContainer":false,"prerequisites":["LANDING_ANALYTICS_RATE_LIMIT_SALT","PUBLIC_APP_ORIGIN","NOTIFICATION_ENCRYPTION_KEY"],"operatorMcp":{"default":"disabled","enabledRequiresToken":true}}'
+  '{"ok":true,"composeOrder":["config","up","runtime-validation"],"preflightFailureMutatedContainer":false,"prerequisites":["LANDING_ANALYTICS_RATE_LIMIT_SALT","PUBLIC_APP_ORIGIN","NOTIFICATION_ENCRYPTION_KEY"],"operatorMcp":{"default":"disabled","authentication":"oauth2.1","legacyStaticBearer":"removed","enabledRequires":["RR_MCP_OAUTH_ISSUER","RR_MCP_OAUTH_ALLOWED_SUBJECTS"]}}'
