@@ -22,6 +22,7 @@ const pageOneUrl = buildHhVacanciesUrl(config, 1);
 assert.equal(pageOneUrl.searchParams.get('text'), 'backend recruiter');
 assert.equal(pageOneUrl.searchParams.get('per_page'), '2');
 assert.equal(pageOneUrl.searchParams.get('page'), '1');
+assert.deepEqual(pageOneUrl.searchParams.getAll('label'), ['not_from_agency']);
 assert.deepEqual(pageOneUrl.searchParams.getAll('area'), ['1', '2']);
 assert.deepEqual(pageOneUrl.searchParams.getAll('professional_role'), ['96']);
 
@@ -110,7 +111,11 @@ try {
       config: { ...config, pages: 1 },
       env: {},
     }),
-    (error) => error instanceof HhAccessForbiddenError && error.status === 403,
+    (error) => (
+      error instanceof HhAccessForbiddenError
+      && error.status === 403
+      && !/geo|proxy|RU-resident egress/i.test(error.message)
+    ),
   );
 
   console.log(JSON.stringify({

@@ -297,11 +297,18 @@ describe('source live readiness contract', () => {
     expect(verifier).toContain("HH_LIVE_VERIFY !== '1'")
     expect(verifier).toContain("SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK !== 'isolated'")
     expect(verifier).toContain("SOURCE_ENV_FILE_DISABLED: 'true'")
+    expect(verifier).toContain("process.env.HH_CLIENT_ID?.trim()")
+    expect(verifier).toContain("process.env.HH_CLIENT_SECRET?.trim()")
     expect(verifier).toContain('source_signal_evidence_lineage_v1')
     expect(verifier).toContain("source = 'hh'")
+    expect(verifier).toContain("publisher_type' = 'direct-employer")
 
     const ingest = readFileSync(hhIngestPath, 'utf8')
     expect(ingest).toContain("process.env.SOURCE_ENV_FILE_DISABLED === 'true'")
+
+    const readiness = readReadinessContract().sources.hh
+    expect(readiness.blockers).toEqual(['credential-not-supplied'])
+    expect(JSON.stringify(readiness)).not.toMatch(/proxy|geo|RU-resident egress/i)
   })
 
   it('provides disposable live DB verification for job APIs and public ATS sources', () => {

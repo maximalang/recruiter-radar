@@ -119,6 +119,7 @@ describe('Query Planner v2 profile isolation', () => {
       }),
       queryEnv: expect.objectContaining({
         HH_AREA: '1',
+        HH_LABEL: 'not_from_agency',
         HH_PAGES: '3',
       }),
       profileSnapshotHash: HASH_A,

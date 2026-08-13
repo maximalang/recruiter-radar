@@ -41,6 +41,26 @@ assert.equal(refreshed, 'Bearer smoke-token-2');
 assert.equal(tokenRequests, 2);
 
 resetHhApplicationTokenCache();
+let nonExpiringTokenRequests = 0;
+const nonExpiringFetchImpl = async () => {
+  nonExpiringTokenRequests += 1;
+  return jsonResponse({
+    access_token: 'hh-non-expiring-application-token',
+    token_type: 'bearer',
+  });
+};
+const nonExpiringFirst = await resolveHhApplicationAuthorization(credentials, {
+  fetchImpl: nonExpiringFetchImpl,
+  now: 3_000_000,
+});
+const nonExpiringCached = await resolveHhApplicationAuthorization(credentials, {
+  fetchImpl: nonExpiringFetchImpl,
+  now: 3_000_000 + (24 * 60 * 60 * 1000),
+});
+assert.equal(nonExpiringCached, nonExpiringFirst);
+assert.equal(nonExpiringTokenRequests, 1);
+
+resetHhApplicationTokenCache();
 await assert.rejects(
   () => resolveHhApplicationAuthorization(credentials, {
     fetchImpl: async () => jsonResponse({ error: 'invalid_client' }, { status: 401 }),
@@ -70,6 +90,7 @@ console.log(JSON.stringify({
   tokenRequests,
   cacheVerified: true,
   expirationRefreshVerified: true,
+  unlimitedLifetimeCacheVerified: true,
   safeOauthFailureVerified: true,
 }, null, 2));
 

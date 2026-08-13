@@ -17,24 +17,22 @@ const DEFAULT_PER_PAGE = 20;
 const DEFAULT_PAGES = 1;
 const MAX_PER_PAGE = 100;
 const MAX_PAGES = 20;
+// HH's official vacancy-search label excludes listings posted by agencies.
+// Source: https://api.hh.ru/openapi/redoc#tag/Poisk-vakansij/operation/get-vacancies
+const DEFAULT_VACANCY_LABELS = ['not_from_agency'];
 
 /**
  * Thrown when HH's search API answers with HTTP 403 `forbidden`.
  *
- * WHY a dedicated error: the HH *search* endpoints (/vacancies, /employers)
- * return 403 when the calling IP is outside HH's allowed range (datacenter /
- * non-RU egress), while the public dictionary endpoints (/areas,
- * /dictionaries) and hh.ru still answer 200. A bare "HTTP 403" is
- * indistinguishable from a broken adapter or a stale user agent, so the HH
- * source has historically read as a silent "HH broken" gate. This carries the
- * operational cause + remediation so the failure is actionable, not a mystery.
+ * Keep the status distinct without guessing whether the cause is credentials,
+ * permissions, policy, or transport. The authenticated response is the source
+ * of truth for operator diagnostics.
  */
 export class HhAccessForbiddenError extends Error {
   constructor(safeUrl, cause) {
     super(
-      'HH search API returned HTTP 403 forbidden. This response alone does not '
-        + 'prove a geo restriction; inspect the safe HH diagnostic after trying '
-        + 'official application OAuth before considering an RU-resident egress fallback.',
+      'HH search API returned HTTP 403 forbidden. Inspect the secret-safe '
+        + 'authenticated application diagnostic before assigning a cause.',
       { cause },
     );
     this.name = 'HhAccessForbiddenError';
@@ -204,13 +202,14 @@ const ENV_PARAM_MAP = [
   ['HH_DATE_TO', 'date_to'],
   ['HH_ORDER_BY', 'order_by'],
   ['HH_SEARCH_FIELD', 'search_field'],
+  ['HH_LABEL', 'label'],
 ];
 
 export function resolveHhVacancySearchConfig(env = process.env) {
   const searchText = toNonEmptyText(env.HH_SEARCH_TEXT) ?? DEFAULT_SEARCH_TEXT;
   const perPage = clampInteger(env.HH_PER_PAGE, DEFAULT_PER_PAGE, 1, MAX_PER_PAGE);
   const pages = clampInteger(env.HH_PAGES, DEFAULT_PAGES, 1, MAX_PAGES);
-  const extraParams = {};
+  const extraParams = { label: [...DEFAULT_VACANCY_LABELS] };
 
   for (const [envName, paramName] of ENV_PARAM_MAP) {
     const values = parseMultiValue(env[envName]);
@@ -375,7 +374,8 @@ export function describeHhFailure(error) {
     captcha: /captcha/i.test(errorType) || /captcha/i.test(message),
     oauthFailure: error instanceof HhOAuthError || status === 401,
     rateLimit: status === 429 || /rate.?limit/i.test(errorType),
-    networkOrGeoFailure: error instanceof HhAccessForbiddenError || status === null,
+    accessForbidden: error instanceof HhAccessForbiddenError,
+    networkFailure: status === null && !(error instanceof HhOAuthError),
   };
 }
 

@@ -198,7 +198,7 @@ async function runHhAdapterSmoke() {
 
 /**
  * A 403 `forbidden` from HH search must surface as HhAccessForbiddenError with
- * an actionable message — not a bare "HTTP 403" that reads as a broken adapter.
+ * a secret-safe neutral message — not a guessed infrastructure diagnosis.
  * Caller restores globalThis.fetch in its finally block.
  */
 async function verifyHhForbiddenMapping(config) {
@@ -213,9 +213,8 @@ async function verifyHhForbiddenMapping(config) {
         'HH 403 forbidden must map to HhAccessForbiddenError',
       );
       assert.equal(error.status, 403);
-      assert.match(error.message, /does not prove a geo restriction/);
-      assert.match(error.message, /official application OAuth/);
-      assert.match(error.message, /RU-resident/);
+      assert.match(error.message, /authenticated application diagnostic/);
+      assert.doesNotMatch(error.message, /geo|proxy|RU-resident/i);
       return true;
     },
   );

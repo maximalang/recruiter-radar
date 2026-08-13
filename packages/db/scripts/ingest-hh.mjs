@@ -55,7 +55,7 @@ try {
   const searchConfig = resolveHhVacancySearchConfig();
   const hhFetch = await fetchVacancies(hhUserAgent, searchConfig);
   const vacancies = hhFetch.items;
-  const normalizedVacancyResult = normalizeVacancies(vacancies);
+  const normalizedVacancyResult = normalizeVacancies(vacancies, searchConfig);
   const normalizedVacancies = normalizedVacancyResult.records;
   const stats =
     normalizedVacancies.length === 0
@@ -117,12 +117,13 @@ async function fetchVacancies(userAgent, config) {
   });
 }
 
-function normalizeVacancies(vacancies) {
+function normalizeVacancies(vacancies, searchConfig) {
   const fetchedAt = new Date().toISOString();
   const normalizedVacancies = [];
+  const directEmployerOnly = searchConfig.extraParams?.label?.includes('not_from_agency') === true;
 
   for (const vacancy of vacancies) {
-    const normalizedVacancy = normalizeVacancy(vacancy, fetchedAt);
+    const normalizedVacancy = normalizeVacancy(vacancy, fetchedAt, directEmployerOnly);
 
     if (normalizedVacancy) {
       normalizedVacancies.push(normalizedVacancy);
@@ -137,7 +138,7 @@ function normalizeVacancies(vacancies) {
   };
 }
 
-function normalizeVacancy(vacancy, fetchedAt) {
+function normalizeVacancy(vacancy, fetchedAt, directEmployerOnly) {
   if (!vacancy || typeof vacancy !== 'object') {
     return null;
   }
@@ -188,6 +189,8 @@ function normalizeVacancy(vacancy, fetchedAt) {
     areaName: toNonEmptyText(vacancy.area?.name),
     publishedAt: toTimestampOrNull(vacancy.published_at),
     alternateUrl: toNonEmptyText(vacancy.alternate_url),
+    publisherType: directEmployerOnly ? 'direct-employer' : 'listing-employer-unverified',
+    publisherAttribution: directEmployerOnly ? 'hh-search-label:not_from_agency' : 'hh-search-label:unverified',
     payload: vacancy,
     fetchedAt,
   };
@@ -476,6 +479,8 @@ function buildSignalPayload(vacancy) {
     source_record_title: vacancy.vacancyName,
     source_record_url: vacancy.alternateUrl,
     source_record_published_at: vacancy.publishedAt,
+    publisher_type: vacancy.publisherType,
+    publisher_attribution: vacancy.publisherAttribution,
     org_source_key: vacancy.orgSourceKey,
     hh_vacancy_id: vacancy.hhVacancyId,
     hh_employer_id: vacancy.hhEmployerId,

@@ -218,7 +218,7 @@ const SOURCE_PAGE_BUDGET: Readonly<Record<QueryPlannerV2Source, number>> = {
 const SOURCE_ALLOWED_OVERRIDE_KEYS: Readonly<
   Record<QueryPlannerV2Source, ReadonlySet<string>>
 > = {
-  hh: new Set(['HH_SEARCH_TEXT', 'HH_AREA', 'HH_PAGES', 'HH_PER_PAGE']),
+  hh: new Set(['HH_SEARCH_TEXT', 'HH_AREA', 'HH_LABEL', 'HH_PAGES', 'HH_PER_PAGE']),
   superjob: new Set([
     'SUPERJOB_KEYWORD', 'SUPERJOB_TOWN', 'SUPERJOB_PAGES', 'SUPERJOB_PER_PAGE',
   ]),
@@ -535,6 +535,7 @@ function buildSourceQueryEnv(input: {
   )
   delete env.RABOTA_ROSSII_REGION
   if (input.source === 'hh') {
+    env.HH_LABEL = 'not_from_agency'
     env.HH_PAGES = String(input.pageBudget)
     if (input.geography.hhAreaIds.length > 0) {
       env.HH_AREA = input.geography.hhAreaIds.join(',')

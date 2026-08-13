@@ -88,7 +88,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
       'HH_SEARCH_TEXT', 'HH_PER_PAGE', 'HH_PAGES',
       'HH_AREA', 'HH_EMPLOYMENT', 'HH_SCHEDULE', 'HH_EXPERIENCE',
       'HH_PROFESSIONAL_ROLE', 'HH_INDUSTRY', 'HH_DATE_FROM', 'HH_DATE_TO',
-      'HH_ORDER_BY', 'HH_SEARCH_FIELD', 'HH_SEARCH_PARAMS_JSON',
+      'HH_ORDER_BY', 'HH_SEARCH_FIELD', 'HH_LABEL', 'HH_SEARCH_PARAMS_JSON',
     ],
     isPrimary: true,
     category: 'job-board',

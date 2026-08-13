@@ -155,7 +155,7 @@
         "state": "blocked",
         "verifiedAt": null,
         "evidence": [
-          "2026-08-12 unauthenticated direct probe: api.hh.ru/areas returned HTTP 200, while api.hh.ru/vacancies returned HTTP 403 forbidden from the current egress. This does not prove a geo blocker."
+          "A previous unauthenticated vacancy-search request returned HTTP 403. An authenticated application request remains pending until the registered application credentials are supplied."
         ]
       },
       "requiresLiveVerification": true,
@@ -167,9 +167,7 @@
         "fixture": ["npm run verify:hh:oauth", "npm run verify:hh:smoke"],
         "contract": ["npm run verify:source:readiness", "npm run verify:hh:live-pipeline"]
       },
-      "blockers": [
-        "HH_CLIENT_ID and HH_CLIENT_SECRET are absent in the production runtime, so authenticated application-OAuth search has not been live-verified. RU-resident egress remains a fallback only if authenticated target-runtime access still fails."
-      ]
+      "blockers": ["credential-not-supplied"]
     },
     "career-pages": {
       "implementation": "implemented",

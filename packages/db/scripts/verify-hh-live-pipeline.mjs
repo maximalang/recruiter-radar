@@ -23,8 +23,12 @@ if (process.env.SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK !== 'isolated') {
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const hhUserAgent = process.env.HH_USER_AGENT?.trim();
+const hhClientId = process.env.HH_CLIENT_ID?.trim();
+const hhClientSecret = process.env.HH_CLIENT_SECRET?.trim();
 assert.ok(databaseUrl, 'DATABASE_URL is required.');
 assert.ok(hhUserAgent, 'HH_USER_AGENT is required.');
+assert.ok(hhClientId, 'credential-not-supplied: HH_CLIENT_ID is required.');
+assert.ok(hhClientSecret, 'credential-not-supplied: HH_CLIENT_SECRET is required.');
 
 const client = new Client({ connectionString: databaseUrl });
 await client.connect();
@@ -78,6 +82,7 @@ try {
       COUNT(DISTINCT lineage.organization_id)::int AS organizations,
       BOOL_AND(lineage.source_url ~ '^https://') AS source_urls_preserved,
       BOOL_AND(lineage.extraction_method = 'hh-api') AS extraction_preserved,
+      BOOL_AND(signal.payload ->> 'publisher_type' = 'direct-employer') AS direct_employer_attribution,
       BOOL_AND(signal.org_id = lineage.organization_id) AS signal_owner_consistent,
       BOOL_AND(evidence.org_id = lineage.organization_id) AS evidence_owner_consistent
     FROM source_signal_evidence_lineage_v1 lineage
@@ -93,6 +98,7 @@ try {
   assert.equal(proof.evidence, proof.lineage_rows, 'each HH lineage row must identify one evidence item');
   assert.equal(proof.source_urls_preserved, true);
   assert.equal(proof.extraction_preserved, true);
+  assert.equal(proof.direct_employer_attribution, true);
   assert.equal(proof.signal_owner_consistent, true);
   assert.equal(proof.evidence_owner_consistent, true);
 

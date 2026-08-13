@@ -2,7 +2,6 @@ import { fetchWithSourcePolicy } from './source-http.mjs';
 
 const HH_TOKEN_URL = 'https://api.hh.ru/token';
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
-const DEFAULT_TOKEN_TTL_SECONDS = 300;
 
 let cachedToken = null;
 let pendingToken = null;
@@ -106,14 +105,19 @@ async function requestApplicationToken({ clientId, clientSecret, userAgent, fetc
   }
 
   const expiresIn = Number(payload.expires_in);
-  const ttlSeconds = Number.isFinite(expiresIn) && expiresIn > 0
-    ? expiresIn
-    : DEFAULT_TOKEN_TTL_SECONDS;
+  // HH application tokens have unlimited lifetime when `expires_in` is absent.
+  // Re-requesting one revokes the previous token and is rate-limited, so keep it
+  // until HH explicitly rejects it with 401. Expiring token responses still use
+  // their advertised TTL and the normal refresh skew.
+  // Source: https://github.com/hhru/api/blob/master/docs/authorization_for_application.md
+  const expiresAt = Number.isFinite(expiresIn) && expiresIn > 0
+    ? now + expiresIn * 1000
+    : Number.POSITIVE_INFINITY;
 
   return {
     clientId,
     accessToken,
-    expiresAt: now + ttlSeconds * 1000,
+    expiresAt,
   };
 }
 
