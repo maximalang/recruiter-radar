@@ -1,11 +1,14 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 
 const DEFAULT_ROOT = resolve('packages/db/scripts/.snapshots');
+const DEFAULT_RETENTION_COUNT = 3;
+const VERSIONED_SNAPSHOT_NAME = /^snapshot-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/;
 
 export function resolveActiveSnapshot(sourceId, { rootDirectory } = {}) {
+  assertSnapshotSourceId(sourceId);
   const manifestPath = join(resolveSnapshotRoot(rootDirectory), sourceId, 'active.json');
   if (!existsSync(manifestPath)) return null;
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
@@ -31,7 +34,7 @@ export function resolveSnapshotInputFile(sourceId, envName, options = {}) {
 }
 
 export function resolveVersionedSnapshotOutput(sourceId, now = new Date(), options = {}) {
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(sourceId)) throw new Error('Invalid snapshot source ID.');
+  assertSnapshotSourceId(sourceId);
   const timestamp = now.toISOString().replace(/[:.]/g, '-');
   return join(resolveSnapshotRoot(options.rootDirectory), sourceId, `snapshot-${timestamp}.json`);
 }
@@ -42,7 +45,10 @@ export async function activateValidatedSnapshot({
   recordCount,
   sourceUrls = [],
   rootDirectory,
+  retentionCount = process.env.SOURCE_SNAPSHOT_RETENTION_COUNT,
 }) {
+  assertSnapshotSourceId(sourceId);
+  const normalizedRetentionCount = normalizeRetentionCount(retentionCount);
   const snapshotPath = resolve(snapshotFile);
   const bytes = await readFile(snapshotPath);
   if (!Number.isInteger(recordCount) || recordCount < 1) {
@@ -65,7 +71,39 @@ export async function activateValidatedSnapshot({
   };
   await writeFile(temporaryPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
   await rename(temporaryPath, manifestPath);
-  return { manifestPath, manifest };
+  const retention = await pruneVersionedSnapshots({
+    directory,
+    activeSnapshotPath: snapshotPath,
+    retentionCount: normalizedRetentionCount,
+  });
+  return { manifestPath, manifest, retention };
+}
+
+async function pruneVersionedSnapshots({ directory, activeSnapshotPath, retentionCount }) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const candidates = entries
+    .filter((entry) => entry.isFile() && VERSIONED_SNAPSHOT_NAME.test(entry.name))
+    .map((entry) => entry.name)
+    .sort((left, right) => right.localeCompare(left));
+  const activeName = dirname(activeSnapshotPath) === directory ? basename(activeSnapshotPath) : null;
+  const retained = new Set(candidates.slice(0, retentionCount));
+  if (activeName && VERSIONED_SNAPSHOT_NAME.test(activeName)) retained.add(activeName);
+  const removed = candidates.filter((name) => !retained.has(name));
+  for (const name of removed) await unlink(join(directory, name));
+  return { retained: candidates.filter((name) => retained.has(name)), removed };
+}
+
+function normalizeRetentionCount(value) {
+  if (value === undefined || value === null || value === '') return DEFAULT_RETENTION_COUNT;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 2 || parsed > 20) {
+    throw new Error('SOURCE_SNAPSHOT_RETENTION_COUNT must be an integer between 2 and 20.');
+  }
+  return parsed;
+}
+
+function assertSnapshotSourceId(sourceId) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(sourceId)) throw new Error('Invalid snapshot source ID.');
 }
 
 function resolveSnapshotRoot(rootDirectory) {

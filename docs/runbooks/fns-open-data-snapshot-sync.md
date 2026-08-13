@@ -81,6 +81,14 @@ for debugging, but it is not the production activation mechanism. Keep both
 files until the new snapshot has completed its first successful daily ingest
 and downstream evidence/lineage checks.
 
+Successful activation retains the active version plus two rollback versions by
+default and removes only older files matching the generated
+`snapshot-<timestamp>.json` name inside that source's snapshot directory. Set
+`SOURCE_SNAPSHOT_RETENTION_COUNT` to an integer from 2 through 20 when a longer
+retention window is required. Invalid values fail before the manifest swap;
+operator override files and files outside the source directory are never
+deleted by retention.
+
 ## Failure behavior
 
 - Passport or archive URLs outside official `nalog.gov.ru` hosts are rejected.
