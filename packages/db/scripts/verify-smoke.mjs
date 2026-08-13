@@ -12,6 +12,7 @@ const rootEnvPath = resolve(scriptDir, '../../../.env');
 loadEnvFile(rootEnvPath);
 
 const alwaysScripts = [
+  './verify-site-discovery-primitives-smoke.mjs',
   './verify-career-pages-smoke.mjs',
   './verify-career-pages-providers-smoke.mjs',
   './verify-career-pages-discovery-smoke.mjs',

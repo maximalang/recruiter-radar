@@ -40,8 +40,10 @@ environment.
 | tech-job-boards / linkedin / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set; generic regional pseudo-source retired |
 
 **Still blocked, documented in `docs/source-review/`:** avito (robots disallow `/api/`+catalog),
-rabota.ru (BI.ZONE WAF), zarplata.ru (= HH backend, same 403), Telegram channels (rejected by
-policy — social/personal scraping is out of product scope; see Rejected table + `telegram-channels-review.md`).
+rabota.ru (reachable UI but licensed database/partner access), GeekJob/getmatch (official terms require permission for commercial
+reuse), Finder.work (no reviewed commercial-ingestion licence), zarplata.ru (= HH backend,
+same 403), and Telegram channels (rejected by policy — social/personal scraping is out of product
+scope; see Rejected table + `telegram-channels-review.md`).
 
 **Coverage improvement this cycle:** rabota-rossii went from one ~25–50-record federal page to
 region-iterated paged fetch (each of ~85 RF region codes exposes an independent offset window),
@@ -188,6 +190,13 @@ counts and no sensitive persisted payload fields. SmartRecruiters remains blocke
 same production runtime received HTTP 403 and its existing optional proxy could not connect;
 local success is not promoted into a production claim.
 
+Known hosted ATS without a reviewed public JSON API are handled only through the public career
+page discovered on the company-owned site. The allowlist covers Workday, Teamtailor, Personio,
+BambooHR, Pinpoint, Breezy, Comeet, JazzHR, iCIMS, Oracle/Taleo/Oracle Cloud, and SAP
+SuccessFactors. The fallback reads JSON-LD, bounded non-executable embedded JSON, or guarded
+same-host vacancy cards; `/api`, `/rest`, GraphQL, auth, internal, and service endpoints are
+rejected. These remain `career-pages` evidence because no private provider API is assumed.
+
 **rabota-rossii** — official trudvsem open-data. In the SQL whitelist and **`digest-allowed` as
 of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
 `source-review/trudvsem-review.md` and memory `project_rabota_rossii_live`).
@@ -280,6 +289,25 @@ registry and matches articles only to already-tracked companies with hiring evid
 The generic **regional-job-boards** pseudo-source is retired. Each board needs a concrete source
 ID plus its own official-access, legal, provenance, and confidence review.
 
+### Shared discovery and incremental primitives
+
+- `adapters/feed-parser.mjs` is the bounded RSS/Atom parser shared by company
+  newsrooms and curated industry media.
+- `adapters/site-discovery.mjs` centralizes fail-closed robots evaluation,
+  bounded sitemap/sitemap-index parsing, same-origin career URL selection,
+  canonical URL cleanup, non-executable embedded JSON parsing, HTTP validator
+  extraction, conditional request headers, and SHA-256 content fingerprints.
+- `source-career-pages.mjs` consumes those primitives before direct path probes,
+  then shares ATS fingerprinting, JSON-LD/embedded `JobPosting`, and guarded
+  same-domain HTML-card extraction across all supported career surfaces.
+- Daily company-owned context selection uses durable DB freshness windows
+  (23 hours for newsrooms/media/GDELT, seven days for generic company pages),
+  while evidence writes are content-hash idempotent. Source APIs retain their
+  own bounded pagination/date windows; FNS snapshots keep official versioned
+  archive URLs and SHA-256 hashes. Together these avoid treating unchanged
+  material as new evidence; no source may invent a cursor its upstream does
+  not expose.
+
 ---
 
 ## Rejected / not adopted
@@ -291,10 +319,14 @@ Reviewed and deliberately **not** integrated. Re-opening any of these requires a
 |---|---|---|
 | **avito jobs** | rejected | See `source-review/avito-jobs-review.md` — live checks failed adoption bar. |
 | **rabota.ru** | rejected | See `source-review/rabota-ru-review.md`. |
+| **GeekJob** | permission required | See `source-review/geekjob-review.md`; official rules restrict database extraction/reuse. |
+| **Finder.work** | permission/legal review required | See `source-review/finder-work-review.md`; public crawlability is not a commercial-ingestion licence. |
+| **getmatch** | permission required | See `source-review/getmatch-review.md`; terms restrict commercial copying and robots disallow `/api/`. |
 | **trudvsem (direct)** | superseded | Covered via `rabota-rossii` open-data; direct review in `source-review/trudvsem-review.md`. |
 | **zarplata.ru** | rejected | See `source-review/zarplata-ru-review.md`. |
 | **Telegram / WhatsApp / social scrapers** | rejected by policy | See `source-review/telegram-channels-review.md` (re-evaluated 2026-06-30) + `source-priority-policy.md` §"Rejected by default" — social/personal scraping is out of scope, has no compliant evidence-grade path, and conflicts with the product's evidence/privacy stance. Overrides any ad-hoc request to add Telegram-channel scraping. |
 | **VC.ru / Tenchat** | rejected by policy | Social networks → fall under the same personal/social-scraping prohibition. |
+| **Public GitHub organizations** | optional / planned | Free official API verified; not active until a company-owned link proves organization ownership. See `source-review/public-github-organizations-review.md`. |
 
 > All decisions above are commit-backed: `78b4160` (avito, rabota-ru, trudvsem, zarplata-ru
 > rejection after live checks).

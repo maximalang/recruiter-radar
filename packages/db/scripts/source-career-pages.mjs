@@ -17,6 +17,12 @@ import {
 } from './adapters/source-records.mjs';
 import { fetchJson as fetchJsonWithPolicy, fetchText } from './adapters/source-http.mjs';
 import {
+  canonicalizePublicUrl,
+  discoverCareerUrlsFromWebsite,
+  extractEmbeddedJsonDocuments,
+  isRobotsPathAllowed,
+} from './adapters/site-discovery.mjs';
+import {
   assertOrgSourceRefOwner,
   resolveOrganizationOwner,
 } from './adapters/organization-resolution.mjs';
@@ -430,7 +436,16 @@ async function discoverCareerPageTargetsFromSeeds(seeds) {
 }
 
 async function probeCareerPageSeed(seed) {
-  const attemptedUrls = buildCareerPageProbeUrls(seed);
+  const baseUrl = seed.websiteUrl ?? deriveWebsiteUrlFromDomain(seed.domain);
+  const siteDiscovery = baseUrl
+    ? await discoverCareerUrlsFromWebsite(baseUrl, { maxSitemaps: 3, maxUrls: 6 })
+    : null;
+  const attemptedUrls = siteDiscovery?.blocked
+    ? []
+    : [...new Set([
+      ...buildCareerPageProbeUrls(seed),
+      ...(siteDiscovery?.careerUrls ?? []),
+    ])].filter((url) => isRobotsPathAllowed(url, siteDiscovery?.robots));
   const pages = [];
 
   for (const url of attemptedUrls) {
@@ -442,7 +457,13 @@ async function probeCareerPageSeed(seed) {
   }
 
   const targets = [];
-  const notes = [];
+  const notes = siteDiscovery
+    ? [
+      `robots:${siteDiscovery.robotsState}`,
+      `sitemaps-fetched:${siteDiscovery.sitemapUrlsFetched.length}`,
+      ...siteDiscovery.errors,
+    ]
+    : [];
   let sameDomainCareerPageUrl = null;
 
   for (const page of pages) {
@@ -639,6 +660,7 @@ export function detectCareerPageTargetFromHtml(html, seed) {
     /https?:\/\/(?:careers\.smartrecruiters\.com\/[A-Za-z0-9_-]+|api\.smartrecruiters\.com\/v1\/companies\/[A-Za-z0-9_-]+\/postings(?:\?[^"'\s<>]*)?)/gi,
   );
   const sameDomainCareerPageUrl = extractSameDomainCareerPageUrl(text, seed.baseUrl ?? seed.websiteUrl ?? null);
+  const hostedCareerPages = extractHostedCareerPageUrls(fingerprintText);
 
   if (greenhouseLink) {
     const slug = extractGreenhouseSlug(greenhouseLink);
@@ -736,6 +758,21 @@ export function detectCareerPageTargetFromHtml(html, seed) {
     }
   }
 
+  if (targets.length === 0 && hostedCareerPages.length > 0) {
+    for (const hosted of hostedCareerPages) {
+      targets.push(buildDiscoveredTarget({
+        adapter: 'hosted-career-page',
+        providerSlug: `${hosted.family}-${hosted.hostname}`,
+        companyName: seed.orgName,
+        companyDomain: seed.domain,
+        companyWebsiteUrl: seed.websiteUrl,
+        careerPageUrl: hosted.url,
+        sourceUrl: hosted.url,
+        hostedAtsFamily: hosted.family,
+      }));
+    }
+  }
+
   if (targets.length === 0 && sameDomainCareerPageUrl) {
     // The company's OWN career page (same host as its website) is a direct,
     // company-owned hiring surface — exactly the RU-native case foreign ATS
@@ -772,24 +809,8 @@ export function detectCareerPageTargetFromHtml(html, seed) {
 export function extractJobPostingsFromHtml(html) {
   const text = typeof html === 'string' ? html : '';
   const postings = [];
-  const scriptPattern = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  let match;
-
-  while ((match = scriptPattern.exec(text)) !== null) {
-    const raw = match[1]?.trim();
-
-    if (!raw) {
-      continue;
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      continue;
-    }
-
-    collectJobPostings(parsed, postings, 0);
+  for (const document of extractEmbeddedJsonDocuments(text)) {
+    collectJobPostings(document, postings, 0);
   }
 
   return postings;
@@ -820,16 +841,10 @@ function collectJobPostings(node, acc, depth) {
     acc.push(node);
   }
 
-  if (Array.isArray(node['@graph'])) {
-    collectJobPostings(node['@graph'], acc, depth + 1);
-  }
-
-  if (Array.isArray(node.itemListElement)) {
-    collectJobPostings(node.itemListElement, acc, depth + 1);
-  }
-
-  if (node.item && typeof node.item === 'object') {
-    collectJobPostings(node.item, acc, depth + 1);
+  for (const value of Object.values(node)) {
+    if (value && typeof value === 'object') {
+      collectJobPostings(value, acc, depth + 1);
+    }
   }
 }
 
@@ -1104,9 +1119,10 @@ function normalizeJsonLdEmploymentType(value) {
   return toNonEmptyText(value);
 }
 
-function buildDiscoveredTarget({ adapter, providerSlug, companyName, companyDomain, companyWebsiteUrl, careerPageUrl, sourceUrl }) {
-  return {
-    id: `${normalizeSourceKeyText(companyDomain ?? companyName ?? providerSlug) ?? providerSlug}-${adapter}`,
+function buildDiscoveredTarget({ adapter, providerSlug, companyName, companyDomain, companyWebsiteUrl, careerPageUrl, sourceUrl, hostedAtsFamily = null }) {
+  const baseId = normalizeSourceKeyText(companyDomain ?? companyName ?? providerSlug) ?? providerSlug;
+  const target = {
+    id: hostedAtsFamily ? `${baseId}-${adapter}-${providerSlug}` : `${baseId}-${adapter}`,
     adapter,
     company_name: companyName,
     company_domain: companyDomain,
@@ -1114,6 +1130,45 @@ function buildDiscoveredTarget({ adapter, providerSlug, companyName, companyDoma
     career_page_url: careerPageUrl,
     source_url: sourceUrl,
   };
+  if (hostedAtsFamily) target.hosted_ats_family = hostedAtsFamily;
+  return target;
+}
+
+function extractHostedCareerPageUrls(value, maxTargets = 4) {
+  const targets = [];
+  const seen = new Set();
+  for (const match of String(value ?? '').matchAll(/https?:\/\/[^"'\s<>]+/gi)) {
+    const url = canonicalizePublicUrl(decodeHtmlUrl(match[0]));
+    if (!url || seen.has(url)) continue;
+    const parsed = new URL(url);
+    if (/\.(?:avif|gif|jpe?g|png|svg|webp|css|js|map|ico)$/i.test(parsed.pathname)) continue;
+    if (/(?:^|\/)(?:api|rest|graphql|oauth|auth|internal|services)(?:\/|$)/i.test(parsed.pathname)) continue;
+    const family = classifyHostedAtsUrl(parsed);
+    if (!family) continue;
+    seen.add(url);
+    targets.push({ family, hostname: parsed.hostname.toLowerCase(), url });
+    if (targets.length >= Math.max(1, maxTargets)) break;
+  }
+  return targets;
+}
+
+function classifyHostedAtsUrl(url) {
+  const host = url.hostname.toLowerCase();
+  const path = url.pathname;
+  if (host.endsWith('.myworkdayjobs.com')) return 'workday';
+  if (host.endsWith('.teamtailor.com')) return 'teamtailor';
+  if (host.endsWith('.jobs.personio.com')) return 'personio';
+  if (host.endsWith('.bamboohr.com') && /^\/(?:careers?|jobs?)(?:\/|$)/i.test(path)) return 'bamboohr';
+  if (host.endsWith('.pinpointhq.com')) return 'pinpoint';
+  if (host.endsWith('.breezy.hr')) return 'breezy';
+  if ((host === 'comeet.com' || host.endsWith('.comeet.com')) && /^\/jobs(?:\/|$)/i.test(path)) return 'comeet';
+  if (host.endsWith('.applytojob.com')) return 'jazzhr';
+  if (host.endsWith('.icims.com') && /\/jobs(?:\/|$)/i.test(path)) return 'icims';
+  if (host.endsWith('.taleo.net') && /\/careersection(?:\/|$)/i.test(path)) return 'oracle-taleo';
+  if (host.endsWith('.oraclecloud.com') && /\/hcmui\/candidateexperience(?:\/|$)/i.test(path)) return 'oracle-cloud';
+  if ((host.endsWith('.successfactors.com') || host.endsWith('.successfactors.eu'))
+    && /\/career(?:\/|$)/i.test(path)) return 'sap-successfactors';
+  return null;
 }
 
 function matchFirstUrl(value, pattern) {
@@ -1274,10 +1329,16 @@ async function fetchCareerPageTarget(target, index) {
     records = await fetchWorkablePublicJobsRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'smartrecruiters-postings') {
     records = await fetchSmartRecruitersPostingsRecords(normalizedTarget);
-  } else if (normalizedTarget.adapter === 'same-domain-jsonld') {
+  } else if (['same-domain-jsonld', 'hosted-career-page'].includes(normalizedTarget.adapter)) {
     const fetched = await fetchSameDomainJsonLdRecords(normalizedTarget);
     records = fetched.records;
     fetchDiagnostics = fetched.diagnostics;
+    if (normalizedTarget.hostedAtsFamily) {
+      for (const record of records) {
+        record.hosted_ats_family = normalizedTarget.hostedAtsFamily;
+        record.raw_target_adapter = 'hosted-career-page';
+      }
+    }
   } else if (normalizedTarget.adapter === 'json-feed') {
     records = await fetchJsonFeedRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'static-records') {
@@ -1329,7 +1390,7 @@ export function resolveCareerPageTargetOutcome({
   if (fetchFailure) return 'page-unreachable';
   if (contentUnsupported) return 'extractor-unsupported';
   if (recordsFetched > 0) return 'parsed';
-  if (adapter === 'same-domain-jsonld' && pageFetched) return 'extraction-zero-unexpected';
+  if (['same-domain-jsonld', 'hosted-career-page'].includes(adapter) && pageFetched) return 'extraction-zero-unexpected';
   if (pageFetched) return 'no-vacancies-present';
   return 'page-unreachable';
 }
@@ -1351,7 +1412,7 @@ function resolveExtractionMethodForSummary(records, adapter) {
   // 0 records: distinguish "no extractor matched" from "adapter ran but found
   // nothing". same-domain-jsonld is the path that now has the HTML fallback —
   // a 0 here means the page had neither JSON-LD nor usable HTML cards.
-  if (adapter === 'same-domain-jsonld') return 'none';
+  if (['same-domain-jsonld', 'hosted-career-page'].includes(adapter)) return 'none';
   return adapter ?? 'none';
 }
 
@@ -1371,6 +1432,7 @@ function normalizeFetchTarget(target, index) {
   const companyDomain = normalizeDomain(target.company_domain ?? target.companyDomain);
   const companyWebsiteUrl = toUrlOrNull(target.company_website_url ?? target.companyWebsiteUrl);
   const careerPageUrl = toUrlOrNull(target.career_page_url ?? target.careerPageUrl ?? target.url);
+  const hostedAtsFamily = toNonEmptyText(target.hosted_ats_family ?? target.hostedAtsFamily);
 
   if (adapter === 'static-records') {
     const records = Array.isArray(target.records) ? target.records : [];
@@ -1382,6 +1444,7 @@ function normalizeFetchTarget(target, index) {
       companyDomain,
       companyWebsiteUrl,
       careerPageUrl,
+      hostedAtsFamily,
       sourceUrl: null,
       records,
     };
@@ -1400,6 +1463,7 @@ function normalizeFetchTarget(target, index) {
     companyDomain,
     companyWebsiteUrl,
     careerPageUrl,
+    hostedAtsFamily,
     sourceUrl,
   };
 }

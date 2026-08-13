@@ -1,6 +1,8 @@
 # Source Review: avito-jobs (avito.ru vacancies)
 
 **Date:** 2026-06-21
+**Re-checked:** 2026-08-13 — HTTP 200 robots still disallows `/api/` and
+`/*/vakansii/catalog/`; decision unchanged.
 **Status:** ❌ BLOCKED — robots.txt disallows the vacancy catalog and all `/api/`
 **Decision:** Do not implement (matches the directive's explicit "SKIP if robots.txt disallows").
 

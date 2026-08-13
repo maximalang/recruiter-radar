@@ -150,6 +150,40 @@ const redirectedAtsDetection = detectCareerPageTargetFromHtml('', {
 assert.equal(redirectedAtsDetection.targets.length, 1, 'a direct redirect to an ATS board must be discoverable');
 assert.equal(redirectedAtsDetection.targets[0].adapter, 'ashby-job-board');
 
+const hostedAtsCases = [
+  ['workday', 'https://acme.wd3.myworkdayjobs.com/en-US/External'],
+  ['teamtailor', 'https://acme.teamtailor.com/'],
+  ['personio', 'https://acme.jobs.personio.com/'],
+  ['bamboohr', 'https://acme.bamboohr.com/careers'],
+  ['pinpoint', 'https://acme.pinpointhq.com/'],
+  ['breezy', 'https://acme.breezy.hr/'],
+  ['comeet', 'https://www.comeet.com/jobs/acme/123'],
+  ['jazzhr', 'https://acme.applytojob.com/apply'],
+  ['icims', 'https://careers-acme.icims.com/jobs/intro'],
+  ['oracle-taleo', 'https://acme.taleo.net/careersection/external/jobsearch.ftl'],
+  ['oracle-cloud', 'https://acme.fa.eu2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1'],
+  ['sap-successfactors', 'https://career5.successfactors.eu/career?company=acme'],
+];
+for (const [family, url] of hostedAtsCases) {
+  const detection = detectCareerPageTargetFromHtml(`<a href="${url}">Jobs</a>`, {
+    baseUrl: 'https://acme.example/',
+    orgName: 'Acme',
+    domain: 'acme.example',
+    websiteUrl: 'https://acme.example/',
+  });
+  assert.equal(detection.targets.length, 1, `${family} public page must be detected`);
+  assert.equal(detection.targets[0].adapter, 'hosted-career-page');
+  assert.equal(detection.targets[0].hosted_ats_family, family);
+  const expectedUrl = new URL(url).pathname === '/' ? new URL(url).toString() : url.replace(/\/$/, '');
+  assert.equal(detection.targets[0].source_url, expectedUrl);
+}
+
+const privateHostedApi = detectCareerPageTargetFromHtml(
+  '<a href="https://acme.teamtailor.com/api/jobs">private endpoint</a>',
+  { baseUrl: 'https://acme.example/', orgName: 'Acme', domain: 'acme.example', websiteUrl: 'https://acme.example/' },
+);
+assert.deepEqual(privateHostedApi.targets, [], 'private hosted ATS API paths must not be adopted');
+
 const sameDomainDetection = detectCareerPageTargetFromHtml(sameDomainHtml, {
   baseUrl: 'https://same.example/',
   orgName: 'Same',
@@ -211,6 +245,14 @@ const jsonLdHtml = `
 `;
 const postings = extractJobPostingsFromHtml(jsonLdHtml);
 assert.equal(postings.length, 1, 'must extract exactly one JobPosting from @graph');
+
+const embeddedPostings = extractJobPostingsFromHtml(`
+  <script id="__NEXT_DATA__" type="application/json">
+    {"props":{"pageProps":{"jobs":[{"@type":"JobPosting","title":"Data Engineer","url":"https://same.example/careers/data"}]}}}
+  </script>
+`);
+assert.equal(embeddedPostings.length, 1, 'must discover JobPosting in bounded non-executable embedded JSON');
+assert.equal(embeddedPostings[0].title, 'Data Engineer');
 
 const mapped = mapJsonLdJobPostings(postings, {
   companyName: 'Same',

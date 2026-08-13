@@ -167,6 +167,7 @@
     "verify:industry-media:feeds": "node packages/db/scripts/verify-industry-media-feeds-smoke.mjs",
     "verify:company-site:smoke": "node packages/db/scripts/verify-company-site-smoke.mjs",
     "verify:company-newsrooms:discovery": "node packages/db/scripts/verify-company-newsrooms-discovery-smoke.mjs",
+    "verify:site-discovery:primitives": "node packages/db/scripts/verify-site-discovery-primitives-smoke.mjs",
     "verify:company-context:live-db": "node packages/db/scripts/run-source-live-db-verifier.mjs company-context",
     "verify:source:subsystem-live-db": "node packages/db/scripts/run-source-live-db-verifier.mjs source-subsystem",
     "career-pages:smoke": "CAREER_PAGES_TARGETS_FILE=packages/db/scripts/career-pages-smoke-targets.json node packages/db/scripts/source-career-pages.mjs fetch",
