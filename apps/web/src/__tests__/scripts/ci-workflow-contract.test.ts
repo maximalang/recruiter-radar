@@ -19,6 +19,7 @@ const browserRunners = [
   resolve(process.cwd(), '..', '..', 'packages', 'db', 'scripts', 'run-auth-v2-account-team-e2e.mjs'),
   resolve(process.cwd(), '..', '..', 'packages', 'db', 'scripts', 'run-auth-v2-passkey-e2e.mjs'),
 ].map((path) => readFileSync(path, 'utf8'))
+const authBrowserRunners = browserRunners.slice(2)
 
 describe('pull request CI workflow contract', () => {
   it('runs the complete release gate for codex pushes and integration pull requests', () => {
@@ -58,6 +59,13 @@ describe('pull request CI workflow contract', () => {
     expect(workflow).toContain('test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"')
     for (const runner of browserRunners) {
       expect(runner).toContain('process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH')
+    }
+  })
+
+  it('generates ignored browser icon assets before direct Next.js auth runs', () => {
+    for (const runner of authBrowserRunners) {
+      expect(runner).toContain("'generate-app-icons.mjs'")
+      expect(runner).toContain('await run(process.execPath, [iconGenerationScript]')
     }
   })
 

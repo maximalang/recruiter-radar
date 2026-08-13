@@ -24,6 +24,7 @@ if (process.env.AUTH_V2_DISPOSABLE_DB_CONFIRMED !== 'true') {
 const root = resolve(import.meta.dirname, '..', '..', '..')
 const webRoot = resolve(root, 'apps', 'web')
 const migrateScript = resolve(root, 'packages', 'db', 'scripts', 'migrate.mjs')
+const iconGenerationScript = resolve(webRoot, 'scripts', 'generate-app-icons.mjs')
 const nextScript = resolve(root, 'node_modules', 'next', 'dist', 'bin', 'next')
 const artifactsDirectory = resolve(webRoot, 'scripts')
 const e2eDistName = `.next-auth-v2-e2e-${process.pid}`
@@ -426,6 +427,7 @@ try {
     AUTH_V2_E2E_TSCONFIG: e2eTsconfigName,
     NODE_EXTRA_CA_CERTS: httpsCertPath,
   }
+  await run(process.execPath, [iconGenerationScript], environment)
   await run(process.execPath, [migrateScript], environment)
   database = new Client({ connectionString: temporaryUrl.toString() })
   await database.connect()
