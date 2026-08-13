@@ -12,6 +12,10 @@ declare module "@/../../packages/db/scripts/adapters/playwright-browser-pool.mjs
     circuitResetMs?: number;
     accessFailureCooldownMs?: number;
     throttlingCooldownMs?: number;
+    dnsLookup?: (hostname: string, options: { all: true; verbatim: true }) => Promise<Array<{
+      address: string;
+      family: number;
+    }>>;
   }): {
     fetchPage(input: {
       url: string;

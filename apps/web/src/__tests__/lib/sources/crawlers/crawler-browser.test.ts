@@ -10,13 +10,23 @@ const waitForTimeout = jest.fn(async () => undefined)
 const closePage = jest.fn(async () => undefined)
 const closeContext = jest.fn(async () => undefined)
 const newPage = jest.fn(async () => ({ goto, content, waitForTimeout, close: closePage }))
-const newContext = jest.fn(async () => ({ newPage, close: closeContext }))
+const route = jest.fn(async () => undefined)
+const newContext = jest.fn(async () => ({ newPage, route, close: closeContext }))
 const closeBrowser = jest.fn(async () => undefined)
 const launch = jest.fn(async () => ({ newContext, close: closeBrowser }))
 
 jest.mock('playwright', () => ({ chromium: { launch } }))
 
-import { createCrawleeSpaEngine } from '@/lib/sources/crawlers/crawler-crawlee'
+import {
+  createCrawleeSpaEngine as createRealCrawleeSpaEngine,
+  type CrawleeEngineOptions,
+} from '@/lib/sources/crawlers/crawler-crawlee'
+
+const publicDnsLookup = async () => [{ address: '93.184.216.34', family: 4 }]
+
+function createCrawleeSpaEngine(options: CrawleeEngineOptions = {}) {
+  return createRealCrawleeSpaEngine({ dnsLookup: publicDnsLookup, ...options })
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -85,6 +95,89 @@ describe('Playwright SPA crawler', () => {
     )
     expect(closeContext).toHaveBeenCalledTimes(1)
     expect(closeBrowser).not.toHaveBeenCalled()
+
+    await engine.close()
+  })
+
+  it.each([
+    'http://localhost/admin',
+    'http://127.0.0.1/admin',
+    'http://[::1]/admin',
+    'https://user:password@careers.example/jobs',
+  ])('rejects an unsafe initial URL before browser navigation: %s', async (url) => {
+    const engine = createCrawleeSpaEngine({
+      dnsLookup: async () => [{ address: '93.184.216.34', family: 4 }],
+    })
+
+    await expect(engine.fetch({ url })).rejects.toMatchObject({ code: 'CRAWLER_SSRF_BLOCKED' })
+    expect(goto).not.toHaveBeenCalled()
+
+    await engine.close()
+  })
+
+  it('rejects a hostname when any resolved address is private', async () => {
+    const engine = createCrawleeSpaEngine({
+      dnsLookup: async () => [
+        { address: '93.184.216.34', family: 4 },
+        { address: '10.0.0.8', family: 4 },
+      ],
+    })
+
+    await expect(engine.fetch({ url: 'https://rebound.example/jobs' })).rejects.toMatchObject({
+      code: 'CRAWLER_SSRF_BLOCKED',
+    })
+    expect(goto).not.toHaveBeenCalled()
+
+    await engine.close()
+  })
+
+  it('installs a guard that blocks a public-to-private redirect before continuing it', async () => {
+    const dnsLookup = jest.fn(async (hostname: string) => hostname === 'public.example'
+      ? [{ address: '93.184.216.34', family: 4 as const }]
+      : [{ address: '192.168.1.20', family: 4 as const }])
+    const engine = createCrawleeSpaEngine({ dnsLookup })
+
+    await engine.fetch({ url: 'https://public.example/jobs' })
+    const guard = route.mock.calls[0]?.[1] as ((routeInput: {
+      abort: (reason: string) => Promise<void>
+      continue: () => Promise<void>
+    }, request: { url: () => string }) => Promise<void>) | undefined
+    expect(guard).toBeDefined()
+    const abort = jest.fn(async () => undefined)
+    const continueRequest = jest.fn(async () => undefined)
+
+    await expect(guard?.(
+      { abort, continue: continueRequest },
+      { url: () => 'https://private.example/latest/meta-data' },
+    )).rejects.toMatchObject({ code: 'CRAWLER_SSRF_BLOCKED' })
+    expect(abort).toHaveBeenCalledWith('blockedbyclient')
+    expect(continueRequest).not.toHaveBeenCalled()
+
+    await engine.close()
+  })
+
+  it('blocks DNS rebinding when a hostname changes from public to private during navigation', async () => {
+    let lookups = 0
+    const dnsLookup = jest.fn(async () => {
+      lookups += 1
+      return lookups <= 2
+        ? [{ address: '93.184.216.34', family: 4 as const }]
+        : [{ address: '169.254.169.254', family: 4 as const }]
+    })
+    const engine = createCrawleeSpaEngine({ dnsLookup })
+
+    await engine.fetch({ url: 'https://rebind.example/jobs' })
+    const guard = route.mock.calls[0]?.[1] as ((routeInput: {
+      abort: (reason: string) => Promise<void>
+      continue: () => Promise<void>
+    }, request: { url: () => string }) => Promise<void>)
+    const abort = jest.fn(async () => undefined)
+
+    await expect(guard(
+      { abort, continue: async () => undefined },
+      { url: () => 'https://rebind.example/redirected' },
+    )).rejects.toMatchObject({ code: 'CRAWLER_SSRF_BLOCKED' })
+    expect(abort).toHaveBeenCalledWith('blockedbyclient')
 
     await engine.close()
   })

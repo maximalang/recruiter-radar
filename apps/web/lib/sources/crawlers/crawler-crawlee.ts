@@ -39,6 +39,11 @@ export interface CrawleeEngineOptions {
   accessFailureCooldownMs?: number
   /** Minimum cool-down after repeated 429 responses. Default 5 minutes. */
   throttlingCooldownMs?: number
+  /** Test seam for deterministic DNS security checks; production uses node:dns. */
+  dnsLookup?: (hostname: string, options: { all: true; verbatim: true }) => Promise<Array<{
+    address: string
+    family: number
+  }>>
 }
 
 export interface ManagedCrawlerEngine extends CrawlerEngine {

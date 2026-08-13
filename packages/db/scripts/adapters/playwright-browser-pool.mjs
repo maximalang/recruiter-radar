@@ -1,3 +1,5 @@
+import { assertCrawlerUrlIsPublic } from './crawler-url-security.mjs';
+
 const DEFAULT_CONCURRENCY = 2;
 const DEFAULT_MAX_REQUESTS_PER_BROWSER = 100;
 const DEFAULT_MAX_BROWSER_AGE_MS = 15 * 60_000;
@@ -81,7 +83,12 @@ export function createPlaywrightBrowserPool(options = {}) {
     previous = {},
     settleMs = readNonNegativeInteger(undefined, 'PLAYWRIGHT_RENDER_SETTLE_MS', 1_500, 15_000),
   }) {
-    const host = toPublicHost(url);
+    const resolutionCache = new Map();
+    const initial = await assertCrawlerUrlIsPublic(url, {
+      lookup: options.dnsLookup,
+      resolutionCache,
+    });
+    const host = initial.hostname;
     await awaitHostPermission(host);
     const worker = await acquire();
     let context = null;
@@ -95,6 +102,18 @@ export function createPlaywrightBrowserPool(options = {}) {
           ...headers,
         },
       });
+      await context.route('**/*', async (route, request) => {
+        try {
+          await assertCrawlerUrlIsPublic(request.url(), {
+            lookup: options.dnsLookup,
+            resolutionCache,
+          });
+          await route.continue();
+        } catch (error) {
+          await route.abort('blockedbyclient').catch(() => undefined);
+          throw error;
+        }
+      });
       const page = await context.newPage();
       const response = await page.goto(url, {
         waitUntil: 'domcontentloaded',
@@ -105,11 +124,16 @@ export function createPlaywrightBrowserPool(options = {}) {
       }
       const status = response?.status() ?? 200;
       const rawHeaders = response ? await response.allHeaders() : {};
+      const finalUrl = response?.url?.() ?? url;
+      await assertCrawlerUrlIsPublic(finalUrl, {
+        lookup: options.dnsLookup,
+        resolutionCache,
+      });
       recordHostOutcome(host, classifyHttpOutcome(status), {
         retryAfterMs: parseRetryAfterMs(rawHeaders['retry-after']),
       });
       return {
-        url: response?.url?.() ?? url,
+        url: finalUrl,
         status,
         html: status === 304 ? null : await page.content(),
         rawHeaders,
@@ -275,14 +299,6 @@ function readNonNegativeInteger(explicit, envName, fallback, maximum) {
   const candidate = explicit ?? (envValue ? Number(envValue) : fallback);
   if (!Number.isFinite(candidate) || candidate < 0) return fallback;
   return Math.min(Math.floor(candidate), maximum);
-}
-
-function toPublicHost(value) {
-  const url = new URL(value);
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
-    throw new TypeError('Playwright browser pool requires a public HTTP(S) URL');
-  }
-  return url.hostname.toLowerCase();
 }
 
 function buildConditionalHeaders(previous) {
