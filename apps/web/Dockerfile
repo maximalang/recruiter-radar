@@ -83,6 +83,12 @@ COPY --from=builder /app/packages/db/scripts/sync-rospatent-open-data-snapshot.m
 COPY --from=builder /app/packages/db/scripts/adapters/government-ca-runtime.mjs ./packages/db/scripts/adapters/government-ca-runtime.mjs
 COPY --from=builder /app/packages/db/source-policy.json ./packages/db/source-policy.json
 
+# The daily radar launches temporal derivation as a child process after source
+# ingestion. Keep the entrypoint and pure derivation dependency explicit because
+# Next standalone tracing cannot see a runtime-resolved execFile target.
+COPY --from=builder /app/packages/db/scripts/derive-source-temporal-intelligence.mjs ./packages/db/scripts/derive-source-temporal-intelligence.mjs
+COPY --from=builder /app/packages/db/scripts/lib/source-temporal-intelligence.mjs ./packages/db/scripts/lib/source-temporal-intelligence.mjs
+
 # Copy migration tooling for startup migrations
 COPY --from=builder /app/packages/db/scripts/migrate.mjs ./packages/db/scripts/migrate.mjs
 COPY --from=builder /app/packages/db/scripts/reconcile-payment-success-telemetry.mjs ./packages/db/scripts/reconcile-payment-success-telemetry.mjs
@@ -95,7 +101,7 @@ COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
 # image. The CLI itself executes at module load, so assert its traced path and
 # import the adapter + lineage writer separately; missing standalone files or
 # dependencies then fail the image build rather than a production run.
-RUN node --input-type=module -e "const { accessSync } = await import('node:fs'); accessSync('./packages/db/scripts/ingest-hh.mjs'); accessSync('./packages/db/scripts/verify-hh-live-pipeline.mjs'); await import('./packages/db/scripts/execute-query-planner-v2.mjs'); await import('./packages/db/scripts/adapters/hh.mjs'); await import('./packages/db/scripts/lib/source-lineage-writer.mjs'); await import('./packages/db/scripts/sync-fns-open-data-snapshot.mjs'); await import('./packages/db/scripts/sync-government-procurement-snapshot.mjs'); await import('./packages/db/scripts/sync-rosstat-open-data-snapshot.mjs'); await import('./packages/db/scripts/sync-rospatent-open-data-snapshot.mjs')"
+RUN node --input-type=module -e "const { accessSync } = await import('node:fs'); accessSync('./packages/db/scripts/ingest-hh.mjs'); accessSync('./packages/db/scripts/verify-hh-live-pipeline.mjs'); await import('./packages/db/scripts/execute-query-planner-v2.mjs'); await import('./packages/db/scripts/adapters/hh.mjs'); await import('./packages/db/scripts/lib/source-lineage-writer.mjs'); await import('./packages/db/scripts/derive-source-temporal-intelligence.mjs'); await import('./packages/db/scripts/sync-fns-open-data-snapshot.mjs'); await import('./packages/db/scripts/sync-government-procurement-snapshot.mjs'); await import('./packages/db/scripts/sync-rosstat-open-data-snapshot.mjs'); await import('./packages/db/scripts/sync-rospatent-open-data-snapshot.mjs')"
 
 # Startup script: run migrations, then start server
 COPY --from=builder /app/apps/web/docker-entrypoint.sh ./docker-entrypoint.sh
