@@ -24,7 +24,7 @@ export const OFFICIAL_OPEN_DATA_CATALOG = Object.freeze({
   'government-procurement': Object.freeze({
     publisher: 'Unified Information System in Procurement / Federal Treasury',
     passportUrls: Object.freeze([
-      'https://zakupki.gov.ru/epz/opendata/search.html',
+      'https://zakupki.gov.ru/epz/opendata/search/results.html',
       'https://roskazna.gov.ru/gis/eis-zakupki-gov-ru/',
     ]),
     allowedHosts: Object.freeze(['zakupki.gov.ru', 'www.zakupki.gov.ru', 'roskazna.gov.ru', 'www.roskazna.gov.ru']),

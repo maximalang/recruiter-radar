@@ -27,11 +27,36 @@ WORKDIR /app
 
 # Playwright uses the distribution Chromium in production. Browser downloads
 # are intentionally not persisted from the builder's node_modules cache.
-RUN apk add --no-cache chromium
+# EIS and Rosstat currently use the official Russian government TLS chain,
+# published at https://www.gosuslugi.ru/crt. Install the fingerprint-pinned
+# root and current intermediate for both the Alpine/Chromium trust store and
+# Node's documented extra-CA path; certificate verification remains enabled.
+COPY packages/db/certs/russian-trusted-root-ca.pem /usr/local/share/ca-certificates/russian-trusted-root-ca.crt
+COPY packages/db/certs/russian-trusted-sub-ca-2024.pem /usr/local/share/ca-certificates/russian-trusted-sub-ca-2024.crt
+RUN apk add --no-cache ca-certificates chromium nss-tools \
+  && update-ca-certificates \
+  && cat /usr/local/share/ca-certificates/russian-trusted-root-ca.crt \
+    /usr/local/share/ca-certificates/russian-trusted-sub-ca-2024.crt \
+    > /etc/ssl/certs/russian-trusted-ca-bundle.pem
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/russian-trusted-ca-bundle.pem
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+
+# Chromium on Linux reads explicitly installed local trust from the user's NSS
+# Shared DB. M146+ uses .local/share/pki; the legacy location remains populated
+# for older distro Chromium versions. The intermediate is imported without
+# root trust, while only the pinned root receives SSL CA trust.
+RUN for nssdb in /home/nextjs/.local/share/pki/nssdb /home/nextjs/.pki/nssdb; do \
+    mkdir -p "$nssdb" \
+    && certutil -d "sql:$nssdb" -N --empty-password \
+    && certutil -d "sql:$nssdb" -A -t 'C,,' -n 'Russian Trusted Root CA' -i /usr/local/share/ca-certificates/russian-trusted-root-ca.crt \
+    && certutil -d "sql:$nssdb" -A -t ',,' -n 'Russian Trusted Sub CA 2024' -i /usr/local/share/ca-certificates/russian-trusted-sub-ca-2024.crt; \
+  done \
+  && chown -R nextjs:nodejs /home/nextjs \
+  && apk del nss-tools
+ENV HOME=/home/nextjs
 
 # Copy the standalone server, Next static files, and public assets.
 # Next.js standalone output does not include public/ automatically.
