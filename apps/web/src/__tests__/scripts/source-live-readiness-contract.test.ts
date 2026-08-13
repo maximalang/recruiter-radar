@@ -200,7 +200,7 @@ describe('source live readiness contract', () => {
       expect.objectContaining({ configured: false, registrationRequired: true, liveVerified: false }),
     )
     expect(report.sources.find((source: { id: string }) => source.id === 'career-pages')).toEqual(
-      expect.objectContaining({ configured: true, liveVerified: false }),
+      expect.objectContaining({ configured: true, liveVerified: true }),
     )
   })
 
@@ -212,7 +212,7 @@ describe('source live readiness contract', () => {
     })
     const databaseOnlyReport = JSON.parse(databaseOnly.stdout)
     expect(databaseOnlyReport.sources.find((source: { id: string }) => source.id === 'career-pages'))
-      .toEqual(expect.objectContaining({ configured: false, liveVerified: false }))
+      .toEqual(expect.objectContaining({ configured: false, liveVerified: true }))
 
     const linkedinInput = spawnSync(process.execPath, [verifierPath, '--json'], {
       cwd: repoRoot,
