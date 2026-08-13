@@ -31,6 +31,7 @@ export type SourceId =
   | 'transparent-business-fns'
   | 'company-newsrooms'
   | 'industry-media'
+  | 'github-company-org'
   | 'fns-open-data'
   | 'government-procurement'
   | 'cbr-registry'
@@ -344,6 +345,17 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: ['INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON'],
     isPrimary: false,
     dailyStage: 'supporting',
+    category: 'business-signal',
+  },
+  {
+    id: 'github-company-org',
+    name: 'GitHub company organizations',
+    description: 'Low-confidence public technology activity from identity-verified company organizations; context only',
+    script: 'source-github-company-org.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['GITHUB_COMPANY_ORG_', 'GITHUB_TOKEN'],
+    searchEnvVars: ['GITHUB_COMPANY_ORG_TARGETS_JSON'],
+    isPrimary: false,
     category: 'business-signal',
   },
   {

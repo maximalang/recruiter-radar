@@ -50,6 +50,7 @@ const SOURCE_BASE_WEIGHTS: Record<string, number> = {
   'company-site': 0.15,
   'company-newsrooms': 0.12,
   'industry-media': 0.08,
+  'github-company-org': 0.04,
   news: 0.08,
   social: 0.05,
   'platform-aggregator': 0.04,

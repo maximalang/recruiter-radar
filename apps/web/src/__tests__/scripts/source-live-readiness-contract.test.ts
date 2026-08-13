@@ -36,6 +36,7 @@ const SOURCE_IDS = [
   'funding-business-signals',
   'company-newsrooms',
   'industry-media',
+  'github-company-org',
   'fns-open-data',
   'government-procurement',
   'cbr-registry',
@@ -58,6 +59,7 @@ const SOURCE_ENV_PREFIXES = [
   'FUNDING_SIGNALS_',
   'COMPANY_NEWSROOMS_',
   'INDUSTRY_MEDIA_',
+  'GITHUB_COMPANY_ORG_',
   'FNS_OPEN_DATA_',
   'GOVERNMENT_PROCUREMENT_',
   'GOVERNMENT_ENRICHMENT_',
@@ -259,7 +261,10 @@ describe('source live readiness contract', () => {
               : id === 'egrul-fns' || id === 'transparent-business-fns'
                 ? 'never-lead-originating'
                 : 'blocked-from-digest-pending-confidence-tests',
-        readiness: readReadinessContract().sources[id],
+        readiness: {
+          implementation: readReadinessContract().sources[id].implementation,
+          contract: readReadinessContract().sources[id].contract,
+        },
       })))};`,
       `sources.find((source) => source.id === 'hh').readiness = { ...sources.find((source) => source.id === 'hh').readiness, implementation: 'blocked' };`,
       'console.log(JSON.stringify(validateSourceCoverage(sources)));',

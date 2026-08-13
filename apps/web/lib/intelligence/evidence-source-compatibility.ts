@@ -29,6 +29,7 @@ export const EVIDENCE_RUNTIME_SOURCE_BINDINGS = {
   'transparent-business-fns': 'official-risk-registers',
   'company-newsrooms': 'official-company-news',
   'industry-media': 'industry-media',
+  'github-company-org': 'industry-media',
   'fns-open-data': 'sme-registry',
   'government-procurement': 'eis-procurement',
   'cbr-registry': 'official-address-license-registers',

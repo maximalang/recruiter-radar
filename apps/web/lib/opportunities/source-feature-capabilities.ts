@@ -109,6 +109,7 @@ export const SOURCE_FEATURE_CAPABILITIES: Record<SourceId, CapabilitySet> = {
   'transparent-business-fns': nonVacancySource({ economics: true }),
   'company-newsrooms': nonVacancySource({ corporateContact: true }),
   'industry-media': nonVacancySource(),
+  'github-company-org': nonVacancySource(),
   'fns-open-data': nonVacancySource({ economics: true }),
   'government-procurement': nonVacancySource(),
   'cbr-registry': nonVacancySource(),

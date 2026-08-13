@@ -33,10 +33,11 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
   P3: Object.freeze({
     description: 'Context sources with supporting role',
     required: true,
-    sources: ['company-newsrooms', 'industry-media', 'fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data'],
+    sources: ['company-newsrooms', 'industry-media', 'github-company-org', 'fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data'],
     leadEligibilityRequirements: {
       'company-newsrooms': 'context-only',
       'industry-media': 'context-only',
+      'github-company-org': 'context-only',
       'fns-open-data': 'context-only',
       'government-procurement': 'context-only',
       'cbr-registry': 'context-only',

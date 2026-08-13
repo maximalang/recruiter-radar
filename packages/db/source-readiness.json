@@ -492,6 +492,20 @@
       },
       "blockers": []
     },
+    "github-company-org": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["GITHUB_COMPANY_ORG_TARGETS_JSON"], ["GITHUB_COMPANY_ORG_TARGETS_FILE"], ["GITHUB_COMPANY_ORG_INPUT_FILE"]] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-14T02:03:08+03:00", "evidence": ["Fresh unauthenticated GitHub REST verification accepted the identity-verified VKCOM Organization whose published corporate website domain matches vk.com and normalized 17 recent public non-fork repository events. No user, member, contributor, subscriber, email, or other personal-profile endpoint is queried."] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:github-company-org:smoke"], "live": ["GITHUB_COMPANY_ORG_TARGETS_JSON='<verified targets>' npm run source:fetch:github-company-org"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": []
+    },
     "fns-open-data": {
       "implementation": "implemented",
       "fixture": "tested",

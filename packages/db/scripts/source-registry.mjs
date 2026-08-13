@@ -59,6 +59,8 @@ const companyNewsroomsScriptPath = './packages/db/scripts/source-company-newsroo
 const companyNewsroomsAbsoluteScriptPath = resolve(scriptDir, './source-company-newsrooms.mjs');
 const industryMediaScriptPath = './packages/db/scripts/source-industry-media.mjs';
 const industryMediaAbsoluteScriptPath = resolve(scriptDir, './source-industry-media.mjs');
+const githubCompanyOrgScriptPath = './packages/db/scripts/source-github-company-org.mjs';
+const githubCompanyOrgAbsoluteScriptPath = resolve(scriptDir, './source-github-company-org.mjs');
 const officialGovernmentSources = Object.freeze([
   ['fns-open-data', './packages/db/scripts/source-fns-open-data.mjs', './source-fns-open-data.mjs', 'Official FNS bulk datasets for company-size, financial, SME, support and tax context.'],
   ['government-procurement', './packages/db/scripts/source-government-procurement.mjs', './source-government-procurement.mjs', 'Official EIS/Treasury contract awards and supplier context.'],
@@ -403,6 +405,18 @@ registerRunnableScriptSource({
   description: 'Curated public RSS/Atom company mentions from allowlisted publishers; context-only and never lead-originating.',
   scriptPath: industryMediaScriptPath,
   absoluteScriptPath: industryMediaAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'github-company-org',
+  kind: 'business-signal',
+  sourceClass: 'company-surface',
+  evidenceTier: 'context-only',
+  defaultConfidence: 0.45,
+  fetchModes: ['file', 'live-public'],
+  description: 'Recent public repository context from identity-verified company GitHub organizations; never lead-originating.',
+  scriptPath: githubCompanyOrgScriptPath,
+  absoluteScriptPath: githubCompanyOrgAbsoluteScriptPath,
 });
 
 export function listSources() {
