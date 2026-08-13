@@ -127,7 +127,7 @@ ATS обнаруживаются единым `career-pages` crawler и хран
 
 - `hh`, `rabota-rossii`, `career-pages`, `greenhouse`, `lever`, `ashby`, `recruitee`, `workable`, `smartrecruiters` — primary/direct hiring evidence;
 - `habr-career`, `superjob`, `linkedin-company-pages` — secondary/provider-gated hiring evidence; `tech-job-boards` is retained only as a historical read-compatible provenance ID, while new hosted ATS records use concrete reviewed IDs;
-- `egrul-fns`, `transparent-business-fns`, `fedresurs`, `company-site`, `company-newsrooms`, `industry-media`, `github-company-org`, `funding-business-signals` — enrichment/context, не самостоятельный обход direct-hiring proof.
+- `egrul-fns`, `transparent-business-fns`, `fedresurs`, `company-site`, `company-newsrooms`, `industry-media`, `github-company-org`, `youtube-company-channels`, `funding-business-signals` — enrichment/context, не самостоятельный обход direct-hiring proof.
 
 Promotion разрешается только registry policy и live verifier. Фиксированное количество источников в narrative документации не является контрактом.
 

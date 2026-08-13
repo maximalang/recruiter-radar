@@ -506,6 +506,14 @@
       "verification": { "fixture": ["npm run verify:github-company-org:smoke"], "live": ["GITHUB_COMPANY_ORG_TARGETS_JSON='<verified targets>' npm run source:fetch:github-company-org"], "contract": ["npm run verify:source:readiness"] },
       "blockers": []
     },
+    "youtube-company-channels": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "registration-required", "acceptedEnvSets": [["YOUTUBE_API_KEY", "YOUTUBE_COMPANY_CHANNELS_TARGETS_JSON"], ["YOUTUBE_API_KEY", "YOUTUBE_COMPANY_CHANNELS_TARGETS_FILE"], ["YOUTUBE_COMPANY_CHANNELS_INPUT_FILE"]] },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": ["Fixture contract proves exact official-site ownership linking, uploads-playlist-only collection, ETag reuse, daily quota budgeting, event normalization and fail-closed behavior. No runtime API key is configured, so no live API or DB claim is made."] },
+      "requiresLiveVerification": true, "confidence": "not-applicable", "eligibility": "context-only", "legalReview": "approved", "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:youtube-company-channels:smoke"], "live": ["npm run source:fetch:youtube-company-channels"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": ["credential-not-supplied"]
+    },
     "fns-open-data": {
       "implementation": "implemented",
       "fixture": "tested",

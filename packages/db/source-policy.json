@@ -19,6 +19,7 @@
   "company-newsrooms": { "priority": "P3", "defaultConfidence": 0.6, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
   "industry-media": { "priority": "P3", "defaultConfidence": 0.52, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
   "github-company-org": { "priority": "P3", "defaultConfidence": 0.45, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "youtube-company-channels": { "priority": "P3", "defaultConfidence": 0.48, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
   "fns-open-data": { "priority": "P3", "defaultConfidence": 0.88, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
   "government-procurement": { "priority": "P3", "defaultConfidence": 0.66, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
   "cbr-registry": { "priority": "P3", "defaultConfidence": 0.9, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },

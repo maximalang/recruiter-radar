@@ -61,6 +61,8 @@ const industryMediaScriptPath = './packages/db/scripts/source-industry-media.mjs
 const industryMediaAbsoluteScriptPath = resolve(scriptDir, './source-industry-media.mjs');
 const githubCompanyOrgScriptPath = './packages/db/scripts/source-github-company-org.mjs';
 const githubCompanyOrgAbsoluteScriptPath = resolve(scriptDir, './source-github-company-org.mjs');
+const youtubeCompanyChannelsScriptPath = './packages/db/scripts/source-youtube-company-channels.mjs';
+const youtubeCompanyChannelsAbsoluteScriptPath = resolve(scriptDir, './source-youtube-company-channels.mjs');
 const officialGovernmentSources = Object.freeze([
   ['fns-open-data', './packages/db/scripts/source-fns-open-data.mjs', './source-fns-open-data.mjs', 'Official FNS bulk datasets for company-size, financial, SME, support and tax context.'],
   ['government-procurement', './packages/db/scripts/source-government-procurement.mjs', './source-government-procurement.mjs', 'Official EIS/Treasury contract awards and supplier context.'],
@@ -417,6 +419,12 @@ registerRunnableScriptSource({
   description: 'Recent public repository context from identity-verified company GitHub organizations; never lead-originating.',
   scriptPath: githubCompanyOrgScriptPath,
   absoluteScriptPath: githubCompanyOrgAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'youtube-company-channels', kind: 'business-signal', sourceClass: 'company-surface', evidenceTier: 'context-only', defaultConfidence: 0.48,
+  fetchModes: ['file', 'provider-token'], description: 'Public videos from automatically ownership-proven company channels via the quota-aware YouTube Data API; never lead-originating.',
+  scriptPath: youtubeCompanyChannelsScriptPath, absoluteScriptPath: youtubeCompanyChannelsAbsoluteScriptPath,
 });
 
 export function listSources() {

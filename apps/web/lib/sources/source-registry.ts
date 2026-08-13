@@ -32,6 +32,7 @@ export type SourceId =
   | 'company-newsrooms'
   | 'industry-media'
   | 'github-company-org'
+  | 'youtube-company-channels'
   | 'fns-open-data'
   | 'government-procurement'
   | 'cbr-registry'
@@ -357,6 +358,12 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: ['GITHUB_COMPANY_ORG_TARGETS_JSON'],
     isPrimary: false,
     category: 'business-signal',
+  },
+  {
+    id: 'youtube-company-channels', name: 'YouTube company channels',
+    description: 'Company-owned public video events through the quota-aware Data API; context only',
+    script: 'source-youtube-company-channels.mjs', requiredEnvVars: ['YOUTUBE_API_KEY'],
+    envPrefixes: ['YOUTUBE_'], searchEnvVars: ['YOUTUBE_COMPANY_CHANNELS_TARGETS_JSON'], isPrimary: false, category: 'business-signal',
   },
   {
     id: 'fedresurs',
