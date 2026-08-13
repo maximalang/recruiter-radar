@@ -62,8 +62,9 @@ def run(argv, timeout=6, check=False) -> subprocess.CompletedProcess:
             argv,
             shell=False,
             check=check,
-            capture_output=True,
-            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
             timeout=timeout,
             env={"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
         )
