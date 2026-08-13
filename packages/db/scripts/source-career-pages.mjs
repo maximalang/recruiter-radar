@@ -1824,15 +1824,36 @@ export function mapSmartRecruitersPostingsPayload(payload, target) {
   }));
 }
 
-async function fetchTeamtailorRssRecords(target) {
-  const { body } = await fetchText(target.sourceUrl, {
-    sourceName: `career-pages target ${target.id}`,
-    headers: {
-      accept: 'application/rss+xml,application/xml,text/xml;q=0.9,*/*;q=0.1',
-      'user-agent': 'RecruiterRadarCareerPages/1.0',
-    },
-  });
-  return mapTeamtailorRss(body, target);
+export async function fetchTeamtailorRssRecords(target, { fetchTextImpl = fetchText } = {}) {
+  const source = new URL(target.sourceUrl);
+  const pageSize = Math.min(Math.max(Number(source.searchParams.get('per_page')) || 100, 1), 200);
+  const initialOffset = Math.max(Number(source.searchParams.get('offset')) || 0, 0);
+  const jobLimit = resolveTeamtailorJobLimit();
+  const records = [];
+  const seen = new Set();
+
+  for (let offset = initialOffset; records.length < jobLimit; offset += pageSize) {
+    const pageUrl = new URL(source);
+    pageUrl.searchParams.set('per_page', String(pageSize));
+    pageUrl.searchParams.set('offset', String(offset));
+    const { body } = await fetchTextImpl(pageUrl.toString(), {
+      sourceName: `career-pages target ${target.id}`,
+      headers: {
+        accept: 'application/rss+xml,application/xml,text/xml;q=0.9,*/*;q=0.1',
+        'user-agent': 'RecruiterRadarCareerPages/1.0',
+      },
+    });
+    const pageRecords = mapTeamtailorRss(body, target);
+    for (const record of pageRecords) {
+      const key = record.external_id ?? record.job_posting_url;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      records.push(record);
+      if (records.length >= jobLimit) break;
+    }
+    if (pageRecords.length < pageSize) break;
+  }
+  return records;
 }
 
 export function mapTeamtailorRss(xml, target) {
@@ -1841,8 +1862,11 @@ export function mapTeamtailorRss(xml, target) {
 
 export function mapPublicCareerRss(xml, target, method = 'public-career-rss') {
   return extractXmlBlocks(xml, 'item').map((item, index) => {
-    const jobUrl = toUrlOrNull(extractXmlValue(item, 'link'))
-      ?? toUrlOrNull(extractXmlValue(item, 'guid'));
+    const jobUrl = canonicalizePublicUrl(extractXmlValue(item, 'link'))
+      ?? canonicalizePublicUrl(extractXmlValue(item, 'guid'));
+    const department = toNonEmptyText(extractXmlValue(item, 'tt:department'));
+    const role = toNonEmptyText(extractXmlValue(item, 'tt:role'));
+    const categories = extractXmlValues(item, 'category').map(toNonEmptyText).filter(Boolean);
     return {
       company_name: target.companyName,
       company_domain: target.companyDomain,
@@ -1856,7 +1880,11 @@ export function mapPublicCareerRss(xml, target, method = 'public-career-rss') {
         index,
       ),
       occurred_at: toTimestampOrNull(extractXmlValue(item, 'pubDate')),
-      tags: extractXmlValues(item, 'category').map(toNonEmptyText).filter(Boolean),
+      location: extractTeamtailorLocation(item),
+      department,
+      role,
+      remote_status: toNonEmptyText(extractXmlValue(item, 'remoteStatus')),
+      tags: [...new Set([...categories, department, role].filter(Boolean))],
       source_record_type: 'job_posting',
       extraction_method: method,
       raw_target_id: target.id,
@@ -1864,6 +1892,21 @@ export function mapPublicCareerRss(xml, target, method = 'public-career-rss') {
       raw: { xml: item.slice(0, 20_000) },
     };
   });
+}
+
+function extractTeamtailorLocation(item) {
+  const locations = extractXmlBlocks(item, 'tt:location')
+    .map((location) => joinLocationParts(
+      extractXmlValue(location, 'tt:name') ?? extractXmlValue(location, 'tt:city'),
+      extractXmlValue(location, 'tt:country'),
+    ))
+    .filter(Boolean);
+  return [...new Set(locations)].join(' | ') || null;
+}
+
+function resolveTeamtailorJobLimit() {
+  const raw = Number(process.env.CAREER_PAGES_TEAMTAILOR_JOB_LIMIT);
+  return Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), 5_000) : 1_000;
 }
 
 async function fetchPersonioXmlRecords(target) {

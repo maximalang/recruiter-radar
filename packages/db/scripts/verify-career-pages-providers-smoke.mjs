@@ -12,6 +12,7 @@ import {
   mapWorkablePublicJobsPayload,
   detectCareerPageTargetFromHtml,
   fetchSmartRecruitersPostingsRecords,
+  fetchTeamtailorRssRecords,
   resolveCareerPageSourceId,
   isHostedAtsVacancyUrl,
   validateCareerVacancyRecord,
@@ -201,11 +202,40 @@ const teamtailorRecords = mapTeamtailorRss(`<?xml version="1.0"?>
     <link>https://example.teamtailor.com/jobs/123-platform-engineer</link>
     <pubDate>Wed, 12 Aug 2026 10:00:00 GMT</pubDate>
     <category>Engineering</category>
+    <remoteStatus>hybrid</remoteStatus>
+    <tt:locations><tt:location><tt:name>Stockholm</tt:name><tt:city>Stockholm</tt:city><tt:country>Sweden</tt:country></tt:location></tt:locations>
+    <tt:department>Product &amp; Engineering</tt:department>
+    <tt:role>Platform</tt:role>
   </item></channel></rss>`, teamtailorTarget);
 assert.equal(teamtailorRecords.length, 1);
 assert.equal(teamtailorRecords[0].job_title, 'Platform Engineer');
 assert.equal(teamtailorRecords[0].job_posting_url, 'https://example.teamtailor.com/jobs/123-platform-engineer');
 assert.equal(teamtailorRecords[0].extraction_method, 'teamtailor-rss');
+assert.equal(teamtailorRecords[0].location, 'Stockholm, Sweden');
+assert.equal(teamtailorRecords[0].department, 'Product & Engineering');
+assert.equal(teamtailorRecords[0].role, 'Platform');
+assert.equal(teamtailorRecords[0].remote_status, 'hybrid');
+assert.deepEqual(teamtailorRecords[0].tags, ['Engineering', 'Product & Engineering', 'Platform']);
+
+const teamtailorRequests = [];
+const paginatedTeamtailorRecords = await fetchTeamtailorRssRecords({
+  ...teamtailorTarget,
+  sourceUrl: 'https://example.teamtailor.com/jobs.rss?per_page=2',
+}, {
+  fetchTextImpl: async (url) => {
+    teamtailorRequests.push(url);
+    const offset = Number(new URL(url).searchParams.get('offset') ?? 0);
+    const ids = offset === 0 ? [1, 2] : [3];
+    return {
+      body: `<rss><channel>${ids.map((id) => `<item><guid>job-${id}</guid><title>Role ${id}</title><link>https://example.teamtailor.com/jobs/${id}-role</link></item>`).join('')}</channel></rss>`,
+    };
+  },
+});
+assert.equal(paginatedTeamtailorRecords.length, 3);
+assert.deepEqual(teamtailorRequests, [
+  'https://example.teamtailor.com/jobs.rss?per_page=2&offset=0',
+  'https://example.teamtailor.com/jobs.rss?per_page=2&offset=2',
+]);
 
 const pinpointRecords = mapPublicCareerRss(`<?xml version="1.0"?>
   <rss><channel><item>
