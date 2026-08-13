@@ -1733,7 +1733,10 @@ try {
   await waitForWebServer(baseUrl)
   webServerListenerPid = await findWindowsListenerPid(port)
 
-  browser = await chromium.launch({ headless: true })
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
+  })
   await runCoreAuthFlows(fixtures)
   const ownerContext = await authenticatedContext(
     fixtures.owner.session.token,

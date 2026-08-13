@@ -466,7 +466,10 @@ try {
   await waitForServer()
   listenerPid = await findListenerPid(port)
 
-  browser = await chromium.launch({ headless: true })
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
+  })
   context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     locale: 'ru-RU',

@@ -170,6 +170,7 @@ jobs:
     timeout-minutes: 35
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome
       AUTH_V2_DISPOSABLE_DB_CONFIRMED: 'true'
       ENTITLEMENT_DISPOSABLE_DB_CONFIRMED: 'true'
       WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED: 'true'
@@ -195,7 +196,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Install acceptance browser
-        run: npx playwright install --with-deps chromium
+        run: |
+          test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+          npx playwright install-deps chromium
       - name: Verify entitlement migration lifecycle
         run: npm run test:entitlements:migration:db
       - name: Run production acceptance scenarios
@@ -234,6 +237,7 @@ jobs:
     timeout-minutes: 20
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome
       LANDING_BASE_URL: http://127.0.0.1:3000
       LANDING_REQUIRE_ANALYTICS_CONSENT: 'true'
       LANDING_E2E_ALLOW_DB_FIXTURES: 'true'
@@ -275,7 +279,9 @@ jobs:
       - name: Prepare standalone static assets
         run: node apps/web/scripts/prepare-standalone.mjs
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+          npx playwright install-deps chromium
       - name: Start production server
         shell: bash
         env:
@@ -349,6 +355,7 @@ jobs:
           - gate: security-smoke
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome
       AUTH_V2_DISPOSABLE_DB_CONFIRMED: 'true'
       SESSION_SECRET: auth-v2-ci-session-secret-at-least-32-characters
       AUTH_RATE_LIMIT_SECRET: auth-v2-ci-rate-limit-secret-at-least-32-characters
@@ -402,7 +409,9 @@ jobs:
         run: npm run test:auth-v2:tenancy:db
       - name: Install Chromium
         if: matrix.gate == 'e2e' || matrix.gate == 'accessibility'
-        run: npx playwright install --with-deps chromium
+        run: |
+          test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+          npx playwright install-deps chromium
       - name: Auth browser end-to-end contracts
         if: matrix.gate == 'e2e'
         run: |

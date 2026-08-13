@@ -16,7 +16,7 @@ describe('production dependency security contract', () => {
   })
 
   it('ships the browser executable required by the SPA crawler', () => {
-    expect(dockerfile).toContain('apk add --no-cache chromium')
+    expect(dockerfile).toMatch(/apk add --no-cache[^\r\n]*\bchromium\b/)
     expect(dockerfile).toContain(
       'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser',
     )

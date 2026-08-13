@@ -13,6 +13,12 @@ const hardeningSmokeWorkflow = readFileSync(
   resolve(process.cwd(), '..', '..', '.github', 'workflows', 'hardening-smoke.yml'),
   'utf8',
 )
+const browserRunners = [
+  resolve(process.cwd(), 'scripts', 'verify-landing-production.mjs'),
+  resolve(process.cwd(), '..', '..', 'scripts', 'verify-responsive-surfaces.mjs'),
+  resolve(process.cwd(), '..', '..', 'packages', 'db', 'scripts', 'run-auth-v2-account-team-e2e.mjs'),
+  resolve(process.cwd(), '..', '..', 'packages', 'db', 'scripts', 'run-auth-v2-passkey-e2e.mjs'),
+].map((path) => readFileSync(path, 'utf8'))
 
 describe('pull request CI workflow contract', () => {
   it('runs the complete release gate for codex pushes and integration pull requests', () => {
@@ -38,10 +44,21 @@ describe('pull request CI workflow contract', () => {
   it('runs migration and production acceptance against a disposable database', () => {
     expect(workflow).toContain('npm run test:entitlements:migration:db')
     expect(workflow).toContain('npm run test:production:acceptance')
-    expect(workflow).toContain('npx playwright install --with-deps chromium')
+    expect(workflow).toContain('npx playwright install-deps chromium')
+    expect(workflow).not.toContain('npx playwright install --with-deps chromium')
     expect(productionAcceptance).toContain('run-workspace-billing-db-tests.mjs')
     expect(workflow).toContain("ENTITLEMENT_DISPOSABLE_DB_CONFIRMED: 'true'")
     expect(workflow).toContain("WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED: 'true'")
+  })
+
+  it('uses the runner image browser without a region-dependent CDN download', () => {
+    expect(workflow).toContain(
+      'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome',
+    )
+    expect(workflow).toContain('test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"')
+    for (const runner of browserRunners) {
+      expect(runner).toContain('process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH')
+    }
   })
 
   it('acknowledges source lineage writes only on the disposable hardening database', () => {
