@@ -47,6 +47,7 @@ const defaultDiscoveryReviewOutputPath = resolve(scriptDir, './.cache/career-pag
 const SOURCE_ID = 'career-pages';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
 let careerPageRenderPool = null;
+const careerPageAccessPolicyCache = new Map();
 
 loadEnvFile(rootEnvPath);
 
@@ -665,6 +666,8 @@ export function detectCareerPageTargetFromHtml(html, seed) {
     fingerprintText,
     /https?:\/\/(?:careers\.smartrecruiters\.com\/[A-Za-z0-9_-]+|api\.smartrecruiters\.com\/v1\/companies\/[A-Za-z0-9_-]+\/postings(?:\?[^"'\s<>]*)?)/gi,
   );
+  const teamtailorLink = matchFirstPublicFeedSurface(fingerprintText, 'teamtailor');
+  const personioLink = matchFirstPublicFeedSurface(fingerprintText, 'personio');
   const sameDomainCareerPageUrl = extractSameDomainCareerPageUrl(text, seed.baseUrl ?? seed.websiteUrl ?? null);
   const hostedCareerPages = extractHostedCareerPageUrls(fingerprintText);
 
@@ -762,6 +765,32 @@ export function detectCareerPageTargetFromHtml(html, seed) {
         sourceUrl: `https://api.smartrecruiters.com/v1/companies/${slug}/postings?limit=100&offset=0`,
       }));
     }
+  }
+
+  if (teamtailorLink) {
+    const teamtailorUrl = new URL(teamtailorLink);
+    targets.push(buildDiscoveredTarget({
+      adapter: 'teamtailor-rss',
+      providerSlug: teamtailorUrl.hostname.split('.')[0],
+      companyName: seed.orgName,
+      companyDomain: seed.domain,
+      companyWebsiteUrl: seed.websiteUrl,
+      careerPageUrl: `${teamtailorUrl.origin}/jobs`,
+      sourceUrl: `${teamtailorUrl.origin}/jobs.rss?per_page=200`,
+    }));
+  }
+
+  if (personioLink) {
+    const personioUrl = new URL(personioLink);
+    targets.push(buildDiscoveredTarget({
+      adapter: 'personio-xml',
+      providerSlug: personioUrl.hostname.split('.')[0],
+      companyName: seed.orgName,
+      companyDomain: seed.domain,
+      companyWebsiteUrl: seed.websiteUrl,
+      careerPageUrl: personioUrl.origin,
+      sourceUrl: `${personioUrl.origin}/xml?language=en`,
+    }));
   }
 
   if (targets.length === 0 && hostedCareerPages.length > 0) {
@@ -1163,7 +1192,7 @@ function classifyHostedAtsUrl(url) {
   const path = url.pathname;
   if (host.endsWith('.myworkdayjobs.com')) return 'workday';
   if (host.endsWith('.teamtailor.com')) return 'teamtailor';
-  if (host.endsWith('.jobs.personio.com')) return 'personio';
+  if (host.endsWith('.jobs.personio.com') || host.endsWith('.jobs.personio.de')) return 'personio';
   if (host.endsWith('.bamboohr.com') && /^\/(?:careers?|jobs?)(?:\/|$)/i.test(path)) return 'bamboohr';
   if (host.endsWith('.pinpointhq.com')) return 'pinpoint';
   if (host.endsWith('.breezy.hr')) return 'breezy';
@@ -1174,6 +1203,30 @@ function classifyHostedAtsUrl(url) {
   if (host.endsWith('.oraclecloud.com') && /\/hcmui\/candidateexperience(?:\/|$)/i.test(path)) return 'oracle-cloud';
   if ((host.endsWith('.successfactors.com') || host.endsWith('.successfactors.eu'))
     && /\/career(?:\/|$)/i.test(path)) return 'sap-successfactors';
+  if (host.endsWith('.potok.io') && /^\/open\/jobs(?:\/|$)/i.test(path)) return 'potok';
+  if (host.endsWith('.huntflow.io')) return 'huntflow';
+  if ((host === 'skillaz.ru' || host.endsWith('.skillaz.ru'))
+    && /^\/(?:jobs?|vacanc(?:y|ies))(?:\/|$)/i.test(path)) return 'skillaz';
+  if ((host === 'friendwork.ru' || host.endsWith('.friendwork.ru'))
+    && /^\/(?:jobs?|vacanc(?:y|ies)|career)(?:\/|$)/i.test(path)) return 'friendwork';
+  if (host === 'talantix.ru' && /^\/(?:form|ats\/vacancy)(?:\/|$)/i.test(path)) return 'talantix';
+  return null;
+}
+
+function matchFirstPublicFeedSurface(value, provider) {
+  for (const match of String(value ?? '').matchAll(/https?:\/\/[^"'\s<>]+/gi)) {
+    const publicUrl = canonicalizePublicUrl(decodeHtmlUrl(match[0]));
+    if (!publicUrl) continue;
+    const parsed = new URL(publicUrl);
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname;
+    if (provider === 'teamtailor'
+      && host.endsWith('.teamtailor.com')
+      && (path === '/' || /^\/jobs(?:\.rss|\/|$)/i.test(path))) return publicUrl;
+    if (provider === 'personio'
+      && (host.endsWith('.jobs.personio.de') || host.endsWith('.jobs.personio.com'))
+      && (path === '/' || /^\/(?:job|xml)(?:\/|$)/i.test(path))) return publicUrl;
+  }
   return null;
 }
 
@@ -1334,7 +1387,13 @@ async function fetchCareerPageTarget(target, index) {
   } else if (normalizedTarget.adapter === 'workable-public-jobs') {
     records = await fetchWorkablePublicJobsRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'smartrecruiters-postings') {
-    records = await fetchSmartRecruitersPostingsRecords(normalizedTarget);
+    const fetched = await fetchSmartRecruitersPostingsRecords(normalizedTarget);
+    records = fetched.records;
+    fetchDiagnostics = fetched.diagnostics;
+  } else if (normalizedTarget.adapter === 'teamtailor-rss') {
+    records = await fetchTeamtailorRssRecords(normalizedTarget);
+  } else if (normalizedTarget.adapter === 'personio-xml') {
+    records = await fetchPersonioXmlRecords(normalizedTarget);
   } else if (['same-domain-jsonld', 'hosted-career-page'].includes(normalizedTarget.adapter)) {
     const fetched = await fetchSameDomainJsonLdRecords(normalizedTarget);
     records = fetched.records;
@@ -1414,6 +1473,8 @@ function resolveExtractionMethodForSummary(records, adapter) {
     if (adapter === 'recruitee-careers') return 'recruitee-careers-api';
     if (adapter === 'workable-public-jobs') return 'workable-public-api';
     if (adapter === 'smartrecruiters-postings') return 'smartrecruiters-posting-api';
+    if (adapter === 'teamtailor-rss') return 'teamtailor-rss';
+    if (adapter === 'personio-xml') return 'personio-xml';
     if (adapter === 'json-feed') return 'json-feed';
     if (adapter === 'static-records') return 'static-records';
     return adapter ?? 'unknown';
@@ -1617,29 +1678,70 @@ export function mapWorkablePublicJobsPayload(payload, target) {
   }));
 }
 
-async function fetchSmartRecruitersPostingsRecords(target) {
+export async function fetchSmartRecruitersPostingsRecords(target, {
+  fetchJsonImpl = fetchJson,
+  fetchPublicCareersImpl = fetchSameDomainJsonLdRecords,
+} = {}) {
   const records = [];
   let sourceUrl = target.sourceUrl;
 
-  while (sourceUrl) {
-    const payload = await fetchJson(sourceUrl, target.id);
-    records.push(...mapSmartRecruitersPostingsPayload(payload, target));
-    const offset = Number(payload?.offset);
-    const limit = Number(payload?.limit);
-    const totalFound = Number(payload?.totalFound);
-    const nextOffset = offset + limit;
+  try {
+    while (sourceUrl) {
+      const payload = await fetchJsonImpl(sourceUrl, target.id, { allowProxyRetry: false });
+      records.push(...mapSmartRecruitersPostingsPayload(payload, target));
+      const offset = Number(payload?.offset);
+      const limit = Number(payload?.limit);
+      const totalFound = Number(payload?.totalFound);
+      const nextOffset = offset + limit;
 
-    if (!Number.isFinite(offset) || !Number.isFinite(limit) || limit <= 0
-      || !Number.isFinite(totalFound) || nextOffset >= totalFound) {
-      sourceUrl = null;
-    } else {
-      const nextUrl = new URL(sourceUrl);
-      nextUrl.searchParams.set('offset', String(nextOffset));
-      sourceUrl = nextUrl.toString();
+      if (!Number.isFinite(offset) || !Number.isFinite(limit) || limit <= 0
+        || !Number.isFinite(totalFound) || nextOffset >= totalFound) {
+        sourceUrl = null;
+      } else {
+        const nextUrl = new URL(sourceUrl);
+        nextUrl.searchParams.set('offset', String(nextOffset));
+        sourceUrl = nextUrl.toString();
+      }
     }
+  } catch (error) {
+    const status = Number(error?.status ?? error?.cause?.status);
+    if (status !== 403 || !target.careerPageUrl) throw error;
+    const publicPage = await fetchPublicCareersImpl({
+      ...target,
+      adapter: 'hosted-career-page',
+      sourceUrl: target.careerPageUrl,
+      hostedAtsFamily: 'smartrecruiters',
+    });
+    return {
+      records: publicPage.records.map((record) => ({
+        ...record,
+        raw_target_adapter: 'smartrecruiters-public-careers',
+        hosted_ats_family: 'smartrecruiters',
+      })),
+      diagnostics: {
+        ...publicPage.diagnostics,
+        officialApiStatus: 403,
+        officialApiOutcome: 'blocked',
+        publicCareersFallback: true,
+      },
+    };
   }
 
-  return records;
+  return {
+    records,
+    diagnostics: {
+      escalationStage: 'official-feed',
+      escalationAttempts: [{
+        stage: 'official-feed',
+        outcome: records.length > 0 ? 'parsed' : 'empty',
+        httpStatus: 200,
+        records: records.length,
+        rejectedRecords: 0,
+        reason: null,
+      }],
+      stoppedByPolicy: false,
+    },
+  };
 }
 
 export function mapSmartRecruitersPostingsPayload(payload, target) {
@@ -1666,6 +1768,121 @@ export function mapSmartRecruitersPostingsPayload(payload, target) {
     raw_target_adapter: target.adapter,
     raw: posting,
   }));
+}
+
+async function fetchTeamtailorRssRecords(target) {
+  const { body } = await fetchText(target.sourceUrl, {
+    sourceName: `career-pages target ${target.id}`,
+    headers: {
+      accept: 'application/rss+xml,application/xml,text/xml;q=0.9,*/*;q=0.1',
+      'user-agent': 'RecruiterRadarCareerPages/1.0',
+    },
+  });
+  return mapTeamtailorRss(body, target);
+}
+
+export function mapTeamtailorRss(xml, target) {
+  return extractXmlBlocks(xml, 'item').map((item, index) => {
+    const jobUrl = toUrlOrNull(extractXmlValue(item, 'link'))
+      ?? toUrlOrNull(extractXmlValue(item, 'guid'));
+    return {
+      company_name: target.companyName,
+      company_domain: target.companyDomain,
+      company_website_url: target.companyWebsiteUrl,
+      career_page_url: target.careerPageUrl,
+      job_posting_url: jobUrl,
+      job_title: toNonEmptyText(extractXmlValue(item, 'title')),
+      external_id: stringifyExternalId(
+        extractXmlValue(item, 'guid') ?? jobUrl,
+        target.id,
+        index,
+      ),
+      occurred_at: toTimestampOrNull(extractXmlValue(item, 'pubDate')),
+      tags: extractXmlValues(item, 'category').map(toNonEmptyText).filter(Boolean),
+      source_record_type: 'job_posting',
+      extraction_method: 'teamtailor-rss',
+      raw_target_id: target.id,
+      raw_target_adapter: target.adapter,
+      raw: { xml: item.slice(0, 20_000) },
+    };
+  });
+}
+
+async function fetchPersonioXmlRecords(target) {
+  const { body } = await fetchText(target.sourceUrl, {
+    sourceName: `career-pages target ${target.id}`,
+    headers: {
+      accept: 'application/xml,text/xml;q=0.9,*/*;q=0.1',
+      'user-agent': 'RecruiterRadarCareerPages/1.0',
+    },
+  });
+  return mapPersonioXml(body, target);
+}
+
+export function mapPersonioXml(xml, target) {
+  const baseUrl = toUrlOrNull(target.careerPageUrl ?? target.sourceUrl);
+  return extractXmlBlocks(xml, 'position').map((position, index) => {
+    const id = toNonEmptyText(extractXmlValue(position, 'id'));
+    const directUrl = toUrlOrNull(
+      extractXmlValue(position, 'jobUrl')
+      ?? extractXmlValue(position, 'url'),
+    );
+    const jobUrl = directUrl ?? (id && baseUrl ? new URL(`/job/${encodeURIComponent(id)}`, baseUrl).toString() : null);
+    return {
+      company_name: target.companyName,
+      company_domain: target.companyDomain,
+      company_website_url: target.companyWebsiteUrl,
+      career_page_url: target.careerPageUrl,
+      job_posting_url: jobUrl,
+      job_title: toNonEmptyText(extractXmlValue(position, 'name')),
+      external_id: stringifyExternalId(id, target.id, index),
+      location: joinLocationParts(
+        extractXmlValue(position, 'office'),
+        extractXmlValue(position, 'recruitingCategory'),
+      ),
+      employment_type: toNonEmptyText(extractXmlValue(position, 'employmentType')),
+      occurred_at: toTimestampOrNull(
+        extractXmlValue(position, 'createdAt') ?? extractXmlValue(position, 'updatedAt'),
+      ),
+      tags: [
+        extractXmlValue(position, 'department'),
+        extractXmlValue(position, 'schedule'),
+      ].map(toNonEmptyText).filter(Boolean),
+      source_record_type: 'job_posting',
+      extraction_method: 'personio-xml',
+      raw_target_id: target.id,
+      raw_target_adapter: target.adapter,
+      raw: { xml: position.slice(0, 20_000) },
+    };
+  });
+}
+
+function extractXmlBlocks(xml, tagName) {
+  const text = typeof xml === 'string' ? xml : '';
+  const pattern = new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'gi');
+  return [...text.matchAll(pattern)].slice(0, 500).map((match) => match[1]);
+}
+
+function extractXmlValues(xml, tagName) {
+  const pattern = new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'gi');
+  return [...String(xml ?? '').matchAll(pattern)].slice(0, 50).map((match) => decodeXmlValue(match[1]));
+}
+
+function extractXmlValue(xml, tagName) {
+  return extractXmlValues(xml, tagName)[0] ?? null;
+}
+
+function decodeXmlValue(value) {
+  return String(value ?? '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, '$1')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function formatRecruiteeLocation(offer) {
@@ -1752,6 +1969,31 @@ async function fetchSameDomainStaticRecords(target) {
 }
 
 async function fetchSameDomainJsonLdRecords(target) {
+  const accessPolicy = await resolveCareerTargetAccessPolicy(target.sourceUrl);
+  if (accessPolicy.blocked || !isRobotsPathAllowed(target.sourceUrl, accessPolicy.robots)) {
+    const reason = accessPolicy.blocked
+      ? `access-policy:${accessPolicy.reason}`
+      : 'access-policy:robots-disallowed';
+    return {
+      records: [],
+      diagnostics: {
+        errorCategory: reason,
+        resolvedUrl: target.sourceUrl,
+        escalationStage: null,
+        escalationAttempts: [{
+          stage: 'static-http',
+          outcome: 'blocked',
+          httpStatus: null,
+          records: 0,
+          rejectedRecords: 0,
+          reason,
+        }],
+        stoppedByPolicy: true,
+        robotsState: accessPolicy.robotsState,
+      },
+    };
+  }
+
   const staticResult = await fetchSameDomainStaticRecords(target);
   const seed = buildCareerExtractionSeed(target);
   const escalation = await runSourceEscalation({
@@ -1785,6 +2027,7 @@ async function fetchSameDomainJsonLdRecords(target) {
         const page = await getCareerPageRenderPool().fetchPage({
           url: target.sourceUrl,
           timeoutMs: resolveRenderedFallbackTimeoutMs(),
+          settleMs: resolveRenderedFallbackSettleMs(target),
           headers: { 'user-agent': 'RecruiterRadarCareerPages/1.0' },
         });
         if ([401, 403, 451].includes(page.status)) {
@@ -1903,9 +2146,62 @@ export function validateCareerVacancyRecord(record, target) {
     target?.companyWebsiteUrl,
   ].map(extractHostname).filter(Boolean);
   const recordHost = extractHostname(publicUrl);
-  return Boolean(recordHost && allowedHosts.some((host) => (
+  const hostAllowed = Boolean(recordHost && allowedHosts.some((host) => (
     recordHost === host || recordHost.endsWith(`.${host}`) || host.endsWith(`.${recordHost}`)
   )));
+  return hostAllowed && isHostedAtsVacancyUrl(publicUrl, target?.hostedAtsFamily);
+}
+
+export function isHostedAtsVacancyUrl(value, family) {
+  if (!family) return true;
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  const path = url.pathname;
+  const patterns = {
+    workday: /\/job\//i,
+    teamtailor: /\/jobs\/\d[^/]*(?:\/|$)/i,
+    personio: /\/job\/\d+(?:\/|$)/i,
+    bamboohr: /\/(?:careers?|jobs?)\/(?:job\/)?\d+(?:\/|$)/i,
+    pinpoint: /\/jobs\/\d+(?:[-/]|$)/i,
+    breezy: /\/p\/[a-f0-9]+(?:[-/]|$)/i,
+    comeet: /\/jobs\/[^/]+\/[^/]+\/[^/]+(?:\/|$)/i,
+    jazzhr: /\/apply\/[A-Za-z0-9_-]+(?:\/|$)/i,
+    icims: /\/jobs\/\d+(?:\/|$)/i,
+    'oracle-taleo': /\/jobdetail\.ftl$/i,
+    'oracle-cloud': /\/job\//i,
+    'sap-successfactors': /(?:\/job\/|[?&](?:career_job_req_id|jobId)=)/i,
+    smartrecruiters: /\/job\/[^/]+(?:\/|$)/i,
+    potok: /\/open\/jobs\/\d+(?:\/|$)/i,
+    huntflow: /\/(?:vacancy|jobs?)\/[^/]+(?:\/|$)/i,
+    skillaz: /\/(?:vacanc(?:y|ies)|jobs?)\/[^/]+(?:\/|$)/i,
+    friendwork: /\/(?:vacanc(?:y|ies)|jobs?)\/[^/]+(?:\/|$)/i,
+    talantix: /\/(?:form|ats\/vacancy)\/[^/]+(?:\/|$)/i,
+  };
+  return patterns[family]?.test(`${path}${url.search}`) ?? true;
+}
+
+async function resolveCareerTargetAccessPolicy(value) {
+  const publicUrl = canonicalizePublicUrl(value, { keepTracking: true });
+  if (!publicUrl) {
+    return { blocked: true, reason: 'invalid-public-url', robotsState: 'invalid', robots: { rules: [] } };
+  }
+  const origin = new URL(publicUrl).origin;
+  let pending = careerPageAccessPolicyCache.get(origin);
+  if (!pending) {
+    pending = discoverCareerUrlsFromWebsite(origin, { maxSitemaps: 1, maxUrls: 1 });
+    careerPageAccessPolicyCache.set(origin, pending);
+  }
+  const discovery = await pending;
+  return {
+    blocked: discovery.blocked,
+    reason: discovery.reason ?? discovery.errors?.[0] ?? 'blocked',
+    robotsState: discovery.robotsState,
+    robots: discovery.robots ?? { rules: [] },
+  };
 }
 
 function parseHttpErrorCategory(value) {
@@ -1939,6 +2235,12 @@ function resolveRenderedFallbackTimeoutMs() {
   return Number.isFinite(raw) && raw >= 1_000 ? Math.min(Math.floor(raw), 120_000) : 30_000;
 }
 
+function resolveRenderedFallbackSettleMs(target) {
+  const raw = Number(process.env.CAREER_PAGES_RENDER_SETTLE_MS);
+  if (Number.isFinite(raw) && raw >= 0) return Math.min(Math.floor(raw), 15_000);
+  return target?.hostedAtsFamily ? 5_000 : 1_500;
+}
+
 function tagRecordsWithExtractionMethod(records, method) {
   for (const record of records) {
     record.extraction_method = method;
@@ -1963,7 +2265,7 @@ async function fetchJsonFeedRecords(target) {
   }));
 }
 
-async function fetchJson(url, targetId) {
+async function fetchJson(url, targetId, { allowProxyRetry = true } = {}) {
   const requestOptions = {
     sourceName: `career-pages target ${targetId}`,
     headers: {
@@ -1979,7 +2281,7 @@ async function fetchJson(url, targetId) {
     // Some otherwise-public ATS endpoints reject the production datacenter IP
     // while remaining accessible through the already-configured compliant
     // source egress. Retry only an explicit 403, never hide other failures.
-    if (error?.status === 403 && proxyUrl) {
+    if (allowProxyRetry && error?.status === 403 && proxyUrl) {
       const { resolveHhProxyDispatcher, resolveHhProxyFetch } = await import('./adapters/hh.mjs');
       const proxyEnv = { HH_PROXY_URL: proxyUrl };
       return fetchJsonWithPolicy(url, {

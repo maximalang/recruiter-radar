@@ -47,6 +47,7 @@ interface SharedPlaywrightPool {
     timeoutMs?: number
     headers?: Record<string, string>
     previous?: { etag?: string; lastModified?: string }
+    settleMs?: number
   }): Promise<{
     url: string
     status: number

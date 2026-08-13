@@ -60,7 +60,13 @@ export function createPlaywrightBrowserPool(options = {}) {
   let idleTimer = null;
   let closed = false;
 
-  async function fetchPage({ url, timeoutMs = 30_000, headers = {}, previous = {} }) {
+  async function fetchPage({
+    url,
+    timeoutMs = 30_000,
+    headers = {},
+    previous = {},
+    settleMs = readNonNegativeInteger(undefined, 'PLAYWRIGHT_RENDER_SETTLE_MS', 1_500, 15_000),
+  }) {
     const host = toPublicHost(url);
     await awaitHostPermission(host);
     const worker = await acquire();
@@ -80,6 +86,9 @@ export function createPlaywrightBrowserPool(options = {}) {
         waitUntil: 'domcontentloaded',
         timeout: timeoutMs,
       });
+      if (settleMs > 0 && typeof page.waitForTimeout === 'function') {
+        await page.waitForTimeout(settleMs);
+      }
       const status = response?.status() ?? 200;
       const rawHeaders = response ? await response.allHeaders() : {};
       recordHostOutcome(host, status < 500 && status !== 429);

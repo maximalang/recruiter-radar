@@ -150,10 +150,24 @@ const redirectedAtsDetection = detectCareerPageTargetFromHtml('', {
 assert.equal(redirectedAtsDetection.targets.length, 1, 'a direct redirect to an ATS board must be discoverable');
 assert.equal(redirectedAtsDetection.targets[0].adapter, 'ashby-job-board');
 
+const firstClassFeedCases = [
+  ['teamtailor-rss', 'https://acme.teamtailor.com/jobs', 'https://acme.teamtailor.com/jobs.rss?per_page=200'],
+  ['personio-xml', 'https://acme.jobs.personio.de/?language=en', 'https://acme.jobs.personio.de/xml?language=en'],
+];
+for (const [adapter, url, expectedSourceUrl] of firstClassFeedCases) {
+  const detection = detectCareerPageTargetFromHtml(`<a href="${url}">Jobs</a>`, {
+    baseUrl: 'https://acme.example/',
+    orgName: 'Acme',
+    domain: 'acme.example',
+    websiteUrl: 'https://acme.example/',
+  });
+  assert.equal(detection.targets.length, 1, `${adapter} public feed surface must be detected`);
+  assert.equal(detection.targets[0].adapter, adapter);
+  assert.equal(detection.targets[0].source_url, expectedSourceUrl);
+}
+
 const hostedAtsCases = [
   ['workday', 'https://acme.wd3.myworkdayjobs.com/en-US/External'],
-  ['teamtailor', 'https://acme.teamtailor.com/'],
-  ['personio', 'https://acme.jobs.personio.com/'],
   ['bamboohr', 'https://acme.bamboohr.com/careers'],
   ['pinpoint', 'https://acme.pinpointhq.com/'],
   ['breezy', 'https://acme.breezy.hr/'],
@@ -163,6 +177,11 @@ const hostedAtsCases = [
   ['oracle-taleo', 'https://acme.taleo.net/careersection/external/jobsearch.ftl'],
   ['oracle-cloud', 'https://acme.fa.eu2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1'],
   ['sap-successfactors', 'https://career5.successfactors.eu/career?company=acme'],
+  ['potok', 'https://b1.potok.io/open/jobs/1580767'],
+  ['huntflow', 'https://hatehr.huntflow.io/'],
+  ['skillaz', 'https://employer.skillaz.ru/vacancies/123'],
+  ['friendwork', 'https://employer.friendwork.ru/vacancies/123'],
+  ['talantix', 'https://talantix.ru/form/SS9Tl8CCK8DP103jQxQpSg'],
 ];
 for (const [family, url] of hostedAtsCases) {
   const detection = detectCareerPageTargetFromHtml(`<a href="${url}">Jobs</a>`, {

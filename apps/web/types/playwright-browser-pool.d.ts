@@ -16,6 +16,7 @@ declare module "@/../../packages/db/scripts/adapters/playwright-browser-pool.mjs
       timeoutMs?: number;
       headers?: Record<string, string>;
       previous?: { etag?: string; lastModified?: string };
+      settleMs?: number;
     }): Promise<{
       url: string;
       status: number;

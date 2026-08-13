@@ -67,6 +67,24 @@ const targets = [
     career_page_url: 'https://careers.smartrecruiters.com/smartrecruiters',
     source_url: 'https://api.smartrecruiters.com/v1/companies/smartrecruiters/postings?limit=100&offset=0',
   },
+  {
+    id: 'teamtailor-rss-live',
+    adapter: 'teamtailor-rss',
+    company_name: 'Teamtailor',
+    company_domain: 'teamtailor.com',
+    company_website_url: 'https://www.teamtailor.com/',
+    career_page_url: 'https://career.teamtailor.com/jobs',
+    source_url: 'https://career.teamtailor.com/jobs.rss?per_page=200',
+  },
+  {
+    id: 'glueckkanja-personio-live',
+    adapter: 'personio-xml',
+    company_name: 'glueckkanja AG',
+    company_domain: 'glueckkanja.com',
+    company_website_url: 'https://www.glueckkanja.com/',
+    career_page_url: 'https://c4a8.jobs.personio.de',
+    source_url: 'https://c4a8.jobs.personio.de/xml?language=en',
+  },
 ];
 
 try {
@@ -97,7 +115,7 @@ try {
   }
   assert.deepEqual(
     [...new Set(input.normalizedRecords.map((record) => record.sourceId))].sort(),
-    ['ashby', 'greenhouse', 'lever', 'recruitee', 'smartrecruiters', 'workable'],
+    ['ashby', 'career-pages', 'greenhouse', 'lever', 'recruitee', 'smartrecruiters', 'workable'],
     'each ATS adapter must persist under its own auditable source id',
   );
 

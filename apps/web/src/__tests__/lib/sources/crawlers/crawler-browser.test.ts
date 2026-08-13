@@ -1,10 +1,14 @@
-const allHeaders = jest.fn(async () => ({ 'content-type': 'text/html' }))
-const response = { status: () => 200, allHeaders }
-const goto = jest.fn(async () => response)
+const allHeaders = jest.fn(async (): Promise<Record<string, string>> => ({ 'content-type': 'text/html' }))
+const response: { status: () => number; allHeaders: () => Promise<Record<string, string>> } = {
+  status: () => 200,
+  allHeaders,
+}
+const goto = jest.fn(async (): Promise<typeof response> => response)
 const content = jest.fn(async () => '<html><main>Rendered</main></html>')
+const waitForTimeout = jest.fn(async () => undefined)
 const closePage = jest.fn(async () => undefined)
 const closeContext = jest.fn(async () => undefined)
-const newPage = jest.fn(async () => ({ goto, content, close: closePage }))
+const newPage = jest.fn(async () => ({ goto, content, waitForTimeout, close: closePage }))
 const newContext = jest.fn(async () => ({ newPage, close: closeContext }))
 const closeBrowser = jest.fn(async () => undefined)
 const launch = jest.fn(async () => ({ newContext, close: closeBrowser }))
@@ -101,6 +105,7 @@ describe('Playwright SPA crawler', () => {
       headless: true,
       executablePath: '/usr/bin/chromium-browser',
     })
+    expect(waitForTimeout).toHaveBeenCalledWith(1_500)
 
     await engine.close()
   })

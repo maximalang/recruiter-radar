@@ -6,7 +6,12 @@ import {
   mapLeverPostingsPayload,
   mapRecruiteeCareersPayload,
   mapSmartRecruitersPostingsPayload,
+  mapTeamtailorRss,
+  mapPersonioXml,
   mapWorkablePublicJobsPayload,
+  detectCareerPageTargetFromHtml,
+  fetchSmartRecruitersPostingsRecords,
+  isHostedAtsVacancyUrl,
 } from './source-career-pages.mjs';
 
 // Offline coverage for the greenhouse-board / lever-postings response mappers.
@@ -179,6 +184,87 @@ assert.equal(smartRecruitersRecords[0].external_id, '744000143115219');
 assert.equal(smartRecruitersRecords[0].location, 'Poland, REMOTE, Poland');
 assert.equal(smartRecruitersRecords[0].job_posting_url, 'https://api.smartrecruiters.com/v1/companies/example/postings/744000143115219');
 
+const teamtailorTarget = {
+  ...sharedTarget,
+  adapter: 'teamtailor-rss',
+  careerPageUrl: 'https://example.teamtailor.com/jobs',
+};
+const teamtailorRecords = mapTeamtailorRss(`<?xml version="1.0"?>
+  <rss><channel><item>
+    <guid>https://example.teamtailor.com/jobs/123-platform-engineer</guid>
+    <title><![CDATA[Platform Engineer]]></title>
+    <link>https://example.teamtailor.com/jobs/123-platform-engineer</link>
+    <pubDate>Wed, 12 Aug 2026 10:00:00 GMT</pubDate>
+    <category>Engineering</category>
+  </item></channel></rss>`, teamtailorTarget);
+assert.equal(teamtailorRecords.length, 1);
+assert.equal(teamtailorRecords[0].job_title, 'Platform Engineer');
+assert.equal(teamtailorRecords[0].job_posting_url, 'https://example.teamtailor.com/jobs/123-platform-engineer');
+assert.equal(teamtailorRecords[0].extraction_method, 'teamtailor-rss');
+
+const personioTarget = {
+  ...sharedTarget,
+  adapter: 'personio-xml',
+  careerPageUrl: 'https://example.jobs.personio.de',
+};
+const personioRecords = mapPersonioXml(`<?xml version="1.0" encoding="UTF-8"?>
+  <workzag-jobs><position>
+    <id>456</id>
+    <name><![CDATA[Senior Data Engineer]]></name>
+    <office>Berlin</office>
+    <employmentType>permanent</employmentType>
+    <createdAt>2026-08-11T12:00:00+00:00</createdAt>
+  </position></workzag-jobs>`, personioTarget);
+assert.equal(personioRecords.length, 1);
+assert.equal(personioRecords[0].job_title, 'Senior Data Engineer');
+assert.equal(personioRecords[0].job_posting_url, 'https://example.jobs.personio.de/job/456');
+assert.equal(personioRecords[0].extraction_method, 'personio-xml');
+
+const feedDetection = detectCareerPageTargetFromHtml(`
+  <a href="https://example.teamtailor.com/jobs">Jobs</a>
+  <a href="https://example.jobs.personio.de">More jobs</a>
+`, {
+  baseUrl: 'https://example.org/careers',
+  orgName: 'Example Org',
+  domain: 'example.org',
+  websiteUrl: 'https://example.org/',
+});
+assert.ok(feedDetection.targets.some((target) => target.adapter === 'teamtailor-rss'));
+assert.ok(feedDetection.targets.some((target) => target.adapter === 'personio-xml'));
+
+let smartRecruitersRequestOptions = null;
+const smartRecruitersFallback = await fetchSmartRecruitersPostingsRecords({
+  ...sharedTarget,
+  adapter: 'smartrecruiters-postings',
+  careerPageUrl: 'https://careers.smartrecruiters.com/example',
+  sourceUrl: 'https://api.smartrecruiters.com/v1/companies/example/postings',
+}, {
+  fetchJsonImpl: async (_url, _targetId, options) => {
+    smartRecruitersRequestOptions = options;
+    const error = new Error('HTTP 403');
+    error.status = 403;
+    throw error;
+  },
+  fetchPublicCareersImpl: async () => ({
+    records: [{
+      company_name: 'Example Org',
+      job_title: 'Public Careers Engineer',
+      job_posting_url: 'https://careers.smartrecruiters.com/example/job/123',
+    }],
+    diagnostics: { escalationStage: 'rendered-dom', escalationAttempts: [] },
+  }),
+});
+assert.deepEqual(smartRecruitersRequestOptions, { allowProxyRetry: false });
+assert.equal(smartRecruitersFallback.records.length, 1);
+assert.equal(smartRecruitersFallback.records[0].raw_target_adapter, 'smartrecruiters-public-careers');
+assert.equal(smartRecruitersFallback.diagnostics.publicCareersFallback, true);
+assert.equal(smartRecruitersFallback.diagnostics.officialApiStatus, 403);
+
+assert.equal(isHostedAtsVacancyUrl('https://acme.wd1.myworkdayjobs.com/en-US/External/job/Engineer_R1', 'workday'), true);
+assert.equal(isHostedAtsVacancyUrl('https://acme.wd1.myworkdayjobs.com/en-US/External/benefits', 'workday'), false);
+assert.equal(isHostedAtsVacancyUrl('https://activeprospect.applytojob.com/apply/abc123/Engineer', 'jazzhr'), true);
+assert.equal(isHostedAtsVacancyUrl('https://activeprospect.applytojob.com/privacy', 'jazzhr'), false);
+
 for (const mapper of [
   mapAshbyJobBoardPayload,
   mapRecruiteeCareersPayload,
@@ -199,4 +285,6 @@ console.log(JSON.stringify({
   recruiteeRecords: recruiteeRecords.length,
   workableRecords: workableRecords.length,
   smartRecruitersRecords: smartRecruitersRecords.length,
+  teamtailorRecords: teamtailorRecords.length,
+  personioRecords: personioRecords.length,
 }, null, 2));
