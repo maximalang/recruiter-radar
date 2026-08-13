@@ -12,8 +12,9 @@ describe('runtime documentation contract', () => {
   const architecture = read('docs/architecture.md')
   const selfServe = read('docs/self-serve-mvp.md')
   const sourceRegistry = read('packages/db/scripts/source-registry.mjs')
+  const generatedSourceStatus = read('docs/source-status.generated.md')
 
-  test('every registered source is represented in the current-state snapshot', () => {
+  test('every registered source is represented in generated status, not a manual snapshot list', () => {
     const sourceIds = new Set<string>()
 
     for (const match of sourceRegistry.matchAll(/\bid:\s*['"]([^'"]+)['"]/g)) {
@@ -21,9 +22,10 @@ describe('runtime documentation contract', () => {
     }
 
     expect(sourceIds.size).toBeGreaterThan(0)
+    expect(currentState).toContain('docs/source-status.generated.md')
 
     for (const sourceId of sourceIds) {
-      expect(currentState).toContain(`\`${sourceId}\``)
+      expect(generatedSourceStatus).toContain(`| ${sourceId} |`)
     }
   })
 

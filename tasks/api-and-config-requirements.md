@@ -1,193 +1,51 @@
-# API & Config Requirements — матрица источников
+# Source API and runtime configuration requirements
 
-**Версия:** 1.0
-**Обновлено:** 2026-05-26
-**Связано:** [tasks/archive/plan-sources-improvement.md](archive/plan-sources-improvement.md) (архив)
+This runbook describes current configuration boundaries. Source status, access class,
+credential names, and user actions are generated in
+[`docs/source-status.generated.md`](../docs/source-status.generated.md) from the three
+machine-readable contracts. Do not copy source counts or live status into this file.
 
-Один файл = один источник истины по тому, что нужно сконфигурировать, чтобы каждый из 15 источников ушёл в зелёную зону.
+## Canonical contracts
 
----
+- `packages/db/source-policy.json` controls priority, confidence, lead eligibility, and promotion.
+- `packages/db/source-readiness.json` records implementation, configuration mode, live evidence, and blockers.
+- `packages/db/source-credentials.json` records access class, registration, credential names, and runtime availability. It never stores credential values.
+- `npm run verify:sources:readiness`, `npm run verify:source:credentials`, and `npm run verify:docs:source-status` fail when these contracts drift.
 
-## Легенда статусов
+## Automatic runtime paths
 
-- ✅ **ready** — работает в digest без env config
-- 🟢 **env-only** — нужны 1-2 env vars, бесплатно
-- 🟡 **fixture-or-env** — можно гонять на fixture-файле (free) или подключить provider
-- 🔴 **paid-provider** — обязателен платный API провайдер
-- ⚫ **not-yet-wired** — реализован, но не подключён к digest pipeline
+- The daily radar ingests primary hiring sources, derives bounded company-owned context targets from tracked organizations, records source health, derives temporal intelligence, and only then builds digests.
+- Company sites and newsrooms use DB-derived targets. Input files are controlled-run overrides, not the default production discovery path.
+- Official FNS, EIS procurement, Rosstat, and Rospatent snapshot synchronizers discover, checksum, and atomically activate approved public datasets. Snapshot files remain reproducibility/debug inputs, not a manual production workflow.
+- Public ATS discovery stores the concrete provider source ID. Russian ATS coverage currently has live proof for Huntflow, FriendWork, and e-staff; policy-blocked surfaces are not bypassed.
+- GitHub organization context is public and credential-free at base rate limits. A token is optional capacity only.
+- YouTube and Telegram company-channel sources are optional Class B context sources and never independently originate leads.
+- GDELT uses bounded tracked-company queries plus persistent cache/cooldown. HTTP 429 is a visible rate-limited result, not successful live verification.
 
----
+## Registration and credentials
 
-## 1. Зелёная зона (запускается из коробки)
+Use the generated credential/action matrix for the current source-by-source state.
+Important operator boundaries:
 
-### `career-pages` ✅
-- **Status:** в digest, работает.
-- **Расширение:** добавить compounds в `apps/web/lib/sources/career-pages-targets.json` (или в `CAREER_PAGES_TARGETS_FILE`). Текущий smoke-fixture: 2 компании.
-- **Goal:** 50+ компаний (топ-RU IT + HH топ-100 рекрутеры).
+- HH: wait for the already submitted application review. Do not submit another registration. After approval, configure `HH_CLIENT_ID` and `HH_CLIENT_SECRET`; `HH_USER_AGENT` remains required for API requests.
+- SuperJob: registration and runtime key are already configured; no user action is required.
+- YouTube: if this optional coverage is desired, create a free Google Cloud project, enable YouTube Data API v3, and configure `YOUTUBE_API_KEY`.
+- Telegram: if this optional coverage is desired, register one Telegram application and provision an authorized least-privilege MTProto session. Bot API collection is not supported.
+- Class C sources require explicit permission, an official subscription, or a compliant provider decision. Missing Class C access does not authorize scraping or access-control bypasses.
 
-### `company-site` ✅ (⚫ not in digest)
-- **Status:** работает, но не feed-ит digest.
-- **Что нужно:** wire через `aggregateSourceSignals` + добавить в `digestLeadSources` allow-list в `source-registry.mjs`.
+Never place credential values in docs, logs, fixtures, generated status, or git.
 
-### `tech-job-boards` — retired
-- **Status:** historical provenance ID only; no runnable adapter or configuration.
-- **Migration:** Greenhouse, Lever, and other reviewed ATS records use concrete source IDs through `career-pages`.
+## Required checks
 
----
+```text
+npm run verify:sources:readiness
+npm run verify:source:credentials
+npm run verify:sources:live-config
+npm run verify:docs:source-status
+npm run verify:source:temporal-health
+npm run db:validate
+npm run web:check
+npm run web:build
+```
 
-## 2. Env-only (бесплатно, нужны 1-2 переменные)
-
-### `hh` 🟢
-- **Env required:** `HH_USER_AGENT="<приложение>/<контакт>"` (HH API требует identification).
-- **Status:** в digest как `digest-allowed`, но не в production до `controlled-live-ready` matrix.
-- **Production blocker:** controlled live matrix для роли × региона × страницы записать в `verify:hiring-patterns`.
-
-### `rabota-rossii` 🟢
-- **Env options:**
-  - `RABOTA_ROSSII_SEARCH_TEXT="<запрос>"` (для live-public)
-  - **или** `RABOTA_ROSSII_INPUT_FILE=path/to/fixture.json` (для file-mode)
-- **Production blocker:** confidence gates pass + dedupe vs HH перед `digest-allowed`.
-
----
-
-## 3. Snapshot/provider sources (нужен отдельный доступ или reviewed export)
-
-### `egrul-fns` 🟡
-- **Access class:** C; официальная интеграция ФНС требует отдельного доступа/абонентского обслуживания.
-- **Runtime path:** `EGRUL_FNS_INPUT_FILE=path/to/reviewed-official-fns-export.json`.
-- **Boundary:** каждая запись обязана содержать официальный URL ФНС; сторонние зеркала и произвольные provider endpoint отключены.
-
-### `funding-business-signals` 🟡
-- **Free path:** `DATABASE_URL` lets the daily supporting stage build bounded exact-company GDELT queries only for tracked organizations with hiring evidence and a strong domain. Operator query JSON remains an override.
-- **Provider path:** `FUNDING_SIGNALS_PROVIDER_API_URL` + `FUNDING_SIGNALS_PROVIDER_API_TOKEN` (Crunchbase, PitchBook, Dealroom).
-
-### `transparent-business-fns` 🟡
-- **Free path:** `TRANSPARENT_BUSINESS_FNS_INPUT_FILE=path/to/fixture.json`
-- **Provider path:** `TRANSPARENT_BUSINESS_FNS_PROVIDER_API_URL` + `TRANSPARENT_BUSINESS_FNS_PROVIDER_API_TOKEN`
-
-### `fedresurs` 🟡
-- **Free path:** `FEDRESURS_INPUT_FILE=path/to/fixture.json`
-- **Provider path:** `FEDRESURS_PROVIDER_API_URL` + `FEDRESURS_PROVIDER_API_TOKEN`
-
-### `habr-career` 🟡
-- **Snapshot path:** `HABR_CAREER_INPUT_FILE=path/to/reviewed-lawful-snapshot.json`
-- **Provider path:** `HABR_CAREER_PROVIDER_API_URL` + `HABR_CAREER_PROVIDER_API_TOKEN` after explicit permission. Direct commercial HTML collection is disabled.
-
-### `company-newsrooms` 🟡
-- **Free path:** `COMPANY_NEWSROOMS_INPUT_FILE` или `COMPANY_NEWSROOMS_TARGETS_FILE`
-- **Provider path:** `COMPANY_NEWSROOMS_PROVIDER_API_URL` + `COMPANY_NEWSROOMS_PROVIDER_API_TOKEN`
-
-### `industry-media` 🟡
-- **Free path:** checked-in allowlisted public RSS/Atom registry plus automatic tracked-company matching through `DATABASE_URL`; `INDUSTRY_MEDIA_FEED_REGISTRY_FILE` is an operator override.
-- **Provider path:** `INDUSTRY_MEDIA_PROVIDER_API_URL` + `INDUSTRY_MEDIA_PROVIDER_API_TOKEN`
-
-### Regional/specialist boards
-- The generic `regional-job-boards` pseudo-source is retired. Add a concrete source ID only after its official/public access and provenance have been reviewed.
-
-### `superjob` 🟡
-- **Free path:** `SUPERJOB_INPUT_FILE`
-- **Provider path:** `SUPERJOB_PROVIDER_API_URL` + `SUPERJOB_API_APP_ID` (бесплатная регистрация app на api.superjob.ru).
-
----
-
-## 4. Paid-provider (обязателен сторонний API)
-
-### `linkedin-company-pages` 🔴
-- **Required:** `LINKEDIN_PROVIDER_API_URL` + `LINKEDIN_PROVIDER_API_TOKEN`
-- **Кандидаты:**
-  - **Apify** (`apify.com/curious_coder/linkedin-jobs-scraper`) — $39/mo на pilot.
-  - **Apollo.io** — есть LinkedIn data, $99/mo базовый.
-  - **Clearbit** (через Salesforce) — enterprise.
-  - **PhantomBuster** — pay-per-execution.
-- **Решение требуется:** какой провайдер брать для MVP?
-- **Compliance:** LinkedIn ToS запрещают scraping; провайдер должен иметь юридическую обвязку.
-
----
-
-## 5. Crawler engines — конфиг (новый раздел)
-
-### Cheerio (текущий, default)
-- **Env:** —
-- **Cost:** 0
-- **Self-hosted:** да
-
-### Playwright
-- **Install:** `npm install playwright @playwright/test` + `npx playwright install chromium`
-- **Env:** —
-- **Cost:** 0 (только инфра — RAM/CPU на worker)
-- **Disk:** ~300MB chromium binary
-- **Self-hosted:** да
-
-### Crawl4AI (Python sidecar через Docker)
-- **Install:** `docker pull unclecode/crawl4ai:latest`
-- **Env:** `CRAWL4AI_BASE_URL=http://crawl4ai:11235` (sidecar URL)
-- **Cost:** 0 (self-hosted)
-- **License:** Apache-2.0 + attribution clause (отдельная строка в `THIRD_PARTY_LICENSES.md`)
-
-### Firecrawl
-- **SaaS:** `FIRECRAWL_API_KEY=fc-...` ($20/mo starter)
-- **Self-hosted:** docker compose, AGPL-3.0 ⚠️
-- **Cost:** $20-100/mo SaaS или 0 self-hosted (но AGPL риск)
-- **Решение требуется:** SaaS или self-hosted? Юридический review AGPL.
-
-### Crawlee
-- **Install:** `npm install crawlee playwright`
-- **Env:** `CRAWLEE_STORAGE_DIR=./storage/crawlee`
-- **Cost:** 0
-- **License:** Apache-2.0
-- **Self-hosted:** да
-
-### Scrapy (Python sidecar)
-- **Install:** Python 3.11 + `pip install scrapy scrapy-playwright`
-- **Cost:** 0
-- **License:** BSD
-- **Self-hosted:** да
-- **Решение требуется:** добавлять Python в monorepo? Или отдельный repo для python workers?
-
-### ScrapeGraph AI
-- **Install:** `pip install scrapegraphai` (Python)
-- **Env:** `OPENAI_API_KEY=sk-...` или `ANTHROPIC_API_KEY=sk-ant-...` (для LLM extraction)
-- **Cost:** ~$0.01-0.10 за страницу (LLM tokens)
-- **License:** MIT
-- **Self-hosted:** да (но требует LLM API)
-
----
-
-## 6. Сводная таблица
-
-| Источник / Engine | Зона | Cost/mo | Решение нужно? |
-|---|---|---|---|
-| career-pages | ✅ | $0 | расширить targets |
-| company-site | ✅ ⚫ | $0 | wire в digest |
-| tech-job-boards | retired | n/a | historical read compatibility only |
-| hh | 🟢 | $0 | `HH_USER_AGENT` |
-| rabota-rossii | 🟢 | $0 | search query |
-| egrul-fns | 🟡 | $0 / $50-200 | INN list или Контур |
-| funding-signals | 🟡 | $0 / $99-500 | GDELT или Crunchbase |
-| transparent-fns | 🟡 | $0 / $50-200 | provider |
-| fedresurs | 🟡 | $0 / $50-200 | provider |
-| habr-career | 🟡 | $0 / provider | reviewed lawful snapshot or explicit provider permission |
-| company-newsrooms | 🟢 | $0 / $50-100 | auto targets + optional provider |
-| industry-media | 🟢 | $0 / $50-100 | curated RSS/Atom + optional provider |
-| superjob | 🟡 | $0 | бесплатная регистрация app |
-| linkedin-company-pages | 🔴 | $39-200 | **выбрать provider** |
-| **cheerio** | engine | $0 | — |
-| **Playwright** | engine | $0 | подтвердить добавление dep |
-| **Crawl4AI** | engine | $0 | подтвердить Docker sidecar |
-| **Firecrawl** | engine | $0 / $20-100 | SaaS или AGPL self-host |
-| **Crawlee** | engine | $0 | подтвердить добавление dep |
-| **Scrapy** | engine | $0 | Python в monorepo? |
-| **ScrapeGraph AI** | engine | $0.01-0.10/page | LLM API + budget |
-
----
-
-## 7. Точки решения для пользователя
-
-1. **LinkedIn provider** — Apify ($39/mo) vs Apollo ($99/mo) vs PhantomBuster vs не делать сейчас?
-2. **Firecrawl** — SaaS subscription или AGPL self-hosted? Юридически приемлемо?
-3. **Scrapy / Python workers** — добавлять Python в monorepo или отдельный repo?
-4. **ScrapeGraph AI бюджет** — какой LLM key выделить и какой месячный лимит?
-5. **Контур.Фокус / Spark** — какой ENI provider для ЕГРЮЛ нужен?
-6. **Crunchbase / Dealroom** — какой funding-data provider для P0?
-
-Без ответов на эти 6 вопросов 7 источников останутся в 🟡-зоне с fixture-only режимом.
+Live DB verifiers must use an isolated disposable database and their explicit isolated-test acknowledgement. A fixture, HTTP response, or runnable adapter is not production live proof.

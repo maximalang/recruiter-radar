@@ -116,7 +116,7 @@ Total Score = Fit + Intent + Urgency + Reachability
 
 Источники runnable, но ещё не в digest selection — на этапе роста покрытия:
 - `linkedin-company-pages` — secondary platform evidence, corroborating layer в digest
-- hosted ATS coverage — concrete provider IDs discovered and ingested through `career-pages`; the former `tech-job-boards` pseudo-source is retired and read-compatible only
+- hosted ATS coverage — concrete provider IDs discovered and ingested through `career-pages`; historical compatibility provenance is not a runnable source
 
 ### Phase 3 — добавить enrichment/context sources (реализовано, не в selection)
 

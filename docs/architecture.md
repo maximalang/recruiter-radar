@@ -40,7 +40,7 @@ Source registry разделяет несколько независимых с�
 - `career-pages`;
 - provider/gate-controlled secondary sources: `habr-career` and `linkedin-company-pages`; hosted ATS vacancies use concrete reviewed source IDs discovered through `career-pages`.
 
-`tech-job-boards` is a retired historical provenance ID. Existing records remain readable, but it has no runnable adapter, environment variables, or source-registry entry.
+Historical compatibility provenance is readable but is not a runnable source family and is omitted from current inventories.
 
 ### Enrichment и context
 

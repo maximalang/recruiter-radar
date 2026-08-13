@@ -50,7 +50,7 @@
 | `npm run guard:router` | ✅ PASS | No `src/app` shadowing `app/`. |
 | `npm run web:check` | ✅ PASS (after `npm run clean`) | tsc --noEmit clean. Stale `.next/types/validator.ts` referenced the removed `favicon-brand27` route until build artifacts were cleaned. |
 | `npm run db:validate` | ✅ PASS | 88 `.mjs` files, syntax OK. |
-| `npm run verify:sources:readiness` | ✅ PASS | 15 sources, registry/contracts/digest boundaries/HTTP usage/actions consistent. Structural only — not live readiness. |
+| `npm run verify:sources:readiness` | ✅ PASS | Historical snapshot passed. Current inventory is generated in `docs/source-status.generated.md`; structural proof was not live readiness. |
 | `npm run verify:sources:coverage` | ✅ PASS | P1/P2/P3 sources all present and compliant. Digest-allowed: `hh`, `rabota-rossii`, `career-pages`. |
 | `npm run verify:source:confidence` | ✅ PASS | Confidence gates consistent. |
 | `npm audit --omit=dev --audit-level=high` | ✅ PASS | **0 vulnerabilities** (vulnerable crawler chain already removed in `037b667`). |
@@ -69,9 +69,9 @@
 1. **No local Postgres.** DB-backed smoke checks (digest selection, feedback,
    corroboration, ingest persistence) cannot run in this environment:
    `DATABASE_URL` → `EACCES/ECONNREFUSED`. These remain unverified locally.
-2. **Provider-only sources blocked.** `linkedin-company-pages`, `tech-job-boards`,
-   `superjob`, `habr-career`, `regional-job-boards` need lawful provider credentials
-   and inputs. No placeholder credentials or synthetic production success is acceptable.
+2. **Provider-only sources blocked in this historical snapshot.** The current provider and
+   credential state is generated in `docs/source-status.generated.md`; no placeholder
+   credentials or synthetic production success is acceptable.
 3. **`hh` needs a real `HH_USER_AGENT`** identifying a registered app/contact
    (policy-aligned). Without it `hh` is not launch-ready despite being digest-allowed.
 4. **Payment-live readiness** requires a real configured RF provider, webhook, return

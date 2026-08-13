@@ -413,7 +413,7 @@ registerRunnableScriptSource({
 
 registerRunnableScriptSource({
   id: 'github-company-org',
-  kind: 'business-signal',
+  kind: 'company-site',
   sourceClass: 'company-surface',
   evidenceTier: 'context-only',
   defaultConfidence: 0.45,
@@ -424,12 +424,12 @@ registerRunnableScriptSource({
 });
 
 registerRunnableScriptSource({
-  id: 'youtube-company-channels', kind: 'business-signal', sourceClass: 'company-surface', evidenceTier: 'context-only', defaultConfidence: 0.48,
+  id: 'youtube-company-channels', kind: 'company-site', sourceClass: 'company-surface', evidenceTier: 'context-only', defaultConfidence: 0.48,
   fetchModes: ['file', 'provider-token'], description: 'Public videos from automatically ownership-proven company channels via the quota-aware YouTube Data API; never lead-originating.',
   scriptPath: youtubeCompanyChannelsScriptPath, absoluteScriptPath: youtubeCompanyChannelsAbsoluteScriptPath,
 });
 registerRunnableScriptSource({
-  id: 'telegram-company-channels', kind: 'business-signal', sourceClass: 'company-surface', evidenceTier: 'context-only', defaultConfidence: 0.5,
+  id: 'telegram-company-channels', kind: 'company-site', sourceClass: 'company-surface', evidenceTier: 'context-only', defaultConfidence: 0.5,
   fetchModes: ['file', 'provider-token'], description: 'Identity-bound public corporate broadcast channels read through authenticated MTProto only; never lead-originating.',
   scriptPath: telegramCompanyChannelsScriptPath, absoluteScriptPath: telegramCompanyChannelsAbsoluteScriptPath,
 });

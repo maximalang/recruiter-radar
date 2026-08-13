@@ -59,11 +59,8 @@ Final branch tip at merge: `b49eae3`, **ahead 44, behind 0**, CI `build`/`test`/
 commits change FIUR scoring, the confidence contract, or source promotion
 policy (the source-automation work changes *which records get fetched* via
 DB-derived inputs, upstream of scoring, with operator override always winning).
-Genuinely operator-credentials-only sources (superjob, linkedin-company-pages,
-industry-media, fedresurs, transparent-business-fns, regional-job-boards,
-tech-job-boards) plus `hh` USER_AGENT and payment-live remain external blockers —
-reported honestly, not stubbed. See `docs/CURRENT_STATE.md` for the live
-post-automatism registry table.
+This dated snapshot's external blockers are historical and must not be used as the current
+source matrix. See `docs/source-status.generated.md` for current source status and user actions.
 
 ## Final verification results (after)
 
@@ -75,7 +72,7 @@ post-automatism registry table.
 | `npm test --workspace @recruiter-radar/web` | ✅ PASS | **158 suites, 1555 tests.** |
 | `npm run db:validate` | ✅ PASS | 89 `.mjs` files. |
 | `npm run verify:smoke` | ✅ PASS (read-only) | `mode: read-only-smoke`, `ok: true`. |
-| `npm run verify:sources:readiness` | ✅ PASS | 15 sources, structural boundaries consistent. |
+| `npm run verify:sources:readiness` | ✅ PASS | Historical snapshot passed; current inventory is generated in `docs/source-status.generated.md`. |
 | `npm run verify:sources:coverage` | ✅ PASS | P1/P2/P3 compliant. Digest-allowed: `hh`, `rabota-rossii`, `career-pages`. |
 | `npm run verify:source:confidence` | ✅ PASS | Confidence gates consistent. |
 | `npm audit --omit=dev --audit-level=high` | ✅ PASS | **0 vulnerabilities.** |
