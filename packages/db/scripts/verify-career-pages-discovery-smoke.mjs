@@ -180,7 +180,7 @@ const hostedAtsCases = [
   ['potok', 'https://b1.potok.io/open/jobs/1580767'],
   ['huntflow', 'https://hatehr.huntflow.io/'],
   ['skillaz', 'https://employer.skillaz.ru/vacancies/123'],
-  ['friendwork', 'https://employer.friendwork.ru/vacancies/123'],
+  ['friendwork', 'https://jobs.friend.work/ggsel/108822'],
   ['talantix', 'https://talantix.ru/form/SS9Tl8CCK8DP103jQxQpSg'],
 ];
 for (const [family, url] of hostedAtsCases) {

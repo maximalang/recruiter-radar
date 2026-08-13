@@ -1212,8 +1212,9 @@ function classifyHostedAtsUrl(url) {
   if (host.endsWith('.huntflow.io')) return 'huntflow';
   if ((host === 'skillaz.ru' || host.endsWith('.skillaz.ru'))
     && /^\/(?:jobs?|vacanc(?:y|ies))(?:\/|$)/i.test(path)) return 'skillaz';
-  if ((host === 'friendwork.ru' || host.endsWith('.friendwork.ru'))
-    && /^\/(?:jobs?|vacanc(?:y|ies)|career)(?:\/|$)/i.test(path)) return 'friendwork';
+  if (((host === 'friendwork.ru' || host.endsWith('.friendwork.ru'))
+      && /^\/(?:jobs?|vacanc(?:y|ies)|career)(?:\/|$)/i.test(path))
+    || (host === 'jobs.friend.work' && /^\/[^/]+(?:\/\d+)?\/?$/i.test(path))) return 'friendwork';
   if (host === 'talantix.ru' && /^\/(?:form|ats\/vacancy)(?:\/|$)/i.test(path)) return 'talantix';
   return null;
 }
@@ -2443,7 +2444,7 @@ export function isHostedAtsVacancyUrl(value, family) {
     potok: /\/open\/jobs\/\d+(?:\/|$)/i,
     huntflow: /\/(?:vacancy|jobs?)\/[^/]+(?:\/|$)/i,
     skillaz: /\/(?:vacanc(?:y|ies)|jobs?)\/[^/]+(?:\/|$)/i,
-    friendwork: /\/(?:vacanc(?:y|ies)|jobs?)\/[^/]+(?:\/|$)/i,
+    friendwork: /(?:\/(?:vacanc(?:y|ies)|jobs?)\/[^/]+(?:\/|$)|^\/[^/]+\/\d+\/?$)/i,
     talantix: /\/(?:form|ats\/vacancy)\/[^/]+(?:\/|$)/i,
   };
   return patterns[family]?.test(`${path}${url.search}`) ?? true;

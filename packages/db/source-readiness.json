@@ -185,7 +185,8 @@
         "evidence": [
           "2026-08-13 public ATS live verifier normalized 331 of 331 real vacancies across Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters, Teamtailor RSS and Personio XML.",
           "2026-08-13 hosted ATS live verifier normalized 232 of 232 real vacancies across Workday, BambooHR, Pinpoint, Breezy, Comeet, JazzHR, iCIMS, Oracle/Taleo, Oracle Cloud and SAP SuccessFactors using official feeds, structured HTML or rendered DOM.",
-          "2026-08-13 isolated disposable PostgreSQL verifier persisted 20 FICO Workday rendered vacancies as 20 signals, 20 evidence items and 20 lineage rows with public source URLs, owner consistency and no sensitive payload fields."
+          "2026-08-13 isolated disposable PostgreSQL verifier persisted 20 FICO Workday rendered vacancies as 20 signals, 20 evidence items and 20 lineage rows with public source URLs, owner consistency and no sensitive payload fields.",
+          "2026-08-13 current Russian ATS verification parsed 7 Huntflow vacancies through static HTML and 17 FriendWork vacancies through rendered DOM. An isolated production-schema PostgreSQL verifier persisted all 24 as signals, evidence items and lineage rows across two owner-consistent organizations with public vacancy URLs and zero sensitive payload fields. A current Potok employer surface was reachable but correctly stopped because its robots.txt declares Disallow: /."
         ]
       },
       "requiresLiveVerification": true,
@@ -194,8 +195,8 @@
       "legalReview": "not-required",
       "pipelineProfile": "hiring-primary",
       "verification": {
-        "fixture": ["npm run verify:career-pages:smoke", "npm run verify:career-pages:html-card-fallback"],
-        "contract": ["npm run verify:career-pages:ingest", "npm run verify:career-pages:public-ats-live", "node packages/db/scripts/verify-career-pages-hosted-ats-live.mjs", "node packages/db/scripts/run-source-live-db-verifier.mjs hosted-ats", "npm run verify:source:readiness"]
+        "fixture": ["npm run verify:career-pages:smoke", "npm run verify:career-pages:html-card-fallback", "npm run verify:career-pages:russian-ats-fixtures"],
+        "contract": ["npm run verify:career-pages:ingest", "npm run verify:career-pages:public-ats-live", "node packages/db/scripts/verify-career-pages-hosted-ats-live.mjs", "node packages/db/scripts/run-source-live-db-verifier.mjs hosted-ats", "npm run verify:career-pages:russian-ats-live", "SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:career-pages:russian-ats-live-db", "npm run verify:source:readiness"]
       },
       "blockers": []
     },
