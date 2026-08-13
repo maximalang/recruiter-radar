@@ -22,6 +22,11 @@ Last reconciled: **2026-08-13** against `source-policy.json`, `source-readiness.
 Operational health is separate from promotion status and must be verified against the current
 environment.
 
+`career-pages` needs no maintained target file in the normal runtime: with
+`DATABASE_URL`, it derives bounded targets from already-tracked organizations,
+persists a review artifact, and then runs the guarded public-surface escalation.
+`CAREER_PAGES_TARGETS_FILE` remains an operator override.
+
 | source | live probe | status | note |
 |---|---|---|---|
 | rabota-rossii | current disposable live DB: 100 signals/evidence/lineage across 80 orgs | digest-allowed; live-verified | official public API; no credential required |

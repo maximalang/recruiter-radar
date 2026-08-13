@@ -204,7 +204,7 @@ describe('source live readiness contract', () => {
     )
   })
 
-  it('uses the actual source input contract and does not treat DATABASE_URL as fetch configuration', () => {
+  it('treats DATABASE_URL as the canonical career target auto-discovery configuration', () => {
     const databaseOnly = spawnSync(process.execPath, [verifierPath, '--json'], {
       cwd: repoRoot,
       env: { ...sourceFreeEnv(), DATABASE_URL: 'postgresql://isolated.invalid/test' },
@@ -212,7 +212,7 @@ describe('source live readiness contract', () => {
     })
     const databaseOnlyReport = JSON.parse(databaseOnly.stdout)
     expect(databaseOnlyReport.sources.find((source: { id: string }) => source.id === 'career-pages'))
-      .toEqual(expect.objectContaining({ configured: false, liveVerified: true }))
+      .toEqual(expect.objectContaining({ configured: true, liveVerified: true, finalState: 'digest-eligible' }))
 
     const linkedinInput = spawnSync(process.execPath, [verifierPath, '--json'], {
       cwd: repoRoot,

@@ -177,7 +177,7 @@
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["CAREER_PAGES_INPUT_FILE"], ["CAREER_PAGES_TARGETS_FILE"]]
+        "acceptedEnvSets": [["DATABASE_URL"], ["CAREER_PAGES_INPUT_FILE"], ["CAREER_PAGES_TARGETS_FILE"]]
       },
       "live": {
         "state": "verified",
@@ -197,9 +197,7 @@
         "fixture": ["npm run verify:career-pages:smoke", "npm run verify:career-pages:html-card-fallback"],
         "contract": ["npm run verify:career-pages:ingest", "npm run verify:career-pages:public-ats-live", "node packages/db/scripts/verify-career-pages-hosted-ats-live.mjs", "node packages/db/scripts/run-source-live-db-verifier.mjs hosted-ats", "npm run verify:source:readiness"]
       },
-      "blockers": [
-        "Production still needs an automatically refreshed CAREER_PAGES_TARGETS_FILE derived from tracked company websites; live extraction and DB lineage are verified independently of that launch configuration."
-      ]
+      "blockers": []
     },
     "greenhouse": {
       "implementation": "implemented", "fixture": "tested", "contract": "tested",
