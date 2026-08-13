@@ -150,8 +150,11 @@ async function runLiveCrawlSmoke() {
     );
     writeFileSync(emptyTargetsPath, '[]');
 
-    process.env.COMPANY_SITE_ALLOW_PRIVATE_TEST_TARGETS = 'true';
-    const liveInput = await resolveCompanySiteLiveInput({ targetsFilePath: targetsPath });
+    const testDependencies = { allowPrivateForTests: true, rendered: false };
+    const liveInput = await resolveCompanySiteLiveInput(
+      { targetsFilePath: targetsPath },
+      { dependencies: testDependencies },
+    );
     const liveSummary = buildFetchSummary(liveInput);
 
     assert.equal(liveInput.inputMode, 'live-public');
@@ -188,11 +191,17 @@ async function runLiveCrawlSmoke() {
     ]);
 
     await assert.rejects(
-      () => resolveCompanySiteLiveInput({ targetsFilePath: failedTargetsPath }),
+      () => resolveCompanySiteLiveInput(
+        { targetsFilePath: failedTargetsPath },
+        { dependencies: testDependencies },
+      ),
       /0 usable pages/,
     );
 
-    const emptyInput = await resolveCompanySiteLiveInput({ targetsFilePath: emptyTargetsPath });
+    const emptyInput = await resolveCompanySiteLiveInput(
+      { targetsFilePath: emptyTargetsPath },
+      { dependencies: testDependencies },
+    );
     const emptySummary = buildFetchSummary(emptyInput);
     assert.equal(emptySummary.zeroReason, 'no-eligible-company-targets');
     assert.equal(emptySummary.normalizedRecords, 0);
@@ -206,7 +215,6 @@ async function runLiveCrawlSmoke() {
       emptyTargetsOutcome: emptySummary.zeroReason,
     };
   } finally {
-    delete process.env.COMPANY_SITE_ALLOW_PRIVATE_TEST_TARGETS;
     await close(server);
     rmSync(tempDir, { recursive: true, force: true });
   }

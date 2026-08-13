@@ -90,7 +90,7 @@ export function resolveCompanySiteInput() {
   );
 }
 
-export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
+export async function resolveCompanySiteLiveInput({ targetsFilePath }, { dependencies = {} } = {}) {
   const { fetchCompanyPages } = await import('./adapters/company-site-crawl.mjs');
   const resolvedPath = resolve(process.cwd(), targetsFilePath);
 
@@ -120,11 +120,7 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
     };
   }
 
-  const crawlResults = await fetchCompanyPages(targets, {
-    dependencies: process.env.COMPANY_SITE_ALLOW_PRIVATE_TEST_TARGETS === 'true'
-      ? { allowPrivateForTests: true, rendered: false }
-      : {},
-  });
+  const crawlResults = await fetchCompanyPages(targets, { dependencies });
   const crawlErrors = crawlResults.filter((r) => r.error).length;
   const records = crawlResults
     .filter((r) => r.record !== null)

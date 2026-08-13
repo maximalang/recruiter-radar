@@ -56,7 +56,7 @@ export function resolveCompanyNewsroomsInput() {
   throw new Error('No input configured for company-newsrooms. Set COMPANY_NEWSROOMS_INPUT_FILE, COMPANY_NEWSROOMS_TARGETS_FILE, or provider env.');
 }
 
-export async function resolveCompanyNewsroomsLiveInput({ targetsFilePath }) {
+export async function resolveCompanyNewsroomsLiveInput({ targetsFilePath }, { dependencies = {} } = {}) {
   const { fetchCompanyNewsrooms } = await import('./adapters/company-newsroom-crawl.mjs');
   const resolvedPath = resolve(process.cwd(), targetsFilePath);
 
@@ -80,11 +80,7 @@ export async function resolveCompanyNewsroomsLiveInput({ targetsFilePath }) {
     });
   }
 
-  const crawlResults = await fetchCompanyNewsrooms(targets, {
-    dependencies: process.env.COMPANY_NEWSROOMS_ALLOW_PRIVATE_TEST_TARGETS === 'true'
-      ? { allowPrivateForTests: true, rendered: false }
-      : {},
-  });
+  const crawlResults = await fetchCompanyNewsrooms(targets, { dependencies });
   const records = crawlResults.flatMap((result) => result.records);
   const reachableTargets = crawlResults.filter((result) => result.rootFetched).length;
   const resourcesDiscovered = sum(crawlResults, 'pagesDiscovered') + sum(crawlResults, 'feedsDiscovered');

@@ -63,6 +63,10 @@ export async function fetchPublicPageWithEscalation({
         if (looksLikeAccessChallenge(body)) {
           return { status: 'blocked', accessControl: true, reason: 'access-challenge-page' };
         }
+        const contentType = String(response.headers?.get?.('content-type') ?? '').toLowerCase();
+        if (contentType && !contentType.includes('html') && !contentType.includes('xhtml')) {
+          return { status: 'error', reason: `unsupported-content-type:${contentType.slice(0, 120)}` };
+        }
         staticArtifact = { html: body, url: responseUrl ?? resolvedUrl };
         return { artifact: staticArtifact };
       },

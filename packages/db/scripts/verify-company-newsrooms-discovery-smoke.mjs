@@ -168,7 +168,7 @@ async function verifyExpectedZeroContracts() {
 
   const originalFetch = globalThis.fetch;
   try {
-    process.env.COMPANY_NEWSROOMS_ALLOW_PRIVATE_TEST_TARGETS = 'true';
+    const testOptions = { dependencies: { allowPrivateForTests: true, rendered: false } };
     globalThis.fetch = async () => ({
       ok: true,
       status: 200,
@@ -177,7 +177,10 @@ async function verifyExpectedZeroContracts() {
       headers: { get: () => 'text/html; charset=utf-8' },
       text: async () => '<html><body><a href="/ru/press/releases/">Пресс-релизы</a><nav>Архив публикаций</nav></body></html>',
     });
-    const reachable = await resolveCompanyNewsroomsLiveInput({ targetsFilePath: reachableTargetsPath });
+    const reachable = await resolveCompanyNewsroomsLiveInput(
+      { targetsFilePath: reachableTargetsPath },
+      testOptions,
+    );
     const reachableSummary = buildFetchSummary(reachable);
     assert.equal(reachableSummary.zeroReason, 'no-company-newsroom-items');
     assert.equal(reachableSummary.crawlSuccesses, 1);
@@ -199,14 +202,14 @@ async function verifyExpectedZeroContracts() {
       throw new Error('simulated discovered-page failure');
     };
     await assert.rejects(
-      () => resolveCompanyNewsroomsLiveInput({ targetsFilePath: reachableTargetsPath }),
+      () => resolveCompanyNewsroomsLiveInput({ targetsFilePath: reachableTargetsPath }, testOptions),
       /discovered 1 newsroom resources, but all were unreachable/,
     );
     assert.ok(requestCount > 1);
 
     globalThis.fetch = async () => { throw new Error('simulated network failure'); };
     await assert.rejects(
-      () => resolveCompanyNewsroomsLiveInput({ targetsFilePath: failedTargetsPath }),
+      () => resolveCompanyNewsroomsLiveInput({ targetsFilePath: failedTargetsPath }, testOptions),
       /could not reach any of 1 targets/,
     );
 
@@ -217,7 +220,6 @@ async function verifyExpectedZeroContracts() {
       allUnreachableRejected: true,
     };
   } finally {
-    delete process.env.COMPANY_NEWSROOMS_ALLOW_PRIVATE_TEST_TARGETS;
     globalThis.fetch = originalFetch;
     rmSync(tempDir, { recursive: true, force: true });
   }
