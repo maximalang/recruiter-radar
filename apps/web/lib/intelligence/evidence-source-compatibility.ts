@@ -31,6 +31,7 @@ export const EVIDENCE_RUNTIME_SOURCE_BINDINGS = {
   'industry-media': 'industry-media',
   'github-company-org': 'industry-media',
   'youtube-company-channels': 'industry-media',
+  'telegram-company-channels': 'public-vacancy-social-channels',
   'fns-open-data': 'sme-registry',
   'government-procurement': 'eis-procurement',
   'cbr-registry': 'official-address-license-registers',

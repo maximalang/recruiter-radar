@@ -63,6 +63,8 @@ const githubCompanyOrgScriptPath = './packages/db/scripts/source-github-company-
 const githubCompanyOrgAbsoluteScriptPath = resolve(scriptDir, './source-github-company-org.mjs');
 const youtubeCompanyChannelsScriptPath = './packages/db/scripts/source-youtube-company-channels.mjs';
 const youtubeCompanyChannelsAbsoluteScriptPath = resolve(scriptDir, './source-youtube-company-channels.mjs');
+const telegramCompanyChannelsScriptPath = './packages/db/scripts/source-telegram-company-channels.mjs';
+const telegramCompanyChannelsAbsoluteScriptPath = resolve(scriptDir, './source-telegram-company-channels.mjs');
 const officialGovernmentSources = Object.freeze([
   ['fns-open-data', './packages/db/scripts/source-fns-open-data.mjs', './source-fns-open-data.mjs', 'Official FNS bulk datasets for company-size, financial, SME, support and tax context.'],
   ['government-procurement', './packages/db/scripts/source-government-procurement.mjs', './source-government-procurement.mjs', 'Official EIS/Treasury contract awards and supplier context.'],
@@ -425,6 +427,11 @@ registerRunnableScriptSource({
   id: 'youtube-company-channels', kind: 'business-signal', sourceClass: 'company-surface', evidenceTier: 'context-only', defaultConfidence: 0.48,
   fetchModes: ['file', 'provider-token'], description: 'Public videos from automatically ownership-proven company channels via the quota-aware YouTube Data API; never lead-originating.',
   scriptPath: youtubeCompanyChannelsScriptPath, absoluteScriptPath: youtubeCompanyChannelsAbsoluteScriptPath,
+});
+registerRunnableScriptSource({
+  id: 'telegram-company-channels', kind: 'business-signal', sourceClass: 'company-surface', evidenceTier: 'context-only', defaultConfidence: 0.5,
+  fetchModes: ['file', 'provider-token'], description: 'Identity-bound public corporate broadcast channels read through authenticated MTProto only; never lead-originating.',
+  scriptPath: telegramCompanyChannelsScriptPath, absoluteScriptPath: telegramCompanyChannelsAbsoluteScriptPath,
 });
 
 export function listSources() {

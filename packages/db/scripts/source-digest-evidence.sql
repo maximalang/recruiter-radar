@@ -105,7 +105,7 @@ WITH source_signal_rows AS (
     -- flag is also the clean seam that keeps context rows out of the
     -- hiring-metric aggregates (vacancies_count, evidence_titles,
     -- latest_published_at) while still letting them count toward source_families.
-    (signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site', 'company-newsrooms', 'industry-media', 'github-company-org', 'youtube-company-channels', 'fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data')) AS is_context_evidence
+    (signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site', 'company-newsrooms', 'industry-media', 'github-company-org', 'youtube-company-channels', 'telegram-company-channels', 'fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data')) AS is_context_evidence
   FROM signals AS signal
   LEFT JOIN LATERAL (
     SELECT recorded.evidence_id
@@ -137,7 +137,7 @@ WITH source_signal_rows AS (
       -- signal_type ('other' or 'funding') so job_posting-only filters above
       -- stay the originator gate.
       signal.signal_type IN ('other', 'funding')
-        AND signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site', 'company-newsrooms', 'industry-media', 'github-company-org', 'youtube-company-channels', 'fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data')
+        AND signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site', 'company-newsrooms', 'industry-media', 'github-company-org', 'youtube-company-channels', 'telegram-company-channels', 'fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data')
     )
 ),
 -- org_corroboration_keys: map each org_id to a canonical cross-source

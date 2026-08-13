@@ -52,6 +52,7 @@ const SOURCE_BASE_WEIGHTS: Record<string, number> = {
   'industry-media': 0.08,
   'github-company-org': 0.04,
   'youtube-company-channels': 0.05,
+  'telegram-company-channels': 0.05,
   news: 0.08,
   social: 0.05,
   'platform-aggregator': 0.04,

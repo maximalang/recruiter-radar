@@ -514,6 +514,14 @@
       "verification": { "fixture": ["npm run verify:youtube-company-channels:smoke"], "live": ["npm run source:fetch:youtube-company-channels"], "contract": ["npm run verify:source:readiness"] },
       "blockers": ["credential-not-supplied"]
     },
+    "telegram-company-channels": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "registration-required", "acceptedEnvSets": [["TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION", "TELEGRAM_COMPANY_CHANNELS_TARGETS_JSON"], ["TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION", "TELEGRAM_COMPANY_CHANNELS_TARGETS_FILE"], ["TELEGRAM_COMPANY_CHANNELS_INPUT_FILE"]] },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": ["Fixture contract uses the maintained teleproto MTProto client boundary and proves official-domain channel linking, public broadcast-only enforcement, bounded history reads, event classification, and rejection of groups/private/mismatched channels. Bot API is not used for discovery or reading. No application credentials or authorized user session are configured, so no live claim is made."] },
+      "requiresLiveVerification": true, "confidence": "not-applicable", "eligibility": "context-only", "legalReview": "approved", "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:telegram-company-channels:smoke"], "live": ["npm run source:fetch:telegram-company-channels"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": ["credential-not-supplied", "authorized-mtproto-session-not-supplied"]
+    },
     "fns-open-data": {
       "implementation": "implemented",
       "fixture": "tested",

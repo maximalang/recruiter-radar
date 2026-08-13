@@ -33,6 +33,7 @@ export type SourceId =
   | 'industry-media'
   | 'github-company-org'
   | 'youtube-company-channels'
+  | 'telegram-company-channels'
   | 'fns-open-data'
   | 'government-procurement'
   | 'cbr-registry'
@@ -364,6 +365,12 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     description: 'Company-owned public video events through the quota-aware Data API; context only',
     script: 'source-youtube-company-channels.mjs', requiredEnvVars: ['YOUTUBE_API_KEY'],
     envPrefixes: ['YOUTUBE_'], searchEnvVars: ['YOUTUBE_COMPANY_CHANNELS_TARGETS_JSON'], isPrimary: false, category: 'business-signal',
+  },
+  {
+    id: 'telegram-company-channels', name: 'Telegram company channels',
+    description: 'Identity-bound public corporate broadcast channels through MTProto; context only',
+    script: 'source-telegram-company-channels.mjs', requiredEnvVars: ['TELEGRAM_API_ID', 'TELEGRAM_API_HASH', 'TELEGRAM_SESSION'],
+    envPrefixes: ['TELEGRAM_COMPANY_CHANNELS_', 'TELEGRAM_API_', 'TELEGRAM_SESSION'], searchEnvVars: ['TELEGRAM_COMPANY_CHANNELS_TARGETS_JSON'], isPrimary: false, category: 'business-signal',
   },
   {
     id: 'fedresurs',
