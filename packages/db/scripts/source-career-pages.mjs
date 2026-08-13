@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import pg from 'pg';
@@ -19,6 +19,11 @@ import { fetchJson as fetchJsonWithPolicy, fetchText } from './adapters/source-h
 import { runSourceEscalation } from './adapters/source-escalation.mjs';
 import { fetchExtractionMarkdown } from './adapters/source-extraction-fallback.mjs';
 import { createPlaywrightBrowserPool } from './adapters/playwright-browser-pool.mjs';
+import {
+  buildCareerPagesHealth,
+  detectCareerPagesHealthAnomalies,
+  resolveCareerPagesHealthFamily,
+} from './adapters/career-pages-health.mjs';
 import {
   canonicalizePublicUrl,
   discoverCareerUrlsFromWebsite,
@@ -45,6 +50,7 @@ const defaultTargetsFilePath = resolve(scriptDir, './career-pages-targets.json')
 const defaultFetchOutputPath = resolve(scriptDir, './.cache/career-pages-fetch.json');
 const defaultDiscoveredTargetsOutputPath = resolve(scriptDir, './.cache/career-pages-discovered-targets.json');
 const defaultDiscoveryReviewOutputPath = resolve(scriptDir, './.cache/career-pages-discovery-review.json');
+const defaultHealthStatePath = resolve(scriptDir, './.cache/career-pages-health.json');
 const SOURCE_ID = 'career-pages';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
 let careerPageRenderPool = null;
@@ -70,7 +76,9 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
     const input = await resolveCareerPagesInput(requestedAction);
 
     if (requestedAction === 'fetch') {
-      console.log(JSON.stringify(buildFetchSummary(input), null, 2));
+      const summary = buildFetchSummary(input);
+      persistCareerPagesHealth(summary.health);
+      console.log(JSON.stringify(summary, null, 2));
       return;
     }
 
@@ -87,10 +95,14 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
     });
 
     if (requestedAction === 'ingest') {
-      console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
+      const summary = buildIngestSummary(input, stats);
+      persistCareerPagesHealth(summary.health);
+      console.log(JSON.stringify(summary, null, 2));
       return;
     }
 
+    const health = buildHealthForInput(input, stats);
+    persistCareerPagesHealth(health);
     console.log(
       JSON.stringify(
         {
@@ -116,6 +128,7 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
           evidenceUpsertsCompleted: stats.evidenceUpsertCount,
           evidenceCreated: stats.evidenceCreatedCount,
           lineageCreated: stats.lineageCreatedCount,
+          health,
         },
         null,
         2,
@@ -188,14 +201,19 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
     // far and fail the whole source. Record the failure in the summary and
     // continue — the partial batch still reaches ingestion, and the bad target
     // is retried on the next run.
+    const targetStartedAt = Date.now();
     try {
       const targetResult = await fetchCareerPageTarget(target, index + 1);
-      targetResults.push(targetResult.summary);
+      targetResults.push({
+        ...targetResult.summary,
+        durationMs: Date.now() - targetStartedAt,
+      });
       records.push(...targetResult.records);
     } catch (error) {
       targetResults.push({
         id: toNonEmptyText(target?.id) ?? `target-${index + 1}`,
         adapter: toNonEmptyText(target?.adapter ?? target?.type) ?? null,
+        hostedAtsFamily: toNonEmptyText(target?.hosted_ats_family ?? target?.hostedAtsFamily) ?? null,
         companyName: toNonEmptyText(target?.company_name ?? target?.companyName) ?? null,
         sourceUrl: toUrlOrNull(target?.source_url ?? target?.sourceUrl ?? target?.url),
         recordsFetched: 0,
@@ -203,6 +221,7 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
         pageFetched: false,
         errorCategory: classifyCareerPageFetchError(error),
         error: error instanceof Error ? error.message : String(error),
+        durationMs: Date.now() - targetStartedAt,
       });
     }
   }
@@ -1482,6 +1501,7 @@ async function fetchCareerPageTarget(target, index) {
       // their native adapter id. A 0-record same-domain target is flagged
       // `extractionMethod: 'none'` so the operator can see the gap.
       extractionMethod: resolveExtractionMethodForSummary(records, normalizedTarget.adapter),
+      hostedAtsFamily: normalizedTarget.hostedAtsFamily,
     },
   };
 }
@@ -2127,7 +2147,7 @@ async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}
         if (validatedHost) validatedRedirectHosts.add(validatedHost);
         const errorCategory = staticResult.diagnostics?.errorCategory ?? null;
         const httpStatus = parseHttpErrorCategory(errorCategory);
-        if ([401, 403, 451].includes(httpStatus)) {
+        if ([401, 403, 407, 451].includes(httpStatus)) {
           return { status: 'blocked', httpStatus, reason: errorCategory };
         }
         if (httpStatus === 429) {
@@ -2154,7 +2174,7 @@ async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}
           settleMs: resolveRenderedFallbackSettleMs(target),
           headers: { 'user-agent': 'RecruiterRadarCareerPages/1.0' },
         });
-        if ([401, 403, 451].includes(page.status)) {
+        if ([401, 403, 407, 451].includes(page.status)) {
           return { status: 'blocked', httpStatus: page.status, reason: `http-${page.status}` };
         }
         if (page.status === 429) {
@@ -2626,7 +2646,17 @@ export function buildNormalizedInput({ records, inputMode, inputFilePath, target
     normalizedRecords.push(normalizedRecord);
   }
 
-  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+  // Provider-local IDs are not globally unique (many boards use small numeric
+  // IDs). Namespace fetch-time dedupe by concrete source so unrelated ATS
+  // vacancies cannot suppress one another before canonical cross-source
+  // vacancy reconciliation preserves their separate provenance edges.
+  const dedupeKey = (record) => `${record.sourceId}:${record.signalExternalId}`;
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords, dedupeKey);
+  const familyDuplicateCounts = {};
+  for (const family of new Set(normalizedRecords.map((record) => record.healthFamily))) {
+    const familyRecords = normalizedRecords.filter((record) => record.healthFamily === family);
+    familyDuplicateCounts[family] = dedupeNormalizedRecords(familyRecords, dedupeKey).duplicateRecords;
+  }
 
   // Live crawl must fail loudly when the fetcher returns records but the
   // normalizer drops every one of them (markup drift, key mismatch). Without
@@ -2655,6 +2685,7 @@ export function buildNormalizedInput({ records, inputMode, inputFilePath, target
     recordsReceived: records.length,
     recordsAfterDedupe: dedupeResult.records.length,
     duplicateRecords: dedupeResult.duplicateRecords,
+    familyDuplicateCounts,
     normalizedRecords: dedupeResult.records,
     skippedRecords,
     sensitiveFieldsDropped,
@@ -2704,6 +2735,7 @@ async function ingestCareerPages({ connectionString, input }) {
   let evidenceUpsertCount = 0;
   let evidenceCreatedCount = 0;
   let lineageCreatedCount = 0;
+  const familyIngestionStats = {};
 
   await client.connect();
 
@@ -2736,6 +2768,13 @@ async function ingestCareerPages({ connectionString, input }) {
       evidenceUpsertCount += lineage.evidenceUpsertCount;
       evidenceCreatedCount += lineage.evidenceCreatedCount;
       lineageCreatedCount += lineage.lineageCreatedCount;
+      const family = record.healthFamily;
+      const familyStats = familyIngestionStats[family] ??= {
+        signalUpsertCount: 0,
+        evidenceCreatedCount: 0,
+      };
+      familyStats.signalUpsertCount += lineage.signalUpsertCount;
+      familyStats.evidenceCreatedCount += lineage.evidenceCreatedCount;
     }
 
     await client.query('COMMIT');
@@ -2746,6 +2785,7 @@ async function ingestCareerPages({ connectionString, input }) {
       evidenceUpsertCount,
       evidenceCreatedCount,
       lineageCreatedCount,
+      familyIngestionStats,
     };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -2911,6 +2951,12 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
   const sourceId = resolveCareerPageSourceId(record.raw_target_adapter);
   const extractionMethod = toNonEmptyText(record.extraction_method) ?? 'unknown';
   const sourceTransport = toNonEmptyText(record.source_transport);
+  const hostedAtsFamily = toNonEmptyText(record.hosted_ats_family);
+  const healthFamily = resolveCareerPagesHealthFamily({
+    hostedAtsFamily,
+    adapter: record.raw_target_adapter,
+    sourceId,
+  });
   const location = toNonEmptyText(record.location ?? record.city ?? record.area_name);
   const pageTitle = toNonEmptyText(record.page_title);
   const employmentType = toNonEmptyText(record.employment_type);
@@ -2981,6 +3027,8 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
     sourceId,
     extractionMethod,
     sourceTransport,
+    hostedAtsFamily,
+    healthFamily,
     orgExternalId,
     companyName,
     companyDomain: inferredDomain,
@@ -3048,6 +3096,7 @@ export function buildFetchSummary(input) {
     // surface that produced 0 evidence. Surfaced here so source quality is
     // inspectable from the fetch summary without a DB query.
     extractionBreakdown: summarizeExtractionBreakdown(input.targetResults),
+    health: buildHealthForInput(input),
   };
 }
 
@@ -3092,7 +3141,51 @@ function buildIngestSummary(input, stats) {
     evidenceUpsertsCompleted: stats.evidenceUpsertCount,
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
+    health: buildHealthForInput(input, stats),
   };
+}
+
+function buildHealthForInput(input, stats = null) {
+  const current = buildCareerPagesHealth({
+    targetResults: input.targetResults,
+    recordsReceived: input.recordsReceived,
+    recordsAfterDedupe: input.recordsAfterDedupe,
+    duplicateRecords: input.duplicateRecords,
+    skippedRecords: input.skippedRecords,
+    ingestionStats: stats,
+    familyIngestionStats: stats?.familyIngestionStats,
+    familyDuplicateCounts: input.familyDuplicateCounts,
+  });
+  const previous = loadCareerPagesHealthState();
+  return {
+    ...current,
+    generatedAt: new Date().toISOString(),
+    anomalies: detectCareerPagesHealthAnomalies(current, previous),
+  };
+}
+
+function loadCareerPagesHealthState() {
+  const statePath = resolveCareerPagesHealthStatePath();
+  if (!existsSync(statePath)) return null;
+  try {
+    return parseJson(stripBom(readFileSync(statePath, 'utf8')), statePath);
+  } catch {
+    return null;
+  }
+}
+
+function persistCareerPagesHealth(health) {
+  if (!health) return;
+  const statePath = resolveCareerPagesHealthStatePath();
+  const temporaryPath = `${statePath}.tmp`;
+  mkdirSync(dirname(statePath), { recursive: true });
+  writeFileSync(temporaryPath, `${JSON.stringify(health, null, 2)}\n`, 'utf8');
+  renameSync(temporaryPath, statePath);
+}
+
+function resolveCareerPagesHealthStatePath() {
+  const configured = process.env.CAREER_PAGES_HEALTH_STATE_FILE?.trim();
+  return resolve(process.cwd(), configured || defaultHealthStatePath);
 }
 
 function buildSignalExternalId({ recordExternalId, jobPostingUrl, careerPageUrl, jobTitle, orgSourceKey }) {

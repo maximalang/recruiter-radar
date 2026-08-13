@@ -36,6 +36,13 @@ assert.equal(summary.duplicateRecords, 0);
 assert.equal(summary.normalizedRecords, expectedRecords.length);
 assert.equal(summary.skippedRecords, 0);
 assert.equal(summary.targetResults.length, expectedTargets.length);
+assert.equal(summary.health.schemaVersion, 1);
+assert.equal(summary.health.totals.discoveredCompanies, expectedTargets.length);
+assert.equal(summary.health.totals.discoveredBoards, expectedTargets.length);
+assert.equal(summary.health.totals.jobsExtracted, expectedRecords.length);
+assert.equal(summary.health.totals.requests, 0);
+assert.equal(summary.health.totals.requestAccounting, 'exact');
+assert.deepEqual(summary.health.anomalies, []);
 assert.deepEqual(beforeSnapshot, {
   inputFile: undefined,
   outputFile: undefined,

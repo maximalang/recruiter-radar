@@ -27,6 +27,15 @@ environment.
 persists a review artifact, and then runs the guarded public-surface escalation.
 `CAREER_PAGES_TARGETS_FILE` remains an operator override.
 
+Every `career-pages` fetch/pipeline summary now includes a bounded per-family `health`
+snapshot: discovered companies/boards, request lower bounds, feed/API/static/browser paths,
+blocked/throttled/parse/zero outcomes, extracted jobs, duplicates, DB/evidence writes, and
+p50/p95 target latency. Zeroes carry an explicit reason instead of an ambiguous success bit.
+The latest snapshot is stored in ignored runtime state at
+`packages/db/scripts/.cache/career-pages-health.json`; comparable board coverage with a global
+zero or severe job-count drop emits a family anomaly on the next run. Raw URLs, company IDs,
+error messages, credentials, and personal data are not metric labels.
+
 | source | live probe | status | note |
 |---|---|---|---|
 | rabota-rossii | current disposable live DB: 100 signals/evidence/lineage across 80 orgs | digest-allowed; live-verified | official public API; no credential required |
@@ -132,7 +141,7 @@ statement does not prove that any source is currently configured or healthy in p
 | id | class / evidence tier | leadEligibility | promotionStatus | live? |
 |---|---|---|---|---|
 | **hh** | primary-platform / medium-signal (0.74) | digest-lead-originating | **digest-allowed** | registration-required; authenticated live path not yet verified |
-| **career-pages** | company-surface / high-signal (0.92) | digest-lead-originating | **digest-allowed** | live-reachable (partial), not live-verified |
+| **career-pages** | company-surface / high-signal (0.92) | digest-lead-originating | **digest-allowed** | live-verified across public and hosted ATS transports; see observed-runtime table above |
 | **greenhouse** | company-surface / high-signal (0.90) | digest-lead-originating | **digest-allowed** | live-verified: 50 persisted |
 | **lever** | company-surface / high-signal (0.90) | digest-lead-originating | **digest-allowed** | live-verified: 130 persisted |
 | **ashby** | company-surface / high-signal (0.90) | digest-lead-originating | **digest-allowed** | live-verified: 57 persisted |

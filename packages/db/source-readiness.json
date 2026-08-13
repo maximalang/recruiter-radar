@@ -195,7 +195,7 @@
       "legalReview": "not-required",
       "pipelineProfile": "hiring-primary",
       "verification": {
-        "fixture": ["npm run verify:career-pages:smoke", "npm run verify:career-pages:html-card-fallback", "npm run verify:career-pages:russian-ats-fixtures"],
+        "fixture": ["npm run verify:career-pages:smoke", "npm run verify:career-pages:health", "npm run verify:career-pages:html-card-fallback", "npm run verify:career-pages:russian-ats-fixtures"],
         "contract": ["npm run verify:career-pages:ingest", "npm run verify:career-pages:public-ats-live", "node packages/db/scripts/verify-career-pages-hosted-ats-live.mjs", "node packages/db/scripts/run-source-live-db-verifier.mjs hosted-ats", "npm run verify:career-pages:russian-ats-live", "SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:career-pages:russian-ats-live-db", "npm run verify:source:readiness"]
       },
       "blockers": []

@@ -115,7 +115,7 @@ assert.deepEqual(SOURCE_ESCALATION_STAGES, [
   assert.equal(result.attempts[0].outcome, 'deferred');
 }
 
-for (const [status, outcome] of [[403, 'blocked'], [429, 'deferred']]) {
+for (const [status, outcome] of [[403, 'blocked'], [407, 'blocked'], [429, 'deferred']]) {
   let staticCalled = false;
   const result = await runSourceEscalation({
     validateRecord: validateVacancy,

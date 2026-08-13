@@ -16,7 +16,7 @@ export const SOURCE_ESCALATION_STAGES = Object.freeze([
   'extraction',
 ]);
 
-const ACCESS_DENIED_STATUSES = new Set([401, 403, 451]);
+const ACCESS_DENIED_STATUSES = new Set([401, 403, 407, 451]);
 
 export async function runSourceEscalation({
   stages,
