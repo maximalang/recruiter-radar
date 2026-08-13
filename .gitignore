@@ -42,6 +42,7 @@ packages/db/scripts/.cache/company-site-derived-targets.json
 packages/db/scripts/.cache/company-newsrooms-derived-targets.json
 packages/db/scripts/.cache/gdelt-doc-api.json
 packages/db/scripts/.cache/career-pages-health.json
+packages/db/scripts/.cache/career-pages-incremental.json
 packages/db/scripts/.snapshots/
 # Throwaway Playwright screenshot/fixture tooling (local visual QA only)
 apps/web/scripts/shot-*.mjs

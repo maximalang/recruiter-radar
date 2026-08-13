@@ -137,6 +137,7 @@ function createAccumulator(family) {
     throttled: 0,
     parseFailures: 0,
     zeroJobResults: 0,
+    notModified: 0,
     jobsExtracted: 0,
     durations: [],
     zeroReasons: createZeroReasons(),
@@ -197,6 +198,10 @@ function accumulateTarget(group, result) {
   if (isThrottled) group.throttled += 1;
   if (isBlocked) group.blocked += 1;
 
+  if (outcome === 'not-modified' || result?.notModified === true) {
+    group.notModified += 1;
+    return;
+  }
   if (boundedCount(result?.recordsFetched) > 0) return;
   group.zeroJobResults += 1;
   if (isThrottled) group.zeroReasons.throttled += 1;
@@ -227,6 +232,7 @@ function finalizeAccumulator(group) {
     throttled: group.throttled,
     parseFailures: group.parseFailures,
     zeroJobResults: group.zeroJobResults,
+    notModified: group.notModified,
     jobsExtracted: group.jobsExtracted,
     duplicates: 0,
     skippedRecords: 0,

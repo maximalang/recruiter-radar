@@ -136,6 +136,20 @@ for (const [status, outcome] of [[403, 'blocked'], [407, 'blocked'], [429, 'defe
   assert.equal(staticCalled, false);
 }
 
+{
+  let renderedCalled = false;
+  const result = await runSourceEscalation({
+    validateRecord: validateVacancy,
+    stages: {
+      'static-http': async () => ({ status: 'not-modified', terminal: true }),
+      'rendered-dom': async () => { renderedCalled = true; return {}; },
+    },
+  });
+  assert.equal(result.stoppedByPolicy, false);
+  assert.equal(result.attempts[0].outcome, 'not-modified');
+  assert.equal(renderedCalled, false);
+}
+
 console.log(JSON.stringify({
   ok: true,
   smoke: 'source-escalation',

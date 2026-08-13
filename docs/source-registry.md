@@ -36,6 +36,12 @@ The latest snapshot is stored in ignored runtime state at
 zero or severe job-count drop emits a family anomaly on the next run. Raw URLs, company IDs,
 error messages, credentials, and personal data are not metric labels.
 
+Normal persisted runs also keep bounded per-URL validators and content hashes in
+`packages/db/scripts/.cache/career-pages-incremental.json`. A prior static extraction may skip
+the browser/heavy fallback after `304` or an unchanged hash; browser-dependent SPA shells never
+qualify for that shortcut. Read-only/live verifiers bypass and do not mutate this state, and an
+explicit extraction-version mismatch forces reprocessing after parser changes.
+
 | source | live probe | status | note |
 |---|---|---|---|
 | rabota-rossii | current disposable live DB: 100 signals/evidence/lineage across 80 orgs | digest-allowed; live-verified | official public API; no credential required |

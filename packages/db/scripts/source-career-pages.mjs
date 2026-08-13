@@ -20,6 +20,10 @@ import { runSourceEscalation } from './adapters/source-escalation.mjs';
 import { fetchExtractionMarkdown } from './adapters/source-extraction-fallback.mjs';
 import { createPlaywrightBrowserPool } from './adapters/playwright-browser-pool.mjs';
 import {
+  createCareerPagesIncrementalState,
+  shouldSkipExpensiveCareerFallback,
+} from './adapters/career-pages-incremental-state.mjs';
+import {
   buildCareerPagesHealth,
   detectCareerPagesHealthAnomalies,
   resolveCareerPagesHealthFamily,
@@ -28,6 +32,7 @@ import {
   canonicalizePublicUrl,
   discoverCareerUrlsFromWebsite,
   extractEmbeddedJsonDocuments,
+  fetchConditionalText,
   isRobotsPathAllowed,
   resolvePublicRobotsPolicy,
 } from './adapters/site-discovery.mjs';
@@ -51,7 +56,9 @@ const defaultFetchOutputPath = resolve(scriptDir, './.cache/career-pages-fetch.j
 const defaultDiscoveredTargetsOutputPath = resolve(scriptDir, './.cache/career-pages-discovered-targets.json');
 const defaultDiscoveryReviewOutputPath = resolve(scriptDir, './.cache/career-pages-discovery-review.json');
 const defaultHealthStatePath = resolve(scriptDir, './.cache/career-pages-health.json');
+const defaultIncrementalStatePath = resolve(scriptDir, './.cache/career-pages-incremental.json');
 const SOURCE_ID = 'career-pages';
+const CAREER_EXTRACTION_VERSION = 'v1';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
 let careerPageRenderPool = null;
 const careerPageAccessPolicyCache = new Map();
@@ -179,6 +186,11 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
   const targets = filterCareerPageTargets(targetsConfig.targets);
   const targetResults = [];
   const records = [];
+  // Read-only verifiers pass persistSnapshot=false and must always exercise the
+  // real transport instead of inheriting or mutating production crawl state.
+  const incrementalState = persistSnapshot
+    ? createCareerPagesIncrementalState({ filePath: resolveCareerPagesIncrementalStatePath() })
+    : null;
 
   // Wall-clock fetch budget. career-pages crawls targets sequentially and only
   // writes to the DB once the whole loop finishes, so when it runs inside the
@@ -203,7 +215,7 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
     // is retried on the next run.
     const targetStartedAt = Date.now();
     try {
-      const targetResult = await fetchCareerPageTarget(target, index + 1);
+      const targetResult = await fetchCareerPageTarget(target, index + 1, { incrementalState });
       targetResults.push({
         ...targetResult.summary,
         durationMs: Date.now() - targetStartedAt,
@@ -227,6 +239,7 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
   }
 
   await closeCareerPageRenderPool();
+  incrementalState?.flush();
 
   const normalizedInput = buildNormalizedInput({
     records,
@@ -587,9 +600,10 @@ async function fetchHtmlPage(url) {
   return (await fetchHtmlPageDetailed(url)).page;
 }
 
-async function fetchHtmlPageDetailed(url) {
+async function fetchHtmlPageDetailed(url, { previous = {} } = {}) {
   try {
-    const { response, body: html } = await fetchText(url, {
+    const conditional = await fetchConditionalText(url, {
+      previous,
       sourceName: 'career-pages discovery',
       headers: {
         accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1',
@@ -597,6 +611,21 @@ async function fetchHtmlPageDetailed(url) {
       },
       redirect: 'follow',
     });
+    const { response, body: html } = conditional;
+
+    if (conditional.notModified) {
+      return {
+        page: null,
+        diagnostics: {
+          pageFetched: true,
+          resolvedUrl: response.url || url,
+          errorCategory: null,
+          notModified: true,
+          validators: conditional.validators,
+          contentHash: conditional.contentHash,
+        },
+      };
+    }
 
     if (!response.ok) {
       return {
@@ -619,6 +648,8 @@ async function fetchHtmlPageDetailed(url) {
           contentUnsupported: true,
           resolvedUrl: response.url,
           errorCategory: 'unsupported-content-type',
+          validators: conditional.validators,
+          contentHash: conditional.contentHash,
         },
       };
     }
@@ -632,6 +663,9 @@ async function fetchHtmlPageDetailed(url) {
         pageFetched: true,
         resolvedUrl: response.url,
         errorCategory: null,
+        notModified: false,
+        validators: conditional.validators,
+        contentHash: conditional.contentHash,
       },
     };
   } catch (error) {
@@ -1406,7 +1440,7 @@ export function resolveCareerPagesDiscoveryReviewOutputPath() {
   return resolve(process.cwd(), configuredPath || defaultDiscoveryReviewOutputPath);
 }
 
-async function fetchCareerPageTarget(target, index) {
+async function fetchCareerPageTarget(target, index, { incrementalState = null } = {}) {
   const normalizedTarget = normalizeFetchTarget(target, index);
   let records;
   let fetchDiagnostics = {};
@@ -1437,6 +1471,7 @@ async function fetchCareerPageTarget(target, index) {
       hostedAtsFamily: 'teamtailor',
     }, {
       officialFeed: () => fetchTeamtailorRssRecords(feedTarget),
+      incrementalState,
     });
     records = fetched.records;
     fetchDiagnostics = fetched.diagnostics;
@@ -1448,11 +1483,12 @@ async function fetchCareerPageTarget(target, index) {
       hostedAtsFamily: 'personio',
     }, {
       officialFeed: () => fetchPersonioXmlRecords(feedTarget),
+      incrementalState,
     });
     records = fetched.records;
     fetchDiagnostics = fetched.diagnostics;
   } else if (['same-domain-jsonld', 'hosted-career-page'].includes(normalizedTarget.adapter)) {
-    const fetched = await fetchSameDomainJsonLdRecords(normalizedTarget);
+    const fetched = await fetchSameDomainJsonLdRecords(normalizedTarget, { incrementalState });
     records = fetched.records;
     fetchDiagnostics = fetched.diagnostics;
     if (normalizedTarget.hostedAtsFamily) {
@@ -1494,6 +1530,7 @@ async function fetchCareerPageTarget(target, index) {
       escalationStage: fetchDiagnostics.escalationStage ?? null,
       escalationAttempts: fetchDiagnostics.escalationAttempts ?? [],
       stoppedByPolicy: fetchDiagnostics.stoppedByPolicy ?? false,
+      notModified: fetchDiagnostics.notModified ?? false,
       // Per-target extraction diagnostics. For same-domain targets this names
       // which extractor produced the records ('jsonld' vs 'html-card-fallback')
       // so a discovered target that fetched a page but yielded 0 is inspectable
@@ -1512,7 +1549,9 @@ export function resolveCareerPageTargetOutcome({
   pageFetched = false,
   fetchFailure = false,
   contentUnsupported = false,
+  notModified = false,
 }) {
+  if (notModified) return 'not-modified';
   if (fetchFailure) return 'page-unreachable';
   if (contentUnsupported) return 'extractor-unsupported';
   if (recordsFetched > 0) return 'parsed';
@@ -2032,8 +2071,22 @@ function joinLocationParts(...parts) {
   return [...new Set(values)].join(', ') || null;
 }
 
-async function fetchSameDomainStaticRecords(target) {
-  const fetchResult = await fetchHtmlPageDetailed(target.sourceUrl);
+async function fetchSameDomainStaticRecords(target, { previous = null } = {}) {
+  const fetchResult = await fetchHtmlPageDetailed(target.sourceUrl, { previous: previous ?? {} });
+  if (shouldSkipExpensiveCareerFallback(previous, {
+    ...fetchResult.diagnostics,
+    extractionVersion: CAREER_EXTRACTION_VERSION,
+  })) {
+    return {
+      records: [],
+      diagnostics: {
+        ...fetchResult.diagnostics,
+        notModified: true,
+        incrementalSkip: 'unchanged-static-content',
+      },
+      artifact: null,
+    };
+  }
   const page = fetchResult.page;
 
   if (!page) {
@@ -2098,7 +2151,10 @@ async function fetchSameDomainStaticRecords(target) {
   };
 }
 
-async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}) {
+async function fetchSameDomainJsonLdRecords(target, {
+  officialFeed = null,
+  incrementalState = null,
+} = {}) {
   const accessPolicy = await resolveCareerTargetAccessPolicy(target.sourceUrl, {
     allowedRobotsRedirectOrigins: target.hostedAtsFamily === 'smartrecruiters'
       ? ['https://jobs.smartrecruiters.com']
@@ -2129,6 +2185,7 @@ async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}
   }
 
   const hostedOfficialFeed = officialFeed ?? resolveHostedOfficialFeed(target);
+  const previousIncremental = incrementalState?.get(target.sourceUrl) ?? null;
   let staticResult = null;
   const seed = buildCareerExtractionSeed(target);
   const validatedRedirectHosts = new Set();
@@ -2142,10 +2199,18 @@ async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}
         ? async () => ({ records: await hostedOfficialFeed() })
         : undefined,
       'static-http': async () => {
-        staticResult ??= await fetchSameDomainStaticRecords(target);
+        staticResult ??= await fetchSameDomainStaticRecords(target, { previous: previousIncremental });
         const validatedHost = extractHostname(staticResult.artifact?.url);
         if (validatedHost) validatedRedirectHosts.add(validatedHost);
         const errorCategory = staticResult.diagnostics?.errorCategory ?? null;
+        if (staticResult.diagnostics?.incrementalSkip) {
+          return {
+            status: 'not-modified',
+            terminal: true,
+            artifact: staticResult,
+            reason: staticResult.diagnostics.incrementalSkip,
+          };
+        }
         const httpStatus = parseHttpErrorCategory(errorCategory);
         if ([401, 403, 407, 451].includes(httpStatus)) {
           return { status: 'blocked', httpStatus, reason: errorCategory };
@@ -2210,6 +2275,26 @@ async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}
     },
   });
 
+  if (staticResult?.diagnostics) {
+    const diagnostics = staticResult.diagnostics;
+    const hasIncrementalMetadata = diagnostics.contentHash
+      || diagnostics.validators?.etag
+      || diagnostics.validators?.lastModified;
+    if (hasIncrementalMetadata) {
+      incrementalState?.update(target.sourceUrl, {
+        ...diagnostics.validators,
+        contentHash: diagnostics.contentHash,
+        reusableStatic: diagnostics.incrementalSkip
+          ? previousIncremental?.reusableStatic === true
+          : escalation.selectedStage === 'structured-data' && escalation.records.length > 0,
+        selectedStage: diagnostics.incrementalSkip
+          ? previousIncremental?.selectedStage
+          : escalation.selectedStage,
+        extractionVersion: CAREER_EXTRACTION_VERSION,
+      });
+    }
+  }
+
   return {
     records: escalation.records,
     diagnostics: {
@@ -2220,6 +2305,7 @@ async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}
       escalationStage: escalation.selectedStage,
       escalationAttempts: escalation.attempts,
       stoppedByPolicy: escalation.stoppedByPolicy,
+      notModified: escalation.attempts.some((attempt) => attempt.outcome === 'not-modified'),
     },
   };
 }
@@ -3186,6 +3272,11 @@ function persistCareerPagesHealth(health) {
 function resolveCareerPagesHealthStatePath() {
   const configured = process.env.CAREER_PAGES_HEALTH_STATE_FILE?.trim();
   return resolve(process.cwd(), configured || defaultHealthStatePath);
+}
+
+function resolveCareerPagesIncrementalStatePath() {
+  const configured = process.env.CAREER_PAGES_INCREMENTAL_STATE_FILE?.trim();
+  return resolve(process.cwd(), configured || defaultIncrementalStatePath);
 }
 
 function buildSignalExternalId({ recordExternalId, jobPostingUrl, careerPageUrl, jobTitle, orgSourceKey }) {

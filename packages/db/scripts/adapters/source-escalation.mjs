@@ -73,7 +73,7 @@ export async function runSourceEscalation({
     const terminalOutcome = resolveTerminalOutcome(response);
     if (terminalOutcome) {
       attempts.push(buildAttempt(stage, terminalOutcome, response, 0, 0));
-      return emptyResult(attempts, artifact, true);
+      return emptyResult(attempts, artifact, terminalOutcome !== 'not-modified');
     }
 
     const candidates = Array.isArray(response.records) ? response.records : [];
@@ -122,6 +122,7 @@ function normalizeResponse(value) {
 
 function resolveTerminalOutcome(response) {
   const httpStatus = Number(response.httpStatus);
+  if (response.status === 'not-modified') return 'not-modified';
   if (response.status === 'deferred' || httpStatus === 429) return 'deferred';
   if (
     response.status === 'blocked'

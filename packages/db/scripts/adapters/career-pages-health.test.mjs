@@ -43,6 +43,11 @@ test('aggregates bounded per-family transport, zero-reason, and latency metrics'
         errorCategory: 'http-429',
         durationMs: 500,
       },
+      {
+        id: 'personio-d', adapter: 'personio-xml', hostedAtsFamily: 'personio',
+        companyName: 'D', recordsFetched: 0, outcome: 'not-modified',
+        notModified: true, durationMs: 10,
+      },
     ],
     duplicateRecords: 2,
     skippedRecords: 1,
@@ -56,8 +61,8 @@ test('aggregates bounded per-family transport, zero-reason, and latency metrics'
     familyDuplicateCounts: { greenhouse: 2 },
   });
 
-  assert.equal(health.totals.discoveredCompanies, 3);
-  assert.equal(health.totals.discoveredBoards, 3);
+  assert.equal(health.totals.discoveredCompanies, 4);
+  assert.equal(health.totals.discoveredBoards, 4);
   assert.equal(health.totals.jobsExtracted, 5);
   assert.equal(health.totals.duplicates, 2);
   assert.equal(health.totals.dbUpserts, 5);
@@ -66,12 +71,14 @@ test('aggregates bounded per-family transport, zero-reason, and latency metrics'
   assert.equal(health.families.find((entry) => entry.family === 'greenhouse').duplicates, 2);
   assert.equal(health.totals.browserFallbacks, 1);
   assert.equal(health.totals.throttled, 1);
+  assert.equal(health.totals.notModified, 1);
   assert.equal(health.totals.zeroReasons.parserOrLayoutDrift, 1);
   assert.equal(health.totals.zeroReasons.throttled, 1);
-  assert.equal(health.totals.latencyMs.p50, 500);
+  assert.equal(health.totals.latencyMs.p50, 100);
   assert.equal(health.totals.latencyMs.p95, 900);
   assert.deepEqual(health.families.map((entry) => entry.family), [
     'greenhouse',
+    'personio',
     'teamtailor',
     'workday',
   ]);
