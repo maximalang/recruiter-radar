@@ -9,8 +9,8 @@ import pg from 'pg';
 const execFileAsync = promisify(execFile);
 const { Client } = pg;
 const sourceId = process.argv[2]?.trim();
-if (!['superjob', 'rabota-rossii', 'public-ats', 'company-context', 'government-open-data', 'source-subsystem'].includes(sourceId)) {
-  throw new Error('Usage: run-source-live-db-verifier.mjs <superjob|rabota-rossii|public-ats|company-context|government-open-data|source-subsystem>');
+if (!['superjob', 'rabota-rossii', 'public-ats', 'hosted-ats', 'company-context', 'government-open-data', 'source-subsystem'].includes(sourceId)) {
+  throw new Error('Usage: run-source-live-db-verifier.mjs <superjob|rabota-rossii|public-ats|hosted-ats|company-context|government-open-data|source-subsystem>');
 }
 if (process.env.SOURCE_LIVE_DB_TEST_ACK !== 'isolated') {
   throw new Error('SOURCE_LIVE_DB_TEST_ACK=isolated is required before creating a disposable database.');
@@ -55,6 +55,8 @@ try {
   await run([resolve(import.meta.dirname, './migrate.mjs')]);
   const verifier = sourceId === 'public-ats'
     ? './verify-public-ats-live-pipeline.mjs'
+    : sourceId === 'hosted-ats'
+      ? './verify-hosted-ats-live-pipeline.mjs'
     : sourceId === 'company-context'
       ? './verify-company-owned-context-live-pipeline.mjs'
       : sourceId === 'government-open-data'
@@ -64,7 +66,7 @@ try {
       : './verify-job-source-live-pipeline.mjs';
   await run([
     resolve(import.meta.dirname, verifier),
-    ...(['public-ats', 'company-context', 'government-open-data', 'source-subsystem'].includes(sourceId) ? [] : [sourceId]),
+    ...(['public-ats', 'hosted-ats', 'company-context', 'government-open-data', 'source-subsystem'].includes(sourceId) ? [] : [sourceId]),
   ]);
 } finally {
   if (databaseCreated) {

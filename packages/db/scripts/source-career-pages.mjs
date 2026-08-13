@@ -795,6 +795,7 @@ export function detectCareerPageTargetFromHtml(html, seed) {
 
   if (targets.length === 0 && hostedCareerPages.length > 0) {
     for (const hosted of hostedCareerPages) {
+      const publicSurfaceUrl = normalizeHostedCareerSurfaceUrl(hosted.url, hosted.family);
       targets.push(buildDiscoveredTarget({
         adapter: 'hosted-career-page',
         providerSlug: `${hosted.family}-${hosted.hostname}`,
@@ -802,7 +803,7 @@ export function detectCareerPageTargetFromHtml(html, seed) {
         companyDomain: seed.domain,
         companyWebsiteUrl: seed.websiteUrl,
         careerPageUrl: hosted.url,
-        sourceUrl: hosted.url,
+        sourceUrl: publicSurfaceUrl,
         hostedAtsFamily: hosted.family,
       }));
     }
@@ -985,7 +986,8 @@ export function extractVacancyCardsFromSameDomainHtml(html, seed) {
     // we want vacancy DETAIL pages, not the listing page we're already on.
     if (normalizeUrlForDedupe(absoluteUrl) === normalizeUrlForDedupe(careerPageUrl)) continue;
 
-    const title = cleanCardText(match[2]);
+    const headingHtml = /<h[1-4]\b[^>]*>([\s\S]*?)<\/h[1-4]>/i.exec(match[2])?.[1];
+    const title = cleanCardText(headingHtml ?? match[2]);
     if (!isPlausibleVacancyTitle(title)) continue;
 
     // Dedupe by vacancy URL: a listing page often links the same vacancy twice
@@ -1110,6 +1112,7 @@ function cleanCardText(value) {
   if (typeof value !== 'string') return null;
   const stripped = value
     .replace(/<[^>]+>/g, ' ') // drop nested tags
+    .replace(/%[A-Z][A-Z0-9_]*%/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
@@ -1211,6 +1214,16 @@ function classifyHostedAtsUrl(url) {
     && /^\/(?:jobs?|vacanc(?:y|ies)|career)(?:\/|$)/i.test(path)) return 'friendwork';
   if (host === 'talantix.ru' && /^\/(?:form|ats\/vacancy)(?:\/|$)/i.test(path)) return 'talantix';
   return null;
+}
+
+function normalizeHostedCareerSurfaceUrl(value, family) {
+  if (family !== 'icims') return value;
+  const url = new URL(value);
+  if (!/\/jobs\/search$/i.test(url.pathname)) url.pathname = '/jobs/search';
+  url.searchParams.set('ss', '1');
+  url.searchParams.set('in_iframe', '1');
+  url.searchParams.sort();
+  return url.toString();
 }
 
 function matchFirstPublicFeedSurface(value, provider) {
@@ -1391,9 +1404,27 @@ async function fetchCareerPageTarget(target, index) {
     records = fetched.records;
     fetchDiagnostics = fetched.diagnostics;
   } else if (normalizedTarget.adapter === 'teamtailor-rss') {
-    records = await fetchTeamtailorRssRecords(normalizedTarget);
+    const feedTarget = { ...normalizedTarget };
+    const fetched = await fetchSameDomainJsonLdRecords({
+      ...normalizedTarget,
+      sourceUrl: normalizedTarget.careerPageUrl,
+      hostedAtsFamily: 'teamtailor',
+    }, {
+      officialFeed: () => fetchTeamtailorRssRecords(feedTarget),
+    });
+    records = fetched.records;
+    fetchDiagnostics = fetched.diagnostics;
   } else if (normalizedTarget.adapter === 'personio-xml') {
-    records = await fetchPersonioXmlRecords(normalizedTarget);
+    const feedTarget = { ...normalizedTarget };
+    const fetched = await fetchSameDomainJsonLdRecords({
+      ...normalizedTarget,
+      sourceUrl: normalizedTarget.careerPageUrl,
+      hostedAtsFamily: 'personio',
+    }, {
+      officialFeed: () => fetchPersonioXmlRecords(feedTarget),
+    });
+    records = fetched.records;
+    fetchDiagnostics = fetched.diagnostics;
   } else if (['same-domain-jsonld', 'hosted-career-page'].includes(normalizedTarget.adapter)) {
     const fetched = await fetchSameDomainJsonLdRecords(normalizedTarget);
     records = fetched.records;
@@ -1782,6 +1813,10 @@ async function fetchTeamtailorRssRecords(target) {
 }
 
 export function mapTeamtailorRss(xml, target) {
+  return mapPublicCareerRss(xml, target, 'teamtailor-rss');
+}
+
+export function mapPublicCareerRss(xml, target, method = 'public-career-rss') {
   return extractXmlBlocks(xml, 'item').map((item, index) => {
     const jobUrl = toUrlOrNull(extractXmlValue(item, 'link'))
       ?? toUrlOrNull(extractXmlValue(item, 'guid'));
@@ -1800,7 +1835,7 @@ export function mapTeamtailorRss(xml, target) {
       occurred_at: toTimestampOrNull(extractXmlValue(item, 'pubDate')),
       tags: extractXmlValues(item, 'category').map(toNonEmptyText).filter(Boolean),
       source_record_type: 'job_posting',
-      extraction_method: 'teamtailor-rss',
+      extraction_method: method,
       raw_target_id: target.id,
       raw_target_adapter: target.adapter,
       raw: { xml: item.slice(0, 20_000) },
@@ -1955,6 +1990,15 @@ async function fetchSameDomainStaticRecords(target) {
     };
   }
 
+  const hostedStructuredRecords = extractHostedStructuredRecords(page.html, target, seed);
+  if (hostedStructuredRecords.length > 0) {
+    return {
+      records: hostedStructuredRecords,
+      diagnostics: { pageFetched: true, resolvedUrl: page.url },
+      artifact: page,
+    };
+  }
+
   // HTML-card fallback: many RU corporate career pages (Bitrix/1C-Bitrix,
   // custom CMS) publish vacancies as HTML cards with NO JSON-LD. Without this
   // fallback the company's direct hiring proof — the only gate-A/B originator
@@ -1968,7 +2012,7 @@ async function fetchSameDomainStaticRecords(target) {
   };
 }
 
-async function fetchSameDomainJsonLdRecords(target) {
+async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}) {
   const accessPolicy = await resolveCareerTargetAccessPolicy(target.sourceUrl);
   if (accessPolicy.blocked || !isRobotsPathAllowed(target.sourceUrl, accessPolicy.robots)) {
     const reason = accessPolicy.blocked
@@ -1994,13 +2038,18 @@ async function fetchSameDomainJsonLdRecords(target) {
     };
   }
 
-  const staticResult = await fetchSameDomainStaticRecords(target);
+  const hostedOfficialFeed = officialFeed ?? resolveHostedOfficialFeed(target);
+  let staticResult = null;
   const seed = buildCareerExtractionSeed(target);
   const escalation = await runSourceEscalation({
     context: { target },
     validateRecord: (record) => validateCareerVacancyRecord(record, target),
     stages: {
+      'official-feed': hostedOfficialFeed
+        ? async () => ({ records: await hostedOfficialFeed() })
+        : undefined,
       'static-http': async () => {
+        staticResult ??= await fetchSameDomainStaticRecords(target);
         const errorCategory = staticResult.diagnostics?.errorCategory ?? null;
         const httpStatus = parseHttpErrorCategory(errorCategory);
         if ([401, 403, 451].includes(httpStatus)) {
@@ -2063,15 +2112,177 @@ async function fetchSameDomainJsonLdRecords(target) {
   return {
     records: escalation.records,
     diagnostics: {
-      ...staticResult.diagnostics,
+      ...(staticResult?.diagnostics ?? {}),
       resolvedUrl: escalation.artifact?.page?.url
-        ?? staticResult.diagnostics?.resolvedUrl
+        ?? staticResult?.diagnostics?.resolvedUrl
         ?? target.sourceUrl,
       escalationStage: escalation.selectedStage,
       escalationAttempts: escalation.attempts,
       stoppedByPolicy: escalation.stoppedByPolicy,
     },
   };
+}
+
+function resolveHostedOfficialFeed(target) {
+  if (target?.hostedAtsFamily === 'bamboohr') return () => fetchBambooHrPublicList(target);
+  if (target?.hostedAtsFamily === 'oracle-cloud') return () => fetchOracleCloudSitemapRecords(target);
+  if (target?.hostedAtsFamily !== 'pinpoint') return null;
+  let source;
+  try {
+    source = new URL(target.sourceUrl);
+  } catch {
+    return null;
+  }
+  const rssUrl = new URL('/jobs.rss', source.origin).toString();
+  return async () => {
+    const { body } = await fetchText(rssUrl, {
+      sourceName: `career-pages target ${target.id}`,
+      headers: {
+        accept: 'application/rss+xml,application/xml,text/xml;q=0.9,*/*;q=0.1',
+        'user-agent': 'RecruiterRadarCareerPages/1.0',
+      },
+    });
+    return mapPublicCareerRss(body, {
+      ...target,
+      careerPageUrl: target.careerPageUrl ?? target.sourceUrl,
+    }, 'pinpoint-rss');
+  };
+}
+
+async function fetchBambooHrPublicList(target) {
+  const origin = new URL(target.sourceUrl).origin;
+  const payload = await fetchJson(new URL('/careers/list', origin).toString(), target.id, {
+    allowProxyRetry: false,
+  });
+  const jobs = Array.isArray(payload?.result) ? payload.result : [];
+  return jobs.slice(0, 200).map((job, index) => {
+    const id = toNonEmptyText(job?.id);
+    return {
+      company_name: target.companyName,
+      company_domain: target.companyDomain,
+      company_website_url: target.companyWebsiteUrl,
+      career_page_url: target.careerPageUrl ?? target.sourceUrl,
+      job_posting_url: id ? new URL(`/careers/${encodeURIComponent(id)}`, origin).toString() : null,
+      job_title: toNonEmptyText(job?.jobOpeningName),
+      external_id: stringifyExternalId(id, target.id, index),
+      location: joinLocationParts(job?.location?.city, job?.location?.state, job?.atsLocation?.country),
+      employment_type: toNonEmptyText(job?.employmentStatusLabel ?? job?.employmentType),
+      occurred_at: null,
+      source_record_type: 'job_posting',
+      extraction_method: 'bamboohr-public-list',
+      raw_target_id: target.id,
+      raw_target_adapter: target.adapter,
+      hosted_ats_family: 'bamboohr',
+      raw: job,
+    };
+  });
+}
+
+async function fetchOracleCloudSitemapRecords(target) {
+  const origin = new URL(target.sourceUrl).origin;
+  const sitemapUrl = new URL('/hcmUI/CandidateExperience/sitemaps/jobpostings', origin).toString();
+  const { body } = await fetchText(sitemapUrl, {
+    sourceName: `career-pages target ${target.id}`,
+    headers: {
+      accept: 'application/xml,text/xml;q=0.9,*/*;q=0.1',
+      'user-agent': 'RecruiterRadarCareerPages/1.0',
+    },
+  });
+  const urls = extractXmlValues(body, 'loc')
+    .map((value) => canonicalizePublicUrl(value))
+    .filter((value) => value && new URL(value).origin === origin && /\/job\//i.test(new URL(value).pathname))
+    .slice(0, resolveHostedFeedJobLimit());
+  const records = [];
+  for (const jobUrl of urls) {
+    const page = await getCareerPageRenderPool().fetchPage({
+      url: jobUrl,
+      timeoutMs: resolveRenderedFallbackTimeoutMs(),
+      settleMs: resolveRenderedFallbackSettleMs(target),
+      headers: { 'user-agent': 'RecruiterRadarCareerPages/1.0' },
+    });
+    if (page.status < 200 || page.status >= 400 || looksLikeAccessChallenge(page.html)) continue;
+    const record = extractHostedJobDetailRecord(page.html, jobUrl, target, 'oracle-cloud-sitemap-rendered');
+    if (record) records.push(record);
+  }
+  return records;
+}
+
+function resolveHostedFeedJobLimit() {
+  const raw = Number(process.env.CAREER_PAGES_HOSTED_FEED_JOB_LIMIT);
+  return Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), 50) : 10;
+}
+
+function extractHostedStructuredRecords(html, target, seed) {
+  if (target?.hostedAtsFamily === 'oracle-taleo') return extractTaleoJobListRecords(html, target, seed);
+  if (isHostedAtsVacancyUrl(target?.sourceUrl, target?.hostedAtsFamily)) {
+    const detail = extractHostedJobDetailRecord(
+      html,
+      target.sourceUrl,
+      target,
+      `${target.hostedAtsFamily}-public-detail`,
+    );
+    return detail ? [detail] : [];
+  }
+  return [];
+}
+
+function extractHostedJobDetailRecord(html, jobUrl, target, method) {
+  const titleHtml = /<h1\b[^>]*(?:job-details__title|job-title|posting-headline)[^>]*>([\s\S]*?)<\/h1>/i.exec(html)?.[1]
+    ?? /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html)?.[1];
+  const title = cleanCardText(titleHtml);
+  const publicUrl = canonicalizePublicUrl(jobUrl);
+  if (!title || !publicUrl || !isPlausibleVacancyTitle(title)) return null;
+  return {
+    company_name: target.companyName,
+    company_domain: target.companyDomain,
+    company_website_url: target.companyWebsiteUrl,
+    career_page_url: target.careerPageUrl ?? target.sourceUrl,
+    job_posting_url: publicUrl,
+    job_title: title,
+    external_id: `${method}:${publicUrl}`,
+    occurred_at: null,
+    source_record_type: 'job_posting',
+    extraction_method: method,
+    raw_target_id: target.id,
+    raw_target_adapter: target.adapter,
+    hosted_ats_family: target.hostedAtsFamily,
+    raw: { title, jobUrl: publicUrl },
+  };
+}
+
+export function extractTaleoJobListRecords(html, target, seed = buildCareerExtractionSeed(target)) {
+  const text = typeof html === 'string' ? html : '';
+  const records = [];
+  const seen = new Set();
+  const pattern = /!\|!(\d+)!\|!([^!]{3,160}?)!\|!\1!\|!\2!\|!\1!\|!\1!\|!\1!\|!\1!\|!\1!\|!([A-Z0-9]+)!\|!/g;
+  let match;
+  while ((match = pattern.exec(text)) !== null && records.length < 200) {
+    const title = cleanCardText(match[2]);
+    const requisitionId = toNonEmptyText(match[3]);
+    if (!title || !requisitionId || !isPlausibleVacancyTitle(title) || seen.has(requisitionId)) continue;
+    seen.add(requisitionId);
+    const source = new URL(target.sourceUrl);
+    source.pathname = source.pathname.replace(/job(?:search|list)\.ftl$/i, 'jobdetail.ftl');
+    source.search = '';
+    source.searchParams.set('job', requisitionId);
+    records.push({
+      company_name: seed.companyName,
+      company_domain: seed.companyDomain,
+      company_website_url: seed.companyWebsiteUrl,
+      career_page_url: seed.careerPageUrl,
+      job_posting_url: source.toString(),
+      job_title: title,
+      external_id: requisitionId,
+      occurred_at: null,
+      source_record_type: 'job_posting',
+      extraction_method: 'taleo-public-joblist',
+      raw_target_id: target.id,
+      raw_target_adapter: target.adapter,
+      hosted_ats_family: 'oracle-taleo',
+      raw: { requisitionId, title, taleoInternalId: match[1] },
+    });
+  }
+  return records;
 }
 
 function buildCareerExtractionSeed(target) {
@@ -2171,7 +2382,7 @@ export function isHostedAtsVacancyUrl(value, family) {
     comeet: /\/jobs\/[^/]+\/[^/]+\/[^/]+(?:\/|$)/i,
     jazzhr: /\/apply\/[A-Za-z0-9_-]+(?:\/|$)/i,
     icims: /\/jobs\/\d+(?:\/|$)/i,
-    'oracle-taleo': /\/jobdetail\.ftl$/i,
+    'oracle-taleo': /\/jobdetail\.ftl(?:\?|$)/i,
     'oracle-cloud': /\/job\//i,
     'sap-successfactors': /(?:\/job\/|[?&](?:career_job_req_id|jobId)=)/i,
     smartrecruiters: /\/job\/[^/]+(?:\/|$)/i,
@@ -2211,7 +2422,7 @@ function parseHttpErrorCategory(value) {
 
 function looksLikeAccessChallenge(html) {
   const sample = typeof html === 'string' ? html.slice(0, 200_000) : '';
-  return /(?:cf-chl-|cloudflare\s+ray\s+id|captcha|verify\s+(?:you\s+are\s+)?human|access\s+denied|attention\s+required)/i.test(sample);
+  return /(?:cf-chl-|cloudflare\s+ray\s+id|<title[^>]*>[^<]*(?:captcha|verify\s+(?:you\s+are\s+)?human|access\s+denied|attention\s+required)|id=["'](?:captcha|challenge)["'])/i.test(sample);
 }
 
 function summarizeExtractionAttempts(attempts) {

@@ -167,7 +167,7 @@ export async function discoverCareerUrlsFromWebsite(baseUrl, {
       headers: { accept: 'text/plain,*/*;q=0.1', 'user-agent': 'RecruiterRadarCareerPages/1.0' },
       redirect: 'follow',
       signal,
-      retries: 0,
+      retries: 1,
       timeoutMs: 5_000,
     });
     if (!isSameOrigin(result.response?.url ?? robotsUrl, baseOrigin)) {

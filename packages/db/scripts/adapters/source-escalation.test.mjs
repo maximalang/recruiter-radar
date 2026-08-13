@@ -115,6 +115,27 @@ assert.deepEqual(SOURCE_ESCALATION_STAGES, [
   assert.equal(result.attempts[0].outcome, 'deferred');
 }
 
+for (const [status, outcome] of [[403, 'blocked'], [429, 'deferred']]) {
+  let staticCalled = false;
+  const result = await runSourceEscalation({
+    validateRecord: validateVacancy,
+    stages: {
+      'official-feed': async () => {
+        const error = new Error(`HTTP ${status}`);
+        error.status = status;
+        throw error;
+      },
+      'static-http': async () => {
+        staticCalled = true;
+        return { records: [validVacancy] };
+      },
+    },
+  });
+  assert.equal(result.stoppedByPolicy, true);
+  assert.equal(result.attempts[0].outcome, outcome);
+  assert.equal(staticCalled, false);
+}
+
 console.log(JSON.stringify({
   ok: true,
   smoke: 'source-escalation',

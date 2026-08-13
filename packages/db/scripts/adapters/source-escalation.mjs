@@ -46,16 +46,23 @@ export async function runSourceEscalation({
         stage,
       }));
     } catch (error) {
-      const blocked = Boolean(error?.accessDenied || error?.captcha || error?.waf);
+      const httpStatus = Number.isInteger(Number(error?.status)) ? Number(error.status) : null;
+      const blocked = Boolean(
+        error?.accessDenied
+        || error?.captcha
+        || error?.waf
+        || ACCESS_DENIED_STATUSES.has(httpStatus),
+      );
+      const deferred = httpStatus === 429;
       attempts.push({
         stage,
-        outcome: blocked ? 'blocked' : 'error',
-        httpStatus: Number.isInteger(error?.status) ? error.status : null,
+        outcome: blocked ? 'blocked' : deferred ? 'deferred' : 'error',
+        httpStatus,
         records: 0,
         rejectedRecords: 0,
         reason: boundedReason(error?.message),
       });
-      if (blocked) return emptyResult(attempts, artifact, true);
+      if (blocked || deferred) return emptyResult(attempts, artifact, true);
       continue;
     }
 

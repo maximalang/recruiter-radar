@@ -8,10 +8,13 @@ import {
   mapSmartRecruitersPostingsPayload,
   mapTeamtailorRss,
   mapPersonioXml,
+  mapPublicCareerRss,
   mapWorkablePublicJobsPayload,
   detectCareerPageTargetFromHtml,
   fetchSmartRecruitersPostingsRecords,
   isHostedAtsVacancyUrl,
+  extractTaleoJobListRecords,
+  extractVacancyCardsFromSameDomainHtml,
 } from './source-career-pages.mjs';
 
 // Offline coverage for the greenhouse-board / lever-postings response mappers.
@@ -202,6 +205,19 @@ assert.equal(teamtailorRecords[0].job_title, 'Platform Engineer');
 assert.equal(teamtailorRecords[0].job_posting_url, 'https://example.teamtailor.com/jobs/123-platform-engineer');
 assert.equal(teamtailorRecords[0].extraction_method, 'teamtailor-rss');
 
+const pinpointRecords = mapPublicCareerRss(`<?xml version="1.0"?>
+  <rss><channel><item>
+    <guid>https://example.pinpointhq.com/jobs/454797</guid>
+    <title>Database Architect</title>
+    <link>https://example.pinpointhq.com/jobs/454797</link>
+  </item></channel></rss>`, {
+  ...sharedTarget,
+  adapter: 'hosted-career-page',
+  careerPageUrl: 'https://example.pinpointhq.com/jobs',
+}, 'pinpoint-rss');
+assert.equal(pinpointRecords.length, 1);
+assert.equal(pinpointRecords[0].extraction_method, 'pinpoint-rss');
+
 const personioTarget = {
   ...sharedTarget,
   adapter: 'personio-xml',
@@ -264,6 +280,31 @@ assert.equal(isHostedAtsVacancyUrl('https://acme.wd1.myworkdayjobs.com/en-US/Ext
 assert.equal(isHostedAtsVacancyUrl('https://acme.wd1.myworkdayjobs.com/en-US/External/benefits', 'workday'), false);
 assert.equal(isHostedAtsVacancyUrl('https://activeprospect.applytojob.com/apply/abc123/Engineer', 'jazzhr'), true);
 assert.equal(isHostedAtsVacancyUrl('https://activeprospect.applytojob.com/privacy', 'jazzhr'), false);
+
+const taleoRecords = extractTaleoJobListRecords(
+  '!|!53475!|!Senior Solutions Engineer!|!53475!|!Senior Solutions Engineer!|!53475!|!53475!|!53475!|!53475!|!53475!|!2600007I!|!',
+  {
+    ...sharedTarget,
+    adapter: 'hosted-career-page',
+    sourceUrl: 'https://example.taleo.net/careersection/ex/joblist.ftl',
+    careerPageUrl: 'https://example.taleo.net/careersection/ex/joblist.ftl',
+  },
+);
+assert.equal(taleoRecords.length, 1);
+assert.equal(taleoRecords[0].job_title, 'Senior Solutions Engineer');
+assert.equal(taleoRecords[0].job_posting_url, 'https://example.taleo.net/careersection/ex/jobdetail.ftl?job=2600007I');
+
+const templatedCardRecords = extractVacancyCardsFromSameDomainHtml(`
+  <a href="/p/000b69e1dea701-engineer">
+    <h2>Platform Engineer</h2><span>Berlin</span>%BUTTON_APPLY%
+  </a>
+  <a href="/p/111b69e1dea701-empty">%BUTTON_APPLY%</a>
+`, {
+  companyName: 'Example Org',
+  careerPageUrl: 'https://example.breezy.hr/',
+});
+assert.equal(templatedCardRecords.length, 1);
+assert.equal(templatedCardRecords[0].job_title, 'Platform Engineer');
 
 for (const mapper of [
   mapAshbyJobBoardPayload,

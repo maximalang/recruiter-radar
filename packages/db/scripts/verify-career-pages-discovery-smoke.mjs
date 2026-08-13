@@ -193,7 +193,9 @@ for (const [family, url] of hostedAtsCases) {
   assert.equal(detection.targets.length, 1, `${family} public page must be detected`);
   assert.equal(detection.targets[0].adapter, 'hosted-career-page');
   assert.equal(detection.targets[0].hosted_ats_family, family);
-  const expectedUrl = new URL(url).pathname === '/' ? new URL(url).toString() : url.replace(/\/$/, '');
+  const expectedUrl = family === 'icims'
+    ? 'https://careers-acme.icims.com/jobs/search?in_iframe=1&ss=1'
+    : new URL(url).pathname === '/' ? new URL(url).toString() : url.replace(/\/$/, '');
   assert.equal(detection.targets[0].source_url, expectedUrl);
 }
 
