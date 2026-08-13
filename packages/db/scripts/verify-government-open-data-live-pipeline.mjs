@@ -10,6 +10,8 @@ const { Client } = pg;
 const sourceIds = ['fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data'];
 const fixturePath = resolve(import.meta.dirname, './government-open-data-smoke-fixture.json');
 const verifyLiveFnsSnapshot = process.env.FNS_LIVE_SNAPSHOT_VERIFY === '1';
+const verifyLiveEisSnapshot = process.env.EIS_LIVE_SNAPSHOT_VERIFY === '1';
+const verifyLiveRosstatSnapshot = process.env.ROSSTAT_LIVE_SNAPSHOT_VERIFY === '1';
 const verifyLiveRospatentSnapshot = process.env.ROSPATENT_LIVE_SNAPSHOT_VERIFY === '1';
 
 assert.equal(process.env.SOURCE_LIVE_VERIFY, '1', 'SOURCE_LIVE_VERIFY=1 is required.');
@@ -27,9 +29,13 @@ try {
       verifyLiveFnsSnapshot ? {} : { FNS_OPEN_DATA_INPUT_FILE: fixturePath },
       verifyLiveFnsSnapshot ? '9102013580' : '7707083893',
     ),
-    runSource('source-government-procurement.mjs', { GOVERNMENT_PROCUREMENT_INPUT_FILE: fixturePath }),
+    runSource(
+      'source-government-procurement.mjs',
+      verifyLiveEisSnapshot ? {} : { GOVERNMENT_PROCUREMENT_INPUT_FILE: fixturePath },
+      verifyLiveEisSnapshot ? '9102013580' : '7707083893',
+    ),
     runSource('source-cbr-registry.mjs', {}),
-    runSource('source-rosstat-open-data.mjs', { ROSSTAT_OPEN_DATA_INPUT_FILE: fixturePath }),
+    runSource('source-rosstat-open-data.mjs', verifyLiveRosstatSnapshot ? {} : { ROSSTAT_OPEN_DATA_INPUT_FILE: fixturePath }),
     runSource('source-rospatent-open-data.mjs', verifyLiveRospatentSnapshot ? {} : { ROSPATENT_OPEN_DATA_INPUT_FILE: fixturePath }),
   ];
 

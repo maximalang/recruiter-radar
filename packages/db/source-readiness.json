@@ -512,15 +512,15 @@
       "implementation": "implemented",
       "fixture": "tested",
       "contract": "tested",
-      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["GOVERNMENT_PROCUREMENT_INPUT_FILE"]] },
-      "live": { "state": "reachable", "verifiedAt": "2026-08-13T16:00:00+03:00", "evidence": ["The current official EIS open-data catalogue returned HTTP 200 after installing the fingerprint-pinned Gosuslugi Russian Trusted Root CA and 2024 intermediate. Node 22 and Alpine Chromium independently verified the chain with certificate checks enabled; the obsolete /epz/opendata/search.html endpoint was replaced after returning HTTP 404. Fixture coverage derives supplier events; no live record-to-DB proof is claimed."] },
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["SOURCE_SNAPSHOT_ROOT"], ["GOVERNMENT_PROCUREMENT_INPUT_FILE"]] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-13T17:54:00+03:00", "evidence": ["The fingerprint-pinned Gosuslugi chain verified the current EIS catalogue with TLS checks enabled; automatic discovery found all 86 regional 44-FZ contract passports.", "The robots-allowed official contract RSS, filtered by controlled legal-entity INN 9102013580 and respecting the published 60-second crawl delay, returned 50 current contract records. The sync checksummed the catalogue/feed, staged a versioned snapshot and atomically activated it.", "The active snapshot produced 25 deterministic context events with zero skips or sensitive fields. A new isolated production-schema PostgreSQL verifier persisted 25 signals, 23 evidence items and 25 lineage rows with official HTTPS provenance, owner consistency and never-hiring-proof assertions, then dropped the disposable database."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
       "pipelineProfile": "context-standard",
-      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "live": ["npm run verify:government-ca:live"], "contract": ["npm run verify:source:readiness"] },
-      "blockers": ["Production needs one periodically refreshed reviewed EIS/Treasury bulk snapshot; per-company manual files are not supported."]
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke", "npm run verify:government-procurement:sync"], "live": ["npm run source:sync:government-procurement -- --validate-only --inns 9102013580"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": []
     },
     "cbr-registry": {
       "implementation": "implemented",
@@ -540,15 +540,15 @@
       "implementation": "implemented",
       "fixture": "tested",
       "contract": "tested",
-      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["ROSSTAT_OPEN_DATA_INPUT_FILE"]] },
-      "live": { "state": "reachable", "verifiedAt": "2026-08-13T16:00:00+03:00", "evidence": ["The official Rosstat open-data catalogue returned HTTP 200 after installing the fingerprint-pinned Gosuslugi Russian Trusted Root CA and 2024 intermediate. Node 22 and Alpine Chromium independently verified the chain with certificate checks enabled. Normalization remains aggregate-only and forbids company attribution; no current scheduled dataset-to-DB proof is claimed."] },
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["SOURCE_SNAPSHOT_ROOT"], ["ROSSTAT_OPEN_DATA_INPUT_FILE"]] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-13T17:54:00+03:00", "evidence": ["The fingerprint-pinned Gosuslugi chain verified the official Rosstat catalogue with TLS checks enabled. Automatic title/metadata discovery selected current dataset 7708234640-unemploymentrate6 for 2026-Q1.", "The sync downloaded and checksummed the official aggregate CSV, normalized 96 federal/district/regional unemployment-rate records, staged a versioned snapshot and atomically activated it with no company identifiers.", "A new isolated production-schema PostgreSQL verifier persisted 96 context-only signals and lineage rows with one shared official dataset evidence item, asserted zero company-attributed or sensitive rows and consistent ownership/provenance, then dropped the disposable database."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
       "pipelineProfile": "context-standard",
-      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "live": ["npm run verify:government-ca:live"], "contract": ["npm run verify:source:readiness"] },
-      "blockers": ["Production needs a curated, periodically refreshed subset of official aggregate datasets relevant to industry, regional labour and market baselines."]
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke", "npm run verify:rosstat-open-data:sync"], "live": ["npm run source:sync:rosstat-open-data -- --validate-only"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": []
     },
     "rospatent-open-data": {
       "implementation": "implemented",

@@ -1061,7 +1061,7 @@ describe('source-ingest', () => {
       process.env.SOURCE_SNAPSHOT_ROOT = 'C:\\ProgramData\\recruiter-radar\\source-snapshots'
       try {
         expect(getDailySupportingSourceIds()).toEqual(expect.arrayContaining([
-          'fns-open-data', 'rospatent-open-data',
+          'fns-open-data', 'government-procurement', 'rosstat-open-data', 'rospatent-open-data',
         ]))
       } finally {
         if (previousRoot === undefined) delete process.env.SOURCE_SNAPSHOT_ROOT

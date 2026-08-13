@@ -424,7 +424,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: ['GOVERNMENT_ENRICHMENT_INNS'],
     isPrimary: false,
     dailyStage: 'supporting',
-    dailyActivationEnvVars: ['GOVERNMENT_PROCUREMENT_INPUT_FILE'],
+    dailyActivationEnvVars: ['SOURCE_SNAPSHOT_ROOT', 'GOVERNMENT_PROCUREMENT_INPUT_FILE'],
     category: 'business-signal',
   },
   {
@@ -449,7 +449,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: [],
     isPrimary: false,
     dailyStage: 'supporting',
-    dailyActivationEnvVars: ['ROSSTAT_OPEN_DATA_INPUT_FILE'],
+    dailyActivationEnvVars: ['SOURCE_SNAPSHOT_ROOT', 'ROSSTAT_OPEN_DATA_INPUT_FILE'],
     category: 'business-signal',
   },
   {
