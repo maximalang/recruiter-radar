@@ -182,6 +182,25 @@ describe('Playwright SPA crawler', () => {
     await engine.close()
   })
 
+  it('blocks an unsafe subresource without failing the public main document', async () => {
+    const engine = createCrawleeSpaEngine()
+
+    await engine.fetch({ url: 'https://public.example/jobs' })
+    const guard = route.mock.calls[0]?.[1] as ((routeInput: {
+      abort: (reason: string) => Promise<void>
+      continue: () => Promise<void>
+    }, request: { url: () => string; isNavigationRequest: () => boolean }) => Promise<void>)
+    const abort = jest.fn(async () => undefined)
+
+    await expect(guard(
+      { abort, continue: async () => undefined },
+      { url: () => 'http://169.254.169.254/analytics.js', isNavigationRequest: () => false },
+    )).resolves.toBeUndefined()
+    expect(abort).toHaveBeenCalledWith('blockedbyclient')
+
+    await engine.close()
+  })
+
   it('uses the production system Chromium when configured', async () => {
     process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = '/usr/bin/chromium-browser'
     const engine = createCrawleeSpaEngine()

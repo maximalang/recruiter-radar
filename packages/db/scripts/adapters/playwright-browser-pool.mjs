@@ -111,7 +111,7 @@ export function createPlaywrightBrowserPool(options = {}) {
           await route.continue();
         } catch (error) {
           await route.abort('blockedbyclient').catch(() => undefined);
-          throw error;
+          if (request.isNavigationRequest?.() ?? true) throw error;
         }
       });
       const page = await context.newPage();
