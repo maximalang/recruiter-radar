@@ -81,7 +81,6 @@ export function createStaticEngine(
     id: 'static',
     capabilities: {
       rendersJs: false,
-      bypassesCloudflare: false,
       returnsMarkdown: false,
       supportsPdf: false,
       selfHosted: true,

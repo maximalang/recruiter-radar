@@ -6,7 +6,6 @@ function fakeEngine(id: CrawlerEngineId): CrawlerEngine {
     id,
     capabilities: {
       rendersJs: id === 'spa',
-      bypassesCloudflare: false,
       returnsMarkdown: id === 'llm-markdown',
       supportsPdf: id === 'llm-markdown',
       selfHosted: true,
@@ -127,7 +126,6 @@ function failingEngine(id: CrawlerEngineId, failCount: number): CrawlerEngine {
     id,
     capabilities: {
       rendersJs: id === 'spa',
-      bypassesCloudflare: false,
       returnsMarkdown: id === 'llm-markdown',
       supportsPdf: id === 'llm-markdown',
       selfHosted: true,
@@ -159,7 +157,6 @@ function selectiveFailingEngine(id: CrawlerEngineId, failSubstring: string, fail
     id,
     capabilities: {
       rendersJs: id === 'spa',
-      bypassesCloudflare: false,
       returnsMarkdown: id === 'llm-markdown',
       supportsPdf: id === 'llm-markdown',
       selfHosted: true,
@@ -196,7 +193,6 @@ function httpErrorEngine(id: CrawlerEngineId, errorStatus: number, failCount: nu
     id,
     capabilities: {
       rendersJs: id === 'spa',
-      bypassesCloudflare: false,
       returnsMarkdown: id === 'llm-markdown',
       supportsPdf: id === 'llm-markdown',
       selfHosted: true,
@@ -429,7 +425,6 @@ describe('circuit breaker', () => {
       id: 'static',
       capabilities: {
         rendersJs: false,
-        bypassesCloudflare: false,
         returnsMarkdown: false,
         supportsPdf: false,
         selfHosted: true,

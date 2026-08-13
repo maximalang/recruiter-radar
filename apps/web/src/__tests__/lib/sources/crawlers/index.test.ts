@@ -51,7 +51,6 @@ describe('createDefaultRouter', () => {
           id: 'spa',
           capabilities: {
             rendersJs: true,
-            bypassesCloudflare: false,
             returnsMarkdown: false,
             supportsPdf: false,
             selfHosted: true,
