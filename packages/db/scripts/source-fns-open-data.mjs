@@ -8,6 +8,7 @@ import {
   normalizeFnsOpenDataRecord,
   parseGovernmentEnrichmentInns,
 } from './adapters/government-open-data.mjs';
+import { resolveSnapshotInputFile } from './adapters/snapshot-activation.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 loadEnvFile(resolve(scriptDir, '../../../.env'));
@@ -27,9 +28,9 @@ const runtime = createStandardSourceRuntime({
 });
 
 export function resolveFnsOpenDataInput() {
-  const inputFilePath = process.env.FNS_OPEN_DATA_INPUT_FILE?.trim();
-  if (inputFilePath) return runtime.resolveFileInput(inputFilePath);
-  throw new Error('No official FNS bulk snapshot configured. Set FNS_OPEN_DATA_INPUT_FILE; per-company JSON files are not supported.');
+  const input = resolveSnapshotInputFile(SOURCE_ID, 'FNS_OPEN_DATA_INPUT_FILE');
+  if (input) return runtime.resolveFileInput(input.inputFilePath);
+  throw new Error('No active official FNS bulk snapshot. Run snapshot sync/activation; FNS_OPEN_DATA_INPUT_FILE is override-only.');
 }
 
 export const resolveFnsOpenDataConfiguredInput = resolveFnsOpenDataInput;

@@ -41,6 +41,7 @@ packages/db/scripts/.cache/company-site-derived-targets.json
 # Derived company-newsrooms targets (DB-derived temp file written by source-ingest each run)
 packages/db/scripts/.cache/company-newsrooms-derived-targets.json
 packages/db/scripts/.cache/gdelt-doc-api.json
+packages/db/scripts/.snapshots/
 # Throwaway Playwright screenshot/fixture tooling (local visual QA only)
 apps/web/scripts/shot-*.mjs
 apps/web/scripts/*-probe.mjs

@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { access, mkdir, mkdtemp, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { activateValidatedSnapshot } from './adapters/snapshot-activation.mjs';
 import { spawn } from 'node:child_process';
 
 import { SaxesParser } from 'saxes';
@@ -201,6 +202,7 @@ export async function syncFnsOpenDataSnapshot({
   datasetNames = Object.keys(FNS_DATASETS),
   previousSnapshotFile = null,
   fetchImpl = globalThis.fetch,
+  activate = true,
 }) {
   const outputPath = resolve(outputFile);
   const outputDirectory = dirname(outputPath);
@@ -253,7 +255,15 @@ export async function syncFnsOpenDataSnapshot({
     }
     await writeFile(temporaryOutput, `${JSON.stringify(snapshot, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
     await rename(temporaryOutput, outputPath);
-    return { outputFile: outputPath, snapshot };
+    const activation = activate
+      ? await activateValidatedSnapshot({
+          sourceId: 'fns-open-data',
+          snapshotFile: outputPath,
+          recordCount: snapshot.fns.length,
+          sourceUrls: snapshot.datasets.map((dataset) => dataset.source_url),
+        })
+      : null;
+    return { outputFile: outputPath, snapshot, activation };
   } finally {
     await rm(temporaryOutput, { force: true });
     await rm(temporaryDirectory, { recursive: true, force: true });

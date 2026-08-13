@@ -3,6 +3,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createStandardSourceRuntime, loadEnvFile } from './adapters/rf-source-runtime.mjs';
 import { extractSourceSection, normalizeRosstatOpenDataRecord } from './adapters/government-open-data.mjs';
+import { resolveSnapshotInputFile } from './adapters/snapshot-activation.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 loadEnvFile(resolve(scriptDir, '../../../.env'));
@@ -13,7 +14,7 @@ const runtime = createStandardSourceRuntime({
   extractRecords: (parsed) => extractSourceSection(parsed, 'rosstat'),
   normalizeRecord: normalizeRosstatOpenDataRecord,
 });
-export function resolveRosstatOpenDataInput() { const path = process.env.ROSSTAT_OPEN_DATA_INPUT_FILE?.trim(); if (path) return runtime.resolveFileInput(path); throw new Error('No official Rosstat aggregate snapshot configured. Set ROSSTAT_OPEN_DATA_INPUT_FILE.'); }
+export function resolveRosstatOpenDataInput() { const input = resolveSnapshotInputFile('rosstat-open-data', 'ROSSTAT_OPEN_DATA_INPUT_FILE'); if (input) return runtime.resolveFileInput(input.inputFilePath); throw new Error('No active official Rosstat aggregate snapshot. Run snapshot sync/activation; ROSSTAT_OPEN_DATA_INPUT_FILE is override-only.'); }
 export const resolveRosstatOpenDataConfiguredInput = resolveRosstatOpenDataInput;
 export const buildFetchSummary = runtime.buildFetchSummary;
 export async function runRosstatOpenDataCli(argv = process.argv.slice(2)) { await runtime.runCli(argv, resolveRosstatOpenDataConfiguredInput); }
