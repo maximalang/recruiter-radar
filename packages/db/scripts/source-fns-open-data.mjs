@@ -29,7 +29,7 @@ const runtime = createStandardSourceRuntime({
 
 export function resolveFnsOpenDataInput() {
   const input = resolveSnapshotInputFile(SOURCE_ID, 'FNS_OPEN_DATA_INPUT_FILE');
-  if (input) return runtime.resolveFileInput(input.inputFilePath);
+  if (input) return { ...runtime.resolveFileInput(input.inputFilePath), inputMode: input.mode === 'active-snapshot' ? input.mode : 'file' };
   throw new Error('No active official FNS bulk snapshot. Run snapshot sync/activation; FNS_OPEN_DATA_INPUT_FILE is override-only.');
 }
 

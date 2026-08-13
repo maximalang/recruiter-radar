@@ -381,7 +381,11 @@ for (const [id, scriptPath, relativeScriptPath, description] of officialGovernme
     sourceClass: isRegistry ? 'registry-reference' : 'market-signal',
     evidenceTier: 'context-only',
     defaultConfidence: id === 'cbr-registry' ? 0.9 : id === 'fns-open-data' ? 0.88 : 0.66,
-    fetchModes: id === 'cbr-registry' ? ['file', 'live-public'] : ['file'],
+    fetchModes: id === 'cbr-registry'
+      ? ['file', 'live-public']
+      : id === 'fns-open-data' || id === 'rospatent-open-data'
+        ? ['file', 'official-snapshot']
+        : ['file'],
     description,
     scriptPath,
     absoluteScriptPath: resolve(scriptDir, relativeScriptPath),

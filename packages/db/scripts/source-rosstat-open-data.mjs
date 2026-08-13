@@ -14,7 +14,7 @@ const runtime = createStandardSourceRuntime({
   extractRecords: (parsed) => extractSourceSection(parsed, 'rosstat'),
   normalizeRecord: normalizeRosstatOpenDataRecord,
 });
-export function resolveRosstatOpenDataInput() { const input = resolveSnapshotInputFile('rosstat-open-data', 'ROSSTAT_OPEN_DATA_INPUT_FILE'); if (input) return runtime.resolveFileInput(input.inputFilePath); throw new Error('No active official Rosstat aggregate snapshot. Run snapshot sync/activation; ROSSTAT_OPEN_DATA_INPUT_FILE is override-only.'); }
+export function resolveRosstatOpenDataInput() { const input = resolveSnapshotInputFile('rosstat-open-data', 'ROSSTAT_OPEN_DATA_INPUT_FILE'); if (input) return { ...runtime.resolveFileInput(input.inputFilePath), inputMode: input.mode === 'active-snapshot' ? input.mode : 'file' }; throw new Error('No active official Rosstat aggregate snapshot. Run snapshot sync/activation; ROSSTAT_OPEN_DATA_INPUT_FILE is override-only.'); }
 export const resolveRosstatOpenDataConfiguredInput = resolveRosstatOpenDataInput;
 export const buildFetchSummary = runtime.buildFetchSummary;
 export async function runRosstatOpenDataCli(argv = process.argv.slice(2)) { await runtime.runCli(argv, resolveRosstatOpenDataConfiguredInput); }

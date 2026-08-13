@@ -509,7 +509,11 @@ function parseCli(argv) {
   }
   options.outputFile ??= process.env.FNS_OPEN_DATA_SYNC_OUTPUT_FILE?.trim();
   options.trackedInns ??= process.env.GOVERNMENT_ENRICHMENT_INNS?.trim();
-  if (!options.outputFile) throw new Error('Usage: sync-fns-open-data-snapshot.mjs --output <new-versioned-snapshot.json> --inns <10-digit INNs> [--include headcount,revenue-expenses,tax-regime] [--previous <snapshot.json>]');
+  options.outputFile ??= resolve(
+    'packages/db/scripts/.snapshots/fns-open-data',
+    `snapshot-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+  );
+  if (!options.trackedInns) throw new Error('Usage: sync-fns-open-data-snapshot.mjs [--output <new-versioned-snapshot.json>] --inns <10-digit INNs> [--include headcount,revenue-expenses,tax-regime] [--previous <snapshot.json>]');
   return options;
 }
 

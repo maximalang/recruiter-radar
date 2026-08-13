@@ -518,7 +518,7 @@
       "implementation": "implemented",
       "fixture": "tested",
       "contract": "tested",
-      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["FNS_OPEN_DATA_INPUT_FILE"]] },
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["GOVERNMENT_ENRICHMENT_INNS"]] },
       "live": { "state": "reachable", "verifiedAt": "2026-08-13T00:35:00+03:00", "evidence": ["Official FNS open-data passports and current file.nalog.ru dataset archives were reachable; fixture coverage verifies INN filtering and derived headcount, revenue and government-support context.", "The explicit live sync discovered the current official headcount archive, downloaded all 98,434,553 bytes in verified HTTP ranges, matched SHA-256 265eca8b05a234ff629f57779ebbc647d07e42c7e43612b40e9ae84340de1464, streamed 2,044,132 legal-entity documents across 2,271 XML files, and published one company-level record for controlled INN 9102013580. The normal source fetch accepted the versioned snapshot with one normalized record, zero skips and zero sensitive fields; the temporary snapshot was then removed."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
@@ -526,7 +526,7 @@
       "legalReview": "approved",
       "pipelineProfile": "context-standard",
       "verification": { "fixture": ["npm run verify:government-open-data:smoke", "npm run verify:fns-open-data:sync"], "live": ["npm run verify:fns-open-data:catalog-live"], "contract": ["npm run verify:source:readiness"] },
-      "blockers": ["Run the explicit operator sync to publish a versioned snapshot and configure FNS_OPEN_DATA_INPUT_FILE; the daily pipeline intentionally does not download multi-gigabyte FNS archives."]
+      "blockers": ["Schedule source:sync:fns-open-data with tracked GOVERNMENT_ENRICHMENT_INNS; the sync now chooses a versioned output and atomically activates it. FNS_OPEN_DATA_INPUT_FILE remains override-only."]
     },
     "government-procurement": {
       "implementation": "implemented",
@@ -574,15 +574,26 @@
       "implementation": "implemented",
       "fixture": "tested",
       "contract": "tested",
-      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["ROSPATENT_OPEN_DATA_INPUT_FILE"]] },
-      "live": { "state": "reachable", "verifiedAt": "2026-08-12T20:05:00Z", "evidence": ["Official Rospatent open-data catalogue exposed current trademark and invention CSV datasets; normalization accepts only 10-digit legal-entity applicant INNs and marks the result weak context, never hiring proof."] },
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["GOVERNMENT_ENRICHMENT_INNS"]] },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-08-13T08:42:00Z",
+        "evidence": [
+          "2026-08-13 official Rospatent trademark metadata discovery selected data-20260805-structure-20180828.csv; bounded range streaming consumed 687174811 bytes, verified SHA-256 08a93ddcf22e5dbb3f850888f1b567c9a4ea1a914dd77597105d44e3999bd3b7, and deterministically selected 502 records for controlled legal-entity INN 7707083893.",
+          "2026-08-13 checksum-verified active snapshot normalized 502 of 502 trademark records with zero skips and zero sensitive fields. An isolated production-schema PostgreSQL verifier persisted 502 signals and lineage rows, 284 evidence items and one organization; official source URLs, context-only classification, owner consistency, never-hiring-proof and zero sensitive payload rows were asserted before the disposable database was dropped."
+        ]
+      },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
       "pipelineProfile": "context-standard",
-      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "contract": ["npm run verify:source:readiness"] },
-      "blockers": ["Production needs a periodically refreshed reviewed subset/index because the official full CSV registries are too large for a daily request path."]
+      "verification": {
+        "fixture": ["npm run verify:government-open-data:smoke", "node --test packages/db/scripts/sync-rospatent-open-data-snapshot.test.mjs"],
+        "live": ["npm run verify:rospatent-open-data:catalog-live -- --inns <tracked-inns>", "ROSPATENT_LIVE_SNAPSHOT_VERIFY=1 SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:government-open-data:live-db"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": []
     }
   }
 }

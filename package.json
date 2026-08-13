@@ -142,6 +142,8 @@
     "source:pipeline:rosstat-open-data": "node packages/db/scripts/run-source-action.mjs pipeline rosstat-open-data",
     "source:fetch:rospatent-open-data": "node packages/db/scripts/run-source-action.mjs fetch rospatent-open-data",
     "source:pipeline:rospatent-open-data": "node packages/db/scripts/run-source-action.mjs pipeline rospatent-open-data",
+    "source:sync:rospatent-open-data": "node packages/db/scripts/sync-rospatent-open-data-snapshot.mjs",
+    "verify:rospatent-open-data:catalog-live": "node packages/db/scripts/sync-rospatent-open-data-snapshot.mjs --validate-only",
     "verify:rabota-rossii:smoke": "node packages/db/scripts/verify-rabota-rossii-smoke.mjs",
     "verify:rabota-rossii:confidence": "node packages/db/scripts/verify-rabota-rossii-confidence.mjs",
     "verify:superjob:smoke": "node packages/db/scripts/verify-superjob-smoke.mjs",

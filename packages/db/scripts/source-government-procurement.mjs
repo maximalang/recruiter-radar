@@ -30,7 +30,7 @@ const runtime = createStandardSourceRuntime({
 
 export function resolveGovernmentProcurementInput() {
   const input = resolveSnapshotInputFile(SOURCE_ID, 'GOVERNMENT_PROCUREMENT_INPUT_FILE');
-  if (input) return runtime.resolveFileInput(input.inputFilePath);
+  if (input) return { ...runtime.resolveFileInput(input.inputFilePath), inputMode: input.mode === 'active-snapshot' ? input.mode : 'file' };
   throw new Error('No active official EIS/Treasury snapshot. Run snapshot sync/activation; GOVERNMENT_PROCUREMENT_INPUT_FILE is override-only.');
 }
 export const resolveGovernmentProcurementConfiguredInput = resolveGovernmentProcurementInput;

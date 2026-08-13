@@ -308,6 +308,26 @@ ID plus its own official-access, legal, provenance, and confidence review.
   material as new evidence; no source may invent a cursor its upstream does
   not expose.
 
+### Government snapshot lifecycle
+
+- `fns-open-data` and `rospatent-open-data` discover current artifacts only from
+  official publisher metadata, stream bounded downloads, calculate SHA-256,
+  validate tracked legal-entity records, and atomically swap a checksummed
+  `active.json` manifest. `*_INPUT_FILE` remains an override/debug path, not the
+  required production operation.
+- The 2026-08-13 Rospatent live run streamed the official 687,174,811-byte
+  trademark CSV and selected 502 records for controlled INN `7707083893`.
+  Canonical normalization accepted all 502; an isolated production-schema DB
+  run created 502 signals/lineage rows and 284 evidence items with zero
+  sensitive payload rows. Patent datasets without a published legal-entity INN
+  are deliberately not company-attributed.
+- Rosstat and EIS/Treasury remain fail-closed: current official catalog and
+  downloadable URLs fail TLS chain validation in both Node and Chromium from
+  this verifier environment. No CA bypass, `ignoreHTTPSErrors`, WAF workaround,
+  or unauthenticated private API is permitted. Their file inputs remain
+  override-only until an official artifact is reachable through a valid TLS
+  chain and a deterministic source-specific parser is live-verified.
+
 ---
 
 ## Rejected / not adopted

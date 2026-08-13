@@ -9,6 +9,7 @@ import pg from 'pg';
 const { Client } = pg;
 const sourceIds = ['fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data'];
 const fixturePath = resolve(import.meta.dirname, './government-open-data-smoke-fixture.json');
+const verifyLiveRospatentSnapshot = process.env.ROSPATENT_LIVE_SNAPSHOT_VERIFY === '1';
 
 assert.equal(process.env.SOURCE_LIVE_VERIFY, '1', 'SOURCE_LIVE_VERIFY=1 is required.');
 assert.equal(process.env.SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK, 'isolated', 'SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK=isolated is required.');
@@ -24,7 +25,7 @@ try {
     runSource('source-government-procurement.mjs', { GOVERNMENT_PROCUREMENT_INPUT_FILE: fixturePath }),
     runSource('source-cbr-registry.mjs', {}),
     runSource('source-rosstat-open-data.mjs', { ROSSTAT_OPEN_DATA_INPUT_FILE: fixturePath }),
-    runSource('source-rospatent-open-data.mjs', { ROSPATENT_OPEN_DATA_INPUT_FILE: fixturePath }),
+    runSource('source-rospatent-open-data.mjs', verifyLiveRospatentSnapshot ? {} : { ROSPATENT_OPEN_DATA_INPUT_FILE: fixturePath }),
   ];
 
   assert.deepEqual(metrics.map((item) => item.source), sourceIds);
@@ -34,6 +35,9 @@ try {
     assert.equal(item.evidenceUpsertsCompleted, item.normalizedRecords);
   }
   assert.equal(metrics.find((item) => item.source === 'cbr-registry').inputMode, 'live-public');
+  const rospatentMetrics = metrics.find((item) => item.source === 'rospatent-open-data');
+  assert.equal(rospatentMetrics.inputMode, verifyLiveRospatentSnapshot ? 'active-snapshot' : 'file');
+  assert.ok(rospatentMetrics.normalizedRecords > 0);
 
   const verified = await client.query(
     `SELECT

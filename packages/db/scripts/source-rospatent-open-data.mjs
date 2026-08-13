@@ -14,7 +14,7 @@ const runtime = createStandardSourceRuntime({
   extractRecords: (parsed) => extractSourceSection(parsed, 'rospatent', parseGovernmentEnrichmentInns()),
   normalizeRecord: normalizeRospatentOpenDataRecord,
 });
-export function resolveRospatentOpenDataInput() { const input = resolveSnapshotInputFile('rospatent-open-data', 'ROSPATENT_OPEN_DATA_INPUT_FILE'); if (input) return runtime.resolveFileInput(input.inputFilePath); throw new Error('No active official Rospatent snapshot. Run snapshot sync/activation; ROSPATENT_OPEN_DATA_INPUT_FILE is override-only.'); }
+export function resolveRospatentOpenDataInput() { const input = resolveSnapshotInputFile('rospatent-open-data', 'ROSPATENT_OPEN_DATA_INPUT_FILE'); if (input) return { ...runtime.resolveFileInput(input.inputFilePath), inputMode: input.mode === 'active-snapshot' ? input.mode : 'file' }; throw new Error('No active official Rospatent snapshot. Run snapshot sync/activation; ROSPATENT_OPEN_DATA_INPUT_FILE is override-only.'); }
 export const resolveRospatentOpenDataConfiguredInput = resolveRospatentOpenDataInput;
 export const buildFetchSummary = runtime.buildFetchSummary;
 export async function runRospatentOpenDataCli(argv = process.argv.slice(2)) { await runtime.runCli(argv, resolveRospatentOpenDataConfiguredInput); }

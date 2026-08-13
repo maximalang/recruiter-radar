@@ -22,6 +22,7 @@ export const EVIDENCE_TIERS = Object.freeze([
 
 export const FETCH_MODES = Object.freeze([
   'file',
+  'official-snapshot',
   'live-public',
   'provider-token',
   'unsupported',
@@ -31,6 +32,10 @@ export const FETCH_MODE_SEMANTICS = Object.freeze({
   'file': Object.freeze({
     description: 'Reads pre-collected data from a local JSON file.',
     liveCapable: false,
+  }),
+  'official-snapshot': Object.freeze({
+    description: 'Discovers, downloads, validates, checksums, and atomically activates an official publisher snapshot.',
+    liveCapable: true,
   }),
   'live-public': Object.freeze({
     description: 'Fetches data from stable public APIs without authentication.',
