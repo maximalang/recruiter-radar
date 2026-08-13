@@ -24,6 +24,7 @@ import {
   discoverCareerUrlsFromWebsite,
   extractEmbeddedJsonDocuments,
   isRobotsPathAllowed,
+  resolvePublicRobotsPolicy,
 } from './adapters/site-discovery.mjs';
 import {
   assertOrgSourceRefOwner,
@@ -108,6 +109,7 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
           normalizedRecords: input.normalizedRecords.length,
           skippedRecords: input.skippedRecords,
           sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
+          targetResults: input.targetResults,
           extractionBreakdown: summarizeExtractionBreakdown(input.targetResults),
           orgsCreated: stats.orgUpsertCount,
           signalUpsertsCompleted: stats.signalUpsertCount,
@@ -1403,6 +1405,10 @@ async function fetchCareerPageTarget(target, index) {
     const fetched = await fetchSmartRecruitersPostingsRecords(normalizedTarget);
     records = fetched.records;
     fetchDiagnostics = fetched.diagnostics;
+  } else if (normalizedTarget.adapter === 'smartrecruiters-public-careers') {
+    const fetched = await fetchSmartRecruitersPublicCareersRecords(normalizedTarget);
+    records = fetched.records;
+    fetchDiagnostics = fetched.diagnostics;
   } else if (normalizedTarget.adapter === 'teamtailor-rss') {
     const feedTarget = { ...normalizedTarget };
     const fetched = await fetchSameDomainJsonLdRecords({
@@ -1737,18 +1743,11 @@ export async function fetchSmartRecruitersPostingsRecords(target, {
   } catch (error) {
     const status = Number(error?.status ?? error?.cause?.status);
     if (status !== 403 || !target.careerPageUrl) throw error;
-    const publicPage = await fetchPublicCareersImpl({
-      ...target,
-      adapter: 'hosted-career-page',
-      sourceUrl: target.careerPageUrl,
-      hostedAtsFamily: 'smartrecruiters',
+    const publicPage = await fetchSmartRecruitersPublicCareersRecords(target, {
+      fetchPublicCareersImpl,
     });
     return {
-      records: publicPage.records.map((record) => ({
-        ...record,
-        raw_target_adapter: 'smartrecruiters-public-careers',
-        hosted_ats_family: 'smartrecruiters',
-      })),
+      records: publicPage.records,
       diagnostics: {
         ...publicPage.diagnostics,
         officialApiStatus: 403,
@@ -1775,6 +1774,28 @@ export async function fetchSmartRecruitersPostingsRecords(target, {
   };
 }
 
+export async function fetchSmartRecruitersPublicCareersRecords(target, {
+  fetchPublicCareersImpl = fetchSameDomainJsonLdRecords,
+} = {}) {
+  const publicPage = await fetchPublicCareersImpl({
+    ...target,
+    adapter: 'hosted-career-page',
+    sourceUrl: target.careerPageUrl ?? target.sourceUrl,
+    hostedAtsFamily: 'smartrecruiters',
+  });
+  return {
+    records: publicPage.records.map((record) => ({
+      ...record,
+      raw_target_adapter: 'smartrecruiters-public-careers',
+      hosted_ats_family: 'smartrecruiters',
+      source_transport: publicPage.diagnostics?.escalationStage === 'rendered-dom'
+        ? 'public-careers-rendered'
+        : 'static-public-careers',
+    })),
+    diagnostics: publicPage.diagnostics,
+  };
+}
+
 export function mapSmartRecruitersPostingsPayload(payload, target) {
   const postings = Array.isArray(payload?.content) ? payload.content : [];
 
@@ -1795,6 +1816,7 @@ export function mapSmartRecruitersPostingsPayload(payload, target) {
       .filter(Boolean),
     source_record_type: 'job_posting',
     extraction_method: 'smartrecruiters-posting-api',
+    source_transport: 'official-api',
     raw_target_id: target.id,
     raw_target_adapter: target.adapter,
     raw: posting,
@@ -1954,7 +1976,7 @@ async function fetchSameDomainStaticRecords(target) {
     return { records: [], diagnostics: fetchResult.diagnostics, artifact: null };
   }
 
-  const careerPageUrl = target.careerPageUrl ?? target.sourceUrl;
+  const careerPageUrl = page.url ?? target.careerPageUrl ?? target.sourceUrl;
   const seed = {
     companyName: target.companyName,
     companyDomain: target.companyDomain,
@@ -2013,7 +2035,11 @@ async function fetchSameDomainStaticRecords(target) {
 }
 
 async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}) {
-  const accessPolicy = await resolveCareerTargetAccessPolicy(target.sourceUrl);
+  const accessPolicy = await resolveCareerTargetAccessPolicy(target.sourceUrl, {
+    allowedRobotsRedirectOrigins: target.hostedAtsFamily === 'smartrecruiters'
+      ? ['https://jobs.smartrecruiters.com']
+      : [],
+  });
   if (accessPolicy.blocked || !isRobotsPathAllowed(target.sourceUrl, accessPolicy.robots)) {
     const reason = accessPolicy.blocked
       ? `access-policy:${accessPolicy.reason}`
@@ -2041,15 +2067,20 @@ async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}
   const hostedOfficialFeed = officialFeed ?? resolveHostedOfficialFeed(target);
   let staticResult = null;
   const seed = buildCareerExtractionSeed(target);
+  const validatedRedirectHosts = new Set();
   const escalation = await runSourceEscalation({
     context: { target },
-    validateRecord: (record) => validateCareerVacancyRecord(record, target),
+    validateRecord: (record) => validateCareerVacancyRecord(record, target, {
+      additionalAllowedHosts: [...validatedRedirectHosts],
+    }),
     stages: {
       'official-feed': hostedOfficialFeed
         ? async () => ({ records: await hostedOfficialFeed() })
         : undefined,
       'static-http': async () => {
         staticResult ??= await fetchSameDomainStaticRecords(target);
+        const validatedHost = extractHostname(staticResult.artifact?.url);
+        if (validatedHost) validatedRedirectHosts.add(validatedHost);
         const errorCategory = staticResult.diagnostics?.errorCategory ?? null;
         const httpStatus = parseHttpErrorCategory(errorCategory);
         if ([401, 403, 451].includes(httpStatus)) {
@@ -2091,9 +2122,15 @@ async function fetchSameDomainJsonLdRecords(target, { officialFeed = null } = {}
         if (looksLikeAccessChallenge(page.html)) {
           return { status: 'blocked', accessControl: true, reason: 'access-challenge-page' };
         }
+        const validatedHost = extractHostname(page.url);
+        if (validatedHost) validatedRedirectHosts.add(validatedHost);
         return {
           artifact: { page },
-          records: extractDeterministicDomRecords(page.html, seed, 'playwright'),
+          records: extractDeterministicDomRecords(page.html, {
+            ...seed,
+            careerPageUrl: page.url,
+            sourceUrl: page.url,
+          }, 'playwright'),
         };
       },
       extraction: async () => {
@@ -2340,7 +2377,7 @@ export function extractVacanciesFromMarkdown(markdown, seed, provider = 'extract
   return records;
 }
 
-export function validateCareerVacancyRecord(record, target) {
+export function validateCareerVacancyRecord(record, target, { additionalAllowedHosts = [] } = {}) {
   const expectedCompany = toNonEmptyText(target?.companyName);
   const actualCompany = toNonEmptyText(record?.company_name ?? record?.companyName);
   const title = toNonEmptyText(record?.job_title ?? record?.jobTitle ?? record?.title);
@@ -2348,19 +2385,36 @@ export function validateCareerVacancyRecord(record, target) {
     record?.job_posting_url ?? record?.jobPostingUrl ?? record?.url,
   );
   if (!expectedCompany || !actualCompany || !title || !publicUrl) return false;
-  if (expectedCompany.localeCompare(actualCompany, undefined, { sensitivity: 'base' }) !== 0) return false;
+  if (normalizeCompanyValidationName(expectedCompany) !== normalizeCompanyValidationName(actualCompany)) return false;
   if (!isPlausibleVacancyTitle(title)) return false;
 
   const allowedHosts = [
     target?.sourceUrl,
     target?.careerPageUrl,
     target?.companyWebsiteUrl,
-  ].map(extractHostname).filter(Boolean);
+    ...additionalAllowedHosts,
+  ].map((value) => extractHostname(value) ?? normalizeDomain(value)).filter(Boolean);
   const recordHost = extractHostname(publicUrl);
   const hostAllowed = Boolean(recordHost && allowedHosts.some((host) => (
     recordHost === host || recordHost.endsWith(`.${host}`) || host.endsWith(`.${recordHost}`)
   )));
   return hostAllowed && isHostedAtsVacancyUrl(publicUrl, target?.hostedAtsFamily);
+}
+
+function normalizeCompanyValidationName(value) {
+  const legalSuffixes = new Set([
+    'inc', 'incorporated', 'llc', 'ltd', 'limited', 'corp', 'corporation', 'company', 'co',
+    'plc', 'gmbh', 'ag', 'sa', 'sas', 'sarl', 'bv', 'nv', 'ооо', 'оао', 'пао', 'ао', 'зао',
+  ]);
+  const parts = String(value ?? '')
+    .normalize('NFKC')
+    .toLocaleLowerCase('ru-RU')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  while (parts.length > 1 && legalSuffixes.has(parts.at(-1))) parts.pop();
+  return parts.join(' ');
 }
 
 export function isHostedAtsVacancyUrl(value, family) {
@@ -2385,7 +2439,7 @@ export function isHostedAtsVacancyUrl(value, family) {
     'oracle-taleo': /\/jobdetail\.ftl(?:\?|$)/i,
     'oracle-cloud': /\/job\//i,
     'sap-successfactors': /(?:\/job\/|[?&](?:career_job_req_id|jobId)=)/i,
-    smartrecruiters: /\/job\/[^/]+(?:\/|$)/i,
+    smartrecruiters: /(?:\/job\/[^/]+(?:\/|$)|^\/[A-Za-z0-9_-]+\/\d{6,}(?:[-/]|$))/i,
     potok: /\/open\/jobs\/\d+(?:\/|$)/i,
     huntflow: /\/(?:vacancy|jobs?)\/[^/]+(?:\/|$)/i,
     skillaz: /\/(?:vacanc(?:y|ies)|jobs?)\/[^/]+(?:\/|$)/i,
@@ -2395,16 +2449,17 @@ export function isHostedAtsVacancyUrl(value, family) {
   return patterns[family]?.test(`${path}${url.search}`) ?? true;
 }
 
-async function resolveCareerTargetAccessPolicy(value) {
+async function resolveCareerTargetAccessPolicy(value, { allowedRobotsRedirectOrigins = [] } = {}) {
   const publicUrl = canonicalizePublicUrl(value, { keepTracking: true });
   if (!publicUrl) {
     return { blocked: true, reason: 'invalid-public-url', robotsState: 'invalid', robots: { rules: [] } };
   }
   const origin = new URL(publicUrl).origin;
-  let pending = careerPageAccessPolicyCache.get(origin);
+  const cacheKey = `${origin}|${[...allowedRobotsRedirectOrigins].sort().join(',')}`;
+  let pending = careerPageAccessPolicyCache.get(cacheKey);
   if (!pending) {
-    pending = discoverCareerUrlsFromWebsite(origin, { maxSitemaps: 1, maxUrls: 1 });
-    careerPageAccessPolicyCache.set(origin, pending);
+    pending = resolvePublicRobotsPolicy(origin, { allowedRedirectOrigins: allowedRobotsRedirectOrigins });
+    careerPageAccessPolicyCache.set(cacheKey, pending);
   }
   const discovery = await pending;
   return {
@@ -2811,6 +2866,7 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
   const sourceRecordType = toNonEmptyText(record.source_record_type) ?? 'job_posting';
   const sourceId = resolveCareerPageSourceId(record.raw_target_adapter);
   const extractionMethod = toNonEmptyText(record.extraction_method) ?? 'unknown';
+  const sourceTransport = toNonEmptyText(record.source_transport);
   const location = toNonEmptyText(record.location ?? record.city ?? record.area_name);
   const pageTitle = toNonEmptyText(record.page_title);
   const employmentType = toNonEmptyText(record.employment_type);
@@ -2880,6 +2936,7 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
     sourceRecordType,
     sourceId,
     extractionMethod,
+    sourceTransport,
     orgExternalId,
     companyName,
     companyDomain: inferredDomain,
@@ -2909,7 +2966,7 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
   };
 }
 
-function resolveCareerPageSourceId(adapter) {
+export function resolveCareerPageSourceId(adapter) {
   const sourceByAdapter = {
     'greenhouse-board': 'greenhouse',
     'lever-postings': 'lever',
@@ -2917,6 +2974,7 @@ function resolveCareerPageSourceId(adapter) {
     'recruitee-careers': 'recruitee',
     'workable-public-jobs': 'workable',
     'smartrecruiters-postings': 'smartrecruiters',
+    'smartrecruiters-public-careers': 'smartrecruiters',
   };
   return sourceByAdapter[toNonEmptyText(adapter)] ?? SOURCE_ID;
 }
@@ -3058,6 +3116,7 @@ function buildSignalPayload(record) {
     source_record_url: record.jobPostingUrl,
     source_record_published_at: record.occurredAt,
     extraction_method: record.extractionMethod,
+    source_transport: record.sourceTransport,
     org_source_key: record.primarySourceKey,
     company_name: record.companyName,
     company_domain: record.companyDomain,

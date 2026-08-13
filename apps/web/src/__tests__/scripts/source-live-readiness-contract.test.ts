@@ -174,14 +174,11 @@ describe('source live readiness contract', () => {
       finalState: 'provider-required',
     }))
 
-    for (const sourceId of ['greenhouse', 'lever', 'ashby', 'recruitee', 'workable']) {
+    for (const sourceId of ['greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters']) {
       expect(report.sources.find((source: { id: string }) => source.id === sourceId)).toEqual(
         expect.objectContaining({ configured: true, liveVerified: true, finalState: 'digest-eligible' }),
       )
     }
-    expect(report.sources.find((source: { id: string }) => source.id === 'smartrecruiters')).toEqual(
-      expect.objectContaining({ configured: true, liveVerified: false, finalState: 'blocked' }),
-    )
   })
 
   it('never derives live verification from an env variable or HTTP capability', () => {

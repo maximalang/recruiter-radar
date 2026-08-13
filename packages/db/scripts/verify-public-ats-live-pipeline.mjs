@@ -23,7 +23,7 @@ const expectedExtraction = {
   ashby: 'ashby-public-api',
   recruitee: 'recruitee-careers-api',
   workable: 'workable-public-api',
-  smartrecruiters: 'smartrecruiters-posting-api',
+  smartrecruiters: null,
 };
 const targets = [
   { id: 'discord-greenhouse-live', adapter: 'greenhouse-board', company_name: 'Discord', company_domain: 'discord.com', company_website_url: 'https://discord.com/', career_page_url: 'https://boards.greenhouse.io/discord', source_url: 'https://boards-api.greenhouse.io/v1/boards/discord/jobs?content=true' },
@@ -31,7 +31,9 @@ const targets = [
   { id: 'ashby-live', adapter: 'ashby-job-board', company_name: 'Ashby', company_domain: 'ashbyhq.com', company_website_url: 'https://www.ashbyhq.com/', career_page_url: 'https://jobs.ashbyhq.com/Ashby', source_url: 'https://api.ashbyhq.com/posting-api/job-board/Ashby?includeCompensation=true' },
   { id: 'framestore-recruitee-live', adapter: 'recruitee-careers', company_name: 'Framestore', company_domain: 'framestore.com', company_website_url: 'https://www.framestore.com/', career_page_url: 'https://framestore.recruitee.com', source_url: 'https://framestore.recruitee.com/api/offers/' },
   { id: 'blue-altair-workable-live', adapter: 'workable-public-jobs', company_name: 'Blue Altair', company_domain: 'bluealtair.com', company_website_url: 'https://www.bluealtair.com/', career_page_url: 'https://apply.workable.com/blue-altair/', source_url: 'https://www.workable.com/api/accounts/blue-altair?details=true' },
-  { id: 'smartrecruiters-live', adapter: 'smartrecruiters-postings', company_name: 'SmartRecruiters Inc', company_domain: 'smartrecruiters.com', company_website_url: 'https://www.smartrecruiters.com/', career_page_url: 'https://careers.smartrecruiters.com/smartrecruiters', source_url: 'https://api.smartrecruiters.com/v1/companies/smartrecruiters/postings?limit=100&offset=0' },
+  process.env.SMARTRECRUITERS_LIVE_PUBLIC_CAREERS === '1'
+    ? { id: 'smartrecruiters-public-careers-live', adapter: 'smartrecruiters-public-careers', company_name: 'SmartRecruiters Inc', company_domain: 'smartrecruiters.com', company_website_url: 'https://www.smartrecruiters.com/', career_page_url: 'https://careers.smartrecruiters.com/smartrecruiters', source_url: 'https://careers.smartrecruiters.com/smartrecruiters' }
+    : { id: 'smartrecruiters-live', adapter: 'smartrecruiters-postings', company_name: 'SmartRecruiters Inc', company_domain: 'smartrecruiters.com', company_website_url: 'https://www.smartrecruiters.com/', career_page_url: 'https://careers.smartrecruiters.com/smartrecruiters', source_url: 'https://api.smartrecruiters.com/v1/companies/smartrecruiters/postings?limit=100&offset=0' },
 ].filter((target) => !excludedSourceIds.has({
   'greenhouse-board': 'greenhouse',
   'lever-postings': 'lever',
@@ -39,6 +41,7 @@ const targets = [
   'recruitee-careers': 'recruitee',
   'workable-public-jobs': 'workable',
   'smartrecruiters-postings': 'smartrecruiters',
+  'smartrecruiters-public-careers': 'smartrecruiters',
 }[target.adapter]));
 
 assert.equal(process.env.SOURCE_LIVE_VERIFY, '1', 'SOURCE_LIVE_VERIFY=1 is required.');
@@ -74,7 +77,10 @@ try {
 
   const metrics = JSON.parse(result.stdout.trim());
   assert.equal(metrics.action, 'pipeline');
-  assert.ok(metrics.recordsReceived > 0);
+  assert.ok(
+    metrics.recordsReceived > 0,
+    `public ATS live run returned no records: ${JSON.stringify(metrics.targetResults ?? [])}`,
+  );
   assert.equal(metrics.normalizedRecords, metrics.recordsReceived);
   assert.equal(metrics.signalUpsertsCompleted, metrics.recordsReceived);
   assert.equal(metrics.evidenceUpsertsCompleted, metrics.recordsReceived);
@@ -93,7 +99,8 @@ try {
        BOOL_AND(signal.payload ->> 'source' = lineage.source) AS payload_source_consistent,
        BOOL_AND(ref.org_id = lineage.organization_id) AS source_ref_owner_consistent,
        BOOL_AND(ref.source = lineage.source) AS source_ref_namespace_consistent,
-       MIN(lineage.extraction_method) AS extraction_method,
+       ARRAY_AGG(DISTINCT lineage.extraction_method ORDER BY lineage.extraction_method) AS extraction_methods,
+       ARRAY_REMOVE(ARRAY_AGG(DISTINCT signal.payload ->> 'source_transport'), NULL) AS source_transports,
        COUNT(*) FILTER (WHERE signal.payload ?| ARRAY['employee_email', 'employee_phone', 'personal_email', 'phone_number', 'mailbox_email'])::int AS sensitive_payload_rows
      FROM source_signal_evidence_lineage_v1 lineage
      JOIN signals signal ON signal.id = lineage.signal_id
@@ -117,7 +124,23 @@ try {
     assert.equal(row.payload_source_consistent, true);
     assert.equal(row.source_ref_owner_consistent, true);
     assert.equal(row.source_ref_namespace_consistent, true);
-    assert.equal(row.extraction_method, expectedExtraction[row.source]);
+    if (row.source === 'smartrecruiters') {
+      assert.ok(row.extraction_methods.every((method) => [
+        'smartrecruiters-posting-api',
+        'jsonld',
+        'html-card-fallback',
+        'playwright-jsonld',
+        'playwright-dom',
+      ].includes(method)), 'SmartRecruiters must use an official or public-careers extraction method');
+      assert.ok(row.source_transports.length > 0, 'SmartRecruiters transport must be persisted separately');
+      assert.ok(row.source_transports.every((transport) => [
+        'official-api',
+        'public-careers-rendered',
+        'static-public-careers',
+      ].includes(transport)), 'SmartRecruiters transport must be auditable');
+    } else {
+      assert.deepEqual(row.extraction_methods, [expectedExtraction[row.source]]);
+    }
     assert.equal(row.sensitive_payload_rows, 0);
   }
 

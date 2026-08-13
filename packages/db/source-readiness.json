@@ -242,10 +242,10 @@
     "smartrecruiters": {
       "implementation": "implemented", "fixture": "tested", "contract": "tested",
       "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
-      "live": { "state": "blocked", "verifiedAt": null, "evidence": ["2026-08-12 local official SmartRecruiters public Posting API fetch returned and normalized 8 current postings without credentials.", "2026-08-12 production-runtime verification received Cloudflare HTTP 403 from api.smartrecruiters.com; the existing optional SOCKS egress could not connect to that host, so no production DB/evidence claim is made."] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-13T12:27:15Z", "evidence": ["2026-08-13 disposable production-schema DB verifier fetched 8 current postings through the official unauthenticated Posting API and persisted 8 signals, evidence items and lineage rows under source=smartrecruiters with transport=official-api and zero sensitive payload fields.", "2026-08-13 the same isolated verifier exercised the real public SmartRecruiters careers surface independently of the API. The official careers URL resolved to the employer public careers domain; the cheap static-public-careers path extracted 2 current vacancy records and persisted 2 signals, evidence items and lineage rows under source=smartrecruiters with owner-consistent provenance and zero sensitive payload fields.", "The earlier production-runtime probe still received HTTP 403 from api.smartrecruiters.com. That is an official-api transport limitation, not a source-family blocker, because the public careers transport is live-verified."] },
       "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
-      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
-      "blockers": ["Production egress to api.smartrecruiters.com is blocked; retain the adapter but do not promote it until an approved reachable egress or provider-side allowlisting is verified."]
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "live": ["SOURCE_LIVE_DB_TEST_ACK=isolated PUBLIC_ATS_LIVE_EXCLUDE=greenhouse,lever,ashby,recruitee,workable SMARTRECRUITERS_LIVE_PUBLIC_CAREERS=1 npm run verify:career-pages:public-ats-live-db"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
     },
     "rabota-rossii": {
       "implementation": "implemented",

@@ -12,7 +12,9 @@ import {
   mapWorkablePublicJobsPayload,
   detectCareerPageTargetFromHtml,
   fetchSmartRecruitersPostingsRecords,
+  resolveCareerPageSourceId,
   isHostedAtsVacancyUrl,
+  validateCareerVacancyRecord,
   extractTaleoJobListRecords,
   extractVacancyCardsFromSameDomainHtml,
 } from './source-career-pages.mjs';
@@ -273,8 +275,30 @@ const smartRecruitersFallback = await fetchSmartRecruitersPostingsRecords({
 assert.deepEqual(smartRecruitersRequestOptions, { allowProxyRetry: false });
 assert.equal(smartRecruitersFallback.records.length, 1);
 assert.equal(smartRecruitersFallback.records[0].raw_target_adapter, 'smartrecruiters-public-careers');
+assert.equal(smartRecruitersFallback.records[0].source_transport, 'public-careers-rendered');
+assert.equal(resolveCareerPageSourceId(smartRecruitersFallback.records[0].raw_target_adapter), 'smartrecruiters');
 assert.equal(smartRecruitersFallback.diagnostics.publicCareersFallback, true);
 assert.equal(smartRecruitersFallback.diagnostics.officialApiStatus, 403);
+assert.equal(validateCareerVacancyRecord({
+  company_name: 'SmartRecruiters',
+  job_title: 'Senior Information Security Engineer',
+  job_posting_url: 'https://jobs.smartrecruiters.com/smartrecruiters/744000143115219-senior-information-security-engineer',
+}, {
+  companyName: 'SmartRecruiters Inc',
+  companyWebsiteUrl: 'https://www.smartrecruiters.com/',
+  careerPageUrl: 'https://careers.smartrecruiters.com/smartrecruiters',
+  hostedAtsFamily: 'smartrecruiters',
+}, { additionalAllowedHosts: ['www.smartrecruiterscareers.com'] }), true);
+assert.equal(validateCareerVacancyRecord({
+  company_name: 'Unrelated Employer',
+  job_title: 'Senior Information Security Engineer',
+  job_posting_url: 'https://jobs.smartrecruiters.com/smartrecruiters/744000143115219-senior-information-security-engineer',
+}, {
+  companyName: 'SmartRecruiters Inc',
+  companyWebsiteUrl: 'https://www.smartrecruiters.com/',
+  careerPageUrl: 'https://careers.smartrecruiters.com/smartrecruiters',
+  hostedAtsFamily: 'smartrecruiters',
+}, { additionalAllowedHosts: ['www.smartrecruiterscareers.com'] }), false);
 
 assert.equal(isHostedAtsVacancyUrl('https://acme.wd1.myworkdayjobs.com/en-US/External/job/Engineer_R1', 'workday'), true);
 assert.equal(isHostedAtsVacancyUrl('https://acme.wd1.myworkdayjobs.com/en-US/External/benefits', 'workday'), false);

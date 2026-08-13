@@ -11,6 +11,7 @@ import {
   isRobotsPathAllowed,
   parseRobotsTxt,
   parseSitemapXml,
+  resolvePublicRobotsPolicy,
   selectCareerUrls,
 } from './adapters/site-discovery.mjs';
 
@@ -119,6 +120,26 @@ assert.deepEqual(liveDiscovery.sitemapUrlsFetched, [
   'https://example.com/sitemap-index.xml',
   'https://example.com/jobs.xml',
 ]);
+
+const allowedSisterHostRobots = await resolvePublicRobotsPolicy('https://careers.smartrecruiters.com/', {
+  allowedRedirectOrigins: ['https://jobs.smartrecruiters.com'],
+  fetchTextImpl: async () => ({
+    response: { url: 'https://jobs.smartrecruiters.com', headers: new Headers() },
+    body: '<html>public jobs host</html>',
+  }),
+});
+assert.equal(allowedSisterHostRobots.blocked, false);
+assert.equal(allowedSisterHostRobots.robotsState, 'redirected-missing');
+
+const blockedUnrelatedRobots = await resolvePublicRobotsPolicy('https://careers.smartrecruiters.com/', {
+  allowedRedirectOrigins: ['https://jobs.smartrecruiters.com'],
+  fetchTextImpl: async () => ({
+    response: { url: 'https://attacker.example/robots.txt', headers: new Headers() },
+    body: 'User-agent: *',
+  }),
+});
+assert.equal(blockedUnrelatedRobots.blocked, true);
+assert.equal(blockedUnrelatedRobots.reason, 'robots-cross-origin-redirect');
 
 console.log(JSON.stringify({
   ok: true,

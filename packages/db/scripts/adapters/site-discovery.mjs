@@ -219,6 +219,7 @@ export async function resolvePublicRobotsPolicy(baseUrl, {
   fetchTextImpl = fetchText,
   signal,
   userAgent = 'RecruiterRadarCareerPages',
+  allowedRedirectOrigins = [],
 } = {}) {
   const base = canonicalizePublicUrl(baseUrl, { keepTracking: true });
   if (!base) return { ...blockedDiscovery('invalid-base-url'), baseUrl: null, reason: 'invalid-base-url' };
@@ -234,6 +235,17 @@ export async function resolvePublicRobotsPolicy(baseUrl, {
       timeoutMs: 5_000,
     });
     if (!isSameOrigin(result.response?.url ?? robotsUrl, baseOrigin)) {
+      const resolvedOrigin = toOrigin(result.response?.url);
+      const allowedOrigins = new Set(allowedRedirectOrigins.map(toOrigin).filter(Boolean));
+      if (resolvedOrigin && allowedOrigins.has(resolvedOrigin)) {
+        return {
+          blocked: false,
+          reason: null,
+          baseUrl: base,
+          robotsState: 'redirected-missing',
+          robots: { rules: [], sitemaps: [] },
+        };
+      }
       return { ...blockedDiscovery('robots-cross-origin-redirect'), baseUrl: base, reason: 'robots-cross-origin-redirect' };
     }
     return {
@@ -255,6 +267,14 @@ export async function resolvePublicRobotsPolicy(baseUrl, {
       robotsState: 'missing',
       robots: { rules: [], sitemaps: [] },
     };
+  }
+}
+
+function toOrigin(value) {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
   }
 }
 
