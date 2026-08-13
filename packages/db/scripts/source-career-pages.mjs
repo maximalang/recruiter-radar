@@ -16,6 +16,9 @@ import {
   stripBom,
 } from './adapters/source-records.mjs';
 import { fetchJson as fetchJsonWithPolicy, fetchText } from './adapters/source-http.mjs';
+import { runSourceEscalation } from './adapters/source-escalation.mjs';
+import { fetchExtractionMarkdown } from './adapters/source-extraction-fallback.mjs';
+import { createPlaywrightBrowserPool } from './adapters/playwright-browser-pool.mjs';
 import {
   canonicalizePublicUrl,
   discoverCareerUrlsFromWebsite,
@@ -43,6 +46,7 @@ const defaultDiscoveredTargetsOutputPath = resolve(scriptDir, './.cache/career-p
 const defaultDiscoveryReviewOutputPath = resolve(scriptDir, './.cache/career-pages-discovery-review.json');
 const SOURCE_ID = 'career-pages';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
+let careerPageRenderPool = null;
 
 loadEnvFile(rootEnvPath);
 
@@ -199,6 +203,8 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
       });
     }
   }
+
+  await closeCareerPageRenderPool();
 
   const normalizedInput = buildNormalizedInput({
     records,
@@ -1369,6 +1375,9 @@ async function fetchCareerPageTarget(target, index) {
       pageFetched: fetchDiagnostics.pageFetched ?? true,
       resolvedUrl: fetchDiagnostics.resolvedUrl ?? normalizedTarget.sourceUrl,
       errorCategory: fetchDiagnostics.errorCategory ?? null,
+      escalationStage: fetchDiagnostics.escalationStage ?? null,
+      escalationAttempts: fetchDiagnostics.escalationAttempts ?? [],
+      stoppedByPolicy: fetchDiagnostics.stoppedByPolicy ?? false,
       // Per-target extraction diagnostics. For same-domain targets this names
       // which extractor produced the records ('jsonld' vs 'html-card-fallback')
       // so a discovered target that fetched a page but yielded 0 is inspectable
@@ -1685,12 +1694,12 @@ function joinLocationParts(...parts) {
   return [...new Set(values)].join(', ') || null;
 }
 
-async function fetchSameDomainJsonLdRecords(target) {
+async function fetchSameDomainStaticRecords(target) {
   const fetchResult = await fetchHtmlPageDetailed(target.sourceUrl);
   const page = fetchResult.page;
 
   if (!page) {
-    return { records: [], diagnostics: fetchResult.diagnostics };
+    return { records: [], diagnostics: fetchResult.diagnostics, artifact: null };
   }
 
   const careerPageUrl = target.careerPageUrl ?? target.sourceUrl;
@@ -1725,6 +1734,7 @@ async function fetchSameDomainJsonLdRecords(target) {
     return {
       records: jsonLdRecords,
       diagnostics: { pageFetched: true, resolvedUrl: page.url },
+      artifact: page,
     };
   }
 
@@ -1737,7 +1747,196 @@ async function fetchSameDomainJsonLdRecords(target) {
   return {
     records: htmlCardRecords,
     diagnostics: { pageFetched: true, resolvedUrl: page.url },
+    artifact: page,
   };
+}
+
+async function fetchSameDomainJsonLdRecords(target) {
+  const staticResult = await fetchSameDomainStaticRecords(target);
+  const seed = buildCareerExtractionSeed(target);
+  const escalation = await runSourceEscalation({
+    context: { target },
+    validateRecord: (record) => validateCareerVacancyRecord(record, target),
+    stages: {
+      'static-http': async () => {
+        const errorCategory = staticResult.diagnostics?.errorCategory ?? null;
+        const httpStatus = parseHttpErrorCategory(errorCategory);
+        if ([401, 403, 451].includes(httpStatus)) {
+          return { status: 'blocked', httpStatus, reason: errorCategory };
+        }
+        if (httpStatus === 429) {
+          return { status: 'deferred', httpStatus, reason: errorCategory };
+        }
+        if (!staticResult.artifact) {
+          return { status: 'error', reason: errorCategory ?? 'static-fetch-empty' };
+        }
+        if (looksLikeAccessChallenge(staticResult.artifact.html)) {
+          return { status: 'blocked', accessControl: true, reason: 'access-challenge-page' };
+        }
+        return { artifact: staticResult };
+      },
+      'structured-data': async ({ artifact }) => ({
+        records: artifact?.records ?? [],
+      }),
+      'rendered-dom': async () => {
+        if (process.env.CAREER_PAGES_RENDERED_FALLBACK_ENABLED?.trim().toLowerCase() === 'false') {
+          return { status: 'empty', reason: 'rendered-fallback-disabled' };
+        }
+        const page = await getCareerPageRenderPool().fetchPage({
+          url: target.sourceUrl,
+          timeoutMs: resolveRenderedFallbackTimeoutMs(),
+          headers: { 'user-agent': 'RecruiterRadarCareerPages/1.0' },
+        });
+        if ([401, 403, 451].includes(page.status)) {
+          return { status: 'blocked', httpStatus: page.status, reason: `http-${page.status}` };
+        }
+        if (page.status === 429) {
+          return { status: 'deferred', httpStatus: page.status, reason: 'http-429' };
+        }
+        if (page.status < 200 || page.status >= 400) {
+          return { status: 'error', httpStatus: page.status, reason: `http-${page.status}` };
+        }
+        if (looksLikeAccessChallenge(page.html)) {
+          return { status: 'blocked', accessControl: true, reason: 'access-challenge-page' };
+        }
+        return {
+          artifact: { page },
+          records: extractDeterministicDomRecords(page.html, seed, 'playwright'),
+        };
+      },
+      extraction: async () => {
+        const extracted = await fetchExtractionMarkdown(target.sourceUrl);
+        if (!extracted.available) {
+          return { status: 'empty', reason: summarizeExtractionAttempts(extracted.attempts) };
+        }
+        return {
+          artifact: { provider: extracted.provider },
+          records: extractVacanciesFromMarkdown(extracted.markdown, seed, extracted.provider),
+        };
+      },
+    },
+  });
+
+  return {
+    records: escalation.records,
+    diagnostics: {
+      ...staticResult.diagnostics,
+      resolvedUrl: escalation.artifact?.page?.url
+        ?? staticResult.diagnostics?.resolvedUrl
+        ?? target.sourceUrl,
+      escalationStage: escalation.selectedStage,
+      escalationAttempts: escalation.attempts,
+      stoppedByPolicy: escalation.stoppedByPolicy,
+    },
+  };
+}
+
+function buildCareerExtractionSeed(target) {
+  return {
+    companyName: target.companyName,
+    companyDomain: target.companyDomain,
+    companyWebsiteUrl: target.companyWebsiteUrl,
+    careerPageUrl: target.careerPageUrl ?? target.sourceUrl,
+    sourceUrl: target.sourceUrl,
+  };
+}
+
+function extractDeterministicDomRecords(html, seed, prefix) {
+  const jsonLdRecords = mapJsonLdJobPostings(extractJobPostingsFromHtml(html), seed);
+  if (jsonLdRecords.length > 0) {
+    return tagRecordsWithExtractionMethod(jsonLdRecords, `${prefix}-jsonld`);
+  }
+  return tagRecordsWithExtractionMethod(
+    extractVacancyCardsFromSameDomainHtml(html, seed),
+    `${prefix}-dom`,
+  );
+}
+
+export function extractVacanciesFromMarkdown(markdown, seed, provider = 'extraction') {
+  const text = typeof markdown === 'string' ? markdown : '';
+  const careerPageUrl = toUrlOrNull(seed?.careerPageUrl ?? seed?.sourceUrl);
+  if (!text || !careerPageUrl) return [];
+
+  const records = [];
+  const seen = new Set();
+  const linkPattern = /\[([^\]\n]{3,160})\]\((https?:\/\/[^\s)]+)\)/g;
+  let match;
+  while ((match = linkPattern.exec(text)) !== null && records.length < 200) {
+    const title = cleanCardText(match[1]);
+    const vacancyUrl = canonicalizePublicUrl(match[2]);
+    if (!title || !vacancyUrl || !isPlausibleVacancyTitle(title)) continue;
+    const key = normalizeUrlForDedupe(vacancyUrl);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    records.push({
+      company_name: seed.companyName ?? null,
+      company_domain: seed.companyDomain ?? null,
+      company_website_url: seed.companyWebsiteUrl ?? null,
+      career_page_url: careerPageUrl,
+      job_posting_url: vacancyUrl,
+      job_title: title,
+      external_id: `${provider}:${vacancyUrl}`,
+      occurred_at: null,
+      source_record_type: 'job_posting',
+      raw_target_adapter: 'extraction-markdown',
+      extraction_method: `${provider}-markdown`,
+      raw: { title, vacancyUrl, provider },
+    });
+  }
+  return records;
+}
+
+export function validateCareerVacancyRecord(record, target) {
+  const expectedCompany = toNonEmptyText(target?.companyName);
+  const actualCompany = toNonEmptyText(record?.company_name ?? record?.companyName);
+  const title = toNonEmptyText(record?.job_title ?? record?.jobTitle ?? record?.title);
+  const publicUrl = canonicalizePublicUrl(
+    record?.job_posting_url ?? record?.jobPostingUrl ?? record?.url,
+  );
+  if (!expectedCompany || !actualCompany || !title || !publicUrl) return false;
+  if (expectedCompany.localeCompare(actualCompany, undefined, { sensitivity: 'base' }) !== 0) return false;
+  if (!isPlausibleVacancyTitle(title)) return false;
+
+  const allowedHosts = [
+    target?.sourceUrl,
+    target?.careerPageUrl,
+    target?.companyWebsiteUrl,
+  ].map(extractHostname).filter(Boolean);
+  const recordHost = extractHostname(publicUrl);
+  return Boolean(recordHost && allowedHosts.some((host) => (
+    recordHost === host || recordHost.endsWith(`.${host}`) || host.endsWith(`.${recordHost}`)
+  )));
+}
+
+function parseHttpErrorCategory(value) {
+  const match = typeof value === 'string' ? value.match(/^http-(\d{3})$/) : null;
+  return match ? Number(match[1]) : null;
+}
+
+function looksLikeAccessChallenge(html) {
+  const sample = typeof html === 'string' ? html.slice(0, 200_000) : '';
+  return /(?:cf-chl-|cloudflare\s+ray\s+id|captcha|verify\s+(?:you\s+are\s+)?human|access\s+denied|attention\s+required)/i.test(sample);
+}
+
+function summarizeExtractionAttempts(attempts) {
+  if (!Array.isArray(attempts) || attempts.length === 0) return 'extraction-provider-not-configured';
+  return attempts.map((attempt) => `${attempt.provider}:${attempt.outcome}`).join(',').slice(0, 240);
+}
+
+function getCareerPageRenderPool() {
+  careerPageRenderPool ??= createPlaywrightBrowserPool();
+  return careerPageRenderPool;
+}
+
+async function closeCareerPageRenderPool() {
+  const pool = careerPageRenderPool;
+  careerPageRenderPool = null;
+  if (pool) await pool.close();
+}
+
+function resolveRenderedFallbackTimeoutMs() {
+  const raw = Number(process.env.CAREER_PAGES_RENDER_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw >= 1_000 ? Math.min(Math.floor(raw), 120_000) : 30_000;
 }
 
 function tagRecordsWithExtractionMethod(records, method) {

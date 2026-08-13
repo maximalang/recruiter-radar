@@ -1,25 +1,18 @@
 /**
  * Browser-backed crawler engines.
  *
- * The historical export names are retained for API compatibility. Static
- * pages use the hardened HTTP engine; rendered pages use a bounded pool of
- * persistent Playwright browser workers. Every request still receives a new
- * isolated BrowserContext, while the expensive Chromium process is reused and
- * recycled after a bounded request count or lifetime.
+ * The historical export names are retained for API compatibility. The actual
+ * bounded Playwright worker pool lives in the canonical packages/db source
+ * runtime so CLI sources and the web runtime share one browser lifecycle.
  */
 
-import type { Browser, BrowserContext } from 'playwright'
+import { createPlaywrightBrowserPool } from '@/../../packages/db/scripts/adapters/playwright-browser-pool.mjs'
 import type {
   CrawlerEngine,
   CrawlerFetchInput,
   CrawlerResult,
 } from './crawler-contract'
 import { createStaticEngine } from './crawler-static'
-
-const DEFAULT_CONCURRENCY = 2
-const DEFAULT_MAX_REQUESTS_PER_BROWSER = 100
-const DEFAULT_MAX_BROWSER_AGE_MS = 15 * 60_000
-const DEFAULT_IDLE_BROWSER_TIMEOUT_MS = 60_000
 
 export interface CrawleeEngineOptions {
   /** Proxy URLs assigned deterministically across persistent browser workers. */
@@ -36,208 +29,40 @@ export interface CrawleeEngineOptions {
   maxBrowserAgeMs?: number
   /** Close idle Chromium workers after this delay. Default 60 seconds. */
   idleBrowserTimeoutMs?: number
+  /** Minimum delay between rendered requests to the same host. Default 250ms. */
+  perHostMinIntervalMs?: number
+  /** Consecutive host failures before opening the circuit. Default 3. */
+  circuitFailureThreshold?: number
+  /** Host circuit cool-down period. Default 60 seconds. */
+  circuitResetMs?: number
 }
 
 export interface ManagedCrawlerEngine extends CrawlerEngine {
   close(): Promise<void>
 }
 
-interface BrowserWorker {
-  index: number
-  browser: Browser | null
-  launchedAt: number
-  requests: number
-  busy: boolean
-}
-
-interface WorkerWaiter {
-  resolve: (worker: BrowserWorker) => void
-  reject: (error: Error) => void
-}
-
-function resolveProxyUrls(explicit?: string[]): string[] {
-  if (explicit && explicit.length > 0) return explicit
-  const envValue = process.env.CRAWLEE_PROXY_URLS?.trim()
-  if (!envValue) return []
-  return envValue.split(',').map((value) => value.trim()).filter(Boolean)
-}
-
-function readPositiveInteger(
-  explicit: number | undefined,
-  envName: string,
-  fallback: number,
-  maximum = Number.MAX_SAFE_INTEGER,
-): number {
-  const envValue = process.env[envName]?.trim()
-  const candidate = explicit ?? (envValue ? Number(envValue) : fallback)
-  if (!Number.isFinite(candidate) || candidate < 1) return fallback
-  return Math.min(Math.floor(candidate), maximum)
-}
-
-class PlaywrightBrowserPool {
-  private readonly workers: BrowserWorker[]
-  private readonly waiters: WorkerWaiter[] = []
-  private readonly proxyUrls: string[]
-  private readonly maxRequestsPerBrowser: number
-  private readonly maxBrowserAgeMs: number
-  private readonly idleBrowserTimeoutMs: number
-  private idleTimer: ReturnType<typeof setTimeout> | null = null
-  private closed = false
-
-  constructor(private readonly options: CrawleeEngineOptions) {
-    const concurrency = readPositiveInteger(
-      options.concurrency,
-      'PLAYWRIGHT_BROWSER_CONCURRENCY',
-      DEFAULT_CONCURRENCY,
-      8,
-    )
-    this.maxRequestsPerBrowser = readPositiveInteger(
-      options.maxRequestsPerBrowser,
-      'PLAYWRIGHT_BROWSER_MAX_REQUESTS',
-      DEFAULT_MAX_REQUESTS_PER_BROWSER,
-    )
-    this.maxBrowserAgeMs = readPositiveInteger(
-      options.maxBrowserAgeMs,
-      'PLAYWRIGHT_BROWSER_MAX_AGE_MS',
-      DEFAULT_MAX_BROWSER_AGE_MS,
-    )
-    this.idleBrowserTimeoutMs = readPositiveInteger(
-      options.idleBrowserTimeoutMs,
-      'PLAYWRIGHT_BROWSER_IDLE_TIMEOUT_MS',
-      DEFAULT_IDLE_BROWSER_TIMEOUT_MS,
-    )
-    this.proxyUrls = resolveProxyUrls(options.proxyUrls)
-    this.workers = Array.from({ length: concurrency }, (_, index) => ({
-      index,
-      browser: null,
-      launchedAt: 0,
-      requests: 0,
-      busy: false,
-    }))
-  }
-
-  async fetch(input: CrawlerFetchInput): Promise<CrawlerResult> {
-    const worker = await this.acquire()
-    let context: BrowserContext | null = null
-    try {
-      const browser = await this.getBrowser(worker)
-      const timeout = input.options?.timeoutMs ?? this.options.navigationTimeoutMs ?? 30_000
-      const headers = {
-        'accept-language': 'ru,en;q=0.9',
-        ...this.options.defaultHeaders,
-        ...(input.options?.headers ?? {}),
-      }
-      context = await browser.newContext({ extraHTTPHeaders: headers })
-      const page = await context.newPage()
-      const response = await page.goto(input.url, {
-        waitUntil: 'domcontentloaded',
-        timeout,
-      })
-
-      return {
-        url: input.url,
-        status: response?.status() ?? 200,
-        html: await page.content(),
-        rawHeaders: response ? await response.allHeaders() : {},
-        fetchedAt: new Date().toISOString(),
-        engine: 'spa',
-        warnings: response ? [] : ['Playwright navigation returned no HTTP response'],
-      }
-    } finally {
-      worker.requests++
-      if (context) await context.close().catch(() => undefined)
-      this.release(worker)
-    }
-  }
-
-  async close(): Promise<void> {
-    this.closed = true
-    this.clearIdleTimer()
-    const error = new Error('Playwright browser pool is closed')
-    while (this.waiters.length > 0) this.waiters.shift()?.reject(error)
-    await this.recycleAllBrowsers()
-  }
-
-  private async acquire(): Promise<BrowserWorker> {
-    if (this.closed) throw new Error('Playwright browser pool is closed')
-    this.clearIdleTimer()
-    const available = this.workers.find((worker) => !worker.busy)
-    if (available) {
-      available.busy = true
-      return available
-    }
-    return new Promise<BrowserWorker>((resolve, reject) => {
-      this.waiters.push({ resolve, reject })
-    })
-  }
-
-  private release(worker: BrowserWorker): void {
-    const waiter = this.waiters.shift()
-    if (waiter) {
-      waiter.resolve(worker)
-      return
-    }
-    worker.busy = false
-    if (this.workers.every((candidate) => !candidate.busy)) this.scheduleIdleRecycle()
-  }
-
-  private async getBrowser(worker: BrowserWorker): Promise<Browser> {
-    const expired = worker.browser && (
-      worker.requests >= this.maxRequestsPerBrowser
-      || Date.now() - worker.launchedAt >= this.maxBrowserAgeMs
-    )
-    if (expired) await this.recycleBrowser(worker)
-    if (worker.browser) return worker.browser
-
-    const { chromium } = await import('playwright')
-    const proxyUrl = this.proxyUrls.length > 0
-      ? this.proxyUrls[worker.index % this.proxyUrls.length]
-      : undefined
-    worker.browser = await chromium.launch({
-      headless: true,
-      ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
-        ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
-        : {}),
-      ...(proxyUrl ? { proxy: { server: proxyUrl } } : {}),
-    })
-    worker.launchedAt = Date.now()
-    worker.requests = 0
-    return worker.browser
-  }
-
-  private async recycleBrowser(worker: BrowserWorker): Promise<void> {
-    const browser = worker.browser
-    worker.browser = null
-    worker.launchedAt = 0
-    worker.requests = 0
-    if (browser) await browser.close().catch(() => undefined)
-  }
-
-  private async recycleAllBrowsers(): Promise<void> {
-    await Promise.all(this.workers.map((worker) => this.recycleBrowser(worker)))
-  }
-
-  private scheduleIdleRecycle(): void {
-    this.clearIdleTimer()
-    this.idleTimer = setTimeout(() => {
-      this.idleTimer = null
-      void this.recycleAllBrowsers()
-    }, this.idleBrowserTimeoutMs)
-    this.idleTimer.unref?.()
-  }
-
-  private clearIdleTimer(): void {
-    if (!this.idleTimer) return
-    clearTimeout(this.idleTimer)
-    this.idleTimer = null
-  }
+interface SharedPlaywrightPool {
+  fetchPage(input: {
+    url: string
+    timeoutMs?: number
+    headers?: Record<string, string>
+    previous?: { etag?: string; lastModified?: string }
+  }): Promise<{
+    url: string
+    status: number
+    html: string | null
+    rawHeaders: Record<string, string>
+    fetchedAt: string
+    warnings: string[]
+  }>
+  close(): Promise<void>
 }
 
 /** @deprecated Name retained for compatibility; implemented with Playwright directly. */
 export function createCrawleeSpaEngine(
   options: CrawleeEngineOptions = {},
 ): ManagedCrawlerEngine {
-  const pool = new PlaywrightBrowserPool(options)
+  const pool = createPlaywrightBrowserPool(options) as SharedPlaywrightPool
   return {
     id: 'spa',
     capabilities: {
@@ -246,8 +71,14 @@ export function createCrawleeSpaEngine(
       supportsPdf: false,
       selfHosted: false,
     },
-    fetch(input: CrawlerFetchInput): Promise<CrawlerResult> {
-      return pool.fetch(input)
+    async fetch(input: CrawlerFetchInput): Promise<CrawlerResult> {
+      const result = await pool.fetchPage({
+        url: input.url,
+        timeoutMs: input.options?.timeoutMs ?? options.navigationTimeoutMs ?? 30_000,
+        headers: input.options?.headers,
+        previous: input.options?.previousValidators,
+      })
+      return { ...result, html: result.html ?? undefined, engine: 'spa' }
     },
     close(): Promise<void> {
       return pool.close()

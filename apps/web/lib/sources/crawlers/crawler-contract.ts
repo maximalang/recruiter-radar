@@ -40,6 +40,8 @@ export interface CrawlerOptions {
   hint?: 'static' | 'spa' | 'pdf' | 'newsroom'
   /** Identifier for logs / rate-limit buckets. */
   sourceName?: string
+  /** Optional HTTP validators for a conditional render request. */
+  previousValidators?: { etag?: string; lastModified?: string }
 }
 
 export interface CrawlerResult {
@@ -56,6 +58,10 @@ export interface CrawlerResult {
   fetchedAt: string
   engine: CrawlerEngineId
   warnings: string[]
+  /** True when the upstream returned 304 and no new body was rendered. */
+  notModified?: boolean
+  /** Bounded upstream validators callers may persist for the next request. */
+  validators?: { etag: string | null; lastModified: string | null }
 }
 
 export interface CrawlerFetchInput {

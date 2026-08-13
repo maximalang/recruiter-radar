@@ -146,4 +146,83 @@ describe('Playwright SPA crawler', () => {
     expect(launch).toHaveBeenCalledTimes(2)
     await engine.close()
   })
+
+  it('opens a per-host circuit after bounded consecutive navigation failures', async () => {
+    goto
+      .mockRejectedValueOnce(new Error('upstream failed'))
+      .mockRejectedValueOnce(new Error('upstream failed again'))
+    const engine = createCrawleeSpaEngine({
+      concurrency: 1,
+      perHostMinIntervalMs: 0,
+      circuitFailureThreshold: 2,
+      circuitResetMs: 60_000,
+    })
+
+    await expect(engine.fetch({ url: 'https://unstable.example/1' })).rejects.toThrow('upstream failed')
+    await expect(engine.fetch({ url: 'https://unstable.example/2' })).rejects.toThrow('upstream failed again')
+    await expect(engine.fetch({ url: 'https://unstable.example/3' })).rejects.toMatchObject({
+      code: 'PLAYWRIGHT_CIRCUIT_OPEN',
+      host: 'unstable.example',
+    })
+    expect(goto).toHaveBeenCalledTimes(2)
+
+    await engine.close()
+  })
+
+  it('keeps browser workers independent across hosts when one circuit opens', async () => {
+    goto.mockRejectedValueOnce(new Error('host A failed'))
+    const engine = createCrawleeSpaEngine({
+      concurrency: 1,
+      perHostMinIntervalMs: 0,
+      circuitFailureThreshold: 1,
+    })
+
+    await expect(engine.fetch({ url: 'https://host-a.example/jobs' })).rejects.toThrow('host A failed')
+    await expect(engine.fetch({ url: 'https://host-a.example/jobs/2' })).rejects.toMatchObject({
+      code: 'PLAYWRIGHT_CIRCUIT_OPEN',
+    })
+    await expect(engine.fetch({ url: 'https://host-b.example/jobs' })).resolves.toMatchObject({
+      status: 200,
+    })
+
+    await engine.close()
+  })
+
+  it('sends bounded validators and returns a bodyless 304 result', async () => {
+    goto.mockResolvedValueOnce({
+      status: () => 304,
+      allHeaders: async () => ({ etag: '"jobs-v2"' }),
+    })
+    const engine = createCrawleeSpaEngine({ perHostMinIntervalMs: 0 })
+
+    const result = await engine.fetch({
+      url: 'https://conditional.example/jobs',
+      options: {
+        previousValidators: {
+          etag: '"jobs-v1"',
+          lastModified: 'Wed, 12 Aug 2026 10:00:00 GMT',
+        },
+      },
+    })
+
+    expect(newContext).toHaveBeenCalledWith({
+      extraHTTPHeaders: {
+        'accept-language': 'ru,en;q=0.9',
+        'if-none-match': '"jobs-v1"',
+        'if-modified-since': 'Wed, 12 Aug 2026 10:00:00 GMT',
+      },
+    })
+    expect(result).toMatchObject({
+      status: 304,
+      notModified: true,
+      validators: {
+        etag: '"jobs-v2"',
+        lastModified: 'Wed, 12 Aug 2026 10:00:00 GMT',
+      },
+    })
+    expect(result.html).toBeUndefined()
+    expect(content).not.toHaveBeenCalled()
+
+    await engine.close()
+  })
 })
