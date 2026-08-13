@@ -335,11 +335,22 @@ ID plus its own official-access, legal, provenance, and confidence review.
 
 ### Government snapshot lifecycle
 
-- `fns-open-data` and `rospatent-open-data` discover current artifacts only from
+- `fns-open-data`, `government-procurement`, `rosstat-open-data` and
+  `rospatent-open-data` discover current artifacts only from
   official publisher metadata, stream bounded downloads, calculate SHA-256,
   validate tracked legal-entity records, and atomically swap a checksummed
   `active.json` manifest. `*_INPUT_FILE` remains an override/debug path, not the
   required production operation.
+- EIS discovers all 86 regional 44-FZ contract passports, then uses the
+  robots-allowed supplier-filtered RSS current-update feed because the legacy
+  passport FTP hostname no longer resolves. Its 60-second crawl delay, exact
+  tracked-INN echo, 50-record/feed cap and checksum are enforced. Rosstat
+  selects the newest non-archive regional unemployment dataset from official
+  metadata and rejects company attribution.
+- On 2026-08-13 the active EIS/Rosstat snapshots normalized 25 and 96 records
+  respectively. A disposable production-schema PostgreSQL run persisted all
+  121 signals and lineage rows with context-only, official-provenance,
+  owner-consistency, no-sensitive-data and never-hiring-proof assertions.
 - The 2026-08-13 FNS live run downloaded the current 98,434,553-byte official
   headcount archive in verified ranges, matched SHA-256
   `265eca8b05a234ff629f57779ebbc647d07e42c7e43612b40e9ae84340de1464`,
