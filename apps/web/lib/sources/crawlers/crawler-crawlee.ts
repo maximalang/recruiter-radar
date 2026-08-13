@@ -35,6 +35,10 @@ export interface CrawleeEngineOptions {
   circuitFailureThreshold?: number
   /** Host circuit cool-down period. Default 60 seconds. */
   circuitResetMs?: number
+  /** Cool-down after repeated 401/403/407/451 responses. Default 15 minutes. */
+  accessFailureCooldownMs?: number
+  /** Minimum cool-down after repeated 429 responses. Default 5 minutes. */
+  throttlingCooldownMs?: number
 }
 
 export interface ManagedCrawlerEngine extends CrawlerEngine {

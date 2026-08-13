@@ -10,6 +10,8 @@ declare module "@/../../packages/db/scripts/adapters/playwright-browser-pool.mjs
     perHostMinIntervalMs?: number;
     circuitFailureThreshold?: number;
     circuitResetMs?: number;
+    accessFailureCooldownMs?: number;
+    throttlingCooldownMs?: number;
   }): {
     fetchPage(input: {
       url: string;

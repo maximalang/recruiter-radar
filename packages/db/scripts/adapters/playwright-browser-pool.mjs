@@ -5,6 +5,8 @@ const DEFAULT_IDLE_BROWSER_TIMEOUT_MS = 60_000;
 const DEFAULT_PER_HOST_MIN_INTERVAL_MS = 250;
 const DEFAULT_CIRCUIT_FAILURE_THRESHOLD = 3;
 const DEFAULT_CIRCUIT_RESET_MS = 60_000;
+const DEFAULT_ACCESS_FAILURE_COOLDOWN_MS = 15 * 60_000;
+const DEFAULT_THROTTLING_COOLDOWN_MS = 5 * 60_000;
 
 /** Shared bounded Playwright worker pool for web and canonical DB sources. */
 export function createPlaywrightBrowserPool(options = {}) {
@@ -47,6 +49,18 @@ export function createPlaywrightBrowserPool(options = {}) {
     'PLAYWRIGHT_CIRCUIT_RESET_MS',
     DEFAULT_CIRCUIT_RESET_MS,
     60 * 60_000,
+  );
+  const accessFailureCooldownMs = readPositiveInteger(
+    options.accessFailureCooldownMs,
+    'PLAYWRIGHT_ACCESS_FAILURE_COOLDOWN_MS',
+    DEFAULT_ACCESS_FAILURE_COOLDOWN_MS,
+    24 * 60 * 60_000,
+  );
+  const throttlingCooldownMs = readPositiveInteger(
+    options.throttlingCooldownMs,
+    'PLAYWRIGHT_THROTTLING_COOLDOWN_MS',
+    DEFAULT_THROTTLING_COOLDOWN_MS,
+    24 * 60 * 60_000,
   );
   const workers = Array.from({ length: concurrency }, (_, index) => ({
     index,
@@ -91,7 +105,9 @@ export function createPlaywrightBrowserPool(options = {}) {
       }
       const status = response?.status() ?? 200;
       const rawHeaders = response ? await response.allHeaders() : {};
-      recordHostOutcome(host, status < 500 && status !== 429);
+      recordHostOutcome(host, classifyHttpOutcome(status), {
+        retryAfterMs: parseRetryAfterMs(rawHeaders['retry-after']),
+      });
       return {
         url: response?.url?.() ?? url,
         status,
@@ -106,7 +122,7 @@ export function createPlaywrightBrowserPool(options = {}) {
         warnings: response ? [] : ['Playwright navigation returned no HTTP response'],
       };
     } catch (error) {
-      recordHostOutcome(host, false);
+      recordHostOutcome(host, 'server-network-failure');
       throw error;
     } finally {
       worker.requests += 1;
@@ -136,17 +152,22 @@ export function createPlaywrightBrowserPool(options = {}) {
     if (waitMs > 0) await delay(waitMs);
   }
 
-  function recordHostOutcome(host, success) {
+  function recordHostOutcome(host, outcome, { retryAfterMs = 0 } = {}) {
     const state = hostStates.get(host);
     if (!state) return;
-    if (success) {
+    if (outcome === 'success') {
       state.failures = 0;
       state.openUntil = 0;
       return;
     }
     state.failures += 1;
     if (state.failures >= circuitFailureThreshold) {
-      state.openUntil = Date.now() + circuitResetMs;
+      const cooldownMs = outcome === 'auth-access-failure'
+        ? accessFailureCooldownMs
+        : outcome === 'throttling'
+          ? Math.max(throttlingCooldownMs, retryAfterMs)
+          : circuitResetMs;
+      state.openUntil = Date.now() + cooldownMs;
     }
   }
 
@@ -280,6 +301,24 @@ function boundedHeader(value) {
     && !/[\r\n]/.test(value)
     ? value.trim()
     : null;
+}
+
+function classifyHttpOutcome(status) {
+  if ((status >= 200 && status < 400) || status === 404 || status === 410) return 'success';
+  if ([401, 403, 407, 451].includes(status)) return 'auth-access-failure';
+  if (status === 429) return 'throttling';
+  if (status >= 500) return 'server-network-failure';
+  return 'server-network-failure';
+}
+
+function parseRetryAfterMs(value) {
+  const normalized = boundedHeader(value);
+  if (!normalized) return 0;
+  if (/^\d+$/.test(normalized)) return Math.min(Number(normalized) * 1_000, 24 * 60 * 60_000);
+  const retryAt = Date.parse(normalized);
+  return Number.isFinite(retryAt)
+    ? Math.min(Math.max(0, retryAt - Date.now()), 24 * 60 * 60_000)
+    : 0;
 }
 
 function delay(ms) {

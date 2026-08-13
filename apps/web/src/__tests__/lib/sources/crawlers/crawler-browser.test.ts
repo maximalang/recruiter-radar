@@ -1,6 +1,7 @@
 const allHeaders = jest.fn(async (): Promise<Record<string, string>> => ({ 'content-type': 'text/html' }))
+let responseStatus = 200
 const response: { status: () => number; allHeaders: () => Promise<Record<string, string>> } = {
-  status: () => 200,
+  status: () => responseStatus,
   allHeaders,
 }
 const goto = jest.fn(async (): Promise<typeof response> => response)
@@ -26,6 +27,7 @@ function deferred<T>() {
 describe('Playwright SPA crawler', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    responseStatus = 200
     delete process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
   })
 
@@ -202,6 +204,67 @@ describe('Playwright SPA crawler', () => {
     await expect(engine.fetch({ url: 'https://host-b.example/jobs' })).resolves.toMatchObject({
       status: 200,
     })
+
+    await engine.close()
+  })
+
+  it.each([401, 403, 407, 451])(
+    'opens a longer access-denial circuit after repeated HTTP %i responses',
+    async (status) => {
+      responseStatus = status
+      const engine = createCrawleeSpaEngine({
+        concurrency: 1,
+        perHostMinIntervalMs: 0,
+        circuitFailureThreshold: 2,
+        circuitResetMs: 100,
+        accessFailureCooldownMs: 60_000,
+      })
+
+      await expect(engine.fetch({ url: 'https://access-denied.example/1' })).resolves.toMatchObject({ status })
+      await expect(engine.fetch({ url: 'https://access-denied.example/2' })).resolves.toMatchObject({ status })
+      await expect(engine.fetch({ url: 'https://access-denied.example/3' })).rejects.toMatchObject({
+        code: 'PLAYWRIGHT_CIRCUIT_OPEN',
+        host: 'access-denied.example',
+      })
+      expect(goto).toHaveBeenCalledTimes(2)
+
+      await engine.close()
+    },
+  )
+
+  it('opens a throttling circuit after repeated HTTP 429 responses', async () => {
+    responseStatus = 429
+    const engine = createCrawleeSpaEngine({
+      concurrency: 1,
+      perHostMinIntervalMs: 0,
+      circuitFailureThreshold: 2,
+      throttlingCooldownMs: 60_000,
+    })
+
+    await expect(engine.fetch({ url: 'https://throttled.example/1' })).resolves.toMatchObject({ status: 429 })
+    await expect(engine.fetch({ url: 'https://throttled.example/2' })).resolves.toMatchObject({ status: 429 })
+    await expect(engine.fetch({ url: 'https://throttled.example/3' })).rejects.toMatchObject({
+      code: 'PLAYWRIGHT_CIRCUIT_OPEN',
+      host: 'throttled.example',
+    })
+    expect(goto).toHaveBeenCalledTimes(2)
+
+    await engine.close()
+  })
+
+  it.each([404, 410])('treats an expected terminal HTTP %i as a successful host outcome', async (status) => {
+    const engine = createCrawleeSpaEngine({
+      concurrency: 1,
+      perHostMinIntervalMs: 0,
+      circuitFailureThreshold: 2,
+    })
+    goto.mockRejectedValueOnce(new Error('temporary network failure'))
+    responseStatus = status
+
+    await expect(engine.fetch({ url: 'https://gone.example/1' })).rejects.toThrow('temporary network failure')
+    await expect(engine.fetch({ url: 'https://gone.example/2' })).resolves.toMatchObject({ status })
+    await expect(engine.fetch({ url: 'https://gone.example/3' })).resolves.toMatchObject({ status })
+    expect(goto).toHaveBeenCalledTimes(3)
 
     await engine.close()
   })
