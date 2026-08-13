@@ -19,6 +19,7 @@ const root = resolve(import.meta.dirname, '..', '..', '..')
 const migrationsDir = resolve(root, 'packages', 'db', 'migrations')
 const migrateScript = resolve(root, 'packages', 'db', 'scripts', 'migrate.mjs')
 const downMigrations = [
+  '20260814030000_add_source_temporal_health.down.sql',
   '20260812150000_add_source_signal_evidence_lineage.down.sql',
   '20260809140000_add_query_plan_quality_feedback_v2.down.sql',
   '20260809130000_add_commercial_signal_quality_v2.down.sql',

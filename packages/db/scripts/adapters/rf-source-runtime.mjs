@@ -21,6 +21,7 @@ import {
   assertOrgSourceRefOwner,
   resolveOrganizationOwner,
 } from './organization-resolution.mjs';
+import { buildSourceRunMetrics, recordSourceRunObservation } from '../lib/source-health-recorder.mjs';
 
 export { loadEnvFile, normalizeDomain };
 
@@ -194,6 +195,8 @@ export function createStandardSourceRuntime(config) {
   async function runCli(argv, resolveInput) {
     const requestedAction = argv[0]?.trim() || 'pipeline';
     const databaseUrl = process.env.DATABASE_URL?.trim();
+    const startedAt = Date.now();
+    let input = null;
 
     if (!SUPPORTED_ACTIONS.has(requestedAction)) {
       console.error(
@@ -204,9 +207,10 @@ export function createStandardSourceRuntime(config) {
     }
 
     try {
-      const input = await resolveInput();
+      input = await resolveInput();
 
       if (requestedAction === 'fetch') {
+        await persistRunHealth(databaseUrl, buildSourceRunMetrics({ sourceId, action: requestedAction, startedAt, completedAt: Date.now(), input }));
         console.log(JSON.stringify(buildFetchSummary(input), null, 2));
         return;
       }
@@ -219,6 +223,7 @@ export function createStandardSourceRuntime(config) {
       }
 
       const stats = await ingest({ connectionString: databaseUrl, input });
+      await persistRunHealth(databaseUrl, buildSourceRunMetrics({ sourceId, action: requestedAction, startedAt, completedAt: Date.now(), input }));
 
       if (requestedAction === 'ingest') {
         console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
@@ -227,6 +232,7 @@ export function createStandardSourceRuntime(config) {
 
       console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
     } catch (error) {
+      await persistRunHealth(databaseUrl, buildSourceRunMetrics({ sourceId, action: requestedAction, startedAt, completedAt: Date.now(), input, error }));
       const message = error instanceof Error ? error.message : String(error);
       console.error(`${sourceId} ${requestedAction} failed: ${message}`);
       process.exit(1);
@@ -307,6 +313,19 @@ export function createStandardSourceRuntime(config) {
     buildIngestSummary,
     buildPipelineSummary,
   };
+}
+
+async function persistRunHealth(connectionString, metrics) {
+  if (!connectionString) return;
+  const client = new Client({ connectionString, connectionTimeoutMillis: resolveDbConnectionTimeoutMillis() });
+  try {
+    await client.connect();
+    await recordSourceRunObservation(client, metrics);
+  } catch (error) {
+    console.error(`source health observation skipped: ${error instanceof Error ? error.message : 'unknown error'}`);
+  } finally {
+    await client.end().catch(() => {});
+  }
 }
 
 async function upsertOrgSourceRef(client, sourceId, record) {

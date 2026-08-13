@@ -51,6 +51,15 @@ export interface SourceHealth {
   recordsProcessed: number;
   errors: number;
   status: "excellent" | "good" | "warning" | "critical";
+  lastSuccessfulFetch?: string;
+  lastSuccessfulNormalization?: string;
+  duplicates?: number;
+  organizationResolutionRejects?: number;
+  blocked?: number;
+  rateLimited?: number;
+  extractionMethods?: Record<string, number>;
+  latencyMs?: number;
+  consecutiveFailures?: number;
 }
 
 // ─── Data Fetching ──────────────────────────────────────────────
@@ -210,32 +219,32 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
     // Get the canonical source list from the registry
     const registry = getSourceRegistry();
 
-    // Query signal stats per source in the last 24h
+    // Operational source-run projection; unlike signals, this also records
+    // expected-zero runs, blocks, throttling and normalization failures.
     const statsResult = await pool.query<{
-      source: string;
-      records_24h: string;
-      latest_at: string | null;
+      source_id: string; last_attempt_at: string; last_successful_fetch_at: string | null;
+      last_successful_normalization_at: string | null; records_fetched: string; records_accepted: string;
+      duplicate_records: string; organization_resolution_rejects: string; blocked_count: string;
+      rate_limited_count: string; extraction_methods: Record<string, number>; last_latency_ms: number; consecutive_failures: number;
     }>(`
-      SELECT
-        source,
-        COUNT(*)::TEXT AS records_24h,
-        MAX(occurred_at)::TEXT AS latest_at
-      FROM signals
-      WHERE occurred_at >= NOW() - INTERVAL '24 hours'
-      GROUP BY source
+      SELECT source_id, last_attempt_at::TEXT, last_successful_fetch_at::TEXT,
+        last_successful_normalization_at::TEXT, records_fetched::TEXT, records_accepted::TEXT,
+        duplicate_records::TEXT, organization_resolution_rejects::TEXT, blocked_count::TEXT,
+        rate_limited_count::TEXT, extraction_methods, last_latency_ms, consecutive_failures
+      FROM source_health_state
     `);
 
     // Build a lookup from the query result
     const statsBySource = new Map(
-      statsResult.rows.map((r) => [r.source, r]),
+      statsResult.rows.map((r) => [r.source_id, r]),
     );
 
     return registry.map((src) => {
       const stats = statsBySource.get(src.id);
-      const records = parseInt(stats?.records_24h ?? "0", 10);
-      const lastRun = stats?.latest_at ?? "";
-      const syncAgeMs = stats?.latest_at
-        ? Date.now() - new Date(stats.latest_at).getTime()
+      const records = parseInt(stats?.records_accepted ?? "0", 10);
+      const lastRun = stats?.last_attempt_at ?? "";
+      const syncAgeMs = stats?.last_attempt_at
+        ? Date.now() - new Date(stats.last_attempt_at).getTime()
         : Infinity;
 
       // Compute overall health for this source (0-100)
@@ -246,6 +255,8 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
       else if (syncAgeMs > 60 * 60 * 1000) overall = 80;
       // Penalty for no records
       if (records === 0 && syncAgeMs > 60 * 60 * 1000) overall -= 20;
+      overall -= Math.min(60, Number(stats?.consecutive_failures ?? 0) * 20);
+      overall = Math.max(0, overall);
 
       const status: SourceHealth["status"] =
         overall >= 80 ? "excellent" :
@@ -259,8 +270,17 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
         overall,
         lastRun,
         recordsProcessed: records,
-        errors: 0, // No error tracking in current schema
+        errors: Number(stats?.consecutive_failures ?? 0),
         status,
+        lastSuccessfulFetch: stats?.last_successful_fetch_at ?? undefined,
+        lastSuccessfulNormalization: stats?.last_successful_normalization_at ?? undefined,
+        duplicates: parseInt(stats?.duplicate_records ?? "0", 10),
+        organizationResolutionRejects: parseInt(stats?.organization_resolution_rejects ?? "0", 10),
+        blocked: parseInt(stats?.blocked_count ?? "0", 10),
+        rateLimited: parseInt(stats?.rate_limited_count ?? "0", 10),
+        extractionMethods: stats?.extraction_methods ?? {},
+        latencyMs: Number(stats?.last_latency_ms ?? 0),
+        consecutiveFailures: Number(stats?.consecutive_failures ?? 0),
       };
     });
   } catch {

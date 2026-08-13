@@ -97,6 +97,21 @@ Stage 2 operational states:
 
 ## Source registry
 
+Standard source runs persist PII-free operational outcomes in append-only
+`source_run_observations` and project current counters through `source_health_state`.
+The protected source status endpoint reports successful fetch/normalization timestamps,
+accepted/duplicate/rejected counts, blocked/rate-limited outcomes, extraction methods,
+latency and consecutive failures. These metrics require migration
+`20260814030000_add_source_temporal_health.sql`; signal freshness is no longer used as
+a substitute for source runtime health.
+
+Temporal intelligence stores daily organization/source observations in
+`source_temporal_observations` and deterministic transitions in
+`source_temporal_derived_events`. Vacancy 7/14/30-day deltas, role reopenings,
+geography/function expansion, FNS trajectories, procurement acceleration and
+Rospatent changes are derived events, not new raw source IDs. The first observation
+is a baseline and emits no transition.
+
 `status: active` означает runnable contract, а не одновременно live-configured, legally approved и digest-allowed. Machine-readable source of truth для priority, confidence, lead eligibility и promotion status — `packages/db/source-policy.json`; `packages/db/scripts/source-registry.mjs` проецирует эту policy в runtime readiness и coverage report.
 
 Operational readiness отдельно зафиксирован в `packages/db/source-readiness.json`, а классы

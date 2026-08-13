@@ -181,6 +181,8 @@
     "verify:github-company-org:smoke": "node --test packages/db/scripts/adapters/github-company-org.test.mjs",
     "verify:youtube-company-channels:smoke": "node --test packages/db/scripts/adapters/youtube-company-channels.test.mjs",
     "verify:telegram-company-channels:smoke": "node --test packages/db/scripts/adapters/telegram-company-channels.test.mjs",
+    "source:derive:temporal-intelligence": "node packages/db/scripts/derive-source-temporal-intelligence.mjs",
+    "verify:source:temporal-health": "node --test packages/db/scripts/lib/source-temporal-intelligence.test.mjs packages/db/scripts/lib/source-health-recorder.test.mjs",
     "verify:company-site:smoke": "node packages/db/scripts/verify-company-site-smoke.mjs",
     "verify:company-newsrooms:discovery": "node packages/db/scripts/verify-company-newsrooms-discovery-smoke.mjs",
     "verify:site-discovery:primitives": "node packages/db/scripts/verify-site-discovery-primitives-smoke.mjs",

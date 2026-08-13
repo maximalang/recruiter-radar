@@ -58,6 +58,15 @@ export async function GET(request: NextRequest) {
             overall: h.overall,
             recordsLast24h: h.recordsProcessed,
             lastRun: h.lastRun || null,
+            lastSuccessfulFetch: h.lastSuccessfulFetch || null,
+            lastSuccessfulNormalization: h.lastSuccessfulNormalization || null,
+            duplicates: h.duplicates ?? 0,
+            organizationResolutionRejects: h.organizationResolutionRejects ?? 0,
+            blocked: h.blocked ?? 0,
+            rateLimited: h.rateLimited ?? 0,
+            extractionMethods: h.extractionMethods ?? {},
+            latencyMs: h.latencyMs ?? 0,
+            consecutiveFailures: h.consecutiveFailures ?? 0,
           }
         : null,
     };
