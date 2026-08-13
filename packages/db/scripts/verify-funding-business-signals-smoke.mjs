@@ -201,11 +201,9 @@ async function runGdeltModeSmoke() {
   const originalFetch = globalThis.fetch;
   const originalInputFile = process.env.FUNDING_BUSINESS_SIGNALS_INPUT_FILE;
   const originalQueriesJson = process.env.FUNDING_SIGNALS_GDELT_QUERIES_JSON;
-  const originalTransport = process.env.FUNDING_SIGNALS_GDELT_TRANSPORT;
   const requestedUrls = [];
 
   delete process.env.FUNDING_BUSINESS_SIGNALS_INPUT_FILE;
-  process.env.FUNDING_SIGNALS_GDELT_TRANSPORT = 'fetch';
   process.env.FUNDING_SIGNALS_GDELT_QUERIES_JSON = JSON.stringify([
     {
       query: 'RocketScale Series B hiring',
@@ -299,7 +297,6 @@ async function runGdeltModeSmoke() {
     globalThis.fetch = originalFetch;
     restoreEnv('FUNDING_BUSINESS_SIGNALS_INPUT_FILE', originalInputFile);
     restoreEnv('FUNDING_SIGNALS_GDELT_QUERIES_JSON', originalQueriesJson);
-    restoreEnv('FUNDING_SIGNALS_GDELT_TRANSPORT', originalTransport);
   }
 }
 

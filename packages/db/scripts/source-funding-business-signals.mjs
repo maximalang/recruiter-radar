@@ -14,6 +14,7 @@ import {
   stripBom,
 } from './adapters/source-records.mjs';
 import { loadEnvFile, normalizeDomain } from './lib/common-utils.mjs';
+import { createGdeltDocClient } from './adapters/gdelt-doc-client.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
 import { assertOrgSourceRefOwner, resolveOrganizationOwner } from './adapters/organization-resolution.mjs';
 import { upsertSignalEvidenceLineage } from './lib/source-lineage-writer.mjs';
@@ -23,6 +24,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
 const SOURCE_ID = 'funding-business-signals';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
+let gdeltDocClient = null;
 
 
 export async function runFundingBusinessSignalsCli(argv = process.argv.slice(2)) {
@@ -171,16 +173,16 @@ export async function resolveFundingProviderInput({ providerUrl, providerToken }
 
 export async function resolveFundingGdeltInput({ gdeltQueries }) {
   const records = [];
-  let previousRequestStartedAt = 0;
+  let cacheHits = 0;
+  let requestAttempts = 0;
+  let schedulerDeferredMs = 0;
 
   for (const queryConfig of gdeltQueries) {
-    const waitMs = Math.max(0, resolveGdeltMinIntervalMs() - (Date.now() - previousRequestStartedAt));
-    if (waitMs > 0) {
-      await new Promise((resolveWait) => setTimeout(resolveWait, waitMs));
-    }
-    previousRequestStartedAt = Date.now();
-    const gdeltRecords = await fetchGdeltRecords(queryConfig);
-    records.push(...gdeltRecords);
+    const fetched = await fetchGdeltRecords(queryConfig);
+    records.push(...fetched.records);
+    cacheHits += Number(fetched.cacheHit);
+    requestAttempts += fetched.attempts;
+    schedulerDeferredMs += fetched.deferredMs;
   }
 
   const syndication = dedupeGdeltSyndicationRecords(records);
@@ -213,6 +215,9 @@ export async function resolveFundingGdeltInput({ gdeltQueries }) {
     inputFilePath: null,
     liveProvider: 'gdelt-doc-api',
     queriesReceived: gdeltQueries.length,
+    cacheHits,
+    requestAttempts,
+    schedulerDeferredMs,
     recordsReceived: records.length,
     duplicateRecords: syndication.duplicateRecords + dedupeResult.duplicateRecords,
     normalizedRecords: dedupeResult.records,
@@ -229,20 +234,17 @@ async function fetchGdeltRecords(queryConfig) {
   url.searchParams.set('timespan', queryConfig.timespan);
   url.searchParams.set('sort', 'datedesc');
 
-  const body = await fetchJson(url, {
-    sourceName: 'funding-business-signals gdelt',
-    nodeHttpFallback: true,
-    preferNodeHttpFallback: process.env.FUNDING_SIGNALS_GDELT_TRANSPORT !== 'fetch',
-    retries: 2,
-    retryDelayMs: 6000,
+  gdeltDocClient ??= createGdeltDocClient();
+  const fetched = await gdeltDocClient.request(url, {
     timeoutMs: resolveGdeltTimeoutMs(),
-    headers: {
-      'user-agent': 'RecruiterRadar/1.0 (funding-business-signals)',
-    },
   });
+  const body = fetched.body;
   const articles = Array.isArray(body?.articles) ? body.articles : [];
 
-  return articles.map((article, index) => mapGdeltArticle(article, queryConfig, index));
+  return {
+    ...fetched,
+    records: articles.map((article, index) => mapGdeltArticle(article, queryConfig, index)),
+  };
 }
 
 function mapGdeltArticle(article, queryConfig, index) {
@@ -788,10 +790,6 @@ function clampInteger(value, fallback, min, max) {
 
 function resolveGdeltTimeoutMs() {
   return clampInteger(process.env.FUNDING_SIGNALS_GDELT_TIMEOUT_MS, 60000, 5000, 120000);
-}
-
-function resolveGdeltMinIntervalMs() {
-  return clampInteger(process.env.FUNDING_SIGNALS_GDELT_MIN_INTERVAL_MS, 6000, 5000, 30000);
 }
 
 function buildSignalSummaryText(record) {
