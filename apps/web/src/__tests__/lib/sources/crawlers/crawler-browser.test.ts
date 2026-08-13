@@ -23,14 +23,6 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-async function waitForCallCount(mock: jest.Mock, count: number): Promise<void> {
-  for (let attempt = 0; attempt < 50; attempt++) {
-    if (mock.mock.calls.length >= count) return
-    await new Promise((resolve) => setTimeout(resolve, 0))
-  }
-  throw new Error(`Expected ${count} calls, received ${mock.mock.calls.length}`)
-}
-
 describe('Playwright SPA crawler', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -130,26 +122,47 @@ describe('Playwright SPA crawler', () => {
   it('never exceeds the configured browser worker concurrency', async () => {
     const firstNavigation = deferred<typeof response>()
     const secondNavigation = deferred<typeof response>()
+    const twoNavigationsStarted = deferred<void>()
+    const thirdNavigationStarted = deferred<void>()
+    let navigationStarts = 0
     goto
-      .mockImplementationOnce(() => firstNavigation.promise)
-      .mockImplementationOnce(() => secondNavigation.promise)
+      .mockImplementationOnce(() => {
+        navigationStarts += 1
+        if (navigationStarts === 2) twoNavigationsStarted.resolve(undefined)
+        return firstNavigation.promise
+      })
+      .mockImplementationOnce(() => {
+        navigationStarts += 1
+        if (navigationStarts === 2) twoNavigationsStarted.resolve(undefined)
+        return secondNavigation.promise
+      })
+      .mockImplementationOnce(async () => {
+        thirdNavigationStarted.resolve(undefined)
+        return response
+      })
     const engine = createCrawleeSpaEngine({ concurrency: 2 })
 
     const first = engine.fetch({ url: 'https://careers.example/1' })
     const second = engine.fetch({ url: 'https://careers.example/2' })
     const third = engine.fetch({ url: 'https://careers.example/3' })
 
-    await waitForCallCount(goto, 2)
-    expect(launch).toHaveBeenCalledTimes(2)
-    expect(goto).toHaveBeenCalledTimes(2)
+    try {
+      await twoNavigationsStarted.promise
+      expect(launch).toHaveBeenCalledTimes(2)
+      expect(goto).toHaveBeenCalledTimes(2)
 
-    firstNavigation.resolve(response)
-    await waitForCallCount(goto, 3)
-    secondNavigation.resolve(response)
-    await Promise.all([first, second, third])
+      firstNavigation.resolve(response)
+      await thirdNavigationStarted.promise
+      secondNavigation.resolve(response)
+      await Promise.all([first, second, third])
 
-    expect(launch).toHaveBeenCalledTimes(2)
-    await engine.close()
+      expect(launch).toHaveBeenCalledTimes(2)
+    } finally {
+      firstNavigation.resolve(response)
+      secondNavigation.resolve(response)
+      await Promise.allSettled([first, second, third])
+      await engine.close()
+    }
   })
 
   it('opens a per-host circuit after bounded consecutive navigation failures', async () => {
