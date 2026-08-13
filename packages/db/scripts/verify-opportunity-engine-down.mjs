@@ -60,7 +60,13 @@ const downMigrations = [
   '20260727120000_add_opportunity_engine_hardening.down.sql',
   '20260726130000_add_opportunity_engine_v1.down.sql',
 ]
-const PRE_FIXTURE_DOWN_MIGRATIONS = 28
+const writeBoundaryDownMigration =
+  '20260728111000_enforce_opportunity_outcome_write_boundary.down.sql'
+const PRE_FIXTURE_DOWN_MIGRATIONS =
+  downMigrations.indexOf(writeBoundaryDownMigration) + 1
+if (PRE_FIXTURE_DOWN_MIGRATIONS === 0) {
+  throw new Error(`Missing required down migration: ${writeBoundaryDownMigration}`)
+}
 
 const admin = new Client({ connectionString: databaseUrl })
 const databaseName = `rr_opportunity_down_${process.pid}_${Date.now()}`

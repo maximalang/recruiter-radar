@@ -223,8 +223,9 @@ describe('Agency DNA Match v2 migration contract', () => {
     expect(matchDown).toBeGreaterThan(-1)
     expect(propensityDown).toBeGreaterThan(matchDown)
     expect(opportunityDownVerifier).toContain(
-      'const PRE_FIXTURE_DOWN_MIGRATIONS = 28',
+      "'20260728111000_enforce_opportunity_outcome_write_boundary.down.sql'",
     )
+    expect(opportunityDownVerifier).toContain('downMigrations.indexOf(writeBoundaryDownMigration) + 1')
     expect(opportunityDownVerifier).not.toContain('CASCADE')
   })
 

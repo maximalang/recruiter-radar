@@ -57,7 +57,7 @@ describe('Opportunity CRM bridge migration contract', () => {
     expect(downVerifier).toContain(
       '20260801140000_add_opportunity_crm_bridge.down.sql',
     )
-    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 28')
+    expect(downVerifier).toContain('downMigrations.indexOf(writeBoundaryDownMigration) + 1')
   })
 
   it('coordinates outbound delivery without keeping the audit ledger mutable', () => {
