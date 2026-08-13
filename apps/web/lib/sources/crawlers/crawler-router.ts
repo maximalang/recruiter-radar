@@ -106,6 +106,8 @@ export interface CrawlerRouterMetrics {
 export interface CrawlerRouter {
   fetch(input: CrawlerFetchInput): Promise<CrawlerResult>
   getMetrics(): Record<string, CrawlerRouterMetrics>
+  /** Gracefully close stateful engines such as the persistent browser pool. */
+  close(): Promise<void>
 }
 
 export function createCrawlerRouter(
@@ -226,5 +228,13 @@ export function createCrawlerRouter(
     },
 
     getMetrics: () => circuitBreaker.getMetrics(),
+
+    async close(): Promise<void> {
+      const uniqueEngines = new Set(Object.values(engines).filter(Boolean))
+      await Promise.all([...uniqueEngines].map(async (engine) => {
+        const close = (engine as CrawlerEngine & { close?: () => Promise<void> }).close
+        if (typeof close === 'function') await close.call(engine)
+      }))
+    },
   }
 }

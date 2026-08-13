@@ -31,6 +31,20 @@ export interface CrawleeEngineOptions {
   idleBrowserTimeoutMs?: number
   /** Minimum delay between rendered requests to the same host. Default 250ms. */
   perHostMinIntervalMs?: number
+  /** Maximum rendered pages in flight for one host. Default 1. */
+  perHostConcurrency?: number
+  /** Maximum requests waiting behind active workers. Default 100. */
+  maxQueueSize?: number
+  /** Host-specific rate/concurrency overrides; supports exact and `*.suffix` keys. */
+  hostProfiles?: Record<string, { maxConcurrency?: number; minIntervalMs?: number }>
+  /** Recycle a worker before reuse when the process RSS reaches this threshold. */
+  maxProcessRssBytes?: number
+  /** Test seam for deterministic memory-threshold verification. */
+  memoryUsage?: () => { rss: number }
+  /** Hard deadline for a rendered-page operation. Default navigation timeout plus 5s. */
+  stuckPageTimeoutMs?: number
+  /** Time to let active pages drain during close before forcing recycle. Default 10s. */
+  gracefulCloseTimeoutMs?: number
   /** Consecutive host failures before opening the circuit. Default 3. */
   circuitFailureThreshold?: number
   /** Host circuit cool-down period. Default 60 seconds. */

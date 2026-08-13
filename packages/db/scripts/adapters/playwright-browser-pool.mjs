@@ -5,6 +5,9 @@ const DEFAULT_MAX_REQUESTS_PER_BROWSER = 100;
 const DEFAULT_MAX_BROWSER_AGE_MS = 15 * 60_000;
 const DEFAULT_IDLE_BROWSER_TIMEOUT_MS = 60_000;
 const DEFAULT_PER_HOST_MIN_INTERVAL_MS = 250;
+const DEFAULT_PER_HOST_CONCURRENCY = 1;
+const DEFAULT_MAX_QUEUE_SIZE = 100;
+const DEFAULT_MAX_PROCESS_RSS_BYTES = 1_500 * 1024 * 1024;
 const DEFAULT_CIRCUIT_FAILURE_THRESHOLD = 3;
 const DEFAULT_CIRCUIT_RESET_MS = 60_000;
 const DEFAULT_ACCESS_FAILURE_COOLDOWN_MS = 15 * 60_000;
@@ -40,6 +43,36 @@ export function createPlaywrightBrowserPool(options = {}) {
     DEFAULT_PER_HOST_MIN_INTERVAL_MS,
     60_000,
   );
+  const perHostConcurrency = readPositiveInteger(
+    options.perHostConcurrency,
+    'PLAYWRIGHT_PER_HOST_CONCURRENCY',
+    DEFAULT_PER_HOST_CONCURRENCY,
+    concurrency,
+  );
+  const maxQueueSize = readPositiveInteger(
+    options.maxQueueSize,
+    'PLAYWRIGHT_BROWSER_MAX_QUEUE_SIZE',
+    DEFAULT_MAX_QUEUE_SIZE,
+    10_000,
+  );
+  const maxProcessRssBytes = readPositiveInteger(
+    options.maxProcessRssBytes,
+    'PLAYWRIGHT_BROWSER_MAX_PROCESS_RSS_BYTES',
+    DEFAULT_MAX_PROCESS_RSS_BYTES,
+  );
+  const gracefulCloseTimeoutMs = readPositiveInteger(
+    options.gracefulCloseTimeoutMs,
+    'PLAYWRIGHT_BROWSER_GRACEFUL_CLOSE_TIMEOUT_MS',
+    10_000,
+    60_000,
+  );
+  const memoryUsage = typeof options.memoryUsage === 'function'
+    ? options.memoryUsage
+    : () => process.memoryUsage();
+  const hostProfiles = buildHostProfiles(options.hostProfiles, {
+    maxConcurrency: perHostConcurrency,
+    minIntervalMs: perHostMinIntervalMs,
+  }, concurrency);
   const circuitFailureThreshold = readPositiveInteger(
     options.circuitFailureThreshold,
     'PLAYWRIGHT_CIRCUIT_FAILURE_THRESHOLD',
@@ -75,6 +108,7 @@ export function createPlaywrightBrowserPool(options = {}) {
   const hostStates = new Map();
   let idleTimer = null;
   let closed = false;
+  let pendingRequests = 0;
 
   async function fetchPage({
     url,
@@ -83,16 +117,20 @@ export function createPlaywrightBrowserPool(options = {}) {
     previous = {},
     settleMs = readNonNegativeInteger(undefined, 'PLAYWRIGHT_RENDER_SETTLE_MS', 1_500, 15_000),
   }) {
+    const releaseQueueSlot = reserveQueueSlot();
     const resolutionCache = new Map();
-    const initial = await assertCrawlerUrlIsPublic(url, {
-      lookup: options.dnsLookup,
-      resolutionCache,
-    });
-    const host = initial.hostname;
-    await awaitHostPermission(host);
-    const worker = await acquire();
+    let host = null;
+    let releaseHost = null;
+    let worker = null;
     let context = null;
     try {
+      const initial = await assertCrawlerUrlIsPublic(url, {
+        lookup: options.dnsLookup,
+        resolutionCache,
+      });
+      host = initial.hostname;
+      releaseHost = await awaitHostPermission(host);
+      worker = await acquire();
       const browser = await getBrowser(worker);
       context = await browser.newContext({
         extraHTTPHeaders: {
@@ -115,27 +153,43 @@ export function createPlaywrightBrowserPool(options = {}) {
         }
       });
       const page = await context.newPage();
-      const response = await page.goto(url, {
-        waitUntil: 'domcontentloaded',
-        timeout: timeoutMs,
-      });
-      if (settleMs > 0 && typeof page.waitForTimeout === 'function') {
-        await page.waitForTimeout(settleMs);
-      }
-      const status = response?.status() ?? 200;
-      const rawHeaders = response ? await response.allHeaders() : {};
-      const finalUrl = response?.url?.() ?? url;
-      await assertCrawlerUrlIsPublic(finalUrl, {
-        lookup: options.dnsLookup,
-        resolutionCache,
-      });
+      const stuckPageTimeoutMs = readPositiveInteger(
+        options.stuckPageTimeoutMs,
+        'PLAYWRIGHT_STUCK_PAGE_TIMEOUT_MS',
+        Math.min(timeoutMs + settleMs + 5_000, 120_000),
+        180_000,
+      );
+      const rendered = await withDeadline(async () => {
+        const response = await page.goto(url, {
+          waitUntil: 'domcontentloaded',
+          timeout: timeoutMs,
+        });
+        if (settleMs > 0 && typeof page.waitForTimeout === 'function') {
+          await page.waitForTimeout(settleMs);
+        }
+        const status = response?.status() ?? 200;
+        const rawHeaders = response ? await response.allHeaders() : {};
+        const finalUrl = response?.url?.() ?? url;
+        await assertCrawlerUrlIsPublic(finalUrl, {
+          lookup: options.dnsLookup,
+          resolutionCache,
+        });
+        return {
+          response,
+          status,
+          rawHeaders,
+          finalUrl,
+          html: status === 304 ? null : await page.content(),
+        };
+      }, stuckPageTimeoutMs, () => buildStuckPageError(host, url, stuckPageTimeoutMs));
+      const { response, status, rawHeaders, finalUrl, html } = rendered;
       recordHostOutcome(host, classifyHttpOutcome(status), {
         retryAfterMs: parseRetryAfterMs(rawHeaders['retry-after']),
       });
       return {
         url: finalUrl,
         status,
-        html: status === 304 ? null : await page.content(),
+        html,
         rawHeaders,
         notModified: status === 304,
         validators: {
@@ -146,34 +200,79 @@ export function createPlaywrightBrowserPool(options = {}) {
         warnings: response ? [] : ['Playwright navigation returned no HTTP response'],
       };
     } catch (error) {
-      recordHostOutcome(host, 'server-network-failure');
+      if (host && error?.code !== 'PLAYWRIGHT_CIRCUIT_OPEN') {
+        recordHostOutcome(host, 'server-network-failure');
+      }
       throw error;
     } finally {
-      worker.requests += 1;
+      if (worker) worker.requests += 1;
       if (context) await context.close().catch(() => undefined);
-      release(worker);
+      if (worker) release(worker);
+      releaseHost?.();
+      releaseQueueSlot();
     }
   }
 
   async function awaitHostPermission(host) {
-    const state = hostStates.get(host) ?? { nextAllowedAt: 0, failures: 0, openUntil: 0 };
+    const state = getHostState(host);
+    return new Promise((resolve, reject) => {
+      state.waiters.push({ resolve, reject });
+      void drainHost(host, state);
+    });
+  }
+
+  function getHostState(host) {
+    const state = hostStates.get(host) ?? {
+      nextAllowedAt: 0,
+      failures: 0,
+      openUntil: 0,
+      active: 0,
+      draining: false,
+      waiters: [],
+      profile: resolveHostProfile(host, hostProfiles),
+    };
     hostStates.set(host, state);
-    const now = Date.now();
-    if (state.openUntil > now) {
-      const error = new Error(`Playwright circuit is open for ${host}`);
-      error.code = 'PLAYWRIGHT_CIRCUIT_OPEN';
-      error.host = host;
-      error.retryAt = new Date(state.openUntil).toISOString();
-      throw error;
+    return state;
+  }
+
+  async function drainHost(host, state) {
+    if (state.draining) return;
+    state.draining = true;
+    try {
+      while (!closed && state.active < state.profile.maxConcurrency && state.waiters.length > 0) {
+        const waiter = state.waiters.shift();
+        const now = Date.now();
+        if (state.openUntil > now) {
+          waiter.reject(buildCircuitOpenError(host, state.openUntil));
+          continue;
+        }
+        if (state.openUntil > 0) {
+          state.openUntil = 0;
+          state.failures = 0;
+        }
+        const reservedAt = Math.max(now, state.nextAllowedAt);
+        const waitMs = reservedAt - now;
+        state.nextAllowedAt = reservedAt + state.profile.minIntervalMs;
+        if (waitMs > 0) await delay(waitMs);
+        if (closed) {
+          waiter.reject(new Error('Playwright browser pool is closed'));
+          continue;
+        }
+        state.active += 1;
+        let released = false;
+        waiter.resolve(() => {
+          if (released) return;
+          released = true;
+          state.active = Math.max(0, state.active - 1);
+          void drainHost(host, state);
+        });
+      }
+    } finally {
+      state.draining = false;
+      if (!closed && state.active < state.profile.maxConcurrency && state.waiters.length > 0) {
+        queueMicrotask(() => void drainHost(host, state));
+      }
     }
-    if (state.openUntil > 0) {
-      state.openUntil = 0;
-      state.failures = 0;
-    }
-    const reservedAt = Math.max(now, state.nextAllowedAt);
-    const waitMs = reservedAt - now;
-    state.nextAllowedAt = reservedAt + perHostMinIntervalMs;
-    if (waitMs > 0) await delay(waitMs);
   }
 
   function recordHostOutcome(host, outcome, { retryAfterMs = 0 } = {}) {
@@ -200,7 +299,33 @@ export function createPlaywrightBrowserPool(options = {}) {
     clearIdleTimer();
     const error = new Error('Playwright browser pool is closed');
     while (waiters.length > 0) waiters.shift()?.reject(error);
+    for (const state of hostStates.values()) {
+      while (state.waiters.length > 0) state.waiters.shift()?.reject(error);
+    }
+    await waitForDrain(gracefulCloseTimeoutMs);
     await recycleAllBrowsers();
+  }
+
+  async function waitForDrain(timeoutMs) {
+    const deadline = Date.now() + timeoutMs;
+    while (pendingRequests > 0 && Date.now() < deadline) await delay(10);
+  }
+
+  function reserveQueueSlot() {
+    if (closed) throw new Error('Playwright browser pool is closed');
+    if (pendingRequests >= concurrency + maxQueueSize) {
+      const error = new Error(`Playwright browser queue is full (${maxQueueSize} waiting requests)`);
+      error.code = 'PLAYWRIGHT_QUEUE_FULL';
+      error.maxQueueSize = maxQueueSize;
+      throw error;
+    }
+    pendingRequests += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      pendingRequests = Math.max(0, pendingRequests - 1);
+    };
   }
 
   async function acquire() {
@@ -230,6 +355,8 @@ export function createPlaywrightBrowserPool(options = {}) {
       && (
         worker.requests >= maxRequestsPerBrowser
         || Date.now() - worker.launchedAt >= maxBrowserAgeMs
+        || Number(memoryUsage()?.rss) >= maxProcessRssBytes
+        || (typeof worker.browser.isConnected === 'function' && !worker.browser.isConnected())
       )
     ) await recycleBrowser(worker);
     if (worker.browser) return worker.browser;
@@ -285,6 +412,100 @@ function resolveProxyUrls(explicit) {
   const envValue = process.env.CRAWLEE_PROXY_URLS?.trim();
   if (!envValue) return [];
   return envValue.split(',').map((value) => value.trim()).filter(Boolean);
+}
+
+function buildHostProfiles(explicit, defaults, maximumConcurrency) {
+  const profiles = [
+    { pattern: 'boards.greenhouse.io', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: 'jobs.lever.co', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: 'jobs.ashbyhq.com', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.recruitee.com', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: 'apply.workable.com', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.myworkdayjobs.com', maxConcurrency: 1, minIntervalMs: 2_000 },
+    { pattern: '*.teamtailor.com', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.jobs.personio.com', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.jobs.personio.de', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.bamboohr.com', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.pinpointhq.com', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.breezy.hr', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.comeet.com', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.applytojob.com', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.icims.com', maxConcurrency: 1, minIntervalMs: 2_000 },
+    { pattern: '*.taleo.net', maxConcurrency: 1, minIntervalMs: 2_000 },
+    { pattern: '*.oraclecloud.com', maxConcurrency: 1, minIntervalMs: 2_000 },
+    { pattern: '*.successfactors.com', maxConcurrency: 1, minIntervalMs: 2_000 },
+    { pattern: '*.successfactors.eu', maxConcurrency: 1, minIntervalMs: 2_000 },
+    { pattern: 'careers.smartrecruiters.com', maxConcurrency: 1, minIntervalMs: 1_500 },
+    { pattern: '*.potok.io', maxConcurrency: 1, minIntervalMs: 2_000 },
+    { pattern: '*.huntflow.io', maxConcurrency: 1, minIntervalMs: 2_000 },
+    { pattern: 'jobs.friend.work', maxConcurrency: 1, minIntervalMs: 2_000 },
+    { pattern: '*.skillaz.ru', maxConcurrency: 1, minIntervalMs: 2_000 },
+    { pattern: 'talantix.ru', maxConcurrency: 1, minIntervalMs: 2_000 },
+  ];
+  for (const [pattern, profile] of Object.entries(explicit ?? {})) {
+    if (!pattern.trim() || !profile || typeof profile !== 'object') continue;
+    profiles.push({
+      pattern: pattern.trim().toLowerCase(),
+      maxConcurrency: readBoundedNumber(profile.maxConcurrency, defaults.maxConcurrency, 1, maximumConcurrency),
+      minIntervalMs: readBoundedNumber(profile.minIntervalMs, defaults.minIntervalMs, 0, 60_000),
+    });
+  }
+  return { defaults, profiles };
+}
+
+function resolveHostProfile(host, configured) {
+  let result = configured.defaults;
+  for (const profile of configured.profiles) {
+    if (matchesHostPattern(host, profile.pattern)) result = profile;
+  }
+  return result;
+}
+
+function matchesHostPattern(host, pattern) {
+  if (pattern.startsWith('*.')) {
+    const suffix = pattern.slice(2);
+    return host === suffix || host.endsWith(`.${suffix}`);
+  }
+  return host === pattern;
+}
+
+function readBoundedNumber(value, fallback, minimum, maximum) {
+  const candidate = Number(value);
+  return Number.isFinite(candidate)
+    ? Math.min(Math.max(Math.floor(candidate), minimum), maximum)
+    : fallback;
+}
+
+function buildCircuitOpenError(host, openUntil) {
+  const error = new Error(`Playwright circuit is open for ${host}`);
+  error.code = 'PLAYWRIGHT_CIRCUIT_OPEN';
+  error.host = host;
+  error.retryAt = new Date(openUntil).toISOString();
+  return error;
+}
+
+function buildStuckPageError(host, url, timeoutMs) {
+  const error = new Error(`Playwright page exceeded ${timeoutMs}ms for ${url}`);
+  error.code = 'PLAYWRIGHT_PAGE_STUCK';
+  error.host = host;
+  error.url = url;
+  error.timeoutMs = timeoutMs;
+  return error;
+}
+
+async function withDeadline(task, timeoutMs, buildError) {
+  let timer = null;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(task),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(buildError()), timeoutMs);
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function readPositiveInteger(explicit, envName, fallback, maximum = Number.MAX_SAFE_INTEGER) {

@@ -1,4 +1,4 @@
-import { createDefaultRouter, createStaticEngine } from '@/lib/sources/crawlers'
+import { createDefaultRouter } from '@/lib/sources/crawlers'
 import { chooseEngine } from '@/lib/sources/crawlers/crawler-router'
 
 describe('CrawlerEngine integration', () => {
@@ -28,18 +28,21 @@ describe('CrawlerEngine integration', () => {
     expect(chooseEngine('')).toBe('static')
   })
 
-  it('creates default router with static engine', () => {
-    const router = createDefaultRouter()
+  it('executes a static source request through the default router', async () => {
+    const router = createDefaultRouter({
+      staticEngine: {
+        fetcher: async () => new Response('<html><main>Company careers</main></html>', { status: 200 }),
+      },
+    })
     expect(router).toBeDefined()
-
-    // Router should handle fetch requests
-    router.fetch({
+    const result = await router.fetch({
       url: 'https://example.com',
       options: {
         headers: { 'User-Agent': 'Test' }
       }
-    }).catch(() => {
-      // Expected to fail in test environment, but should not throw synchronously
     })
+    expect(result.engine).toBe('static')
+    expect(result.html).toContain('Company careers')
+    await router.close()
   })
 })

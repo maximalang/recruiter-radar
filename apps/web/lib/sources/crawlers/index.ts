@@ -100,20 +100,14 @@ export function createDefaultRouter(
     ...options.extraEngines,
   }
 
-  // NOTE: Optional engines (Playwright, Firecrawl) are registered
-  // synchronously here. Playwright may fail at `fetch()` time if
-  // its deps are missing, and Firecrawl gracefully falls back
-  // to the static engine. For full async detection, use
-  // `createDefaultRouterAsync()` below.
-  //
-  // We register Firecrawl eagerly (it has built-in fallback),
-  // but skip Playwright SPA unless explicitly requested via extraEngines
-  // or forceRegisterAll, because its import is expensive.
-
-  if (options.forceRegisterAll) {
-    try {
-      registry.spa = createCrawleeSpaEngine(options.crawlee)
-    } catch { /* Playwright not installed */ }
+  // The pool imports Playwright lazily on its first rendered request, so
+  // registering the SPA engine here is cheap. Without this registration the
+  // router selected `spa` for supported hosts and then silently used static
+  // HTTP, leaving production behind the behaviour covered by chooseEngine().
+  try {
+    registry.spa ??= createCrawleeSpaEngine(options.crawlee)
+  } catch {
+    // A genuinely unavailable runtime still degrades through router warnings.
   }
 
   // Firecrawl is always safe to register — it degrades gracefully

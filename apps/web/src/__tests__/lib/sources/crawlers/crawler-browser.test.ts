@@ -256,9 +256,9 @@ describe('Playwright SPA crawler', () => {
       })
     const engine = createCrawleeSpaEngine({ concurrency: 2 })
 
-    const first = engine.fetch({ url: 'https://careers.example/1' })
-    const second = engine.fetch({ url: 'https://careers.example/2' })
-    const third = engine.fetch({ url: 'https://careers.example/3' })
+    const first = engine.fetch({ url: 'https://careers-a.example/1' })
+    const second = engine.fetch({ url: 'https://careers-b.example/2' })
+    const third = engine.fetch({ url: 'https://careers-c.example/3' })
 
     try {
       await twoNavigationsStarted.promise
@@ -277,6 +277,165 @@ describe('Playwright SPA crawler', () => {
       await Promise.allSettled([first, second, third])
       await engine.close()
     }
+  })
+
+  it('serializes rendered pages for the same host while other hosts may proceed', async () => {
+    const firstNavigation = deferred<typeof response>()
+    const firstNavigationStarted = deferred<void>()
+    const secondNavigationStarted = deferred<void>()
+    goto
+      .mockImplementationOnce(() => {
+        firstNavigationStarted.resolve(undefined)
+        return firstNavigation.promise
+      })
+      .mockImplementationOnce(async () => {
+        secondNavigationStarted.resolve(undefined)
+        return response
+      })
+    const engine = createCrawleeSpaEngine({
+      concurrency: 2,
+      perHostConcurrency: 1,
+      perHostMinIntervalMs: 0,
+    })
+
+    const first = engine.fetch({ url: 'https://slow.example/1' })
+    const second = engine.fetch({ url: 'https://slow.example/2' })
+
+    try {
+      await firstNavigationStarted.promise
+      expect(goto).toHaveBeenCalledTimes(1)
+
+      const otherHost = engine.fetch({ url: 'https://other.example/1' })
+      await secondNavigationStarted.promise
+      expect(goto).toHaveBeenCalledTimes(2)
+
+      firstNavigation.resolve(response)
+      await Promise.all([first, second, otherHost])
+      expect(goto).toHaveBeenCalledTimes(3)
+    } finally {
+      firstNavigation.resolve(response)
+      await Promise.allSettled([first, second])
+      await engine.close()
+    }
+  })
+
+  it('applies a stricter concurrency profile to matching ATS hosts', async () => {
+    const firstNavigation = deferred<typeof response>()
+    const firstNavigationStarted = deferred<void>()
+    goto
+      .mockImplementationOnce(() => {
+        firstNavigationStarted.resolve(undefined)
+        return firstNavigation.promise
+      })
+      .mockImplementationOnce(async () => response)
+    const engine = createCrawleeSpaEngine({
+      concurrency: 2,
+      perHostConcurrency: 2,
+      perHostMinIntervalMs: 0,
+      hostProfiles: {
+        '*.ats.example': { maxConcurrency: 1, minIntervalMs: 0 },
+      },
+    })
+
+    const first = engine.fetch({ url: 'https://tenant.ats.example/1' })
+    const second = engine.fetch({ url: 'https://tenant.ats.example/2' })
+
+    try {
+      await firstNavigationStarted.promise
+      expect(goto).toHaveBeenCalledTimes(1)
+      firstNavigation.resolve(response)
+      await Promise.all([first, second])
+      expect(goto).toHaveBeenCalledTimes(2)
+    } finally {
+      firstNavigation.resolve(response)
+      await Promise.allSettled([first, second])
+      await engine.close()
+    }
+  })
+
+  it('rejects excess queued work instead of allowing unbounded backpressure', async () => {
+    const firstNavigation = deferred<typeof response>()
+    goto.mockImplementationOnce(() => firstNavigation.promise)
+    const engine = createCrawleeSpaEngine({
+      concurrency: 1,
+      maxQueueSize: 1,
+      perHostConcurrency: 1,
+      perHostMinIntervalMs: 0,
+    })
+
+    const first = engine.fetch({ url: 'https://queue-a.example/1' })
+    const second = engine.fetch({ url: 'https://queue-b.example/1' })
+
+    try {
+      await expect(engine.fetch({ url: 'https://queue-c.example/1' })).rejects.toMatchObject({
+        code: 'PLAYWRIGHT_QUEUE_FULL',
+      })
+      firstNavigation.resolve(response)
+      await Promise.all([first, second])
+    } finally {
+      firstNavigation.resolve(response)
+      await Promise.allSettled([first, second])
+      await engine.close()
+    }
+  })
+
+  it('recycles a browser worker when the configured process memory threshold is reached', async () => {
+    const engine = createCrawleeSpaEngine({
+      concurrency: 1,
+      perHostMinIntervalMs: 0,
+      maxProcessRssBytes: 100,
+      memoryUsage: () => ({ rss: 101 }),
+    })
+
+    await engine.fetch({ url: 'https://memory.example/1' })
+    await engine.fetch({ url: 'https://memory.example/2' })
+
+    expect(launch).toHaveBeenCalledTimes(2)
+    expect(closeBrowser).toHaveBeenCalledTimes(1)
+
+    await engine.close()
+  })
+
+  it('aborts a stuck rendered page with a bounded diagnostic and releases its context', async () => {
+    goto.mockImplementationOnce(() => new Promise(() => undefined))
+    const engine = createCrawleeSpaEngine({
+      concurrency: 1,
+      perHostMinIntervalMs: 0,
+      stuckPageTimeoutMs: 10,
+    })
+
+    await expect(engine.fetch({ url: 'https://stuck.example/jobs' })).rejects.toMatchObject({
+      code: 'PLAYWRIGHT_PAGE_STUCK',
+      host: 'stuck.example',
+    })
+    expect(closeContext).toHaveBeenCalledTimes(1)
+
+    await engine.close()
+  })
+
+  it('waits for active pages before gracefully closing browser workers', async () => {
+    const navigation = deferred<typeof response>()
+    const navigationStarted = deferred<void>()
+    goto.mockImplementationOnce(() => {
+      navigationStarted.resolve(undefined)
+      return navigation.promise
+    })
+    const engine = createCrawleeSpaEngine({
+      concurrency: 1,
+      perHostMinIntervalMs: 0,
+      gracefulCloseTimeoutMs: 1_000,
+    })
+
+    const fetch = engine.fetch({ url: 'https://graceful.example/jobs' })
+    await navigationStarted.promise
+    const closing = engine.close()
+    await Promise.resolve()
+    expect(closeBrowser).not.toHaveBeenCalled()
+
+    navigation.resolve(response)
+    await fetch
+    await closing
+    expect(closeBrowser).toHaveBeenCalledTimes(1)
   })
 
   it('opens a per-host circuit after bounded consecutive navigation failures', async () => {
