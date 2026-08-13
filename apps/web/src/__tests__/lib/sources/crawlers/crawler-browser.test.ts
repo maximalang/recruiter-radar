@@ -10,7 +10,19 @@ const waitForTimeout = jest.fn(async () => undefined)
 const closePage = jest.fn(async () => undefined)
 const closeContext = jest.fn(async () => undefined)
 const newPage = jest.fn(async () => ({ goto, content, waitForTimeout, close: closePage }))
-const route = jest.fn(async () => undefined)
+type MockRouteInput = {
+  abort: (reason: string) => Promise<void>
+  continue: () => Promise<void>
+}
+type MockRouteRequest = {
+  url: () => string
+  isNavigationRequest?: () => boolean
+}
+type MockRouteGuard = (
+  routeInput: MockRouteInput,
+  request: MockRouteRequest,
+) => Promise<void>
+const route = jest.fn<Promise<void>, [string, MockRouteGuard]>(async () => undefined)
 const newContext = jest.fn(async () => ({ newPage, route, close: closeContext }))
 const closeBrowser = jest.fn(async () => undefined)
 const launch = jest.fn(async () => ({ newContext, close: closeBrowser }))
@@ -138,10 +150,7 @@ describe('Playwright SPA crawler', () => {
     const engine = createCrawleeSpaEngine({ dnsLookup })
 
     await engine.fetch({ url: 'https://public.example/jobs' })
-    const guard = route.mock.calls[0]?.[1] as ((routeInput: {
-      abort: (reason: string) => Promise<void>
-      continue: () => Promise<void>
-    }, request: { url: () => string }) => Promise<void>) | undefined
+    const guard = route.mock.calls[0]?.[1]
     expect(guard).toBeDefined()
     const abort = jest.fn(async () => undefined)
     const continueRequest = jest.fn(async () => undefined)
@@ -167,13 +176,11 @@ describe('Playwright SPA crawler', () => {
     const engine = createCrawleeSpaEngine({ dnsLookup })
 
     await engine.fetch({ url: 'https://rebind.example/jobs' })
-    const guard = route.mock.calls[0]?.[1] as ((routeInput: {
-      abort: (reason: string) => Promise<void>
-      continue: () => Promise<void>
-    }, request: { url: () => string }) => Promise<void>)
+    const guard = route.mock.calls[0]?.[1]
+    expect(guard).toBeDefined()
     const abort = jest.fn(async () => undefined)
 
-    await expect(guard(
+    await expect(guard?.(
       { abort, continue: async () => undefined },
       { url: () => 'https://rebind.example/redirected' },
     )).rejects.toMatchObject({ code: 'CRAWLER_SSRF_BLOCKED' })
@@ -186,13 +193,11 @@ describe('Playwright SPA crawler', () => {
     const engine = createCrawleeSpaEngine()
 
     await engine.fetch({ url: 'https://public.example/jobs' })
-    const guard = route.mock.calls[0]?.[1] as ((routeInput: {
-      abort: (reason: string) => Promise<void>
-      continue: () => Promise<void>
-    }, request: { url: () => string; isNavigationRequest: () => boolean }) => Promise<void>)
+    const guard = route.mock.calls[0]?.[1]
+    expect(guard).toBeDefined()
     const abort = jest.fn(async () => undefined)
 
-    await expect(guard(
+    await expect(guard?.(
       { abort, continue: async () => undefined },
       { url: () => 'http://169.254.169.254/analytics.js', isNavigationRequest: () => false },
     )).resolves.toBeUndefined()

@@ -188,6 +188,35 @@ describe('HiringEpisodeDetectionService', () => {
     expect(cluster?.metadata.publicationCount).toBe(4)
   })
 
+  it('keeps cross-source provenance while fallback-matching one vacancy once', () => {
+    const vacancies = canonicalizeVacancies([
+      signal('ats-java', 7, {
+        title: 'Senior Java Developer',
+        region: 'Москва',
+        source: 'career-pages',
+        sourceUrl: 'https://employer.example/jobs/java',
+        evidenceIds: ['evidence-owned'],
+      }),
+      signal('hh-java-copy', 6, {
+        title: 'senior java developer',
+        region: 'москва',
+        source: 'hh',
+        sourceUrl: 'https://hh.ru/vacancy/999',
+        evidenceIds: ['evidence-platform'],
+      }),
+    ])
+
+    expect(vacancies).toHaveLength(1)
+    expect(vacancies[0].publications.map((item) => item.id)).toEqual([
+      'ats-java',
+      'hh-java-copy',
+    ])
+    expect(vacancies[0].evidenceIds).toEqual([
+      'evidence-owned',
+      'evidence-platform',
+    ])
+  })
+
   it('does not collapse a newly reopened role outside the publication window', () => {
     const vacancies = canonicalizeVacancies([
         signal('old-java', 55, { title: 'Java developer', sourceUrl: null }),
