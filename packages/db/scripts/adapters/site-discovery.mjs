@@ -386,7 +386,7 @@ function robotsRuleSpecificity(value) {
 
 function robotsRuleMatches(path, value) {
   const pattern = String(value);
-  if (!pattern.startsWith('/')) return false;
+  if (!pattern.startsWith('/') && !pattern.startsWith('*')) return false;
   const anchored = pattern.endsWith('$');
   const body = pattern.slice(0, anchored ? -1 : undefined)
     .split('*')

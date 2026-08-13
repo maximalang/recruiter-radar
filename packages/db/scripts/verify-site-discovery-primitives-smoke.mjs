@@ -28,6 +28,12 @@ assert.equal(isRobotsPathAllowed('https://example.com/jobs/backend', robots), tr
 assert.equal(isRobotsPathAllowed('https://example.com/jobs/internal', robots), false);
 assert.equal(isRobotsPathAllowed('https://example.com/private/jobs', robots), false);
 
+const wildcardRobots = parseRobotsTxt(`
+User-agent: *
+Disallow: */form/*
+`);
+assert.equal(isRobotsPathAllowed('https://example.com/form/public-vacancy', wildcardRobots), false);
+
 const sitemap = parseSitemapXml(`
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

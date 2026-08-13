@@ -18,7 +18,9 @@ const previous = {
 const targets = [
   ['potok', 'B1', 'b1.ru', 'https://b1.potok.io/open/jobs', 'page-unreachable'],
   ['huntflow', 'hate agency', 'hateagency.com', 'https://hatehr.huntflow.io/', 'parsed'],
-  ['friendwork', 'GGSEL', 'ggsel.net', 'https://jobs.friend.work/ggsel', 'parsed'],
+  ['friendwork', 'GGSEL', 'ggsel.net', 'https://jobs.friend.work/ggsel/113802', 'parsed'],
+  ['e-staff', 'Lamoda', 'lamoda.ru', 'https://job.lamoda.ru/vacancies', 'parsed'],
+  ['talantix', 'ZennoLab', 'zennolab.com', 'https://talantix.ru/form/OBjUfTGmI2oHKyP9ipazTA', 'page-unreachable'],
 ].map(([family, companyName, companyDomain, sourceUrl, expectedOutcome]) => ({
   id: `${family}-live`,
   adapter: 'hosted-career-page',
@@ -56,7 +58,11 @@ try {
     const result = resultsByFamily.get(target.hosted_ats_family);
     const records = recordsByFamily.get(target.hosted_ats_family) ?? [];
     assert.ok(result, `${target.hosted_ats_family} must produce a live result`);
-    assert.equal(result.outcome, target.expectedOutcome);
+    assert.equal(
+      result.outcome,
+      target.expectedOutcome,
+      `${target.hosted_ats_family} live result: ${JSON.stringify(result)}`,
+    );
     if (target.expectedOutcome !== 'parsed') {
       assert.equal(result.errorCategory, 'access-policy:robots-disallowed');
       assert.equal(result.recordsFetched, 0);

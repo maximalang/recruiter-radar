@@ -725,6 +725,20 @@ export function detectCareerPageTargetFromHtml(html, seed) {
   const personioLink = matchFirstPublicFeedSurface(fingerprintText, 'personio');
   const sameDomainCareerPageUrl = extractSameDomainCareerPageUrl(text, seed.baseUrl ?? seed.websiteUrl ?? null);
   const hostedCareerPages = extractHostedCareerPageUrls(fingerprintText);
+  const eStaffFingerprint = /"hrSystem"\s*:\s*\{[^{}]*"name"\s*:\s*"e-?staff"|vacancy_response_e-?staff/i.test(text);
+
+  if (eStaffFingerprint && sameDomainCareerPageUrl) {
+    targets.push(buildDiscoveredTarget({
+      adapter: 'hosted-career-page',
+      providerSlug: `e-staff-${extractHostname(sameDomainCareerPageUrl) ?? 'careers'}`,
+      companyName: seed.orgName,
+      companyDomain: seed.domain,
+      companyWebsiteUrl: seed.websiteUrl,
+      careerPageUrl: sameDomainCareerPageUrl,
+      sourceUrl: sameDomainCareerPageUrl,
+      hostedAtsFamily: 'e-staff',
+    }));
+  }
 
   if (greenhouseLink) {
     const slug = extractGreenhouseSlug(greenhouseLink);
@@ -1360,7 +1374,12 @@ function extractSameDomainCareerPageUrl(value, baseUrl) {
     const href = decodeHtmlUrl(match[1] ?? match[0]);
     const absoluteUrl = toAbsoluteUrlOrNull(href, baseUrl);
 
-    if (!absoluteUrl || extractHostname(absoluteUrl) !== baseHostname) {
+    const absoluteHostname = extractHostname(absoluteUrl);
+    const rootBaseHostname = baseHostname.replace(/^www\./i, '');
+    if (!absoluteUrl || !absoluteHostname || (
+      absoluteHostname !== rootBaseHostname
+      && !absoluteHostname.endsWith(`.${rootBaseHostname}`)
+    )) {
       continue;
     }
 
@@ -2253,13 +2272,17 @@ async function fetchSameDomainJsonLdRecords(target, {
         }
         const validatedHost = extractHostname(page.url);
         if (validatedHost) validatedRedirectHosts.add(validatedHost);
+        const renderedSeed = {
+          ...seed,
+          careerPageUrl: page.url,
+          sourceUrl: page.url,
+        };
+        const hostedDetailRecords = extractHostedStructuredRecords(page.html, target, renderedSeed);
         return {
           artifact: { page },
-          records: extractDeterministicDomRecords(page.html, {
-            ...seed,
-            careerPageUrl: page.url,
-            sourceUrl: page.url,
-          }, 'playwright'),
+          records: hostedDetailRecords.length > 0
+            ? hostedDetailRecords
+            : extractDeterministicDomRecords(page.html, renderedSeed, 'playwright'),
         };
       },
       extraction: async () => {
@@ -2313,6 +2336,7 @@ async function fetchSameDomainJsonLdRecords(target, {
 function resolveHostedOfficialFeed(target) {
   if (target?.hostedAtsFamily === 'bamboohr') return () => fetchBambooHrPublicList(target);
   if (target?.hostedAtsFamily === 'oracle-cloud') return () => fetchOracleCloudSitemapRecords(target);
+  if (target?.hostedAtsFamily === 'e-staff') return () => fetchEStaffSitemapRecords(target);
   if (target?.hostedAtsFamily !== 'pinpoint') return null;
   let source;
   try {
@@ -2334,6 +2358,55 @@ function resolveHostedOfficialFeed(target) {
       careerPageUrl: target.careerPageUrl ?? target.sourceUrl,
     }, 'pinpoint-rss');
   };
+}
+
+export function extractEStaffSitemapVacancyUrls(xml, careerPageUrl) {
+  let origin;
+  try {
+    origin = new URL(careerPageUrl).origin;
+  } catch {
+    return [];
+  }
+  const urls = [];
+  const seen = new Set();
+  for (const match of String(xml ?? '').matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)) {
+    const publicUrl = canonicalizePublicUrl(decodeHtmlUrl(match[1]));
+    if (!publicUrl || seen.has(publicUrl)) continue;
+    const parsed = new URL(publicUrl);
+    if (parsed.origin !== origin || !isHostedAtsVacancyUrl(publicUrl, 'e-staff')) continue;
+    seen.add(publicUrl);
+    urls.push(publicUrl);
+  }
+  return urls;
+}
+
+async function fetchEStaffSitemapRecords(target) {
+  const origin = new URL(target.sourceUrl).origin;
+  const sitemapUrl = new URL('/sitemap.xml', origin).toString();
+  const { body } = await fetchText(sitemapUrl, {
+    sourceName: `career-pages target ${target.id}`,
+    headers: {
+      accept: 'application/xml,text/xml;q=0.9,*/*;q=0.1',
+      'user-agent': 'RecruiterRadarCareerPages/1.0',
+    },
+  });
+  const records = [];
+  const urls = extractEStaffSitemapVacancyUrls(body, target.sourceUrl)
+    .slice(0, resolveHostedFeedJobLimit());
+  for (const jobUrl of urls) {
+    const policy = await resolveCareerTargetAccessPolicy(jobUrl);
+    if (policy.blocked || !isRobotsPathAllowed(jobUrl, policy.robots)) continue;
+    const page = await fetchText(jobUrl, {
+      sourceName: `career-pages target ${target.id}`,
+      headers: {
+        accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1',
+        'user-agent': 'RecruiterRadarCareerPages/1.0',
+      },
+    });
+    const record = extractHostedJobDetailRecord(page.body, jobUrl, target, 'e-staff-sitemap-detail');
+    if (record) records.push(record);
+  }
+  return records;
 }
 
 async function fetchBambooHrPublicList(target) {
@@ -2595,6 +2668,7 @@ export function isHostedAtsVacancyUrl(value, family) {
     skillaz: /\/(?:vacanc(?:y|ies)|jobs?)\/[^/]+(?:\/|$)/i,
     friendwork: /(?:\/(?:vacanc(?:y|ies)|jobs?)\/[^/]+(?:\/|$)|^\/[^/]+\/\d+\/?$)/i,
     talantix: /\/(?:form|ats\/vacancy)\/[^/]+(?:\/|$)/i,
+    'e-staff': /^\/vacancies\/[^/?#]+(?:\/|$)/i,
   };
   return patterns[family]?.test(`${path}${url.search}`) ?? true;
 }

@@ -22,7 +22,8 @@ const tempDirectory = mkdtempSync(resolve(tmpdir(), 'rr-russian-ats-db-'));
 const targetsFilePath = resolve(tempDirectory, 'targets.json');
 const targets = [
   ['huntflow', 'hate agency', 'hateagency.com', 'https://hatehr.huntflow.io/'],
-  ['friendwork', 'GGSEL', 'ggsel.net', 'https://jobs.friend.work/ggsel'],
+  ['friendwork', 'GGSEL', 'ggsel.net', 'https://jobs.friend.work/ggsel/113802'],
+  ['e-staff', 'Lamoda', 'lamoda.ru', 'https://job.lamoda.ru/vacancies'],
 ].map(([family, companyName, companyDomain, sourceUrl]) => ({
   id: `${family}-db-live`,
   adapter: 'hosted-career-page',
@@ -74,7 +75,10 @@ try {
        COUNT(DISTINCT lineage.organization_id)::int AS organizations,
        BOOL_AND(lineage.source_url ~ '^https://') AS source_urls_preserved,
        BOOL_AND(lineage.evidence_tier = 'direct') AS direct_evidence_preserved,
-       BOOL_AND(lineage.extraction_method IN ('html-card-fallback', 'playwright-dom')) AS extraction_preserved,
+       BOOL_AND(lineage.extraction_method IN (
+         'html-card-fallback', 'playwright-dom',
+         'friendwork-public-detail', 'e-staff-sitemap-detail'
+       )) AS extraction_preserved,
        BOOL_AND(signal.org_id = lineage.organization_id) AS signal_owner_consistent,
        BOOL_AND(evidence.org_id = lineage.organization_id) AS evidence_owner_consistent,
        BOOL_AND(signal.payload ->> 'source' = 'career-pages') AS payload_source_consistent,
@@ -90,12 +94,12 @@ try {
      JOIN evidence_items evidence ON evidence.id = lineage.evidence_id
      WHERE lineage.source = 'career-pages'
        AND lineage.created_at >= $1
-       AND signal.payload -> 'raw' ->> 'hosted_ats_family' IN ('huntflow', 'friendwork')
+       AND signal.payload -> 'raw' ->> 'hosted_ats_family' IN ('huntflow', 'friendwork', 'e-staff')
      GROUP BY signal.payload -> 'raw' ->> 'hosted_ats_family'
      ORDER BY family`,
     [baseline.rows[0].database_started_at],
   );
-  assert.deepEqual(verified.rows.map((row) => row.family), ['friendwork', 'huntflow']);
+  assert.deepEqual(verified.rows.map((row) => row.family), ['e-staff', 'friendwork', 'huntflow']);
   for (const row of verified.rows) {
     assert.ok(row.lineage_rows > 0);
     assert.equal(row.signals, row.lineage_rows);
