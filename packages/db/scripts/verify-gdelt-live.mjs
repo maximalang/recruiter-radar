@@ -8,7 +8,7 @@ url.searchParams.set('maxrecords', '5');
 url.searchParams.set('timespan', '1d');
 url.searchParams.set('sort', 'datedesc');
 
-const client = createGdeltDocClient({ maxAttempts: 1, persist: false });
+const client = createGdeltDocClient({ maxAttempts: 1 });
 try {
   const result = await client.request(url, { timeoutMs: 30_000 });
   const articles = Array.isArray(result.body?.articles) ? result.body.articles : [];
@@ -30,6 +30,8 @@ try {
       dbVerified: false,
       attempts: error.attempts,
       retryAfter: error.retryAfter,
+      retryAt: error.retryAt ?? null,
+      deferred: error.deferred === true,
       reason: error.retryAfter
         ? 'Controlled verifier stopped after one request; production scheduler will honor Retry-After before retrying.'
         : 'Controlled verifier stopped after one request; no Retry-After was returned, so production uses bounded exponential backoff with jitter.',

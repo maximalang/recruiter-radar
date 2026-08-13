@@ -9,8 +9,8 @@ import pg from 'pg';
 const execFileAsync = promisify(execFile);
 const { Client } = pg;
 const sourceId = process.argv[2]?.trim();
-if (!['superjob', 'rabota-rossii', 'public-ats', 'hosted-ats', 'russian-ats', 'company-context', 'government-open-data', 'source-subsystem'].includes(sourceId)) {
-  throw new Error('Usage: run-source-live-db-verifier.mjs <superjob|rabota-rossii|public-ats|hosted-ats|russian-ats|company-context|government-open-data|source-subsystem>');
+if (!['superjob', 'rabota-rossii', 'public-ats', 'hosted-ats', 'russian-ats', 'company-context', 'government-open-data', 'source-subsystem', 'gdelt'].includes(sourceId)) {
+  throw new Error('Usage: run-source-live-db-verifier.mjs <superjob|rabota-rossii|public-ats|hosted-ats|russian-ats|company-context|government-open-data|source-subsystem|gdelt>');
 }
 if (process.env.SOURCE_LIVE_DB_TEST_ACK !== 'isolated') {
   throw new Error('SOURCE_LIVE_DB_TEST_ACK=isolated is required before creating a disposable database.');
@@ -63,12 +63,14 @@ try {
       ? './verify-company-owned-context-live-pipeline.mjs'
       : sourceId === 'government-open-data'
         ? './verify-government-open-data-live-pipeline.mjs'
+        : sourceId === 'gdelt'
+          ? './verify-gdelt-live-pipeline.mjs'
         : sourceId === 'source-subsystem'
           ? './verify-source-subsystem-db.mjs'
       : './verify-job-source-live-pipeline.mjs';
   await run([
     resolve(import.meta.dirname, verifier),
-    ...(['public-ats', 'hosted-ats', 'russian-ats', 'company-context', 'government-open-data', 'source-subsystem'].includes(sourceId) ? [] : [sourceId]),
+    ...(['public-ats', 'hosted-ats', 'russian-ats', 'company-context', 'government-open-data', 'source-subsystem', 'gdelt'].includes(sourceId) ? [] : [sourceId]),
   ]);
 } finally {
   if (databaseCreated) {

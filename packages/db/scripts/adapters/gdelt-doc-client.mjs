@@ -9,6 +9,7 @@ const DEFAULT_MIN_INTERVAL_MS = 6_000;
 const DEFAULT_MAX_ATTEMPTS = 4;
 const DEFAULT_BASE_BACKOFF_MS = 10_000;
 const DEFAULT_MAX_BACKOFF_MS = 5 * 60_000;
+const DEFAULT_THROTTLE_COOLDOWN_MS = 30 * 60_000;
 
 /** Process-wide bounded GDELT scheduler with persistent response cache. */
 export function createGdeltDocClient(options = {}) {
@@ -49,6 +50,21 @@ export function createGdeltDocClient(options = {}) {
     if (cached && now() - cached.storedAt < cacheTtlMs) {
       return { body: cached.body, cacheHit: true, attempts: 0, deferredMs: 0 };
     }
+    const persistedNextRequestAt = Number(cache.scheduler?.nextRequestAt) || 0;
+    if (persistedNextRequestAt > now()) {
+      if (cached?.body) {
+        return {
+          body: cached.body,
+          cacheHit: true,
+          staleCache: true,
+          attempts: 0,
+          deferredMs: 0,
+          retryAt: persistedNextRequestAt,
+        };
+      }
+      throw createDeferredError(persistedNextRequestAt);
+    }
+    nextRequestAt = Math.max(nextRequestAt, persistedNextRequestAt);
 
     let deferredMs = 0;
     let lastError = null;
@@ -71,7 +87,24 @@ export function createGdeltDocClient(options = {}) {
         continue;
       }
 
-      if (response.status === 429 || response.status >= 500) {
+      if (response.status === 429) {
+        lastError = createHttpError(response, attempt);
+        const retryAfter = response.headers?.get?.('retry-after') ?? null;
+        const backoff = retryAfter
+          ? computeBackoff(attempt, retryAfter, random)
+          : computeThrottleCooldown(random);
+        nextRequestAt = Math.max(nextRequestAt, now() + backoff);
+        cache.scheduler = {
+          nextRequestAt,
+          lastStatus: 429,
+          lastThrottledAt: now(),
+        };
+        await persistCache(cache);
+        lastError.retryAt = nextRequestAt;
+        if (!retryAfter || attempt === maxAttempts) break;
+        continue;
+      }
+      if (response.status >= 500) {
         lastError = createHttpError(response, attempt);
         if (attempt === maxAttempts) break;
         const backoff = computeBackoff(attempt, response.headers?.get?.('retry-after'), random);
@@ -84,6 +117,7 @@ export function createGdeltDocClient(options = {}) {
 
       const body = await response.json();
       cache.entries[cacheKey] = { storedAt: now(), body };
+      cache.scheduler = { nextRequestAt: 0 };
       await persistCache(cache);
       return { body, cacheHit: false, attempts: attempt, deferredMs };
     }
@@ -104,7 +138,7 @@ export function createGdeltDocClient(options = {}) {
     cachePromise ??= readFile(cachePath, 'utf8')
       .then((value) => JSON.parse(value))
       .then((value) => normalizeCache(value))
-      .catch(() => ({ version: 1, entries: {} }));
+      .catch(() => ({ version: 2, entries: {}, scheduler: { nextRequestAt: 0 } }));
     return cachePromise;
   }
 
@@ -158,11 +192,25 @@ function computeBackoff(attempt, retryAfter, random) {
   return Math.floor(exponential * (0.75 + random() * 0.5));
 }
 
+function computeThrottleCooldown(random) {
+  return Math.floor(DEFAULT_THROTTLE_COOLDOWN_MS * (0.75 + random() * 0.5));
+}
+
 function createHttpError(response, attempts) {
   const error = new Error(`GDELT DOC API returned HTTP ${response.status}`);
   error.status = response.status;
   error.retryAfter = response.headers?.get?.('retry-after') ?? null;
   error.attempts = attempts;
+  return error;
+}
+
+function createDeferredError(retryAt) {
+  const error = new Error('GDELT DOC API request deferred by persistent cooldown');
+  error.status = 429;
+  error.attempts = 0;
+  error.deferred = true;
+  error.retryAt = retryAt;
+  error.retryAfter = null;
   return error;
 }
 
@@ -175,9 +223,20 @@ function parseRetryAfter(value) {
 }
 
 function normalizeCache(value) {
-  return value?.version === 1 && value.entries && typeof value.entries === 'object'
-    ? value
-    : { version: 1, entries: {} };
+  if (value?.entries && typeof value.entries === 'object') {
+    return {
+      version: 2,
+      entries: value.entries,
+      scheduler: {
+        nextRequestAt: Number(value.scheduler?.nextRequestAt) || 0,
+        ...(Number(value.scheduler?.lastStatus) === 429 ? { lastStatus: 429 } : {}),
+        ...(Number.isFinite(Number(value.scheduler?.lastThrottledAt))
+          ? { lastThrottledAt: Number(value.scheduler.lastThrottledAt) }
+          : {}),
+      },
+    };
+  }
+  return { version: 2, entries: {}, scheduler: { nextRequestAt: 0 } };
 }
 
 function pruneCache(cache, currentTime) {
@@ -186,7 +245,7 @@ function pruneCache(cache, currentTime) {
       .filter(([, entry]) => currentTime - Number(entry?.storedAt) < 24 * 60 * 60_000)
       .slice(-500),
   );
-  return { version: 1, entries };
+  return { version: 2, entries, scheduler: cache.scheduler ?? { nextRequestAt: 0 } };
 }
 
 function boundedInteger(value, fallback, minimum, maximum) {

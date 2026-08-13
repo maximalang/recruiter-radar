@@ -433,7 +433,7 @@
         "mode": "launch-required",
         "acceptedEnvSets": [["DATABASE_URL"], ["FUNDING_BUSINESS_SIGNALS_INPUT_FILE"], ["FUNDING_SIGNALS_GDELT_QUERIES"], ["FUNDING_SIGNALS_GDELT_QUERIES_JSON"], ["FUNDING_SIGNALS_PROVIDER_API_URL", "FUNDING_SIGNALS_PROVIDER_API_TOKEN"]]
       },
-      "live": { "state": "reachable", "verifiedAt": "2026-08-13T16:00:00+03:00", "evidence": ["A single controlled request reached the official public GDELT DOC API through the bounded Node HTTPS fallback after the Windows Undici transport timed out. GDELT returned HTTP 429 without Retry-After; the verifier exited successfully as throttled after one attempt, and production uses bounded exponential backoff with jitter. No live article or DB success is claimed."] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-14T01:34:53+03:00", "evidence": ["2026-08-14 low-frequency controlled verifier made one request after the prior cooldown and again received HTTP 429 without Retry-After. No live article or DB success is claimed. The production client now persists a jittered 30-minute no-Retry-After cooldown across processes, honors explicit Retry-After, and exposes a deferred state without issuing another request."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
@@ -441,10 +441,10 @@
       "pipelineProfile": "context-only",
       "verification": {
         "fixture": ["npm run verify:funding-business-signals:smoke"],
-        "live": ["npm run verify:funding-business-signals:live"],
+        "live": ["npm run verify:funding-business-signals:live", "SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:funding-business-signals:live-db"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["Current controlled state is throttled after one request, so live normalization and source-to-DB lineage remain unverified. Automatic queries are restricted to tracked companies with hiring evidence and a strong domain; publisher-versus-subject attribution remains context-only."]
+      "blockers": ["rate-limited: the fresh controlled request returned HTTP 429 without Retry-After, so live normalization and source-to-DB lineage remain unverified. The next verifier run must occur only after the persisted cooldown and will use the isolated article-to-organization-to-context-to-evidence-to-lineage contract."]
     },
     "company-newsrooms": {
       "implementation": "implemented",

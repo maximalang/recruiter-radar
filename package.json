@@ -167,6 +167,7 @@
     "monitoring:dashboard": "node packages/db/scripts/monitoring-dashboard.mjs",
     "verify:funding-business-signals:smoke": "node packages/db/scripts/verify-funding-business-signals-smoke.mjs",
     "verify:funding-business-signals:live": "node packages/db/scripts/verify-gdelt-live.mjs",
+    "verify:funding-business-signals:live-db": "node packages/db/scripts/run-source-live-db-verifier.mjs gdelt",
     "verify:industry-media:feeds": "node packages/db/scripts/verify-industry-media-feeds-smoke.mjs",
     "verify:company-site:smoke": "node packages/db/scripts/verify-company-site-smoke.mjs",
     "verify:company-newsrooms:discovery": "node packages/db/scripts/verify-company-newsrooms-discovery-smoke.mjs",

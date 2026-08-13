@@ -322,6 +322,9 @@ describe('source live readiness contract', () => {
     expect(packageJson.scripts['verify:career-pages:public-ats-live-db']).toBe(
       'node packages/db/scripts/run-source-live-db-verifier.mjs public-ats',
     )
+    expect(packageJson.scripts['verify:funding-business-signals:live-db']).toBe(
+      'node packages/db/scripts/run-source-live-db-verifier.mjs gdelt',
+    )
 
     expect(existsSync(jobSourceLiveVerifierPath)).toBe(true)
     expect(existsSync(sourceLiveDbRunnerPath)).toBe(true)
@@ -341,6 +344,8 @@ describe('source live readiness contract', () => {
     expect(runner).toContain('DROP DATABASE IF EXISTS')
     expect(runner).toContain('WITH (FORCE)')
     expect(runner).toContain("'public-ats'")
+    expect(runner).toContain("'gdelt'")
+    expect(runner).toContain("'./verify-gdelt-live-pipeline.mjs'")
   })
 
   it('classifies source access and credential availability without storing secret values', () => {
