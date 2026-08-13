@@ -2,6 +2,7 @@ import { isIP } from 'node:net';
 
 import { fetchText } from './source-http.mjs';
 import { parseRssAtomFeed } from './feed-parser.mjs';
+import { fetchPublicPageWithEscalation } from './public-page-escalation.mjs';
 
 const NEWSROOM_PATH_PATTERN = /(?:^|\/)(?:news|newsroom|press|media|press-center|press_center|novosti|press-releases|press_releases)(?:\/|$)/i;
 const FEED_TYPE_PATTERN = /(?:application|text)\/(?:rss|atom)\+xml/i;
@@ -117,7 +118,11 @@ export function parseCompanyNewsroomFeed(xml, feedUrl, target) {
 }
 
 /** Fetch bounded company targets and return per-target diagnostics plus records. */
-export async function fetchCompanyNewsrooms(targets, { signal, concurrency = 3 } = {}) {
+export async function fetchCompanyNewsrooms(targets, {
+  signal,
+  concurrency = 3,
+  dependencies = {},
+} = {}) {
   if (!Array.isArray(targets)) return [];
 
   const results = new Array(targets.length);
@@ -128,7 +133,7 @@ export async function fetchCompanyNewsrooms(targets, { signal, concurrency = 3 }
       const next = queue.shift();
       if (!next) break;
       results[next.index] = next.target
-        ? await fetchTarget(next.target, { signal })
+        ? await fetchTarget(next.target, { signal, dependencies })
         : invalidTargetResult(targets[next.index]);
     }
   }
@@ -141,7 +146,7 @@ export async function fetchCompanyNewsrooms(targets, { signal, concurrency = 3 }
   return results;
 }
 
-async function fetchTarget(target, { signal } = {}) {
+async function fetchTarget(target, { signal, dependencies = {} } = {}) {
   const diagnostics = {
     target,
     records: [],
@@ -152,9 +157,15 @@ async function fetchTarget(target, { signal } = {}) {
     feedsFetched: 0,
     errors: [],
     error: null,
+    escalationStages: [],
   };
 
-  const root = await fetchResource(target.url, { signal, kind: 'page' });
+  const root = await fetchResource(target.url, {
+    signal,
+    kind: 'page',
+    target,
+    dependencies,
+  });
   if (root.error) {
     diagnostics.errors.push(root.error);
     diagnostics.error = root.error;
@@ -162,6 +173,7 @@ async function fetchTarget(target, { signal } = {}) {
   }
 
   diagnostics.rootFetched = true;
+  if (root.selectedStage) diagnostics.escalationStages.push(root.selectedStage);
   const discovered = discoverCompanyNewsroomUrls(root.body, target.url);
   const pageUrls = new Set(discovered.pageUrls);
   const feedUrls = new Set(discovered.feedUrls);
@@ -174,18 +186,24 @@ async function fetchTarget(target, { signal } = {}) {
     queuedResources.add(key);
     resources.push({ kind, url });
   };
-  for (const pageUrl of pageUrls) enqueue('page', pageUrl);
   for (const feedUrl of feedUrls) enqueue('feed', feedUrl);
+  for (const pageUrl of pageUrls) enqueue('page', pageUrl);
 
   for (let index = 0; index < resources.length && index < 8; index += 1) {
     const resource = resources[index];
     const fetched = resource.url === target.url
       ? root
-      : await fetchResource(resource.url, { signal, kind: resource.kind });
+      : await fetchResource(resource.url, {
+          signal,
+          kind: resource.kind,
+          target,
+          dependencies,
+        });
     if (fetched.error) {
       diagnostics.errors.push(fetched.error);
       continue;
     }
+    if (fetched.selectedStage) diagnostics.escalationStages.push(fetched.selectedStage);
 
     if (resource.kind === 'feed') {
       diagnostics.feedsFetched += 1;
@@ -208,7 +226,31 @@ async function fetchTarget(target, { signal } = {}) {
   return diagnostics;
 }
 
-async function fetchResource(url, { signal, kind }) {
+async function fetchResource(url, { signal, kind, target, dependencies = {} }) {
+  if (kind === 'page') {
+    const result = await fetchPublicPageWithEscalation({
+      url,
+      sourceName: 'company-newsrooms',
+      signal,
+      dependencies,
+      headers: {
+        'user-agent': 'RecruiterRadar/1.0 (company-owned newsroom discovery)',
+        accept: 'text/html, application/xhtml+xml',
+      },
+      parseHtml: (html, resolvedUrl) => buildUsefulPageArtifact(html, resolvedUrl, target),
+      parseMarkdown: (markdown, resolvedUrl) => buildUsefulPageArtifact(
+        markdownToAnchorHtml(markdown),
+        resolvedUrl,
+        target,
+      ),
+      validateRecord: (record) => validatePageArtifact(record, url, target),
+    });
+    const artifact = result.records[0] ?? null;
+    return artifact
+      ? { body: artifact.body, error: null, selectedStage: result.selectedStage }
+      : { body: null, error: result.error, selectedStage: null };
+  }
+
   try {
     const { response, body } = await fetchText(url, {
       sourceName: 'company-newsrooms',
@@ -230,10 +272,44 @@ async function fetchResource(url, { signal, kind }) {
       ? contentType.includes('xml') || contentType.includes('rss') || contentType.includes('atom') || body.trimStart().startsWith('<')
       : contentType.includes('html');
     if (!accepted) return { body: null, error: `Unsupported ${kind} content-type for ${url}: ${contentType || 'missing'}` };
-    return { body, error: null };
+    return { body, error: null, selectedStage: 'official-feed' };
   } catch (error) {
     return { body: null, error: error?.message ?? String(error) };
   }
+}
+
+function buildUsefulPageArtifact(html, resolvedUrl, target) {
+  if (!html || typeof html !== 'string') return [];
+  const discovered = discoverCompanyNewsroomUrls(html, resolvedUrl);
+  const items = extractCompanyNewsroomItemsFromHtml(html, resolvedUrl, target);
+  const isExplicitNewsroom = NEWSROOM_PATH_PATTERN.test(new URL(resolvedUrl).pathname);
+  if (!isExplicitNewsroom && discovered.pageUrls.length === 0 && discovered.feedUrls.length === 0) return [];
+  if (isExplicitNewsroom && items.length === 0 && discovered.feedUrls.length === 0) return [];
+  return [{ body: html, resolved_url: resolvedUrl }];
+}
+
+function validatePageArtifact(record, requestedUrl, target) {
+  return Boolean(
+    record?.body
+    && typeof record.body === 'string'
+    && resolveSameCompanyUrl(record.resolved_url, requestedUrl, target),
+  );
+}
+
+function markdownToAnchorHtml(markdown) {
+  const anchors = [];
+  for (const match of String(markdown ?? '').matchAll(/\[([^\]\n]{3,300})\]\((https?:\/\/[^\s)]+)\)/g)) {
+    anchors.push(`<a href="${escapeHtmlAttribute(match[2])}">${escapeHtmlText(match[1])}</a>`);
+  }
+  return anchors.join('\n');
+}
+
+function escapeHtmlAttribute(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function escapeHtmlText(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function buildRecord({ target, sourceUrl, headline, summary, occurredAt, extractionMethod }) {

@@ -154,32 +154,11 @@ export async function discoverCareerUrlsFromWebsite(baseUrl, {
   maxSitemaps = 3,
   maxUrls = 50,
 } = {}) {
-  const base = canonicalizePublicUrl(baseUrl, { keepTracking: true });
-  if (!base) return blockedDiscovery('invalid-base-url');
+  const policy = await resolvePublicRobotsPolicy(baseUrl, { fetchTextImpl, signal });
+  if (policy.blocked) return { ...blockedDiscovery(policy.reason), robotsState: policy.robotsState };
+  const base = policy.baseUrl;
   const baseOrigin = new URL(base).origin;
-  const robotsUrl = new URL('/robots.txt', baseOrigin).toString();
-  let robots = { rules: [], sitemaps: [] };
-  let robotsState = 'missing';
-
-  try {
-    const result = await fetchTextImpl(robotsUrl, {
-      sourceName: 'career-pages robots',
-      headers: { accept: 'text/plain,*/*;q=0.1', 'user-agent': 'RecruiterRadarCareerPages/1.0' },
-      redirect: 'follow',
-      signal,
-      retries: 1,
-      timeoutMs: 5_000,
-    });
-    if (!isSameOrigin(result.response?.url ?? robotsUrl, baseOrigin)) {
-      return blockedDiscovery('robots-cross-origin-redirect');
-    }
-    robots = parseRobotsTxt(result.body);
-    robotsState = 'loaded';
-  } catch (error) {
-    if (![404, 410].includes(Number(error?.status))) {
-      return blockedDiscovery(`robots-${safeErrorCategory(error)}`);
-    }
-  }
+  const { robots, robotsState } = policy;
 
   const sitemapCandidates = robots.sitemaps.length > 0
     ? robots.sitemaps
@@ -233,6 +212,50 @@ export async function discoverCareerUrlsFromWebsite(baseUrl, {
     careerUrls,
     errors: [...new Set(errors)],
   };
+}
+
+/** Resolve only the public robots policy without triggering sitemap discovery. */
+export async function resolvePublicRobotsPolicy(baseUrl, {
+  fetchTextImpl = fetchText,
+  signal,
+  userAgent = 'RecruiterRadarCareerPages',
+} = {}) {
+  const base = canonicalizePublicUrl(baseUrl, { keepTracking: true });
+  if (!base) return { ...blockedDiscovery('invalid-base-url'), baseUrl: null, reason: 'invalid-base-url' };
+  const baseOrigin = new URL(base).origin;
+  const robotsUrl = new URL('/robots.txt', baseOrigin).toString();
+  try {
+    const result = await fetchTextImpl(robotsUrl, {
+      sourceName: 'public-source robots',
+      headers: { accept: 'text/plain,*/*;q=0.1', 'user-agent': `${userAgent}/1.0` },
+      redirect: 'follow',
+      signal,
+      retries: 1,
+      timeoutMs: 5_000,
+    });
+    if (!isSameOrigin(result.response?.url ?? robotsUrl, baseOrigin)) {
+      return { ...blockedDiscovery('robots-cross-origin-redirect'), baseUrl: base, reason: 'robots-cross-origin-redirect' };
+    }
+    return {
+      blocked: false,
+      reason: null,
+      baseUrl: base,
+      robotsState: 'loaded',
+      robots: parseRobotsTxt(result.body, userAgent),
+    };
+  } catch (error) {
+    if (![404, 410].includes(Number(error?.status))) {
+      const reason = `robots-${safeErrorCategory(error)}`;
+      return { ...blockedDiscovery(reason), baseUrl: base, reason };
+    }
+    return {
+      blocked: false,
+      reason: null,
+      baseUrl: base,
+      robotsState: 'missing',
+      robots: { rules: [], sitemaps: [] },
+    };
+  }
 }
 
 export function canonicalizePublicUrl(value, { keepTracking = false } = {}) {

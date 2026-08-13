@@ -120,7 +120,11 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
     };
   }
 
-  const crawlResults = await fetchCompanyPages(targets);
+  const crawlResults = await fetchCompanyPages(targets, {
+    dependencies: process.env.COMPANY_SITE_ALLOW_PRIVATE_TEST_TARGETS === 'true'
+      ? { allowPrivateForTests: true, rendered: false }
+      : {},
+  });
   const crawlErrors = crawlResults.filter((r) => r.error).length;
   const records = crawlResults
     .filter((r) => r.record !== null)

@@ -1,4 +1,5 @@
-import { fetchText } from './source-http.mjs';
+import { canonicalizePublicUrl } from './site-discovery.mjs';
+import { fetchPublicPageWithEscalation } from './public-page-escalation.mjs';
 
 export function parseCompanyPage(html, url) {
   if (!html || typeof html !== 'string') {
@@ -24,33 +25,59 @@ export function parseCompanyPage(html, url) {
   };
 }
 
-export async function fetchCompanyPage(url, { signal, timeoutMs = 15000 } = {}) {
-  try {
-    const { response, body: html } = await fetchText(url, {
-      sourceName: 'company-site',
-      headers: {
-        'user-agent': 'RecruiterRadar/1.0 (company-site enrichment)',
-        accept: 'text/html',
-      },
-      signal,
-      timeoutMs,
-      redirect: 'follow',
-    });
-
-    const contentType = response.headers.get('content-type') ?? '';
-
-    if (!contentType.includes('text/html')) {
-      return { url, error: `Non-HTML content-type: ${contentType}`, record: null };
-    }
-
-    const record = parseCompanyPage(html, url);
-    return { url, error: null, record };
-  } catch (err) {
-    return { url, error: err.message ?? String(err), record: null };
-  }
+export async function fetchCompanyPage(url, {
+  signal,
+  timeoutMs = 15000,
+  target = {},
+  dependencies = {},
+} = {}) {
+  const parse = (html, resolvedUrl) => {
+    const record = parseCompanyPage(html, resolvedUrl);
+    if (!record) return [];
+    record.company_name = target.company_name ?? null;
+    record.company_domain = target.company_domain ?? null;
+    record.extraction_method = 'deterministic-html';
+    return [record];
+  };
+  const result = await fetchPublicPageWithEscalation({
+    url,
+    sourceName: 'company-site',
+    signal,
+    timeoutMs,
+    dependencies,
+    headers: {
+      'user-agent': 'RecruiterRadar/1.0 (company-site enrichment)',
+      accept: 'text/html, application/xhtml+xml',
+    },
+    parseHtml: parse,
+    parseMarkdown: (markdown, resolvedUrl, provider) => {
+      const text = cleanMarkdown(markdown);
+      if (!text) return [];
+      return [{
+        page_url: resolvedUrl,
+        page_title: firstMarkdownHeading(markdown),
+        summary: truncate(text, 500),
+        signals: detectSignals(text),
+        contact_paths: [],
+        company_name: target.company_name ?? null,
+        company_domain: target.company_domain ?? null,
+        extraction_method: `${provider}-markdown`,
+        _meta: { crawled: true },
+      }];
+    },
+    validateRecord: (record) => validateCompanyPageRecord(record, url, target),
+  });
+  return {
+    url,
+    error: result.error,
+    record: result.records[0] ?? null,
+    escalationStage: result.selectedStage,
+    escalationAttempts: result.attempts,
+    stoppedByPolicy: result.stoppedByPolicy,
+  };
 }
 
-export async function fetchCompanyPages(targets, { signal, concurrency = 3 } = {}) {
+export async function fetchCompanyPages(targets, { signal, concurrency = 3, dependencies = {} } = {}) {
   const results = [];
   const queue = [...targets];
 
@@ -64,12 +91,11 @@ export async function fetchCompanyPages(targets, { signal, concurrency = 3 } = {
       const companyName = typeof target === 'object' ? target.company_name ?? null : null;
       const companyDomain = typeof target === 'object' ? target.company_domain ?? null : null;
 
-      const result = await fetchCompanyPage(url, { signal });
-
-      if (result.record) {
-        result.record.company_name = companyName;
-        result.record.company_domain = companyDomain;
-      }
+      const result = await fetchCompanyPage(url, {
+        signal,
+        target: { company_name: companyName, company_domain: companyDomain },
+        dependencies,
+      });
 
       results.push(result);
     }
@@ -79,6 +105,35 @@ export async function fetchCompanyPages(targets, { signal, concurrency = 3 } = {
   await Promise.all(workers);
 
   return results;
+}
+
+function validateCompanyPageRecord(record, requestedUrl, target) {
+  const pageUrl = canonicalizePublicUrl(record?.page_url, { keepTracking: true });
+  const expectedUrl = canonicalizePublicUrl(requestedUrl, { keepTracking: true });
+  if ((!pageUrl || !expectedUrl) && !String(requestedUrl).startsWith('http://127.0.0.1:')) return false;
+  if (pageUrl && expectedUrl) {
+    const left = new URL(pageUrl).hostname.replace(/^www\./, '');
+    const right = new URL(expectedUrl).hostname.replace(/^www\./, '');
+    if (left !== right && !left.endsWith(`.${right}`) && !right.endsWith(`.${left}`)) return false;
+  }
+  if (target.company_name && record.company_name !== target.company_name) return false;
+  return Boolean(record.page_title || record.summary) && Array.isArray(record.signals);
+}
+
+function cleanMarkdown(value) {
+  const text = String(value ?? '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/^[#>*+\-]+\s*/gm, '')
+    .replace(/[`*_~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text || null;
+}
+
+function firstMarkdownHeading(value) {
+  const match = String(value ?? '').match(/^#{1,3}\s+(.{3,160})$/m);
+  return match?.[1]?.trim() ?? null;
 }
 
 function extractTagContent(html, tagName) {

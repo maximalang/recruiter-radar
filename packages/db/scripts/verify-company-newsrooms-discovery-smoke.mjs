@@ -168,6 +168,7 @@ async function verifyExpectedZeroContracts() {
 
   const originalFetch = globalThis.fetch;
   try {
+    process.env.COMPANY_NEWSROOMS_ALLOW_PRIVATE_TEST_TARGETS = 'true';
     globalThis.fetch = async () => ({
       ok: true,
       status: 200,
@@ -216,6 +217,7 @@ async function verifyExpectedZeroContracts() {
       allUnreachableRejected: true,
     };
   } finally {
+    delete process.env.COMPANY_NEWSROOMS_ALLOW_PRIVATE_TEST_TARGETS;
     globalThis.fetch = originalFetch;
     rmSync(tempDir, { recursive: true, force: true });
   }

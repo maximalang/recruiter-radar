@@ -80,7 +80,11 @@ export async function resolveCompanyNewsroomsLiveInput({ targetsFilePath }) {
     });
   }
 
-  const crawlResults = await fetchCompanyNewsrooms(targets);
+  const crawlResults = await fetchCompanyNewsrooms(targets, {
+    dependencies: process.env.COMPANY_NEWSROOMS_ALLOW_PRIVATE_TEST_TARGETS === 'true'
+      ? { allowPrivateForTests: true, rendered: false }
+      : {},
+  });
   const records = crawlResults.flatMap((result) => result.records);
   const reachableTargets = crawlResults.filter((result) => result.rootFetched).length;
   const resourcesDiscovered = sum(crawlResults, 'pagesDiscovered') + sum(crawlResults, 'feedsDiscovered');
