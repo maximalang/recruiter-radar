@@ -20,7 +20,7 @@ const runtime = createStandardSourceRuntime({
   evidenceRole: 'context',
   sourceRecordType: 'fns_open_data_context',
   inputFileEnvName: 'FNS_OPEN_DATA_INPUT_FILE',
-  usageText: 'Set FNS_OPEN_DATA_INPUT_FILE to one reviewed bulk snapshot covering all tracked companies; GOVERNMENT_ENRICHMENT_INNS is derived from the database.',
+  usageText: 'Run the official snapshot sync for tracked company INNs; FNS_OPEN_DATA_INPUT_FILE is an override/debug input only.',
   extractRecords: (parsed) => deriveFnsOpenDataEvents(
     extractSourceSection(parsed, 'fns', parseGovernmentEnrichmentInns()),
   ),

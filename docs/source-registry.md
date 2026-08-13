@@ -25,7 +25,7 @@ environment.
 | source | live probe | status | note |
 |---|---|---|---|
 | rabota-rossii | current disposable live DB: 100 signals/evidence/lineage across 80 orgs | digest-allowed; live-verified | official public API; no credential required |
-| career-pages | current controlled crawl: 5/12 targets parsed, 381 normalized | digest-allowed; live-reachable, not full-path verified | 7 targets explicitly page-unreachable; isolated live ingest/evidence run still required |
+| career-pages | 563/563 real vacancies across 18 public/hosted ATS families; FICO Workday 20/20 persisted | digest-allowed; live-verified | official feeds/APIs, structured HTML and rendered DOM; public URL/evidence/lineage asserted |
 | greenhouse | production disposable DB: 50 signals/evidence/lineage | digest-allowed; live-verified | public board discovered from company career surface; persisted as `greenhouse` |
 | lever | production disposable DB: 130 signals/evidence/lineage | digest-allowed; live-verified | public postings discovered from company career surface; persisted as `lever` |
 | ashby | production disposable DB: 57 signals/evidence/lineage | digest-allowed; live-verified | official public Job Posting API |
@@ -36,6 +36,8 @@ environment.
 | superjob | current disposable live DB: 40 signals/evidence/lineage | digest-allowed; live-verified | production app-id found; 32 direct-employer eligible, 8 non-direct rejected |
 | hh | unauthenticated `/areas` HTTP 200; `/vacancies` HTTP 403 | digest-allowed; registration-required | official application OAuth implemented; `HH_CLIENT_ID`/`HH_CLIENT_SECRET` absent, so geo is not yet proven |
 | industry-media | production disposable DB: 6 signals/evidence/lineage | context-only; live-verified | official CBR RSS; allowlisted host/public DNS, one tracked organization, zero sensitive payload fields |
+| fns-open-data | official 98,434,553-byte headcount archive; 1/1 persisted | context-only; live-verified | DB-derived tracked INN, checksum-verified active snapshot, official lineage |
+| rospatent-open-data | official 687,174,811-byte trademark CSV; 502/502 persisted | context-only; live-verified | 284 evidence items, official lineage, zero sensitive payload fields |
 | egrul-fns / transparent-business / fedresurs | n/a | enrichment/context only | never originate leads |
 | tech-job-boards / linkedin / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set; generic regional pseudo-source retired |
 
@@ -315,6 +317,14 @@ ID plus its own official-access, legal, provenance, and confidence review.
   validate tracked legal-entity records, and atomically swap a checksummed
   `active.json` manifest. `*_INPUT_FILE` remains an override/debug path, not the
   required production operation.
+- The 2026-08-13 FNS live run downloaded the current 98,434,553-byte official
+  headcount archive in verified ranges, matched SHA-256
+  `265eca8b05a234ff629f57779ebbc647d07e42c7e43612b40e9ae84340de1464`,
+  and atomically activated one record for controlled INN `9102013580`.
+  Canonical normalization accepted it with zero skips; an isolated
+  production-schema DB run persisted one context-only signal, evidence item and
+  lineage row with official provenance, consistent ownership and no sensitive
+  payload fields.
 - The 2026-08-13 Rospatent live run streamed the official 687,174,811-byte
   trademark CSV and selected 502 records for controlled INN `7707083893`.
   Canonical normalization accepted all 502; an isolated production-schema DB

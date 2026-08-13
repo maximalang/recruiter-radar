@@ -436,7 +436,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: ['GOVERNMENT_ENRICHMENT_INNS'],
     isPrimary: false,
     dailyStage: 'supporting',
-    dailyActivationEnvVars: ['FNS_OPEN_DATA_INPUT_FILE'],
+    dailyActivationEnvVars: ['SOURCE_SNAPSHOT_ROOT', 'FNS_OPEN_DATA_INPUT_FILE'],
     category: 'registry',
   },
   {
@@ -487,7 +487,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: ['GOVERNMENT_ENRICHMENT_INNS'],
     isPrimary: false,
     dailyStage: 'supporting',
-    dailyActivationEnvVars: ['ROSPATENT_OPEN_DATA_INPUT_FILE'],
+    dailyActivationEnvVars: ['SOURCE_SNAPSHOT_ROOT', 'ROSPATENT_OPEN_DATA_INPUT_FILE'],
     category: 'registry',
   },
 ]

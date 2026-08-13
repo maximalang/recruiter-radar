@@ -5,8 +5,8 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 
 const DEFAULT_ROOT = resolve('packages/db/scripts/.snapshots');
 
-export function resolveActiveSnapshot(sourceId, { rootDirectory = DEFAULT_ROOT } = {}) {
-  const manifestPath = join(resolve(rootDirectory), sourceId, 'active.json');
+export function resolveActiveSnapshot(sourceId, { rootDirectory } = {}) {
+  const manifestPath = join(resolveSnapshotRoot(rootDirectory), sourceId, 'active.json');
   if (!existsSync(manifestPath)) return null;
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   const snapshotPath = isAbsolute(manifest.snapshot_file)
@@ -30,12 +30,18 @@ export function resolveSnapshotInputFile(sourceId, envName, options = {}) {
   return active ? { inputFilePath: active.snapshotPath, mode: 'active-snapshot' } : null;
 }
 
+export function resolveVersionedSnapshotOutput(sourceId, now = new Date(), options = {}) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(sourceId)) throw new Error('Invalid snapshot source ID.');
+  const timestamp = now.toISOString().replace(/[:.]/g, '-');
+  return join(resolveSnapshotRoot(options.rootDirectory), sourceId, `snapshot-${timestamp}.json`);
+}
+
 export async function activateValidatedSnapshot({
   sourceId,
   snapshotFile,
   recordCount,
   sourceUrls = [],
-  rootDirectory = DEFAULT_ROOT,
+  rootDirectory,
 }) {
   const snapshotPath = resolve(snapshotFile);
   const bytes = await readFile(snapshotPath);
@@ -43,7 +49,7 @@ export async function activateValidatedSnapshot({
     throw new Error(`${sourceId} snapshot activation requires at least one validated record.`);
   }
   JSON.parse(bytes.toString('utf8'));
-  const directory = join(resolve(rootDirectory), sourceId);
+  const directory = join(resolveSnapshotRoot(rootDirectory), sourceId);
   await mkdir(directory, { recursive: true });
   const manifestPath = join(directory, 'active.json');
   const temporaryPath = join(directory, `.active.${process.pid}.tmp`);
@@ -60,6 +66,10 @@ export async function activateValidatedSnapshot({
   await writeFile(temporaryPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
   await rename(temporaryPath, manifestPath);
   return { manifestPath, manifest };
+}
+
+function resolveSnapshotRoot(rootDirectory) {
+  return resolve(rootDirectory ?? process.env.SOURCE_SNAPSHOT_ROOT?.trim() ?? DEFAULT_ROOT);
 }
 
 function relativeSnapshotPath(directory, snapshotPath) {

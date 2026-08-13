@@ -518,15 +518,15 @@
       "implementation": "implemented",
       "fixture": "tested",
       "contract": "tested",
-      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["GOVERNMENT_ENRICHMENT_INNS"]] },
-      "live": { "state": "reachable", "verifiedAt": "2026-08-13T00:35:00+03:00", "evidence": ["Official FNS open-data passports and current file.nalog.ru dataset archives were reachable; fixture coverage verifies INN filtering and derived headcount, revenue and government-support context.", "The explicit live sync discovered the current official headcount archive, downloaded all 98,434,553 bytes in verified HTTP ranges, matched SHA-256 265eca8b05a234ff629f57779ebbc647d07e42c7e43612b40e9ae84340de1464, streamed 2,044,132 legal-entity documents across 2,271 XML files, and published one company-level record for controlled INN 9102013580. The normal source fetch accepted the versioned snapshot with one normalized record, zero skips and zero sensitive fields; the temporary snapshot was then removed."] },
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["DATABASE_URL", "SOURCE_SNAPSHOT_ROOT"], ["GOVERNMENT_ENRICHMENT_INNS", "SOURCE_SNAPSHOT_ROOT"]] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-13T10:05:18Z", "evidence": ["Official FNS open-data passports and current file.nalog.ru dataset archives were reachable; fixture coverage verifies INN filtering and derived headcount, revenue and government-support context.", "The 2026-08-13 live sync discovered the current official headcount archive, downloaded all 98,434,553 bytes in verified HTTP ranges, matched SHA-256 265eca8b05a234ff629f57779ebbc647d07e42c7e43612b40e9ae84340de1464, streamed the bulk XML and atomically activated one company-level record for controlled INN 9102013580.", "The checksum-verified active snapshot normalized one of one record with zero skips and zero sensitive fields. An isolated production-schema PostgreSQL verifier persisted the record as a context-only signal, evidence item and lineage row with official source URL and consistent organization ownership before dropping the disposable database."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
       "pipelineProfile": "context-standard",
-      "verification": { "fixture": ["npm run verify:government-open-data:smoke", "npm run verify:fns-open-data:sync"], "live": ["npm run verify:fns-open-data:catalog-live"], "contract": ["npm run verify:source:readiness"] },
-      "blockers": ["Schedule source:sync:fns-open-data with tracked GOVERNMENT_ENRICHMENT_INNS; the sync now chooses a versioned output and atomically activates it. FNS_OPEN_DATA_INPUT_FILE remains override-only."]
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke", "npm run verify:fns-open-data:sync"], "live": ["npm run verify:fns-open-data:catalog-live", "FNS_LIVE_SNAPSHOT_VERIFY=1 SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:government-open-data:live-db"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": []
     },
     "government-procurement": {
       "implementation": "implemented",
@@ -574,7 +574,7 @@
       "implementation": "implemented",
       "fixture": "tested",
       "contract": "tested",
-      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["GOVERNMENT_ENRICHMENT_INNS"]] },
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["DATABASE_URL", "SOURCE_SNAPSHOT_ROOT"], ["GOVERNMENT_ENRICHMENT_INNS", "SOURCE_SNAPSHOT_ROOT"]] },
       "live": {
         "state": "verified",
         "verifiedAt": "2026-08-13T08:42:00Z",

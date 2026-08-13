@@ -9,6 +9,7 @@ import pg from 'pg';
 const { Client } = pg;
 const sourceIds = ['fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data'];
 const fixturePath = resolve(import.meta.dirname, './government-open-data-smoke-fixture.json');
+const verifyLiveFnsSnapshot = process.env.FNS_LIVE_SNAPSHOT_VERIFY === '1';
 const verifyLiveRospatentSnapshot = process.env.ROSPATENT_LIVE_SNAPSHOT_VERIFY === '1';
 
 assert.equal(process.env.SOURCE_LIVE_VERIFY, '1', 'SOURCE_LIVE_VERIFY=1 is required.');
@@ -21,7 +22,11 @@ await client.connect();
 try {
   const baseline = await client.query('SELECT clock_timestamp() AS database_started_at');
   const metrics = [
-    runSource('source-fns-open-data.mjs', { FNS_OPEN_DATA_INPUT_FILE: fixturePath }),
+    runSource(
+      'source-fns-open-data.mjs',
+      verifyLiveFnsSnapshot ? {} : { FNS_OPEN_DATA_INPUT_FILE: fixturePath },
+      verifyLiveFnsSnapshot ? '9102013580' : '7707083893',
+    ),
     runSource('source-government-procurement.mjs', { GOVERNMENT_PROCUREMENT_INPUT_FILE: fixturePath }),
     runSource('source-cbr-registry.mjs', {}),
     runSource('source-rosstat-open-data.mjs', { ROSSTAT_OPEN_DATA_INPUT_FILE: fixturePath }),
@@ -35,6 +40,9 @@ try {
     assert.equal(item.evidenceUpsertsCompleted, item.normalizedRecords);
   }
   assert.equal(metrics.find((item) => item.source === 'cbr-registry').inputMode, 'live-public');
+  const fnsMetrics = metrics.find((item) => item.source === 'fns-open-data');
+  assert.equal(fnsMetrics.inputMode, verifyLiveFnsSnapshot ? 'active-snapshot' : 'file');
+  assert.ok(fnsMetrics.normalizedRecords > 0);
   const rospatentMetrics = metrics.find((item) => item.source === 'rospatent-open-data');
   assert.equal(rospatentMetrics.inputMode, verifyLiveRospatentSnapshot ? 'active-snapshot' : 'file');
   assert.ok(rospatentMetrics.normalizedRecords > 0);
@@ -105,14 +113,14 @@ try {
   await client.end();
 }
 
-function runSource(scriptName, extraEnv) {
+function runSource(scriptName, extraEnv, trackedInns = '7707083893') {
   const result = spawnSync(process.execPath, [resolve(import.meta.dirname, scriptName), 'pipeline'], {
     cwd: resolve(import.meta.dirname, '../../..'),
     env: {
       ...process.env,
       ...extraEnv,
       DATABASE_URL: databaseUrl,
-      GOVERNMENT_ENRICHMENT_INNS: '7707083893',
+      GOVERNMENT_ENRICHMENT_INNS: trackedInns,
       SOURCE_ENV_FILE_DISABLED: 'true',
     },
     encoding: 'utf8',

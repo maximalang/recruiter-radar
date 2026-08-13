@@ -6,7 +6,8 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import tls from 'node:tls';
 
-import { activateValidatedSnapshot } from './adapters/snapshot-activation.mjs';
+import { activateValidatedSnapshot, resolveVersionedSnapshotOutput } from './adapters/snapshot-activation.mjs';
+import { resolveTrackedCompanyInns } from './adapters/tracked-company-inns.mjs';
 import { normalizeLegalInn, parseCommaSeparated, toNonEmptyText } from './adapters/rf-source-runtime.mjs';
 import { fetchWithSourcePolicy } from './adapters/source-http.mjs';
 
@@ -276,14 +277,15 @@ function parseCli(argv) {
   options.trackedInns ??= process.env.GOVERNMENT_ENRICHMENT_INNS?.trim();
   if (!options.validateOnly) {
     options.outputFile ??= process.env.ROSPATENT_OPEN_DATA_SYNC_OUTPUT_FILE?.trim();
-    options.outputFile ??= resolve('packages/db/scripts/.snapshots/rospatent-open-data', `snapshot-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+    options.outputFile ??= resolveVersionedSnapshotOutput(SOURCE_ID);
   }
-  if (!options.trackedInns) throw new Error('Usage: sync-rospatent-open-data-snapshot.mjs [--output <versioned.json>] --inns <10-digit INNs> [--validate-only]');
   return options;
 }
 
 async function main() {
-  const result = await syncRospatentOpenDataSnapshot(parseCli(process.argv.slice(2)));
+  const options = parseCli(process.argv.slice(2));
+  options.trackedInns = await resolveTrackedCompanyInns({ explicitInns: options.trackedInns });
+  const result = await syncRospatentOpenDataSnapshot(options);
   console.log(JSON.stringify({
     ok: true,
     source: SOURCE_ID,

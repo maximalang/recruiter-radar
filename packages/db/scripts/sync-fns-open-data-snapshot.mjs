@@ -5,13 +5,14 @@ import { existsSync } from 'node:fs';
 import { access, mkdir, mkdtemp, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { activateValidatedSnapshot } from './adapters/snapshot-activation.mjs';
+import { activateValidatedSnapshot, resolveVersionedSnapshotOutput } from './adapters/snapshot-activation.mjs';
 import { spawn } from 'node:child_process';
 
 import { SaxesParser } from 'saxes';
 
 import { normalizeLegalInn, parseCommaSeparated, toNonEmptyText } from './adapters/rf-source-runtime.mjs';
 import { fetchWithSourcePolicy } from './adapters/source-http.mjs';
+import { resolveTrackedCompanyInns } from './adapters/tracked-company-inns.mjs';
 
 const FNS_DATASETS = Object.freeze({
   headcount: Object.freeze({
@@ -509,16 +510,14 @@ function parseCli(argv) {
   }
   options.outputFile ??= process.env.FNS_OPEN_DATA_SYNC_OUTPUT_FILE?.trim();
   options.trackedInns ??= process.env.GOVERNMENT_ENRICHMENT_INNS?.trim();
-  options.outputFile ??= resolve(
-    'packages/db/scripts/.snapshots/fns-open-data',
-    `snapshot-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
-  );
-  if (!options.trackedInns) throw new Error('Usage: sync-fns-open-data-snapshot.mjs [--output <new-versioned-snapshot.json>] --inns <10-digit INNs> [--include headcount,revenue-expenses,tax-regime] [--previous <snapshot.json>]');
+  options.outputFile ??= resolveVersionedSnapshotOutput('fns-open-data');
   return options;
 }
 
 async function main() {
-  const result = await syncFnsOpenDataSnapshot(parseCli(process.argv.slice(2)));
+  const options = parseCli(process.argv.slice(2));
+  options.trackedInns = await resolveTrackedCompanyInns({ explicitInns: options.trackedInns });
+  const result = await syncFnsOpenDataSnapshot(options);
   console.log(JSON.stringify({
     ok: true,
     source: 'fns-open-data',

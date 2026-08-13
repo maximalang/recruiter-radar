@@ -1056,6 +1056,19 @@ describe('source-ingest', () => {
       ]))
     })
 
+    it('enables active snapshot sources through one persistent snapshot root', () => {
+      const previousRoot = process.env.SOURCE_SNAPSHOT_ROOT
+      process.env.SOURCE_SNAPSHOT_ROOT = 'C:\\ProgramData\\recruiter-radar\\source-snapshots'
+      try {
+        expect(getDailySupportingSourceIds()).toEqual(expect.arrayContaining([
+          'fns-open-data', 'rospatent-open-data',
+        ]))
+      } finally {
+        if (previousRoot === undefined) delete process.env.SOURCE_SNAPSHOT_ROOT
+        else process.env.SOURCE_SNAPSHOT_ROOT = previousRoot
+      }
+    })
+
     it('starts supporting sources only after every primary source completes', async () => {
       const events: string[] = []
       mockGetPool.mockReturnValue({
