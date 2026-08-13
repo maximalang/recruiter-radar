@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
-import { fetchWithSourcePolicy } from './source-http.mjs';
+import { fetchJson, fetchWithSourcePolicy } from './source-http.mjs';
 
 const DEFAULT_CACHE_TTL_MS = 30 * 60_000;
 const DEFAULT_MIN_INTERVAL_MS = 6_000;
@@ -32,7 +32,12 @@ export function createGdeltDocClient(options = {}) {
     60_000,
     24 * 60 * 60_000,
   );
-  const maxAttempts = boundedInteger(options.maxAttempts, DEFAULT_MAX_ATTEMPTS, 1, 6);
+  const maxAttempts = boundedInteger(
+    options.maxAttempts ?? process.env.FUNDING_SIGNALS_GDELT_MAX_ATTEMPTS,
+    DEFAULT_MAX_ATTEMPTS,
+    1,
+    6,
+  );
   let nextRequestAt = 0;
   let cachePromise = null;
   let persistChain = Promise.resolve();
@@ -67,7 +72,7 @@ export function createGdeltDocClient(options = {}) {
       }
 
       if (response.status === 429 || response.status >= 500) {
-        lastError = new Error(`GDELT DOC API returned HTTP ${response.status}`);
+        lastError = createHttpError(response, attempt);
         if (attempt === maxAttempts) break;
         const backoff = computeBackoff(attempt, response.headers?.get?.('retry-after'), random);
         nextRequestAt = Math.max(nextRequestAt, now() + backoff);
@@ -118,7 +123,7 @@ export function createGdeltDocClient(options = {}) {
 }
 
 async function defaultRequest(url, timeoutMs) {
-  return fetchWithSourcePolicy(url, {
+  const options = {
     sourceName: 'funding-business-signals gdelt',
     retries: 0,
     timeoutMs,
@@ -126,7 +131,24 @@ async function defaultRequest(url, timeoutMs) {
       accept: 'application/json',
       'user-agent': 'RecruiterRadar/1.0 (funding-business-signals)',
     },
-  });
+  };
+  try {
+    return await fetchWithSourcePolicy(url, options);
+  } catch (transportError) {
+    try {
+      const body = await fetchJson(url, { ...options, preferNodeHttpFallback: true });
+      return { status: 200, headers: { get: () => null }, json: async () => body };
+    } catch (fallbackError) {
+      if (Number.isInteger(fallbackError?.status)) {
+        return {
+          status: fallbackError.status,
+          headers: { get: (name) => name.toLowerCase() === 'retry-after' ? fallbackError.retryAfter : null },
+          json: async () => ({}),
+        };
+      }
+      throw new AggregateError([transportError, fallbackError], 'GDELT DOC API transports failed.');
+    }
+  }
 }
 
 function computeBackoff(attempt, retryAfter, random) {
@@ -134,6 +156,14 @@ function computeBackoff(attempt, retryAfter, random) {
   if (retryAfterMs !== null) return Math.min(retryAfterMs, DEFAULT_MAX_BACKOFF_MS);
   const exponential = Math.min(DEFAULT_BASE_BACKOFF_MS * (2 ** (attempt - 1)), DEFAULT_MAX_BACKOFF_MS);
   return Math.floor(exponential * (0.75 + random() * 0.5));
+}
+
+function createHttpError(response, attempts) {
+  const error = new Error(`GDELT DOC API returned HTTP ${response.status}`);
+  error.status = response.status;
+  error.retryAfter = response.headers?.get?.('retry-after') ?? null;
+  error.attempts = attempts;
+  return error;
 }
 
 function parseRetryAfter(value) {

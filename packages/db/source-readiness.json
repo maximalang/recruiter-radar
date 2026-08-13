@@ -435,7 +435,7 @@
         "mode": "launch-required",
         "acceptedEnvSets": [["DATABASE_URL"], ["FUNDING_BUSINESS_SIGNALS_INPUT_FILE"], ["FUNDING_SIGNALS_GDELT_QUERIES"], ["FUNDING_SIGNALS_GDELT_QUERIES_JSON"], ["FUNDING_SIGNALS_PROVIDER_API_URL", "FUNDING_SIGNALS_PROVIDER_API_TOKEN"]]
       },
-      "live": { "state": "reachable", "verifiedAt": "2026-08-12T21:28:00Z", "evidence": ["The official public GDELT DOC API was reachable without credentials from the local runtime but returned its documented HTTP 429 request-rate response; no live article or DB success is claimed."] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-13T16:00:00+03:00", "evidence": ["A single controlled request reached the official public GDELT DOC API through the bounded Node HTTPS fallback after the Windows Undici transport timed out. GDELT returned HTTP 429 without Retry-After; the verifier exited successfully as throttled after one attempt, and production uses bounded exponential backoff with jitter. No live article or DB success is claimed."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
@@ -443,9 +443,10 @@
       "pipelineProfile": "context-only",
       "verification": {
         "fixture": ["npm run verify:funding-business-signals:smoke"],
+        "live": ["npm run verify:funding-business-signals:live"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["Production live normalization remains unverified because the controlled request was rate-limited. Automatic queries are now restricted to tracked companies with hiring evidence and a strong domain; publisher-versus-subject attribution remains context-only."]
+      "blockers": ["Current controlled state is throttled after one request, so live normalization and source-to-DB lineage remain unverified. Automatic queries are restricted to tracked companies with hiring evidence and a strong domain; publisher-versus-subject attribution remains context-only."]
     },
     "company-newsrooms": {
       "implementation": "implemented",
@@ -512,13 +513,13 @@
       "fixture": "tested",
       "contract": "tested",
       "configuration": { "mode": "launch-required", "acceptedEnvSets": [["GOVERNMENT_PROCUREMENT_INPUT_FILE"]] },
-      "live": { "state": "reachable", "verifiedAt": "2026-08-12T20:05:00Z", "evidence": ["Official EIS/Treasury public catalogue and contract URL provenance were verified; fixture coverage derives large, first, series, growth, region and customer events by supplier INN."] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-13T16:00:00+03:00", "evidence": ["The current official EIS open-data catalogue returned HTTP 200 after installing the fingerprint-pinned Gosuslugi Russian Trusted Root CA and 2024 intermediate. Node 22 and Alpine Chromium independently verified the chain with certificate checks enabled; the obsolete /epz/opendata/search.html endpoint was replaced after returning HTTP 404. Fixture coverage derives supplier events; no live record-to-DB proof is claimed."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
       "pipelineProfile": "context-standard",
-      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "contract": ["npm run verify:source:readiness"] },
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "live": ["npm run verify:government-ca:live"], "contract": ["npm run verify:source:readiness"] },
       "blockers": ["Production needs one periodically refreshed reviewed EIS/Treasury bulk snapshot; per-company manual files are not supported."]
     },
     "cbr-registry": {
@@ -540,13 +541,13 @@
       "fixture": "tested",
       "contract": "tested",
       "configuration": { "mode": "launch-required", "acceptedEnvSets": [["ROSSTAT_OPEN_DATA_INPUT_FILE"]] },
-      "live": { "state": "reachable", "verifiedAt": "2026-08-12T20:05:00Z", "evidence": ["Official Rosstat open-data catalogue exposed current machine-readable CSV datasets; normalization is aggregate-only and explicitly forbids company attribution."] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-13T16:00:00+03:00", "evidence": ["The official Rosstat open-data catalogue returned HTTP 200 after installing the fingerprint-pinned Gosuslugi Russian Trusted Root CA and 2024 intermediate. Node 22 and Alpine Chromium independently verified the chain with certificate checks enabled. Normalization remains aggregate-only and forbids company attribution; no current scheduled dataset-to-DB proof is claimed."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
       "pipelineProfile": "context-standard",
-      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "contract": ["npm run verify:source:readiness"] },
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "live": ["npm run verify:government-ca:live"], "contract": ["npm run verify:source:readiness"] },
       "blockers": ["Production needs a curated, periodically refreshed subset of official aggregate datasets relevant to industry, regional labour and market baselines."]
     },
     "rospatent-open-data": {

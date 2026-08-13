@@ -66,3 +66,20 @@ test('GDELT scheduler serializes distinct queries through one reservation clock'
   await client.request('https://api.gdeltproject.org/api/v2/doc/doc?query=two');
   assert.deepEqual(sleeps, [6_000]);
 });
+
+test('controlled verifier can stop after one throttled request with machine-readable state', async () => {
+  const client = createGdeltDocClient({
+    persist: false,
+    maxAttempts: 1,
+    requestImpl: async () => ({
+      status: 429,
+      headers: { get: (name) => name === 'retry-after' ? '30' : null },
+      json: async () => ({}),
+    }),
+  });
+
+  await assert.rejects(
+    () => client.request('https://api.gdeltproject.org/api/v2/doc/doc?query=controlled'),
+    (error) => error.status === 429 && error.retryAfter === '30' && error.attempts === 1,
+  );
+});
