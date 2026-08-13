@@ -5,15 +5,16 @@
  * the legacy daily cycle for non-canary workspaces:
  *   1. Ingest all primary hiring sources
  *   2. Ingest bounded company-owned supporting/context sources
- *   3. Generate digest for each active non-canary client profile
- *   4. Deliver the digest to every enabled channel
+ *   3. Derive temporal observations/events from the refreshed evidence
+ *   4. Generate digest for each active non-canary client profile
+ *   5. Deliver the digest to every enabled channel
  *
  * A Commercial Signal canary is executed by its separate exact-lineage cron
  * stage and is deliberately excluded from legacy digest delivery here.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { ingestDailyRadarSources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
+import { ingestDailyRadarSources, isNoActiveProfiles, runSourceTemporalIntelligence } from '@/lib/lead-discovery/source-ingest'
 import { runDigestForClientProfile } from '@/lib/digest'
 import { deliverCandidatesForRun } from '@/lib/digest/deliver-candidates'
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
@@ -94,6 +95,19 @@ export async function POST(request: NextRequest) {
       }, {}),
     }
 
+    const temporalResult = await runSourceTemporalIntelligence()
+    const temporalPayload = {
+      success: temporalResult.success,
+      observations: temporalResult.observations,
+      derivedEvents: temporalResult.derivedEvents,
+      error: temporalResult.error ?? null,
+    }
+    if (temporalResult.success) {
+      logEvent('daily_radar.temporal_intelligence_completed', temporalPayload)
+    } else {
+      logWarn('daily_radar.temporal_intelligence_failed', temporalPayload)
+    }
+
     const digestResults = await generateAndDeliverDigests()
     const digestOk = digestResults.every(r => r.ok)
     const digestSummary = {
@@ -104,13 +118,16 @@ export async function POST(request: NextRequest) {
       totalSkipped: digestResults.reduce((sum, r) => sum + r.skipped, 0),
     }
 
-    const allOk = ingestOk && digestOk
+    const allOk = ingestOk && temporalResult.success && digestOk
     const durationMs = Date.now() - startMs
 
     logEvent('daily_radar.run', {
       status: allOk ? 'ok' : 'partial',
       ingestOk: ingestSummary.succeeded,
       ingestTotal: ingestSummary.total,
+      temporalOk: temporalResult.success,
+      temporalObservations: temporalResult.observations,
+      temporalEvents: temporalResult.derivedEvents,
       digestOk: digestSummary.succeeded,
       digestTotal: digestSummary.total,
       sent: digestSummary.totalSent,
@@ -134,6 +151,7 @@ export async function POST(request: NextRequest) {
         completedAt: new Date().toISOString(),
         durationMs,
         ingest: { ok: ingestOk, ...ingestSummary, details: ingestResults },
+        temporal: { ok: temporalResult.success, ...temporalResult },
         digest: { ok: digestOk, ...digestSummary, details: digestResults },
       },
     }, { status: allOk ? 200 : 207 })

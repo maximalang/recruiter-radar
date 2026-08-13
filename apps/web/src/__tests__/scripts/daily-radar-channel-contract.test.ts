@@ -16,4 +16,12 @@ describe('daily radar channel eligibility contract', () => {
     expect(route).toContain('FROM notification_routes nr')
     expect(route).toContain("nr.event_kind = 'daily_digest'")
   })
+
+  it('derives temporal intelligence after source ingestion and reports the stage', () => {
+    expect(route).toContain('runSourceTemporalIntelligence')
+    expect(route.indexOf('await ingestDailyRadarSources()')).toBeLessThan(
+      route.indexOf('await runSourceTemporalIntelligence()'),
+    )
+    expect(route).toContain('temporal: { ok: temporalResult.success, ...temporalResult }')
+  })
 })

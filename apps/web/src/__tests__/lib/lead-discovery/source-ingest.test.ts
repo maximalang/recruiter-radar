@@ -1,4 +1,4 @@
-import { ingestSource, ingestAllPrimarySources, ingestDailyRadarSources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
+import { ingestSource, ingestAllPrimarySources, ingestDailyRadarSources, isNoActiveProfiles, runSourceTemporalIntelligence } from '@/lib/lead-discovery/source-ingest'
 import { getDailySupportingSourceIds, getHiringEvidenceSourceIds, getPrimarySourceIds, getSourceConfig } from '@/lib/sources/source-registry'
 
 // Mock the execFile accessor (production resolves execFile via
@@ -22,6 +22,35 @@ describe('source-ingest', () => {
   beforeEach(() => {
     mockExecFile.mockReset()
     mockGetPool.mockReturnValue(null)
+  })
+
+  describe('runSourceTemporalIntelligence', () => {
+    it('runs the bounded DB derivation job and parses its summary', async () => {
+      mockExecFile.mockImplementation((_cmd, args: any, opts: any, callback: any) => {
+        expect(args[0]).toContain('derive-source-temporal-intelligence.mjs')
+        expect(opts.timeout).toBe(120_000)
+        callback(null, JSON.stringify({ observations: 4, derivedEvents: 2 }), '')
+      })
+
+      await expect(runSourceTemporalIntelligence()).resolves.toEqual({
+        success: true,
+        observations: 4,
+        derivedEvents: 2,
+      })
+    })
+
+    it('keeps a failed derivation visible to the daily pipeline', async () => {
+      mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+        callback(new Error('exit 1'), '', 'source_temporal_observations is missing')
+      })
+
+      await expect(runSourceTemporalIntelligence()).resolves.toEqual({
+        success: false,
+        observations: 0,
+        derivedEvents: 0,
+        error: 'source_temporal_observations is missing',
+      })
+    })
   })
 
   describe('ingestSource', () => {

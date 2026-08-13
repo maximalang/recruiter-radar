@@ -114,6 +114,69 @@ export interface IngestDiagnostics {
   zeroReason?: string
 }
 
+export interface TemporalIntelligenceResult {
+  success: boolean
+  observations: number
+  derivedEvents: number
+  error?: string
+}
+
+/**
+ * Run the bounded temporal derivation after all daily source ingestion.
+ * A failure is returned explicitly so the cron route can report a partial run
+ * instead of silently delivering without refreshing temporal intelligence.
+ */
+export function runSourceTemporalIntelligence(): Promise<TemporalIntelligenceResult> {
+  const scriptDir = getScriptDir()
+  const scriptPath = resolve(scriptDir, 'derive-source-temporal-intelligence.mjs')
+  if (!scriptPath.startsWith(scriptDir)) {
+    return Promise.resolve({
+      success: false,
+      observations: 0,
+      derivedEvents: 0,
+      error: 'Temporal intelligence script path escapes scripts directory.',
+    })
+  }
+
+  return new Promise((resolvePromise) => {
+    getExecFile()('node', [scriptPath], {
+      env: process.env,
+      timeout: 120_000,
+      maxBuffer: 1024 * 1024,
+      windowsHide: true,
+    }, (error, stdout, stderr) => {
+      if (error) {
+        resolvePromise({
+          success: false,
+          observations: 0,
+          derivedEvents: 0,
+          error: stderr?.trim() || error.message,
+        })
+        return
+      }
+
+      try {
+        const summary = JSON.parse(stdout.trim()) as Record<string, unknown>
+        if (!Number.isInteger(summary.observations) || !Number.isInteger(summary.derivedEvents)) {
+          throw new Error('Temporal intelligence summary is missing integer counts.')
+        }
+        resolvePromise({
+          success: true,
+          observations: summary.observations as number,
+          derivedEvents: summary.derivedEvents as number,
+        })
+      } catch (parseError) {
+        resolvePromise({
+          success: false,
+          observations: 0,
+          derivedEvents: 0,
+          error: parseError instanceof Error ? parseError.message : 'Invalid temporal intelligence summary.',
+        })
+      }
+    })
+  })
+}
+
 /**
  * Sentinel returned by ingestAllPrimarySources() when there are no active
  * client profiles to ingest for. Distinct from IngestResult[] so callers can
