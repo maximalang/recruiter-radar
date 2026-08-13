@@ -23,7 +23,6 @@ const expectedSources = [
   'workable',
   'smartrecruiters',
   'linkedin-company-pages',
-  'tech-job-boards',
   'egrul-fns',
   'company-site',
   'funding-business-signals',
@@ -57,7 +56,6 @@ const digestLeadSources = [
   'rabota-rossii',
   'superjob',
   'habr-career',
-  'tech-job-boards',
   'linkedin-company-pages',
 ];
 const digestContextSources = [
@@ -76,7 +74,6 @@ const digestContextSources = [
 ];
 const providerTokenSources = [
   'linkedin-company-pages',
-  'tech-job-boards',
   'funding-business-signals',
   'transparent-business-fns',
   'fedresurs',
@@ -161,10 +158,11 @@ assert.ok(
 const digestSources = [...digestSourceMatch[1].matchAll(/'([^']+)'/g)]
   .map((match) => match[1])
   .sort();
+const legacyDigestCompatibilitySources = ['tech-job-boards'];
 assert.deepEqual(
   digestSources,
-  [...digestLeadSources].sort(),
-  'digest lead selection must stay limited to lead-originating sources',
+  [...digestLeadSources, ...legacyDigestCompatibilitySources].sort(),
+  'digest lead selection must stay limited to runnable lead sources plus explicit historical compatibility ids',
 );
 
 const digestContextMatch = digestSql.match(

@@ -26,7 +26,6 @@ export type SourceId =
   | 'egrul-fns'
   | 'rabota-rossii'
   | 'company-site'
-  | 'tech-job-boards'
   | 'funding-business-signals'
   | 'fedresurs'
   | 'transparent-business-fns'
@@ -308,30 +307,6 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     isPrimary: false,
     dailyStage: 'supporting',
     category: 'career-page',
-  },
-  {
-    id: 'tech-job-boards',
-    name: 'Tech job boards (Greenhouse/Lever)',
-    description:
-      'Public ATS manifests (boards.greenhouse.io, jobs.lever.co) — international tech companies with Russia-presence vacancies',
-    script: 'source-tech-job-boards.mjs',
-    // No paid provider key required: the live-public mode reads the public JSON
-    // manifests that every Greenhouse/Lever board publishes. The operator only
-    // needs to list the board tokens/slugs (TECH_JOB_BOARDS_GREENHOUSE_TOKENS /
-    // TECH_JOB_BOARDS_LEVER_SLUGS) — these are board identifiers, not secrets.
-    // File mode (TECH_JOB_BOARDS_INPUT_FILE) and provider mode
-    // (TECH_JOB_BOARDS_PROVIDER_API_URL + _TOKEN) are also supported.
-    requiredEnvVars: [],
-    envPrefixes: ['TECH_JOB_BOARDS_'],
-    searchEnvVars: [],
-    // NOT primary (2026-07-15): this is a curated ATS surface, not a
-    // search-crawl. The operator lists which boards to poll, so it must not run
-    // blindly every day. It is digest-eligible (signal_type 'job_posting' and
-    // accepted by source-digest-evidence.sql) so any records it ingests DO
-    // surface as leads — running it from the admin panel enriches the pool with
-    // international tech-company vacancies that have a Russian location.
-    isPrimary: false,
-    category: 'job-board',
   },
   {
     id: 'funding-business-signals',

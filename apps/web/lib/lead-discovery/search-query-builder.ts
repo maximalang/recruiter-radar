@@ -95,7 +95,6 @@ const SOURCE_SEARCH_PARAM: Readonly<Record<string, SourceSearchParams>> = {
   superjob: { text: 'SUPERJOB_KEYWORD', roleKeywords: 'SUPERJOB_KEYWORD', region: null },
   'rabota-rossii': { text: 'RABOTA_ROSSII_SEARCH_TEXT', roleKeywords: null, region: 'RABOTA_ROSSII_REGION' },
   'career-pages': { text: null, roleKeywords: null, region: null },
-  'tech-job-boards': { text: null, roleKeywords: null, region: null },
 }
 
 /** A reduced, serialisable view of ClientProfile the builder needs. */

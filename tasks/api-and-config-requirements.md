@@ -29,9 +29,9 @@
 - **Status:** работает, но не feed-ит digest.
 - **Что нужно:** wire через `aggregateSourceSignals` + добавить в `digestLeadSources` allow-list в `source-registry.mjs`.
 
-### `tech-job-boards` ✅ (⚫ not in digest)
-- **Status:** работает на public endpoints.
-- **Что нужно:** wire в digest pipeline.
+### `tech-job-boards` — retired
+- **Status:** historical provenance ID only; no runnable adapter or configuration.
+- **Migration:** Greenhouse, Lever, and other reviewed ATS records use concrete source IDs through `career-pages`.
 
 ---
 
@@ -159,7 +159,7 @@
 |---|---|---|---|
 | career-pages | ✅ | $0 | расширить targets |
 | company-site | ✅ ⚫ | $0 | wire в digest |
-| tech-job-boards | ✅ ⚫ | $0 | wire в digest |
+| tech-job-boards | retired | n/a | historical read compatibility only |
 | hh | 🟢 | $0 | `HH_USER_AGENT` |
 | rabota-rossii | 🟢 | $0 | search query |
 | egrul-fns | 🟡 | $0 / $50-200 | INN list или Контур |

@@ -322,26 +322,6 @@
       },
       "blockers": []
     },
-    "tech-job-boards": {
-      "implementation": "implemented",
-      "fixture": "tested",
-      "contract": "tested",
-      "configuration": {
-        "mode": "launch-required",
-        "acceptedEnvSets": [["TECH_JOB_BOARDS_INPUT_FILE"], ["TECH_JOB_BOARDS_GREENHOUSE_TOKENS"], ["TECH_JOB_BOARDS_LEVER_SLUGS"], ["TECH_JOB_BOARDS_PROVIDER_API_URL", "TECH_JOB_BOARDS_PROVIDER_API_TOKEN"]]
-      },
-      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
-      "requiresLiveVerification": true,
-      "confidence": "pending",
-      "eligibility": "supporting-evidence-only",
-      "legalReview": "approved",
-      "pipelineProfile": "hiring-gated",
-      "verification": {
-        "fixture": ["npm run verify:tech-job-boards:smoke"],
-        "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
-      },
-      "blockers": ["Production configuration and confidence approval are absent."]
-    },
     "linkedin-company-pages": {
       "implementation": "implemented",
       "fixture": "tested",

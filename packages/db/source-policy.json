@@ -14,7 +14,6 @@
   "company-site": { "priority": "P2", "defaultConfidence": 0.68, "leadEligibility": "enrichment-only", "promotionStatus": "supporting-evidence-only" },
   "funding-business-signals": { "priority": "P2", "defaultConfidence": 0.58, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
   "linkedin-company-pages": { "priority": "P2", "defaultConfidence": 0.72, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
-  "tech-job-boards": { "priority": "P2", "defaultConfidence": 0.68, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
   "superjob": { "priority": "P2", "defaultConfidence": 0.66, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "digest-allowed" },
   "habr-career": { "priority": "P2", "defaultConfidence": 0.69, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
   "company-newsrooms": { "priority": "P3", "defaultConfidence": 0.6, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },

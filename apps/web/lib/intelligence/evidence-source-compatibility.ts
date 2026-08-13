@@ -24,7 +24,6 @@ export const EVIDENCE_RUNTIME_SOURCE_BINDINGS = {
   'egrul-fns': 'egrul-egrip',
   'rabota-rossii': 'rabota-rossii-open-data',
   'company-site': 'official-product-surfaces',
-  'tech-job-boards': 'professional-job-boards',
   'funding-business-signals': 'funding-business-signals',
   fedresurs: 'official-risk-registers',
   'transparent-business-fns': 'official-risk-registers',

@@ -21,12 +21,11 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
   P2: Object.freeze({
     description: 'Secondary sources with confidence gates',
     required: true,
-    sources: ['company-site', 'funding-business-signals', 'linkedin-company-pages', 'tech-job-boards', 'superjob', 'habr-career'],
+    sources: ['company-site', 'funding-business-signals', 'linkedin-company-pages', 'superjob', 'habr-career'],
     leadEligibilityRequirements: {
       'company-site': 'enrichment-only',
       'funding-business-signals': 'context-only',
       'linkedin-company-pages': 'confidence-gated-evidence',
-      'tech-job-boards': 'confidence-gated-evidence',
       'superjob': 'confidence-gated-evidence',
       'habr-career': 'confidence-gated-evidence'
     }

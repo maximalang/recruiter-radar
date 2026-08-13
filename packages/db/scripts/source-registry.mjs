@@ -41,8 +41,6 @@ const companySiteScriptPath = './packages/db/scripts/source-company-site.mjs';
 const companySiteAbsoluteScriptPath = resolve(scriptDir, './source-company-site.mjs');
 const linkedinScriptPath = './packages/db/scripts/source-linkedin-company-pages.mjs';
 const linkedinAbsoluteScriptPath = resolve(scriptDir, './source-linkedin-company-pages.mjs');
-const techJobBoardsScriptPath = './packages/db/scripts/source-tech-job-boards.mjs';
-const techJobBoardsAbsoluteScriptPath = resolve(scriptDir, './source-tech-job-boards.mjs');
 const egrulFnsScriptPath = './packages/db/scripts/source-egrul-fns.mjs';
 const egrulFnsAbsoluteScriptPath = resolve(scriptDir, './source-egrul-fns.mjs');
 const fundingScriptPath = './packages/db/scripts/source-funding-business-signals.mjs';
@@ -213,39 +211,6 @@ registerSource(
       fetch: () => runSourceScript(linkedinAbsoluteScriptPath, 'fetch'),
       ingest: () => runSourceScript(linkedinAbsoluteScriptPath, 'ingest'),
       pipeline: () => runSourceScript(linkedinAbsoluteScriptPath, 'pipeline'),
-    },
-  }),
-);
-
-registerSource(
-  defineSource({
-    id: 'tech-job-boards',
-    kind: 'job-board',
-    sourceClass: 'primary-platform',
-    evidenceTier: 'medium-signal',
-    defaultConfidence: 0.68,
-    status: 'active',
-    fetchModes: ['file', 'live-public', 'provider-token'],
-    description: 'Specialized tech job boards and compliant job snapshot providers beyond HH for additional market coverage.',
-    capabilities: SOURCE_ACTIONS,
-    scripts: {
-      fetch: techJobBoardsScriptPath,
-      ingest: techJobBoardsScriptPath,
-      pipeline: techJobBoardsScriptPath,
-    },
-    actionMap: createActionMap({
-      status: 'active',
-      capabilities: SOURCE_ACTIONS,
-      scripts: {
-        fetch: techJobBoardsScriptPath,
-        ingest: techJobBoardsScriptPath,
-        pipeline: techJobBoardsScriptPath,
-      },
-    }),
-    runner: {
-      fetch: () => runSourceScript(techJobBoardsAbsoluteScriptPath, 'fetch'),
-      ingest: () => runSourceScript(techJobBoardsAbsoluteScriptPath, 'ingest'),
-      pipeline: () => runSourceScript(techJobBoardsAbsoluteScriptPath, 'pipeline'),
     },
   }),
 );

@@ -38,7 +38,9 @@ Source registry разделяет несколько независимых с�
 - `hh`;
 - `rabota-rossii`;
 - `career-pages`;
-- provider/gate-controlled secondary sources: `habr-career`, `linkedin-company-pages`, and `tech-job-boards`; regional boards must be registered under concrete reviewed source IDs.
+- provider/gate-controlled secondary sources: `habr-career` and `linkedin-company-pages`; hosted ATS vacancies use concrete reviewed source IDs discovered through `career-pages`.
+
+`tech-job-boards` is a retired historical provenance ID. Existing records remain readable, but it has no runnable adapter, environment variables, or source-registry entry.
 
 ### Enrichment и context
 

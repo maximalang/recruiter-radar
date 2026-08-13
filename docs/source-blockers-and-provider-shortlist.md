@@ -62,11 +62,11 @@ This document provides an honest operational report on source readiness, blocker
   - Digest: Never lead-originating
 
 #### P2 Sources
-- **tech-job-boards**: Greenhouse/Lever/other tech boards
-  - Status: Provider/fixture ready
-  - Blocker: Confidence gate tests required
-  - Ready: Yes, but blocked from digest
-  - Digest: Blocked until confidence tests
+- **Hosted ATS boards**: Greenhouse/Lever/other reviewed ATS providers
+  - Status: concrete source IDs through the unified career crawler
+  - Boundary: the legacy `tech-job-boards` pseudo-source is retired and read-compatible only
+  - Ready: concrete reviewed ATS IDs only
+  - Digest: governed per concrete source ID; legacy ID accepts no new records
 
 - **linkedin-company-pages**: LinkedIn employer pages
   - Status: Provider/snapshot only
@@ -109,17 +109,17 @@ This document provides an honest operational report on source readiness, blocker
 
 ## API-Mega-List Provider Shortlist
 
-### Tier A - Quality Candidates for tech-job-boards
+### Tier A - Quality Candidates for concrete reviewed source IDs
 
 #### All Jobs Scraper - LinkedIn, Indeed, Glassdoor
-- **Status**: Candidate for tech-job-boards provider integration
+- **Status**: Candidate for a dedicated provider integration after legal and provenance review
 - **Acceptance Criteria**:
   - ✅ Vacancy-level records only
   - ✅ Employer identity required
   - ✅ Region, salary, source URL, freshness included
   - ❌ No personal contact fields
   - ❌ No job URLs as org identity
-- **Integration Path**: Provider fixture → tech-job-boards normalization
+- **Integration Path**: Provider fixture → concrete source-ID normalization
 - **RF Priority**: Secondary after P1 core
 
 #### LinkedIn Jobs Scraper with Company Insights (No Cookies)

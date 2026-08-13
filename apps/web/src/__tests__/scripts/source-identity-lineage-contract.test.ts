@@ -93,7 +93,6 @@ describe('source identity and evidence lineage contract', () => {
     const lineageSources = [
       'ingest-hh.mjs',
       'source-career-pages.mjs',
-      'source-tech-job-boards.mjs',
       'source-linkedin-company-pages.mjs',
       'source-company-site.mjs',
       'source-funding-business-signals.mjs',

@@ -332,7 +332,7 @@ async function loadActiveFeedbackPatterns(): Promise<FeedbackPatternEvent[]> {
  * inside the operator's ICP while poor-fit industries are de-emphasised.
  * Operator-pinned includeKeywords are exempt from demotion (human pin > loop).
  *
- * Sources with no supported search params (career-pages, tech-job-boards) get
+ * Sources with no supported search params (for example career-pages) get
  * an empty env — their ingestion is not keyword-driven.
  */
 async function resolveProfileSearchEnv(

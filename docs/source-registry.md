@@ -44,7 +44,7 @@ persists a review artifact, and then runs the guarded public-surface escalation.
 | fns-open-data | official 98,434,553-byte headcount archive; 1/1 persisted | context-only; live-verified | DB-derived tracked INN, checksum-verified active snapshot, official lineage |
 | rospatent-open-data | official 687,174,811-byte trademark CSV; 502/502 persisted | context-only; live-verified | 284 evidence items, official lineage, zero sensitive payload fields |
 | egrul-fns / transparent-business / fedresurs | n/a | enrichment/context only | never originate leads |
-| tech-job-boards / linkedin / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set; generic regional pseudo-source retired |
+| linkedin / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set; generic board pseudo-sources retired |
 
 **Still blocked, documented in `docs/source-review/`:** avito (robots disallow `/api/`+catalog),
 rabota.ru (reachable UI but licensed database/partner access), GeekJob/getmatch (official terms require permission for commercial
@@ -102,6 +102,8 @@ A source reaching the digest is gated in **two** independent places. Both must a
                       'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards',
                       'linkedin-company-pages')
    ```
+
+   `tech-job-boards` appears here only so historical signals remain readable; no new records may be ingested under that ID.
    Only `signal_type = 'job_posting'` rows from these 13 sources are even *considered*.
 
 2. **`promotionStatus`** — even when a source is in the SQL whitelist, if its
@@ -242,7 +244,7 @@ INNs only; third-party mirrors, arbitrary endpoints, and 12-digit IP/person reco
 |---|---|---|---|---|
 | **superjob** | primary-platform / medium-signal (0.66) | confidence-gated-evidence | **digest-allowed** | free-registration app-id; live-verified |
 | **habr-career** | primary-platform / medium-signal (0.69) | confidence-gated-evidence | **blocked-from-digest-pending-confidence-tests** | reviewed snapshot or permitted provider only; direct HTML disabled |
-| **tech-job-boards** | primary-platform / medium-signal (0.68) | confidence-gated-evidence | blocked-from-digest | live + provider |
+| **tech-job-boards** | retired historical ID | read-compatible only | historical digest compatibility | no adapter or configuration |
 | **linkedin-company-pages** | primary-platform / medium-signal (0.72) | confidence-gated-evidence | blocked-from-digest | provider-token only |
 | **company-site** | company-surface / medium-signal (0.68) | enrichment-only | supporting-evidence-only | live-public; production-runtime verified |
 | **funding-business-signals** | market-signal / context-only (0.58) | context-only | never-lead-originating | free public GDELT + provider; identity-bound automatic targets |
@@ -258,9 +260,10 @@ copying/commercial-use restrictions are controlling even though robots.txt allow
 path. Only a reviewed lawful snapshot or explicitly permitted provider may be run manually;
 candidate/PII surfaces remain prohibited and the source stays outside automatic ingestion.
 
-**tech-job-boards** — legacy curated/provider shell for generic technology boards. Concrete
-Greenhouse, Lever, Ashby, Recruitee, Workable, and SmartRecruiters boards now use individual
-source IDs through the unified career crawler; do not add them back to this generic family.
+**tech-job-boards** — retired legacy provenance ID. Concrete Greenhouse, Lever, Ashby,
+Recruitee, Workable, SmartRecruiters, and other reviewed ATS boards use individual source IDs
+through the unified career crawler. Historical rows remain readable, but the legacy ID has no
+runnable registry entry, environment variables, smoke command, or ingestion path.
 
 **linkedin-company-pages** — **compliant provider snapshots only.** Discard employee, profile,
 email, and phone fields. No direct scraping.

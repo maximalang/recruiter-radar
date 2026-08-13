@@ -52,9 +52,6 @@ COMPANY_NEWSROOMS_PROVIDER_API_TOKEN=your_prnewswire_token
 INDUSTRY_MEDIA_PROVIDER_API_URL=https://provider.example/api
 INDUSTRY_MEDIA_PROVIDER_API_TOKEN=your_provider_token
 
-# Tech Job Boards (optional for additional coverage)
-TECH_JOB_BOARDS_PROVIDER_API_URL=https://api.greenhouse.io
-TECH_JOB_BOARDS_PROVIDER_API_TOKEN=your_greenhouse_token
 ```
 
 ### 📋 Step 3: Database Configuration

@@ -104,7 +104,6 @@ export const SOURCE_FEATURE_CAPABILITIES: Record<SourceId, CapabilitySet> = {
   'egrul-fns': nonVacancySource({ economics: true }),
   'rabota-rossii': vacancySource({ salary: true }),
   'company-site': vacancySource({ salary: true, corporateContact: true }),
-  'tech-job-boards': vacancySource({ salary: true }),
   'funding-business-signals': nonVacancySource(),
   fedresurs: nonVacancySource({ economics: true }),
   'transparent-business-fns': nonVacancySource({ economics: true }),
@@ -115,6 +114,13 @@ export const SOURCE_FEATURE_CAPABILITIES: Record<SourceId, CapabilitySet> = {
   'cbr-registry': nonVacancySource(),
   'rosstat-open-data': nonVacancySource(),
   'rospatent-open-data': nonVacancySource(),
+}
+
+// Records ingested before the concrete ATS source IDs were introduced remain
+// readable, but this compatibility map must not make the retired source
+// runnable or add it back to the active source registry.
+const LEGACY_SOURCE_FEATURE_CAPABILITIES: Readonly<Record<string, CapabilitySet>> = {
+  'tech-job-boards': vacancySource({ salary: true }),
 }
 
 const SOURCE_ALIASES: Readonly<Record<string, SourceId>> = {
@@ -128,7 +134,9 @@ export function getSourceFeatureCapability(
 ): SourceFeatureCapability {
   const normalized = rawSource.trim().toLocaleLowerCase('en-US')
   const source = (SOURCE_ALIASES[normalized] ?? normalized) as SourceId
-  return SOURCE_FEATURE_CAPABILITIES[source]?.[feature] ?? {
+  return SOURCE_FEATURE_CAPABILITIES[source]?.[feature]
+    ?? LEGACY_SOURCE_FEATURE_CAPABILITIES[normalized]?.[feature]
+    ?? {
     status: 'unsupported',
     reason: 'SOURCE_NOT_REGISTERED',
   }

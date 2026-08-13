@@ -29,36 +29,6 @@ const CONFIDENCE_THRESHOLDS = {
 
 // Test fixtures data
 const confidenceFixtures = {
-  'tech-job-boards': [
-    {
-      external_id: 'tjb-conf-1',
-      job_title: 'Senior Software Engineer',
-      company_name: 'TechCorp Inc',
-      company_domain: 'techcorp.example',
-      company_website_url: 'https://techcorp.example',
-      inn: '1234567890',
-      location: 'Москва',
-      salary: '200 000 — 300 000 ₽',
-      published_at: new Date().toISOString(),
-      board: 'greenhouse',
-      tags: ['typescript', 'react', 'node.js'],
-      // Sensitive fields that should be rejected
-      // employee_email: 'john@techcorp.example', // Should be dropped
-      // employee_phone: '+79991234567', // Should be dropped
-    },
-    {
-      external_id: 'tjb-conf-2',
-      job_title: 'DevOps Engineer',
-      company_name: 'CloudSystems',
-      company_domain: 'cloudsystems.ru',
-      location: 'Санкт-Петербург',
-      salary: '180 000 — 250 000 ₽',
-      published_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-      board: 'lever',
-      tags: ['aws', 'docker', 'kubernetes'],
-    },
-  ],
-
   'linkedin-company-pages': [
     {
       external_id: 'linkedin-conf-1',
