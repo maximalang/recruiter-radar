@@ -1,20 +1,19 @@
 /**
  * Cron: Daily Radar Pipeline
  *
- * Triggered by the production cron (cron/trigger-daily-radar.mjs) to run
- * the legacy daily cycle for non-canary workspaces:
- *   1. Ingest all primary hiring sources
- *   2. Ingest bounded company-owned supporting/context sources
- *   3. Derive temporal observations/events from the refreshed evidence
- *   4. Generate digest for each active non-canary client profile
- *   5. Deliver the digest to every enabled channel
+ * The daily clock is delivery-oriented. Source refresh has its own persisted
+ * cadence scheduler and hourly clock; this route only asks that scheduler to
+ * run anything currently due before deriving temporal context and delivering.
+ * A day-level lease prevents duplicate delivery when multiple external clocks
+ * happen to trigger the route on the same UTC date.
  *
  * A Commercial Signal canary is executed by its separate exact-lineage cron
  * stage and is deliberately excluded from legacy digest delivery here.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { ingestDailyRadarSources, isNoActiveProfiles, runSourceTemporalIntelligence } from '@/lib/lead-discovery/source-ingest'
+import { isNoActiveProfiles, runSourceTemporalIntelligence } from '@/lib/lead-discovery/source-ingest'
+import { runScheduledSourceRefresh } from '@/lib/lead-discovery/scheduled-source-refresh'
 import { runDigestForClientProfile } from '@/lib/digest'
 import { deliverCandidatesForRun } from '@/lib/digest/deliver-candidates'
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
@@ -24,6 +23,7 @@ import {
   getCommercialSignalCanaryWorkspaceId,
   resolveCommercialSignalRollout,
 } from '@/lib/opportunities/commercial-signal-rollout'
+import { claimDailyRadarRun, finishDailyRadarRun } from '@/lib/daily-radar-run-state'
 import { logEvent, logError, logWarn } from '@/lib/runtime'
 
 export const runtime = 'nodejs'
@@ -53,11 +53,22 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const lease = await claimDailyRadarRun()
+  if (!lease.acquired) {
+    return NextResponse.json({
+      success: true,
+      skipped: true,
+      reason: 'daily-radar-already-claimed',
+      runDate: lease.runDate,
+    })
+  }
+
   const startMs = Date.now()
 
   try {
-    const ingestResults = await ingestDailyRadarSources()
+    const ingestResults = await runScheduledSourceRefresh()
     if (isNoActiveProfiles(ingestResults)) {
+      await finishDailyRadarRun(lease, 'completed')
       return NextResponse.json(
         { success: false, error: 'No active client profiles; pipeline skipped.', hint: ingestResults.hint },
         { status: 422 }
@@ -78,9 +89,9 @@ export async function POST(request: NextRequest) {
         signals: result.upsertedCount ?? null,
       }
       if (result.success) {
-        logEvent('daily_radar.source_ingest_completed', sourcePayload)
+        logEvent('daily_radar.source_refresh_completed', sourcePayload)
       } else {
-        logWarn('daily_radar.source_ingest_failed', sourcePayload)
+        logWarn('daily_radar.source_refresh_failed', sourcePayload)
       }
     }
     const ingestSummary = {
@@ -144,6 +155,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    await finishDailyRadarRun(lease, 'completed')
     return NextResponse.json({
       success: allOk,
       data: {
@@ -156,6 +168,7 @@ export async function POST(request: NextRequest) {
       },
     }, { status: allOk ? 200 : 207 })
   } catch (error) {
+    await finishDailyRadarRun(lease, 'failed').catch(() => undefined)
     logError('daily_radar.pipeline_failed', error)
     return NextResponse.json(
       { success: false, error: 'Daily radar pipeline failed' },
