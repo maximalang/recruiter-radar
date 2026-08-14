@@ -24,6 +24,24 @@ function dbWithQuery(handler: (sql: string, params?: readonly unknown[]) => {
         if (sql.includes('pg_advisory_xact_lock')) {
           return { rowCount: 1, rows: [{ locked: true }] }
         }
+        if (sql.includes('FROM canonical_vacancies_v1')) {
+          return { rowCount: 0, rows: [] }
+        }
+        if (sql.includes('FROM source_run_observations')) {
+          return { rowCount: 0, rows: [] }
+        }
+        if (sql.includes('INSERT INTO canonical_vacancies_v1')) {
+          return { rowCount: 1, rows: [{ id: '9001' }] }
+        }
+        if (sql.includes('INSERT INTO canonical_vacancy_publications_v1')) {
+          return { rowCount: 1, rows: [] }
+        }
+        if (sql.includes('INSERT INTO canonical_vacancy_observations_v1')) {
+          return { rowCount: 1, rows: [{ id: '9002' }] }
+        }
+        if (sql.includes('INSERT INTO canonical_vacancy_events_v1')) {
+          return { rowCount: 1, rows: [] }
+        }
         if (
           sql.includes('FROM hiring_episodes') &&
           sql.includes('episode_identity') &&

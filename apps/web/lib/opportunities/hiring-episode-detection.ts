@@ -63,6 +63,7 @@ export interface HiringSignalInput {
   sourceUrl: string | null
   externalVacancyId?: string | null
   occurredAt: string
+  lastObservedAt?: string
   evidenceIds: string[]
 }
 

@@ -10,10 +10,18 @@ export function deriveTemporalEvents({ subjectType, current, history }) {
       if (!prior) continue;
       const change = number(current.current_count) - number(prior.metrics.current_count);
       if (change) events.push({ eventType: 'vacancy_count_change', windowDays, delta: { previous: number(prior.metrics.current_count), current: number(current.current_count), change } });
+      const accelerationThreshold = Math.max(3, Math.ceil(number(prior.metrics.current_count) * 0.25));
+      if (change >= accelerationThreshold) events.push({ eventType: 'hiring_acceleration', windowDays, delta: { previous: number(prior.metrics.current_count), current: number(current.current_count), change } });
     }
     if (previous) {
       addSetEvent(events, 'roles_newly_opened', current.roles, previous.metrics?.roles);
-      for (const role of strings(current.reopened_roles)) events.push({ eventType: 'role_reopened', windowDays: null, delta: { role } });
+      const priorLifecycleIds = new Set(history.flatMap((item) =>
+        lifecycleEvents(item.metrics?.lifecycle_events).map((event) => event.id)));
+      for (const event of lifecycleEvents(current.lifecycle_events)) {
+        if (priorLifecycleIds.has(event.id)) continue;
+        if (event.type === 'reopened') events.push({ eventType: 'role_reopened', windowDays: null, delta: { role: event.role, lifecycleEventId: event.id } });
+        if (event.type === 'closed') events.push({ eventType: 'role_closed', windowDays: null, delta: { role: event.role, lifecycleEventId: event.id } });
+      }
       addSetEvent(events, 'geography_expansion', current.geographies, previous.metrics?.geographies);
       addSetEvent(events, 'new_department', current.departments, previous.metrics?.departments);
     }
@@ -47,3 +55,4 @@ function atWindow(history, days) { return history.filter((x) => Number(x.ageDays
 function closest(history) { return [...history].sort((a, b) => Number(a.ageDays) - Number(b.ageDays))[0] ?? null; }
 function number(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
 function strings(v) { return Array.isArray(v) ? v.map(String).map((x) => x.trim()).filter(Boolean) : []; }
+function lifecycleEvents(value) { return Array.isArray(value) ? value.filter((item) => item && typeof item === 'object' && item.id != null && ['opened', 'closed', 'reopened'].includes(item.type)).map((item) => ({ id: String(item.id), type: item.type, role: String(item.role ?? '').trim() })).filter((item) => item.role) : []; }

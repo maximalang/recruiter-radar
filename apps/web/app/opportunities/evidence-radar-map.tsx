@@ -168,6 +168,7 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
   const minHeadcount = numeric(staffing?.minHeadcount)
   const maxHeadcount = numeric(staffing?.maxHeadcount)
   const mode = typeof staffing?.mode === 'string' ? staffing.mode : null
+  const acceleration = lead.temporalContext?.strongestAcceleration ?? null
 
   return (
     <article className={styles.leadCard} data-evidence-lead-card data-motion-disclosure>
@@ -188,6 +189,11 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
       <section className={styles.leadSection}>
         <h3>Почему сейчас</h3>
         <p>{lead.whyNow}</p>
+        {acceleration && acceleration.change > 0 ? (
+          <p>
+            Активные вакансии: {acceleration.previous} → {acceleration.current} за {acceleration.windowDays} дней (+{acceleration.change}).
+          </p>
+        ) : null}
       </section>
 
       <section className={styles.opportunityStrength} aria-label="Сила возможности">

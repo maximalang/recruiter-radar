@@ -89,6 +89,38 @@ describe('OpportunityScoringService', () => {
     expect(result.scoringVersion).toBe('opportunity-v1')
   })
 
+  it('uses proven vacancy acceleration as a bounded timing multiplier', () => {
+    const baselineEpisode = episode({
+      freshnessScore: 0.4,
+      strengthScore: 0.4,
+      metadata: { activityTrend: 'stable' },
+    })
+    const baseline = service.score(input({ episode: baselineEpisode }))
+    const accelerated = service.score(input({
+      episode: episode({
+        ...baselineEpisode,
+        metadata: {
+          activityTrend: 'stable',
+          temporalContext: {
+            events: [], activeVacancyCount: 27, vacancyDeltas: { '14': 15 },
+            strongestAcceleration: {
+              windowDays: 14, previous: 12, current: 27, change: 15,
+            },
+            newlyOpenedRoles: [], closedRoles: [], reopenedRoles: [],
+            evidenceIds: ['e-1'],
+          },
+        },
+      }),
+    }))
+
+    expect(accelerated.components.timing.score)
+      .toBeGreaterThan(baseline.components.timing.score)
+    expect(accelerated.components.timing.reasons)
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'TEMPORAL_HIRING_ACCELERATION' }),
+      ]))
+  })
+
   it('dismisses a profile exclusion before high hiring intent can compensate', () => {
     const result = service.score(
       input({

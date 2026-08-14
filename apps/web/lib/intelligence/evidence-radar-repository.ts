@@ -1,6 +1,10 @@
 import type { Pool, PoolClient } from 'pg'
 
 import { getPool } from '@/lib/db-pool'
+import {
+  summarizeOpportunityTemporalContext,
+  type OpportunityTemporalContext,
+} from '@/lib/opportunities/temporal-context'
 
 export type EvidenceRadarLead = {
   cardId: string
@@ -59,6 +63,7 @@ export type EvidenceRadarLead = {
     href: string | null
   }>
   riskReasons: string[]
+  temporalContext?: OpportunityTemporalContext
 }
 
 type EvidenceRadarDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
@@ -102,6 +107,7 @@ export async function listEvidenceRadarLeads(
     evidence: EvidenceRadarLead['evidence']
     contactPaths: EvidenceRadarLead['contactPaths']
     riskReasons: string[]
+    temporalEvents: unknown
   }>(
     `SELECT
        card.id::TEXT AS "cardId",
@@ -136,7 +142,8 @@ export async function listEvidenceRadarLeads(
          AS "independentSourceCount",
        COALESCE(evidence.items, '[]'::JSONB) AS evidence,
        COALESCE(contacts.items, '[]'::JSONB) AS "contactPaths",
-       COALESCE(card.risk_reasons, ARRAY[]::TEXT[]) AS "riskReasons"
+       COALESCE(card.risk_reasons, ARRAY[]::TEXT[]) AS "riskReasons",
+       COALESCE(temporal.items, '[]'::JSONB) AS "temporalEvents"
      FROM evidence_lead_cards_v1 AS card
      JOIN organization_identity_profiles_v1 AS identity
        ON identity.workspace_id = card.workspace_id
@@ -187,6 +194,21 @@ export async function listEvidenceRadarLeads(
          AND contact.id = ANY(card.contact_path_ids)
          AND contact.verification_status = 'verified'
      ) AS contacts ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT JSONB_AGG(JSONB_BUILD_OBJECT(
+         'id', event.id::TEXT,
+         'subjectType', event.subject_type,
+         'eventType', event.event_type,
+         'occurredAt', event.occurred_at::TEXT,
+         'windowDays', event.window_days,
+         'delta', event.delta,
+         'evidenceIds', event.evidence_ids::TEXT[]
+       ) ORDER BY event.occurred_at DESC, event.id DESC) AS items
+       FROM source_temporal_derived_events AS event
+       WHERE event.organization_id = card.organization_id
+         AND event.occurred_at >= card.generated_at - INTERVAL '30 days'
+         AND event.occurred_at <= NOW()
+     ) AS temporal ON TRUE
      WHERE card.workspace_id = $1
        AND card.status = 'qualified'
        AND card.valid_until >= NOW()
@@ -237,5 +259,6 @@ export async function listEvidenceRadarLeads(
     evidence: Array.isArray(row.evidence) ? row.evidence : [],
     contactPaths: Array.isArray(row.contactPaths) ? row.contactPaths : [],
     riskReasons: Array.isArray(row.riskReasons) ? row.riskReasons : [],
+    temporalContext: summarizeOpportunityTemporalContext(row.temporalEvents),
   }))
 }

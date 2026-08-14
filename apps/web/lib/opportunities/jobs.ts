@@ -13,12 +13,14 @@ import {
   DEFAULT_HIRING_EPISODE_CONFIG,
   HIRING_EPISODE_ENGINE_VERSION,
   HiringEpisodeDetectionService,
+  canonicalizeVacancies,
   classifyOpportunityRoleFamily,
   hashEpisodeEvidence,
   isEpisodeContinuation,
   type HiringEpisodeCandidate,
   type HiringSignalInput,
 } from './hiring-episode-detection'
+import { persistCanonicalVacancyLifecycle } from './canonical-vacancy-lifecycle-repository'
 import {
   OpportunityBriefBuilder,
   type OpportunityBrief,
@@ -71,6 +73,7 @@ import {
   OpportunityStrategistV1,
   type OpportunityStrategistBrief,
 } from './opportunity-strategist-v1'
+import { summarizeOpportunityTemporalContext } from './temporal-context'
 
 type OpportunityJobDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
 
@@ -129,6 +132,7 @@ interface SignalRow {
   sourceUrl: string | null
   externalVacancyId: string | null
   occurredAt: string
+  lastObservedAt: string
   evidenceIds: unknown
 }
 
@@ -166,6 +170,7 @@ interface OpportunityBuildRow {
   evidenceIds: unknown
   signals: unknown
   evidence: unknown
+  temporalEvents: unknown
   digestCandidateId: string
   digestPayload: unknown
   digestReasons: unknown
@@ -286,6 +291,7 @@ async function runDetectHiringEpisodesJob(
                E'\\x1f',
                s.id::TEXT,
                s.updated_at::TEXT,
+               source_run.successful_run_id::TEXT,
                s.occurred_at::TEXT,
                s.source,
                s.source_url,
@@ -320,6 +326,13 @@ async function runDetectHiringEpisodesJob(
          WHERE ei.org_id = s.org_id
            AND ei.url = s.source_url
        ) evidence ON s.id IS NOT NULL
+       LEFT JOIN LATERAL (
+         SELECT MAX(run.id) AS successful_run_id
+         FROM source_run_observations run
+         WHERE run.source_id = s.source
+           AND run.outcome = 'success'
+           AND run.action = 'pipeline'
+       ) source_run ON s.id IS NOT NULL
        GROUP BY scope.organization_id
      )
      SELECT
@@ -373,6 +386,7 @@ async function runDetectHiringEpisodesJob(
            s.source_url AS "sourceUrl",
            s.external_id AS "externalVacancyId",
            s.occurred_at::TEXT AS "occurredAt",
+           s.updated_at::TEXT AS "lastObservedAt",
            COALESCE(
              ARRAY_AGG(DISTINCT ei.id::TEXT)
                FILTER (WHERE ei.id IS NOT NULL),
@@ -415,6 +429,12 @@ async function runDetectHiringEpisodesJob(
         await db.query(
           `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
           [`opportunity:detect:organization:${organization.organizationId}`],
+        )
+        await persistCanonicalVacancyLifecycle(
+          organization.organizationId,
+          canonicalizeVacancies(signals),
+          now,
+          db,
         )
         const closedMissing = await closeMissingActiveEpisodes(
           organization.organizationId,
@@ -1759,6 +1779,7 @@ async function persistOpportunityBuild(input: {
       components: activeComponents,
       hardGates: hardGateResults,
       sourceFamilies: toStringArray(row.sourceFamilies),
+      temporalContext: summarizeOpportunityTemporalContext(row.temporalEvents),
       agencyFitExplanation: brief.agencyFitExplanation,
       limitations: brief.limitations,
       ...(strategistBrief ? { strategistBrief } : {}),
@@ -2395,11 +2416,13 @@ function mapHiringSignal(row: SignalRow): HiringSignalInput {
     sourceUrl: row.sourceUrl,
     externalVacancyId: row.externalVacancyId,
     occurredAt: row.occurredAt,
+    lastObservedAt: row.lastObservedAt,
     evidenceIds: toStringArray(row.evidenceIds),
   }
 }
 
 function mapEpisode(row: OpportunityBuildRow): HiringEpisodeCandidate {
+  const temporalContext = summarizeOpportunityTemporalContext(row.temporalEvents)
   return {
     organizationId: row.organizationId,
     episodeType: row.episodeType,
@@ -2418,7 +2441,10 @@ function mapEpisode(row: OpportunityBuildRow): HiringEpisodeCandidate {
     engineVersion: row.engineVersion,
     signalIds: toStringArray(row.signalIds),
     evidenceIds: toStringArray(row.evidenceIds),
-    metadata: asRecord(row.episodeMetadata),
+    metadata: {
+      ...asRecord(row.episodeMetadata),
+      temporalContext,
+    },
   }
 }
 
@@ -2900,6 +2926,7 @@ const OPPORTUNITY_BUILD_QUERY = `
     COALESCE(episode_data.evidence_ids, ARRAY[]::TEXT[]) AS "evidenceIds",
     COALESCE(episode_data.signals, '[]'::jsonb) AS signals,
     COALESCE(episode_data.evidence, '[]'::jsonb) AS evidence,
+    COALESCE(temporal_data.events, '[]'::jsonb) AS "temporalEvents",
     dc.id::TEXT AS "digestCandidateId",
     dc.payload AS "digestPayload",
     dc.reasons AS "digestReasons",
@@ -2982,4 +3009,19 @@ const OPPORTUNITY_BUILD_QUERY = `
     LEFT JOIN evidence_items ei ON ei.id = hee.evidence_id
     WHERE hee.hiring_episode_id = he.id
   ) episode_data ON TRUE
+  LEFT JOIN LATERAL (
+    SELECT JSONB_AGG(JSONB_BUILD_OBJECT(
+      'id', event.id::TEXT,
+      'subjectType', event.subject_type,
+      'eventType', event.event_type,
+      'occurredAt', event.occurred_at::TEXT,
+      'windowDays', event.window_days,
+      'delta', event.delta,
+      'evidenceIds', event.evidence_ids::TEXT[]
+    ) ORDER BY event.occurred_at DESC, event.id DESC) AS events
+    FROM source_temporal_derived_events event
+    WHERE event.organization_id = he.organization_id
+      AND event.occurred_at >= he.started_at - INTERVAL '30 days'
+      AND event.occurred_at <= NOW()
+  ) temporal_data ON TRUE
 `
