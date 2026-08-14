@@ -279,7 +279,8 @@ function resolveExistingCanonicalVacancy(
     normalizeMatchText(row.normalizedRole) === normalizeMatchText(vacancy.title) &&
     normalizeMatchText(row.location ?? '') === normalizeMatchText(vacancy.region ?? '') &&
     Math.abs(Date.parse(row.firstSeenAt) - incomingFirstSeenAt) <= CANONICAL_MATCH_WINDOW_MS &&
-    !hasConflictingProviderId(row, vacancy))
+    !hasConflictingProviderId(row, vacancy) &&
+    !hasAmbiguousCrossSourceStrongIdentity(row, vacancy))
   return fallbackMatches.length === 1 ? fallbackMatches[0] : null
 }
 
@@ -289,6 +290,19 @@ function hasConflictingProviderId(row: LifecycleRow, vacancy: CanonicalVacancy):
     const existing = row.sourceExternalIds?.[publication.source] ?? []
     return existing.length > 0 && !existing.includes(publication.externalVacancyId)
   })
+}
+
+function hasAmbiguousCrossSourceStrongIdentity(
+  row: LifecycleRow,
+  vacancy: CanonicalVacancy,
+): boolean {
+  const existingStrongSources = Object.entries(row.sourceExternalIds ?? {})
+    .filter(([, ids]) => ids.length > 0)
+    .map(([source]) => source)
+  if (existingStrongSources.length === 0) return false
+  return vacancy.publications.some((publication) =>
+    Boolean(publication.externalVacancyId) &&
+    existingStrongSources.some((source) => source !== publication.source))
 }
 
 function normalizeMatchText(value: string): string {

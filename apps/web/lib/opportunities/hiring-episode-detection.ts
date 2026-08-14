@@ -587,6 +587,17 @@ export function canonicalizeVacancies(
       })
       return
     }
+    if (
+      enforcePublicationWindow &&
+      explicitIdsByProvider[leftRoot].size > 0 &&
+      explicitIdsByProvider[rightRoot].size > 0
+    ) {
+      logEvent('canonical_vacancy.merge_rejected', {
+        organizationId: signals[left].organizationId,
+        reasonCode: 'ambiguous_cross_source_strong_ids',
+      })
+      return
+    }
     if (enforcePublicationWindow) {
       const earliestPublication = Math.min(
         earliestPublicationByRoot[leftRoot],
@@ -709,13 +720,19 @@ function vacancyPublicationMatchKind(
     return null
   }
   if (!withinPublicationWindow(left.occurredAt, right.occurredAt)) return null
+  const leftProvider = normalizeText(left.source)
+  const rightProvider = normalizeText(right.source)
   const conflictingSameSourceIds =
-    normalizeText(left.source) === normalizeText(right.source) &&
+    leftProvider === rightProvider &&
     Boolean(left.externalVacancyId) &&
     Boolean(right.externalVacancyId) &&
     normalizeExternalVacancyId(left.externalVacancyId ?? '') !==
       normalizeExternalVacancyId(right.externalVacancyId ?? '')
-  return conflictingSameSourceIds ? null : 'fallback'
+  const ambiguousCrossSourceStrongIds =
+    leftProvider !== rightProvider &&
+    Boolean(left.externalVacancyId) &&
+    Boolean(right.externalVacancyId)
+  return conflictingSameSourceIds || ambiguousCrossSourceStrongIds ? null : 'fallback'
 }
 
 function canonicalVacancyIdentity(publications: HiringSignalInput[]): string {

@@ -85,7 +85,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     name: 'HeadHunter',
     description: 'Primary Russian job board — fetch vacancies and upsert signals',
     script: 'ingest-hh.mjs',
-    requiredEnvVars: ['HH_USER_AGENT'],
+    requiredEnvVars: ['HH_USER_AGENT', 'HH_CLIENT_ID', 'HH_CLIENT_SECRET'],
     envPrefixes: ['HH_'],
     searchEnvVars: [
       'HH_SEARCH_TEXT', 'HH_PER_PAGE', 'HH_PAGES',
