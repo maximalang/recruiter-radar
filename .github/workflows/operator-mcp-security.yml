@@ -73,6 +73,7 @@ jobs:
           bash -n scripts/deploy/configure-timeweb-mcp-auth.sh
           bash -n scripts/deploy/configure-timeweb-mcp-runtime.sh
           bash -n scripts/deploy/configure-timeweb-mcp-caddy.sh
+          bash scripts/deploy/test-timeweb-mcp-first-bootstrap.sh
           test -f .github/workflows/timeweb-mcp-bootstrap.yml
           test ! -f .github/workflows/operator-mcp-bootstrap.yml
           grep -Fq 'RR_TIMEWEB_MCP_TOKEN:' .github/workflows/timeweb-mcp-bootstrap.yml
