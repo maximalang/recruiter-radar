@@ -157,6 +157,7 @@ jobs:
           npm run verify:sources:readiness
           npm run verify:sources:coverage
           npm run verify:source:confidence
+          npm run verify:smartrecruiters:confidence
       - name: Upload contract reports
         if: always()
         uses: actions/upload-artifact@v7

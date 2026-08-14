@@ -226,9 +226,10 @@ function checkDigestBoundaries(sources) {
   // Verify no non-digest sources are in active digest
   // Keep this allowlist deliberately explicit: promotion is a production
   // decision, not something inferred from a source being runnable. Rabota
-  // Rossii, the five production-verified public ATS sources, and SuperJob have
-  // cleared their recorded gates. SmartRecruiters, Habr Career, and the other
-  // job-board families remain explicitly blocked in source-policy.json.
+  // Rossii, the six production-verified public ATS sources, and SuperJob have
+  // cleared their recorded gates. Habr Career and the other gated families
+  // remain explicitly blocked in source-policy.json. SmartRecruiters is listed
+  // only after its dedicated representative confidence verifier joined CI.
   const expectedDigestSources = [
     'hh',
     'career-pages',
@@ -237,6 +238,7 @@ function checkDigestBoundaries(sources) {
     'ashby',
     'recruitee',
     'workable',
+    'smartrecruiters',
     'rabota-rossii',
     'superjob',
   ];

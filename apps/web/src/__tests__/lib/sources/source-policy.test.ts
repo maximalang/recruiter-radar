@@ -28,6 +28,7 @@ describe('canonical source policy adapter', () => {
         'ashby',
         'recruitee',
         'workable',
+        'smartrecruiters',
         'rabota-rossii',
       ])
   })

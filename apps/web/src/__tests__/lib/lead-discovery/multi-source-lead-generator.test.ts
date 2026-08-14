@@ -184,6 +184,7 @@ describe('MultiSourceLeadGenerator', () => {
         'ashby',
         'recruitee',
         'workable',
+        'smartrecruiters',
         'egrul-fns',
         'rabota-rossii',
       ])

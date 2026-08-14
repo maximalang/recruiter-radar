@@ -1878,18 +1878,31 @@ export async function fetchSmartRecruitersPublicCareersRecords(target, {
 export function mapSmartRecruitersPostingsPayload(payload, target) {
   const postings = Array.isArray(payload?.content) ? payload.content : [];
 
-  return postings.map((posting, index) => ({
+  return postings.map((posting) => mapSmartRecruitersPosting(posting, target)).filter(Boolean);
+}
+
+function mapSmartRecruitersPosting(posting, target) {
+  if (!posting || typeof posting !== 'object' || Array.isArray(posting)) return null;
+  const externalId = toNonEmptyText(posting.id ?? posting.uuid);
+  const jobTitle = toNonEmptyText(posting.name);
+  const jobPostingUrl = toUrlOrNull(posting.postingUrl ?? posting.ref);
+  const releasedDate = toNonEmptyText(posting.releasedDate);
+  const occurredAt = toTimestampOrNull(releasedDate);
+  if (!externalId || !jobTitle || !isOwnedSmartRecruitersPostingUrl(jobPostingUrl, target)) return null;
+  if (releasedDate && !occurredAt) return null;
+
+  return {
     company_name: target.companyName ?? toNonEmptyText(posting?.company?.name),
     company_domain: target.companyDomain,
     company_website_url: target.companyWebsiteUrl,
     career_page_url: target.careerPageUrl,
-    job_posting_url: toUrlOrNull(posting?.postingUrl ?? posting?.ref),
-    job_title: toNonEmptyText(posting?.name),
-    external_id: stringifyExternalId(posting?.id ?? posting?.uuid, target.id, index),
+    job_posting_url: jobPostingUrl,
+    job_title: jobTitle,
+    external_id: externalId,
     location: toNonEmptyText(posting?.location?.fullLocation)
       ?? joinLocationParts(posting?.location?.city, posting?.location?.region, posting?.location?.country),
     employment_type: toNonEmptyText(posting?.typeOfEmployment?.label),
-    occurred_at: toTimestampOrNull(posting?.releasedDate),
+    occurred_at: occurredAt,
     tags: [posting?.department?.label, posting?.function?.label, posting?.industry?.label]
       .map(toNonEmptyText)
       .filter(Boolean),
@@ -1899,7 +1912,32 @@ export function mapSmartRecruitersPostingsPayload(payload, target) {
     raw_target_id: target.id,
     raw_target_adapter: target.adapter,
     raw: posting,
-  }));
+  };
+}
+
+function isOwnedSmartRecruitersPostingUrl(value, target) {
+  if (!value) return false;
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) return false;
+  const expectedSlug = extractSmartRecruitersSlug(target.careerPageUrl ?? target.sourceUrl)?.toLowerCase();
+  if (!expectedSlug) return false;
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (url.hostname.toLowerCase() === 'jobs.smartrecruiters.com') {
+    return parts.length >= 2 && parts[0].toLowerCase() === expectedSlug;
+  }
+  if (url.hostname.toLowerCase() === 'api.smartrecruiters.com') {
+    return parts.length >= 5
+      && parts[0].toLowerCase() === 'v1'
+      && parts[1].toLowerCase() === 'companies'
+      && parts[2].toLowerCase() === expectedSlug
+      && parts[3].toLowerCase() === 'postings';
+  }
+  return false;
 }
 
 export async function fetchTeamtailorRssRecords(target, { fetchTextImpl = fetchText } = {}) {
