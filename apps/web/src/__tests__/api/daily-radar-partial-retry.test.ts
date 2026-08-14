@@ -1,0 +1,90 @@
+const profileRows = [
+  { id: '101', delivery_frequency: 'daily' },
+  { id: '202', delivery_frequency: 'daily' },
+]
+const runDigestForClientProfile = jest.fn()
+const deliverCandidatesForRun = jest.fn()
+const enrichRunCandidates = jest.fn(async () => undefined)
+const heartbeatDailyRadarRun = jest.fn(async () => true)
+const attachDailyRadarProfileDigestRun = jest.fn(async (lease: { digestRunId: string | null }, runId: string) => {
+  lease.digestRunId = runId
+  return true
+})
+const finishDailyRadarProfile = jest.fn(async () => true)
+const claimDailyRadarProfile = jest.fn()
+
+jest.mock('@/lib/db', () => ({
+  getPool: () => ({ query: jest.fn(async () => ({ rows: profileRows })) }),
+}))
+jest.mock('@/lib/digest', () => ({ runDigestForClientProfile: (...args: unknown[]) => runDigestForClientProfile(...args) }))
+jest.mock('@/lib/digest/deliver-candidates', () => ({ deliverCandidatesForRun: (...args: unknown[]) => deliverCandidatesForRun(...args) }))
+jest.mock('@/lib/ai/enrichment/enrichRunCandidates', () => ({ enrichRunCandidates: (...args: unknown[]) => enrichRunCandidates(...args) }))
+jest.mock('@/lib/delivery/nextDeliveryHint', () => ({ shouldDeliverOnRun: () => true }))
+jest.mock('@/lib/opportunities/commercial-signal-rollout', () => ({
+  getCommercialSignalCanaryWorkspaceId: () => null,
+  resolveCommercialSignalRollout: () => ({ effectiveMode: 'off' }),
+}))
+jest.mock('@/lib/daily-radar-run-state', () => ({
+  claimDailyRadarRun: jest.fn(),
+  finishDailyRadarRun: jest.fn(),
+  recordDailyRadarSourceRefreshResult: jest.fn(),
+  recordDailyRadarTemporalResult: jest.fn(),
+  heartbeatDailyRadarRun: (...args: unknown[]) => heartbeatDailyRadarRun(...args),
+  claimDailyRadarProfile: (...args: unknown[]) => claimDailyRadarProfile(...args),
+  attachDailyRadarProfileDigestRun: (...args: unknown[]) => attachDailyRadarProfileDigestRun(...args),
+  finishDailyRadarProfile: (...args: unknown[]) => finishDailyRadarProfile(...args),
+}))
+jest.mock('@/lib/lead-discovery/source-ingest', () => ({
+  isNoActiveProfiles: () => false,
+  runSourceTemporalIntelligence: jest.fn(),
+}))
+jest.mock('@/lib/lead-discovery/scheduled-source-refresh', () => ({ runScheduledSourceRefresh: jest.fn() }))
+jest.mock('@/lib/runtime', () => ({ logEvent: jest.fn(), logError: jest.fn(), logWarn: jest.fn() }))
+
+import { generateAndDeliverDigests } from '@/app/api/cron/daily-radar/route'
+import type { DailyRadarLease } from '@/lib/daily-radar-run-state'
+
+const dailyLease = (attemptCount: number): DailyRadarLease => ({
+  acquired: true,
+  persisted: true,
+  runDate: '2026-08-14',
+  leaseId: `00000000-0000-4000-8000-00000000000${attemptCount}`,
+  attemptCount,
+})
+
+describe('daily radar partial retry', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    runDigestForClientProfile
+      .mockResolvedValueOnce({ run: { id: 'run-a' } })
+      .mockResolvedValueOnce({ run: { id: 'run-b' } })
+    deliverCandidatesForRun
+      .mockResolvedValueOnce({ ok: true, sent: 1, failed: 0, skipped: 0, failures: [] })
+      .mockResolvedValueOnce({ ok: false, sent: 0, failed: 1, skipped: 0, failures: [{ digestCandidateId: 0, error: 'profile B failed' }] })
+      .mockResolvedValueOnce({ ok: true, sent: 1, failed: 0, skipped: 0, failures: [] })
+  })
+
+  test('profile A sent + profile B failed -> retry skips A and retries B on the same digest run', async () => {
+    claimDailyRadarProfile
+      .mockResolvedValueOnce({ acquired: true, persisted: true, runDate: '2026-08-14', clientProfileId: '101', leaseId: 'lease-1', attemptCount: 1, digestRunId: null, status: 'running' })
+      .mockResolvedValueOnce({ acquired: true, persisted: true, runDate: '2026-08-14', clientProfileId: '202', leaseId: 'lease-1', attemptCount: 1, digestRunId: null, status: 'running' })
+      .mockResolvedValueOnce({ acquired: false, persisted: true, runDate: '2026-08-14', clientProfileId: '101', leaseId: 'lease-2', attemptCount: 1, digestRunId: 'run-a', status: 'completed' })
+      .mockResolvedValueOnce({ acquired: true, persisted: true, runDate: '2026-08-14', clientProfileId: '202', leaseId: 'lease-2', attemptCount: 2, digestRunId: 'run-b', status: 'running' })
+
+    const first = await generateAndDeliverDigests(dailyLease(1))
+    expect(first.map((result) => result.ok)).toEqual([true, false])
+    expect(runDigestForClientProfile).toHaveBeenCalledTimes(2)
+    expect(deliverCandidatesForRun).toHaveBeenNthCalledWith(1, 'run-a')
+    expect(deliverCandidatesForRun).toHaveBeenNthCalledWith(2, 'run-b')
+
+    const second = await generateAndDeliverDigests(dailyLease(2))
+    expect(second.map((result) => result.ok)).toEqual([true, true])
+    expect(second[0]).toMatchObject({ clientProfileId: '101', skipped: 1, retried: true })
+    expect(second[1]).toMatchObject({ clientProfileId: '202', digestRunId: 'run-b', retried: true })
+
+    expect(runDigestForClientProfile).toHaveBeenCalledTimes(2)
+    expect(deliverCandidatesForRun).toHaveBeenCalledTimes(3)
+    expect(deliverCandidatesForRun).toHaveBeenNthCalledWith(3, 'run-b')
+    expect(deliverCandidatesForRun).not.toHaveBeenNthCalledWith(3, 'run-a')
+  })
+})
