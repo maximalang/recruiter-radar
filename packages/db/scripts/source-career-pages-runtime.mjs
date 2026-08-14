@@ -17,6 +17,7 @@ const TARGET_PROVENANCE_SOURCES = new Set([
   'workable',
   'smartrecruiters',
 ]);
+const TARGET_SCOPED_SIGNAL_SOURCES = ['career-pages', ...TARGET_PROVENANCE_SOURCES];
 const SOURCE_BY_ADAPTER = new Map([
   ['greenhouse-board', 'greenhouse'],
   ['lever-postings', 'lever'],
@@ -81,6 +82,26 @@ async function persistTargetRunObservations({ summary, startedAt, completedAt })
   await client.connect();
   try {
     await client.query('BEGIN');
+
+    // The core career-page normalizer retains raw_target_id inside payload.raw.
+    // Promote that already-observed provenance field to the payload root so the
+    // canonical publication writer can bind each signal to the exact source
+    // target without parsing source-specific raw payloads itself. This is an
+    // idempotent compatibility projection, not a new identity inference.
+    await client.query(
+      `UPDATE signals
+       SET payload = JSONB_SET(
+         payload,
+         '{raw_target_id}',
+         TO_JSONB(payload->'raw'->>'raw_target_id'),
+         true
+       )
+       WHERE source = ANY($1::TEXT[])
+         AND NULLIF(payload->>'raw_target_id', '') IS NULL
+         AND NULLIF(payload->'raw'->>'raw_target_id', '') IS NOT NULL`,
+      [TARGET_SCOPED_SIGNAL_SOURCES],
+    );
+
     for (const result of targetResults) {
       const targetKey = nonEmptyText(result?.id);
       if (!targetKey) continue;
