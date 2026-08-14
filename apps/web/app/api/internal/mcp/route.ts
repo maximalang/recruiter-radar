@@ -12,18 +12,18 @@ function disabled() {
   return NextResponse.json({ error: 'not_found' }, { status: 404, headers: HEADERS })
 }
 
-export async function GET() {
+export async function GET(_request?: Request) {
   return disabled()
 }
 
-export async function POST() {
+export async function POST(_request?: Request) {
   return disabled()
 }
 
-export async function DELETE() {
+export async function DELETE(_request?: Request) {
   return disabled()
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(_request?: Request) {
   return disabled()
 }
