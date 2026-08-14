@@ -1,0 +1,133 @@
+name: Final Correctness Autopatch
+
+on:
+  push:
+    branches: [codex/free-source-expansion]
+    paths:
+      - '.github/workflows/final-correctness-autopatch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/free-source-expansion
+          fetch-depth: 0
+
+      - name: Apply exact matcher replacements
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+
+          function replaceExact(path, before, after) {
+            const content = fs.readFileSync(path, 'utf8')
+            if (!content.includes(before)) {
+              throw new Error(`Exact patch anchor not found in ${path}`)
+            }
+            const updated = content.replace(before, after)
+            if (updated === content) throw new Error(`Patch produced no change in ${path}`)
+            fs.writeFileSync(path, updated)
+          }
+
+          const detection = 'apps/web/lib/opportunities/hiring-episode-detection.ts'
+          replaceExact(
+            detection,
+            `    if (conflictProvider) {
+              logEvent('canonical_vacancy.merge_rejected', {
+                organizationId: signals[left].organizationId,
+                provider: conflictProvider,
+                reasonCode: 'conflicting_provider_external_ids',
+              })
+              return
+            }
+            if (enforcePublicationWindow) {`,
+            `    if (conflictProvider) {
+              logEvent('canonical_vacancy.merge_rejected', {
+                organizationId: signals[left].organizationId,
+                provider: conflictProvider,
+                reasonCode: 'conflicting_provider_external_ids',
+              })
+              return
+            }
+            if (
+              enforcePublicationWindow &&
+              explicitIdsByProvider[leftRoot].size > 0 &&
+              explicitIdsByProvider[rightRoot].size > 0
+            ) {
+              logEvent('canonical_vacancy.merge_rejected', {
+                organizationId: signals[left].organizationId,
+                reasonCode: 'ambiguous_cross_source_strong_ids',
+              })
+              return
+            }
+            if (enforcePublicationWindow) {`,
+          )
+
+          replaceExact(
+            detection,
+            `  const conflictingSameSourceIds =
+            normalizeText(left.source) === normalizeText(right.source) &&
+            Boolean(left.externalVacancyId) &&
+            Boolean(right.externalVacancyId) &&
+            normalizeExternalVacancyId(left.externalVacancyId ?? '') !==
+              normalizeExternalVacancyId(right.externalVacancyId ?? '')
+          return conflictingSameSourceIds ? null : 'fallback'`,
+            `  const leftProvider = normalizeText(left.source)
+          const rightProvider = normalizeText(right.source)
+          const conflictingSameSourceIds =
+            leftProvider === rightProvider &&
+            Boolean(left.externalVacancyId) &&
+            Boolean(right.externalVacancyId) &&
+            normalizeExternalVacancyId(left.externalVacancyId ?? '') !==
+              normalizeExternalVacancyId(right.externalVacancyId ?? '')
+          const ambiguousCrossSourceStrongIds =
+            leftProvider !== rightProvider &&
+            Boolean(left.externalVacancyId) &&
+            Boolean(right.externalVacancyId)
+          return conflictingSameSourceIds || ambiguousCrossSourceStrongIds ? null : 'fallback'`,
+          )
+
+          const lifecycle = 'apps/web/lib/opportunities/canonical-vacancy-lifecycle-repository.ts'
+          replaceExact(
+            lifecycle,
+            `    Math.abs(Date.parse(row.firstSeenAt) - incomingFirstSeenAt) <= CANONICAL_MATCH_WINDOW_MS &&
+            !hasConflictingProviderId(row, vacancy))`,
+            `    Math.abs(Date.parse(row.firstSeenAt) - incomingFirstSeenAt) <= CANONICAL_MATCH_WINDOW_MS &&
+            !hasConflictingProviderId(row, vacancy) &&
+            !hasAmbiguousCrossSourceStrongIdentity(row, vacancy))`,
+          )
+
+          replaceExact(
+            lifecycle,
+            `function normalizeMatchText(value: string): string {`,
+            `function hasAmbiguousCrossSourceStrongIdentity(
+            row: LifecycleRow,
+            vacancy: CanonicalVacancy,
+          ): boolean {
+            const existingStrongSources = Object.entries(row.sourceExternalIds ?? {})
+              .filter(([, ids]) => ids.length > 0)
+              .map(([source]) => source)
+            if (existingStrongSources.length === 0) return false
+            return vacancy.publications.some((publication) =>
+              Boolean(publication.externalVacancyId) &&
+              existingStrongSources.some((source) => source !== publication.source))
+          }
+
+          function normalizeMatchText(value: string): string {`,
+          )
+          NODE
+
+      - name: Commit matcher hardening
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/web/lib/opportunities/hiring-episode-detection.ts \
+                  apps/web/lib/opportunities/canonical-vacancy-lifecycle-repository.ts
+          git diff --cached --check
+          git commit -m 'fix: reject ambiguous cross-source vacancy collisions'
+          git push origin HEAD:codex/free-source-expansion
