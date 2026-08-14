@@ -16,9 +16,15 @@ const claimDailyRadarProfile = jest.fn()
 jest.mock('@/lib/db', () => ({
   getPool: () => ({ query: jest.fn(async () => ({ rows: profileRows })) }),
 }))
-jest.mock('@/lib/digest', () => ({ runDigestForClientProfile: (...args: unknown[]) => runDigestForClientProfile(...args) }))
-jest.mock('@/lib/digest/deliver-candidates', () => ({ deliverCandidatesForRun: (...args: unknown[]) => deliverCandidatesForRun(...args) }))
-jest.mock('@/lib/ai/enrichment/enrichRunCandidates', () => ({ enrichRunCandidates: (...args: unknown[]) => enrichRunCandidates(...args) }))
+jest.mock('@/lib/digest', () => ({
+  runDigestForClientProfile: (arg: unknown) => runDigestForClientProfile(arg),
+}))
+jest.mock('@/lib/digest/deliver-candidates', () => ({
+  deliverCandidatesForRun: (runId: unknown) => deliverCandidatesForRun(runId),
+}))
+jest.mock('@/lib/ai/enrichment/enrichRunCandidates', () => ({
+  enrichRunCandidates: (runId: unknown) => enrichRunCandidates(runId),
+}))
 jest.mock('@/lib/delivery/nextDeliveryHint', () => ({ shouldDeliverOnRun: () => true }))
 jest.mock('@/lib/opportunities/commercial-signal-rollout', () => ({
   getCommercialSignalCanaryWorkspaceId: () => null,
@@ -29,10 +35,12 @@ jest.mock('@/lib/daily-radar-run-state', () => ({
   finishDailyRadarRun: jest.fn(),
   recordDailyRadarSourceRefreshResult: jest.fn(),
   recordDailyRadarTemporalResult: jest.fn(),
-  heartbeatDailyRadarRun: (...args: unknown[]) => heartbeatDailyRadarRun(...args),
-  claimDailyRadarProfile: (...args: unknown[]) => claimDailyRadarProfile(...args),
-  attachDailyRadarProfileDigestRun: (...args: unknown[]) => attachDailyRadarProfileDigestRun(...args),
-  finishDailyRadarProfile: (...args: unknown[]) => finishDailyRadarProfile(...args),
+  heartbeatDailyRadarRun: (lease: unknown) => heartbeatDailyRadarRun(lease),
+  claimDailyRadarProfile: (lease: unknown, profileId: unknown) => claimDailyRadarProfile(lease, profileId),
+  attachDailyRadarProfileDigestRun: (lease: { digestRunId: string | null }, runId: string) =>
+    attachDailyRadarProfileDigestRun(lease, runId),
+  finishDailyRadarProfile: (lease: unknown, status: unknown, error?: unknown) =>
+    finishDailyRadarProfile(lease, status, error),
 }))
 jest.mock('@/lib/lead-discovery/source-ingest', () => ({
   isNoActiveProfiles: () => false,
