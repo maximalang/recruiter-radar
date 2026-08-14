@@ -180,19 +180,19 @@ test('does not advance last-source-seen when no newer exact target observation e
 test('preserves canonical identity when later publications add new source families', async () => {
   const hhOnly = canonicalizeVacancies([{
     id: '11', organizationId: '7', signalType: 'job_posting', title: 'Java Developer',
-    region: 'Москва', source: 'hh', sourceUrl: 'https://hh.ru/vacancy/100',
+    region: 'Москва', source: 'hh', sourceUrl: 'https://jobs.example.ru/java?utm_source=hh',
     externalVacancyId: '100', occurredAt: '2026-01-01T00:00:00.000Z', evidenceIds: ['101'],
   }])[0]
   const expanded = canonicalizeVacancies([
     ...hhOnly.publications,
     {
       id: '12', organizationId: '7', signalType: 'job_posting', title: 'Java Developer',
-      region: 'Москва', source: 'superjob', sourceUrl: 'https://superjob.ru/vakansii/200.html',
+      region: 'Москва', source: 'superjob', sourceUrl: 'https://jobs.example.ru/java?utm_source=superjob',
       externalVacancyId: '200', occurredAt: '2026-01-02T00:00:00.000Z', evidenceIds: ['102'],
     },
     {
       id: '13', organizationId: '7', signalType: 'job_posting', title: 'Java Developer',
-      region: 'Москва', source: 'career-pages', sourceUrl: 'https://example.ru/jobs/java',
+      region: 'Москва', source: 'career-pages', sourceUrl: 'https://jobs.example.ru/java?ref=career',
       externalVacancyId: null, occurredAt: '2026-01-03T00:00:00.000Z', evidenceIds: ['103'],
     },
   ])
@@ -205,7 +205,7 @@ test('preserves canonical identity when later publications add new source famili
     if (sql.includes('FROM canonical_vacancies_v1')) return { rowCount: 1, rows: [{
       id: '41', vacancyFingerprint: hhOnly.vacancyFingerprint,
       normalizedRole: 'Java Developer', location: 'Москва',
-      canonicalDestinationUrl: 'https://hh.ru/vacancy/100',
+      canonicalDestinationUrl: 'https://jobs.example.ru/java?utm_source=hh',
       sourceExternalIds: { hh: ['100'] }, sourceTargetKeys: {}, active: true,
       firstSeenAt: '2026-01-01T00:00:00.000Z', lastSeenAt: '2026-01-01T00:00:00.000Z',
       lastSourceSeenAt: '2026-01-01T00:00:00.000Z', closedAt: null, reopenedAt: null,
