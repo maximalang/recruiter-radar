@@ -119,6 +119,16 @@ describe('Timeweb MCP OAuth resource boundary', () => {
     expect(wrongSubject).toEqual({ ok: false, reason: 'subject_not_allowed' })
   })
 
+  it('rejects an expired access token so the client must refresh before MCP access', async () => {
+    const expired = await verifyTimewebMcpAccessToken(
+      `Bearer ${token({ iat: NOW - 1200, exp: NOW - 60 })}`,
+      env,
+      discoveryFetch(),
+      NOW_MS,
+    )
+    expect(expired).toEqual({ ok: false, reason: 'token_expired' })
+  })
+
   it('rejects private JWK material from discovery and never depends on the Timeweb API token', async () => {
     const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
