@@ -7,9 +7,9 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/postgres-adapter.js && node --check test/security.test.js",
-    "test": "node --test test/security.test.js"
+    "start": "node src/entrypoint.js",
+    "check": "node --check src/timeweb-server.js && node --check src/entrypoint.js && node --check src/postgres-adapter.js && node --check test/security.test.js && node --check test/timeweb-security.test.js",
+    "test": "node --test test/security.test.js test/timeweb-security.test.js"
   },
   "dependencies": {
     "argon2": "0.45.1",
