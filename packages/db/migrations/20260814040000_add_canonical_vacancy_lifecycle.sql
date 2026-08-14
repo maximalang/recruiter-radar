@@ -37,7 +37,10 @@ CREATE TABLE canonical_vacancy_publications_v1 (
   id BIGSERIAL PRIMARY KEY,
   canonical_vacancy_id BIGINT NOT NULL,
   organization_id BIGINT NOT NULL REFERENCES orgs(id) ON DELETE RESTRICT,
-  signal_id BIGINT NOT NULL REFERENCES signals(id) ON DELETE RESTRICT,
+  -- A publication keeps its company/source/external-id/URL/evidence receipt
+  -- after a mutable signal is removed during evidence contraction. The signal
+  -- is a materialization pointer, not the publication's lifecycle owner.
+  signal_id BIGINT REFERENCES signals(id) ON DELETE SET NULL,
   source_family TEXT NOT NULL CHECK (BTRIM(source_family) <> ''),
   external_vacancy_id TEXT,
   destination_url TEXT,

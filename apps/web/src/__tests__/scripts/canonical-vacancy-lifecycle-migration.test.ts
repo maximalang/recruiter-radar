@@ -25,6 +25,8 @@ test('adds auditable canonical vacancy lifecycle storage', () => {
   ]) expect(up).toContain(field)
 
   expect(up).toContain("event_type IN ('opened', 'closed', 'reopened')")
+  expect(up).toMatch(/signal_id BIGINT REFERENCES signals\(id\) ON DELETE SET NULL/)
+  expect(up).not.toMatch(/signal_id BIGINT NOT NULL/)
   expect(up).not.toMatch(/DELETE\s+FROM|TRUNCATE|UPDATE\s+(signals|hiring_episodes|opportunities)/i)
 })
 
