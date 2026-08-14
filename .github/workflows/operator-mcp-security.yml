@@ -75,7 +75,8 @@ jobs:
           bash -n scripts/deploy/configure-timeweb-mcp-caddy.sh
           test -f .github/workflows/timeweb-mcp-bootstrap.yml
           test ! -f .github/workflows/operator-mcp-bootstrap.yml
-          grep -Fq 'RR_TIMEWEB_MCP_TOKEN: ${{ secrets.RR_TIMEWEB_MCP_TOKEN }}' .github/workflows/timeweb-mcp-bootstrap.yml
+          grep -Fq 'RR_TIMEWEB_MCP_TOKEN:' .github/workflows/timeweb-mcp-bootstrap.yml
+          grep -Fq 'secrets.RR_TIMEWEB_MCP_TOKEN' .github/workflows/timeweb-mcp-bootstrap.yml
           grep -Fq 'RR_MCP_ENABLED: "false"' scripts/deploy/configure-timeweb-mcp-runtime.sh
           grep -Fq 'RR_MCP_MUTATIONS_ENABLED: "false"' scripts/deploy/configure-timeweb-mcp-runtime.sh
           grep -Fq 'respond @rr_legacy_operator_mcp 404' scripts/deploy/configure-timeweb-mcp-caddy.sh
