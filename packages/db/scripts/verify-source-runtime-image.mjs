@@ -34,6 +34,11 @@ const sourceScripts = [
   'source-rospatent-open-data.mjs',
 ];
 
+const runtimeSupportScripts = [
+  'source-career-pages-runtime.mjs',
+  'derive-source-temporal-intelligence.mjs',
+];
+
 const governmentSyncScripts = [
   'sync-fns-open-data-snapshot.mjs',
   'sync-government-procurement-snapshot.mjs',
@@ -41,13 +46,19 @@ const governmentSyncScripts = [
   'sync-rospatent-open-data-snapshot.mjs',
 ];
 
+const requiredMigrationFiles = [
+  '20260814040000_add_canonical_vacancy_lifecycle.sql',
+  '20260814050000_add_source_scheduler_state.sql',
+  '20260814060000_add_source_target_run_scope.sql',
+  '20260814070000_add_daily_radar_run_lease.sql',
+];
+
 async function verifyFilesystem() {
   const requiredPaths = [
     ...sourceScripts.map((name) => `packages/db/scripts/${name}`),
+    ...runtimeSupportScripts.map((name) => `packages/db/scripts/${name}`),
     ...governmentSyncScripts.map((name) => `packages/db/scripts/${name}`),
-    'packages/db/scripts/derive-source-temporal-intelligence.mjs',
-    'packages/db/migrations/20260814040000_add_canonical_vacancy_lifecycle.sql',
-    'packages/db/migrations/20260814050000_add_source_scheduler_state.sql',
+    ...requiredMigrationFiles.map((name) => `packages/db/migrations/${name}`),
     '/etc/ssl/certs/ca-certificates.crt',
     '/etc/ssl/certs/russian-trusted-ca-bundle.pem',
   ];
@@ -67,7 +78,12 @@ async function verifyFilesystem() {
   const snapshotRoot = process.env.SOURCE_SNAPSHOT_ROOT?.trim();
   if (snapshotRoot) await access(resolve(snapshotRoot), constants.R_OK | constants.W_OK);
 
-  console.log(JSON.stringify({ check: 'filesystem', sources: sourceScripts.length, status: 'passed' }));
+  console.log(JSON.stringify({
+    check: 'filesystem',
+    sources: sourceScripts.length,
+    runtimeSupportScripts: runtimeSupportScripts.length,
+    status: 'passed',
+  }));
 }
 
 async function verifyBrowser() {
@@ -102,7 +118,18 @@ async function verifyDatabase() {
     'canonical_vacancy_publications_v1',
     'canonical_vacancy_observations_v1',
     'canonical_vacancy_events_v1',
+    'daily_radar_run_state',
   ];
+  const requiredColumns = new Map([
+    ['source_run_observations', [
+      'scope',
+      'execution_source_id',
+      'organization_id',
+      'target_key',
+      'target_outcome',
+    ]],
+    ['canonical_vacancy_publications_v1', ['source_target_key']],
+  ]);
   try {
     const result = await pool.query(
       `SELECT table_name
@@ -113,10 +140,31 @@ async function verifyDatabase() {
     const present = new Set(result.rows.map((row) => row.table_name));
     const missing = requiredTables.filter((table) => !present.has(table));
     if (missing.length > 0) throw new Error(`Source runtime tables are missing: ${missing.join(', ')}`);
+
+    for (const [table, columns] of requiredColumns) {
+      const columnResult = await pool.query(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = $1
+           AND column_name = ANY($2::TEXT[])`,
+        [table, columns],
+      );
+      const presentColumns = new Set(columnResult.rows.map((row) => row.column_name));
+      const missingColumns = columns.filter((column) => !presentColumns.has(column));
+      if (missingColumns.length > 0) {
+        throw new Error(`Source runtime columns are missing from ${table}: ${missingColumns.join(', ')}`);
+      }
+    }
   } finally {
     await pool.end();
   }
-  console.log(JSON.stringify({ check: 'database', tables: requiredTables.length, status: 'passed' }));
+  console.log(JSON.stringify({
+    check: 'database',
+    tables: requiredTables.length,
+    targetScopeColumns: [...requiredColumns.values()].flat().length,
+    status: 'passed',
+  }));
 }
 
 if (flags.size === 0 || ![...flags].every((flag) => ['--filesystem', '--browser', '--database'].includes(flag))) {
