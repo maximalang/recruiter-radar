@@ -22,6 +22,8 @@ const REQUEST_HEADERS = [
   'content-type',
   'mcp-protocol-version',
   'mcp-session-id',
+  'mcp-method',
+  'mcp-name',
   'last-event-id',
 ] as const
 
