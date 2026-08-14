@@ -21,6 +21,7 @@ import {
 } from './adapters/organization-resolution.mjs';
 import { extractDomain } from './lib/adapter-base.mjs';
 import { upsertSignalEvidenceLineage } from './lib/source-lineage-writer.mjs';
+import { redactSourceRuntimeSecrets } from './lib/source-secret-redaction.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -96,9 +97,13 @@ try {
     console.log(`vacancies skipped for normalized layer: ${stats.skippedSignalCount}`);
   }
 } catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = redactSourceRuntimeSecrets(
+    error instanceof Error ? error.message : String(error),
+  );
   const causeMessage =
-    error instanceof Error && error.cause instanceof Error ? error.cause.message : '';
+    error instanceof Error && error.cause instanceof Error
+      ? redactSourceRuntimeSecrets(error.cause.message)
+      : '';
 
   console.error(`HH ingestion failed: ${message}`);
   console.error(`HH diagnostic: ${JSON.stringify(describeHhFailure(error))}`);

@@ -22,6 +22,7 @@ import {
   resolveOrganizationOwner,
 } from './organization-resolution.mjs';
 import { buildSourceRunMetrics, recordSourceRunObservation } from '../lib/source-health-recorder.mjs';
+import { redactSourceRuntimeSecrets } from '../lib/source-secret-redaction.mjs';
 
 export { loadEnvFile, normalizeDomain };
 
@@ -233,7 +234,9 @@ export function createStandardSourceRuntime(config) {
       console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
     } catch (error) {
       await persistRunHealth(databaseUrl, buildSourceRunMetrics({ sourceId, action: requestedAction, startedAt, completedAt: Date.now(), input, error }));
-      const message = error instanceof Error ? error.message : String(error);
+      const message = redactSourceRuntimeSecrets(
+        error instanceof Error ? error.message : String(error),
+      );
       console.error(`${sourceId} ${requestedAction} failed: ${message}`);
       process.exit(1);
     }

@@ -60,7 +60,17 @@ export async function fetchYouTubeCompanyChannels(targets, options = {}) {
 async function getJson(url, { fetchImpl, etag }) {
   const headers = { Accept: 'application/json' };
   if (etag) headers['If-None-Match'] = etag;
-  const response = await fetchWithSourcePolicy(url, { headers, redirect: 'error', fetchImpl, sourceName: 'youtube-company-channels', retries: 1 });
+  let response;
+  try {
+    response = await fetchWithSourcePolicy(url, { headers, redirect: 'error', fetchImpl, sourceName: 'youtube-company-channels', retries: 1 });
+  } catch (error) {
+    const status = Number.isInteger(error?.status) ? error.status : null;
+    const sanitized = new Error(status
+      ? `YouTube Data API returned HTTP ${status}`
+      : 'YouTube Data API request failed.');
+    if (status) sanitized.status = status;
+    throw sanitized;
+  }
   if (response.status === 304) return { notModified: true, etag, value: null };
   if (!response.ok) throw new Error(`YouTube Data API returned HTTP ${response.status}`);
   return { notModified: false, etag: response.headers.get('etag'), value: await response.json() };

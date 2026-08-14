@@ -64,4 +64,18 @@ test('resolves an exact company-linked handle through channels.list before readi
   assert.equal(result.diagnostics[0].ownershipVerified, true);
 });
 
+test('does not expose the YouTube API key from a transport exception', async () => {
+  const apiKey = 'youtube-sensitive-api-key';
+  await assert.rejects(
+    fetchYouTubeCompanyChannels([target], {
+      apiKey,
+      fetchCompanyPage: async () => '<a href="https://www.youtube.com/channel/UC_COMPANY">YouTube</a>',
+      fetchImpl: async (url) => { throw new Error(`transport failed for ${url}`); },
+      quota: { remainingUnits: 2 },
+    }),
+    (error) => error.message === 'YouTube Data API request failed.'
+      && !error.message.includes(apiKey),
+  );
+});
+
 function json(value, { etag } = {}) { return new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json', ...(etag ? { etag } : {}) } }); }

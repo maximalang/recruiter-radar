@@ -52,3 +52,20 @@ test('reads incrementally after the cached public message id', async () => {
   assert.deepEqual(result.records.map((record) => record.external_id), ['telegram-post:acme_career:43']);
   assert.deepEqual(result.cacheUpdates, [{ channelUsername: 'acme_career', lastMessageId: 43 }]);
 });
+
+test('redacts the MTProto session and API hash from diagnostics', async () => {
+  const session = 'highly-sensitive-session-value';
+  const apiHash = 'highly-sensitive-api-hash';
+  const result = await fetchTelegramCompanyChannels([target], {
+    client: {
+      async getEntity() { throw new Error(`transport ${session} ${apiHash}`); },
+    },
+    sensitiveValues: [session, apiHash],
+    fetchCompanyPage: async () => '<a href="https://t.me/acme_career">Telegram</a>',
+  });
+
+  const serialized = JSON.stringify(result);
+  assert.equal(serialized.includes(session), false);
+  assert.equal(serialized.includes(apiHash), false);
+  assert.match(result.diagnostics[0].error, /\[redacted\]/);
+});

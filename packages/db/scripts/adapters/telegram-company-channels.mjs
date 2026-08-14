@@ -34,7 +34,13 @@ export async function fetchTelegramCompanyChannels(targets, options = {}) {
       }
       if (maxMessageId > lastMessageId) cacheUpdates.push({ channelUsername: target.username, lastMessageId: maxMessageId });
       diagnostics.push({ channelUsername: target.username, ownershipVerified: true, records: count });
-    } catch (error) { diagnostics.push({ channelUsername: target.username, ownershipVerified: false, error: error instanceof Error ? error.message.slice(0, 200) : 'mtproto-error' }); }
+    } catch (error) {
+      diagnostics.push({
+        channelUsername: target.username,
+        ownershipVerified: false,
+        error: redactSensitiveError(error, options.sensitiveValues),
+      });
+    }
   }
   return { records, diagnostics, cacheUpdates };
 }
@@ -42,11 +48,31 @@ export async function fetchTelegramCompanyChannels(targets, options = {}) {
 export async function createTelegramMtprotoClient({ apiId, apiHash, session }) {
   const id = Number(apiId);
   if (!Number.isInteger(id) || id <= 0 || !text(apiHash) || !text(session)) throw new Error('TELEGRAM_API_ID, TELEGRAM_API_HASH, and authenticated TELEGRAM_SESSION are required.');
-  const { TelegramClient, sessions } = await import('teleproto');
-  const client = new TelegramClient(new sessions.StringSession(session), id, apiHash, { connectionRetries: 3, autoReconnect: false });
-  await client.connect();
-  if (!await client.checkAuthorization()) { await client.disconnect(); throw new Error('TELEGRAM_SESSION is not authorized. Complete one-time MTProto user authentication first.'); }
-  return client;
+  let client = null;
+  try {
+    const { TelegramClient, sessions } = await import('teleproto');
+    client = new TelegramClient(new sessions.StringSession(session), id, apiHash, {
+      connectionRetries: 3,
+      autoReconnect: false,
+    });
+    await client.connect();
+    if (!await client.checkAuthorization()) {
+      throw new Error('not-authorized');
+    }
+    return client;
+  } catch {
+    await client?.disconnect().catch(() => {});
+    throw new Error('Telegram MTProto connection or authorization failed.');
+  }
+}
+
+function redactSensitiveError(error, sensitiveValues = []) {
+  let message = error instanceof Error ? error.message : 'mtproto-error';
+  for (const value of sensitiveValues) {
+    const secret = text(value);
+    if (secret) message = message.replaceAll(secret, '[redacted]');
+  }
+  return message.slice(0, 200);
 }
 
 function normalize(v) { const username = text(v?.channel_username ?? v?.channelUsername)?.replace(/^@/, ''); const companyName = text(v?.company_name ?? v?.companyName), companyDomain = domain(v?.company_domain ?? v?.companyDomain), companyWebsiteUrl = https(v?.company_website_url ?? v?.companyWebsiteUrl), ownershipProofUrl = https(v?.ownership_proof_url ?? v?.ownershipProofUrl); if (!/^[a-z][a-z0-9_]{4,31}$/i.test(username ?? '') || !companyName || !companyDomain || host(companyWebsiteUrl) !== companyDomain || host(ownershipProofUrl) !== companyDomain) return null; return { username, companyName, companyDomain, companyWebsiteUrl, ownershipProofUrl }; }
