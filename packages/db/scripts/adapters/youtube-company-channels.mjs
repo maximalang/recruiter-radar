@@ -17,21 +17,25 @@ export async function fetchYouTubeCompanyChannels(targets, options = {}) {
   for (const raw of targets.slice(0, 50)) {
     const target = normalizeTarget(raw);
     if (!target) { diagnostics.push({ ownershipVerified: false, error: 'invalid-target' }); continue; }
-    if (remainingUnits - quotaUsed < 2) { diagnostics.push({ channelId: target.channelId, deferred: 'quota-budget' }); continue; }
+    if (remainingUnits - quotaUsed < 2) { diagnostics.push({ channelId: target.channelId, channelHandle: target.channelHandle, deferred: 'quota-budget' }); continue; }
     let proof;
     try { proof = await fetchCompanyPage(target.ownershipProofUrl); } catch { proof = ''; }
-    if (!containsExactChannelLink(proof, target.channelId)) { diagnostics.push({ channelId: target.channelId, ownershipVerified: false }); continue; }
+    if (!containsExactChannelLink(proof, target)) { diagnostics.push({ channelId: target.channelId, channelHandle: target.channelHandle, ownershipVerified: false }); continue; }
 
-    const channel = await getJson(`${API_ROOT}/channels?part=snippet,contentDetails&id=${encodeURIComponent(target.channelId)}&key=${encodeURIComponent(apiKey)}&fields=items(id,snippet/title,contentDetails/relatedPlaylists/uploads)`, { fetchImpl });
+    const lookup = target.channelId
+      ? `id=${encodeURIComponent(target.channelId)}`
+      : `forHandle=${encodeURIComponent(target.channelHandle)}`;
+    const channel = await getJson(`${API_ROOT}/channels?part=snippet,contentDetails&${lookup}&key=${encodeURIComponent(apiKey)}&fields=items(id,snippet/title,contentDetails/relatedPlaylists/uploads)`, { fetchImpl });
     quotaUsed += 1;
     const item = channel.value?.items?.[0];
-    if (item?.id !== target.channelId || !item?.contentDetails?.relatedPlaylists?.uploads) { diagnostics.push({ channelId: target.channelId, ownershipVerified: false }); continue; }
-    const cachedEtag = options.cache?.[target.channelId]?.etag;
+    const resolvedChannelId = text(item?.id);
+    if (!resolvedChannelId || (target.channelId && resolvedChannelId !== target.channelId) || !item?.contentDetails?.relatedPlaylists?.uploads) { diagnostics.push({ channelId: target.channelId, channelHandle: target.channelHandle, ownershipVerified: false }); continue; }
+    const cachedEtag = options.cache?.[resolvedChannelId]?.etag;
     const uploads = await getJson(`${API_ROOT}/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(item.contentDetails.relatedPlaylists.uploads)}&maxResults=25&key=${encodeURIComponent(apiKey)}&fields=etag,items(id,snippet(title,description,resourceId/videoId,videoOwnerChannelId),contentDetails/videoPublishedAt)`, { fetchImpl, etag: cachedEtag });
     quotaUsed += 1;
-    if (uploads.notModified) { diagnostics.push({ channelId: target.channelId, ownershipVerified: true, notModified: true }); continue; }
+    if (uploads.notModified) { diagnostics.push({ channelId: resolvedChannelId, channelHandle: target.channelHandle, ownershipVerified: true, notModified: true }); continue; }
     for (const upload of uploads.value?.items ?? []) {
-      if (upload.snippet?.videoOwnerChannelId !== target.channelId) continue;
+      if (upload.snippet?.videoOwnerChannelId !== resolvedChannelId) continue;
       const occurred = new Date(upload.contentDetails?.videoPublishedAt);
       if (Number.isNaN(occurred.getTime()) || occurred.getTime() < cutoff) continue;
       const videoId = text(upload.snippet?.resourceId?.videoId);
@@ -43,12 +47,12 @@ export async function fetchYouTubeCompanyChannels(targets, options = {}) {
         source_url: `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
         headline, summary: text(upload.snippet?.description), event_type: classifyEvent(headline, upload.snippet?.description),
         published_at: occurred.toISOString(), extraction_method: 'youtube-data-api-uploads-playlist',
-        publisher: `YouTube company channel ${item.snippet?.title ?? target.channelId}`,
+        publisher: `YouTube company channel ${item.snippet?.title ?? resolvedChannelId}`,
         category: 'company-video-context', context_only: true,
       });
     }
-    if (uploads.etag) cacheUpdates.push({ channelId: target.channelId, etag: uploads.etag });
-    diagnostics.push({ channelId: target.channelId, ownershipVerified: true, records: records.length });
+    if (uploads.etag) cacheUpdates.push({ channelId: resolvedChannelId, etag: uploads.etag });
+    diagnostics.push({ channelId: resolvedChannelId, channelHandle: target.channelHandle, ownershipVerified: true, records: records.length });
   }
   return { records, diagnostics, cacheUpdates, quotaUsed };
 }
@@ -63,15 +67,25 @@ async function getJson(url, { fetchImpl, etag }) {
 }
 
 function normalizeTarget(value) {
-  const channelId = text(value?.channel_id ?? value?.channelId), companyName = text(value?.company_name ?? value?.companyName);
+  const channelId = text(value?.channel_id ?? value?.channelId);
+  const channelHandle = text(value?.channel_handle ?? value?.channelHandle);
+  const companyName = text(value?.company_name ?? value?.companyName);
   const companyDomain = domain(value?.company_domain ?? value?.companyDomain), companyWebsiteUrl = url(value?.company_website_url ?? value?.companyWebsiteUrl);
   const ownershipProofUrl = url(value?.ownership_proof_url ?? value?.ownershipProofUrl);
-  if (!/^UC[A-Za-z0-9_-]{6,}$/.test(channelId ?? '') || !companyName || !companyDomain || !companyWebsiteUrl || !ownershipProofUrl) return null;
+  const hasChannelId = /^UC[A-Za-z0-9_-]{6,}$/.test(channelId ?? '');
+  const hasChannelHandle = /^@[A-Za-z0-9_.-]{3,30}$/.test(channelHandle ?? '');
+  if (hasChannelId === hasChannelHandle || !companyName || !companyDomain || !companyWebsiteUrl || !ownershipProofUrl) return null;
   if (host(companyWebsiteUrl) !== companyDomain || host(ownershipProofUrl) !== companyDomain) return null;
-  return { channelId, companyName, companyDomain, companyWebsiteUrl, ownershipProofUrl };
+  return { channelId: hasChannelId ? channelId : null, channelHandle: hasChannelHandle ? channelHandle : null, companyName, companyDomain, companyWebsiteUrl, ownershipProofUrl };
 }
 
-function containsExactChannelLink(html, id) { return new RegExp(`https?://(?:www\\.)?youtube\\.com/channel/${id}(?:["'/?#<\\s]|$)`, 'i').test(String(html)); }
+function containsExactChannelLink(html, target) {
+  const path = target.channelId
+    ? `channel/${escapeRegex(target.channelId)}`
+    : escapeRegex(target.channelHandle);
+  return new RegExp(`https?://(?:www\\.)?youtube\\.com/${path}(?:["'/?#<\\s]|$)`, 'i').test(String(html));
+}
+function escapeRegex(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function classifyEvent(...values) { const s = values.join(' ').toLowerCase(); if (/office|region|expan|офис|регион|расшир/.test(s)) return 'company_expansion'; if (/launch|запуск|production|производств/.test(s)) return 'product_launch'; if (/hiring|vacanc|career|ваканс|нанима/.test(s)) return 'hiring_context'; return 'company_news'; }
 async function defaultFetchCompanyPage(target) { const r = await fetchWithSourcePolicy(target, { redirect: 'error', sourceName: 'youtube-company-channels ownership', retries: 1 }); if (!r.ok) throw new Error(`ownership page HTTP ${r.status}`); return r.text(); }
 function text(v) { return typeof v === 'string' && v.trim() ? v.trim() : null; }

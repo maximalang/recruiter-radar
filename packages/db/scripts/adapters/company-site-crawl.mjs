@@ -1,5 +1,6 @@
 import { canonicalizePublicUrl } from './site-discovery.mjs';
 import { fetchPublicPageWithEscalation } from './public-page-escalation.mjs';
+import { extractCompanyOwnedSourceLinks } from './company-owned-source-discovery.mjs';
 
 export function parseCompanyPage(html, url) {
   if (!html || typeof html !== 'string') {
@@ -13,7 +14,9 @@ export function parseCompanyPage(html, url) {
 
   const bodyText = extractVisibleText(html);
   const signals = detectSignals(bodyText);
-  const contactPaths = extractContactPaths(html, url, bodyText);
+  const hrefValues = extractHrefValues(html);
+  const contactPaths = extractContactPaths(hrefValues, url, bodyText);
+  const ownedSourceLinks = extractCompanyOwnedSourceLinks(hrefValues, url);
 
   return {
     page_url: url,
@@ -21,6 +24,7 @@ export function parseCompanyPage(html, url) {
     summary: ogDescription ?? metaDescription ?? truncate(bodyText, 500) ?? null,
     signals,
     contact_paths: contactPaths,
+    owned_source_links: ownedSourceLinks,
     _meta: { crawled: true },
   };
 }
@@ -207,11 +211,11 @@ function detectSignals(text) {
   return signals;
 }
 
-function extractContactPaths(html, baseUrl, visibleText) {
+function extractContactPaths(hrefValues, baseUrl, visibleText) {
   const contactPaths = [];
   const seen = new Set();
 
-  for (const href of extractHrefValues(html)) {
+  for (const href of hrefValues) {
     const lowerHref = href.toLowerCase();
 
     if (lowerHref.startsWith('mailto:')) {

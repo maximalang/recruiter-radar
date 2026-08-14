@@ -27,3 +27,28 @@ test('rejects private, group, mismatched, and unproven channels before history r
   assert.equal(unproven.diagnostics[0].ownershipVerified, false);
   assert.equal(historyReads, 0);
 });
+
+test('reads incrementally after the cached public message id', async () => {
+  let requestedOptions;
+  const client = {
+    async getEntity() { return { username: 'acme_career', broadcast: true, megagroup: false }; },
+    async getMessages(_entity, options) {
+      requestedOptions = options;
+      return [
+        { id: 43, date: 1786665600, message: 'We are hiring for a new vacancy' },
+        { id: 42, date: 1786665500, message: 'We are hiring for a new vacancy' },
+      ];
+    },
+  };
+
+  const result = await fetchTelegramCompanyChannels([target], {
+    client,
+    now: new Date('2026-08-14T00:00:00Z'),
+    cache: { acme_career: { lastMessageId: 42 } },
+    fetchCompanyPage: async () => '<a href="https://t.me/acme_career">Telegram</a>',
+  });
+
+  assert.deepEqual(requestedOptions, { limit: 50, minId: 42 });
+  assert.deepEqual(result.records.map((record) => record.external_id), ['telegram-post:acme_career:43']);
+  assert.deepEqual(result.cacheUpdates, [{ channelUsername: 'acme_career', lastMessageId: 43 }]);
+});

@@ -36,4 +36,32 @@ test('does not spend quota when budget or automatic ownership proof is absent', 
   assert.equal(noProof.diagnostics[0].ownershipVerified, false);
 });
 
+test('resolves an exact company-linked handle through channels.list before reading uploads', async () => {
+  const urls = [];
+  const result = await fetchYouTubeCompanyChannels([{
+    channel_handle: '@AcmeOfficial',
+    company_name: 'Acme',
+    company_domain: 'acme.ru',
+    company_website_url: 'https://acme.ru/',
+    ownership_proof_url: 'https://acme.ru/media',
+  }], {
+    apiKey: 'fixture-key',
+    now: new Date('2026-08-14T00:00:00Z'),
+    fetchCompanyPage: async () => '<a href="https://youtube.com/@AcmeOfficial">YouTube</a>',
+    fetchImpl: async (url) => {
+      urls.push(String(url));
+      if (String(url).includes('/channels?')) {
+        return json({ items: [{ id: 'UC_RESOLVED', snippet: { title: 'Acme' }, contentDetails: { relatedPlaylists: { uploads: 'UU_RESOLVED' } } }] });
+      }
+      return json({ items: [] }, { etag: '"empty"' });
+    },
+    quota: { remainingUnits: 2 },
+  });
+
+  assert.match(urls[0], /forHandle=%40AcmeOfficial/);
+  assert.match(urls[1], /playlistId=UU_RESOLVED/);
+  assert.equal(result.diagnostics[0].channelId, 'UC_RESOLVED');
+  assert.equal(result.diagnostics[0].ownershipVerified, true);
+});
+
 function json(value, { etag } = {}) { return new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json', ...(etag ? { etag } : {}) } }); }

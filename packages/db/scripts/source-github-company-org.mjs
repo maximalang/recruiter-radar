@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { fetchGitHubCompanyOrganizations } from './adapters/github-company-org.mjs';
+import { loadCompanyOwnedSourceTargetsFromDatabase } from './adapters/company-owned-source-targets.mjs';
 import { normalizeContextEventRecord } from './adapters/rf-source-normalizers.mjs';
 import { createStandardSourceRuntime, loadEnvFile, parseJson } from './adapters/rf-source-runtime.mjs';
 import { stripBom } from './adapters/source-records.mjs';
@@ -19,7 +20,7 @@ const runtime = createStandardSourceRuntime({
   evidenceRole: 'context',
   sourceRecordType: 'github_company_repository',
   inputFileEnvName: 'GITHUB_COMPANY_ORG_INPUT_FILE',
-  usageText: 'Input: GITHUB_COMPANY_ORG_TARGETS_JSON/FILE for verified company organizations; GITHUB_TOKEN is optional rate-limit capacity only.',
+  usageText: 'Default: DB-enrolled company-owned organization refs. GITHUB_COMPANY_ORG_TARGETS_JSON/FILE is an override; GITHUB_TOKEN is optional rate-limit capacity only.',
   normalizeRecord: (record, context) => normalizeContextEventRecord(record, context, {
     sourceRecordType: 'github_company_repository',
     defaultEventType: 'technology_activity',
@@ -32,6 +33,7 @@ const runtime = createStandardSourceRuntime({
       ownershipVerified: input.ownershipVerified,
       targetsFailed: input.targetsFailed,
       notModified: input.notModified,
+      enrollmentSource: input.enrollmentSource,
       zeroReason: input.zeroReason ?? undefined,
     }
     : {},
@@ -43,18 +45,15 @@ export function resolveGitHubCompanyOrgInput() {
   const targetsFile = process.env.GITHUB_COMPANY_ORG_TARGETS_FILE?.trim();
   const targetsJson = process.env.GITHUB_COMPANY_ORG_TARGETS_JSON?.trim();
   if (!targetsFile && !targetsJson) {
-    return runtime.buildInputFromRecords({
-      inputMode: 'expected-zero', inputFilePath: null, records: [],
-      extra: { targetsProcessed: 0, ownershipVerified: 0, targetsFailed: 0, notModified: 0, zeroReason: 'no-eligible-company-targets' },
-    });
+    return { inputMode: 'database-pending' };
   }
   const targets = targetsFile
     ? parseJson(stripBom(readFileSync(resolve(process.cwd(), targetsFile), 'utf8')), targetsFile)
     : parseJson(targetsJson, 'GITHUB_COMPANY_ORG_TARGETS_JSON');
-  return { inputMode: 'live-pending', targets };
+  return { inputMode: 'live-pending', targets, enrollmentSource: 'manual-override' };
 }
 
-export async function resolveGitHubCompanyOrgLiveInput({ targets }, options = {}) {
+export async function resolveGitHubCompanyOrgLiveInput({ targets, enrollmentSource }, options = {}) {
   if (!Array.isArray(targets)) throw new Error('GitHub company organization targets must be a JSON array.');
   const cachePath = resolve(process.cwd(), process.env.GITHUB_COMPANY_ORG_CACHE_FILE?.trim() || DEFAULT_CACHE_PATH);
   const state = readCache(cachePath);
@@ -78,13 +77,26 @@ export async function resolveGitHubCompanyOrgLiveInput({ targets }, options = {}
       ownershipVerified,
       targetsFailed,
       notModified: fetched.diagnostics.filter((item) => item.notModified).length,
+      enrollmentSource,
       zeroReason: fetched.records.length === 0 ? 'no-recent-company-repository-events' : null,
     },
   });
 }
 
 export async function resolveGitHubCompanyOrgConfiguredInput(options = {}) {
-  const input = resolveGitHubCompanyOrgInput();
+  let input = resolveGitHubCompanyOrgInput();
+  if (input.inputMode === 'database-pending') {
+    const targets = options.loadTargets
+      ? await options.loadTargets(SOURCE_ID)
+      : await loadCompanyOwnedSourceTargetsFromDatabase(process.env.DATABASE_URL, SOURCE_ID);
+    if (targets.length === 0) {
+      return runtime.buildInputFromRecords({
+        inputMode: 'expected-zero', inputFilePath: null, records: [],
+        extra: { targetsProcessed: 0, ownershipVerified: 0, targetsFailed: 0, notModified: 0, enrollmentSource: 'database', zeroReason: 'no-eligible-company-targets' },
+      });
+    }
+    input = { inputMode: 'live-pending', targets, enrollmentSource: 'database' };
+  }
   return input.inputMode === 'live-pending' ? resolveGitHubCompanyOrgLiveInput(input, options) : input;
 }
 

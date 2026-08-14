@@ -1079,7 +1079,7 @@ describe('source-ingest', () => {
     })
 
     it('declares company-owned and identity-bound free context plus CBR lookup as supporting', () => {
-      expect(getDailySupportingSourceIds()).toEqual(['company-site', 'company-newsrooms', 'funding-business-signals', 'industry-media', 'cbr-registry'])
+      expect(getDailySupportingSourceIds()).toEqual(['company-site', 'company-newsrooms', 'funding-business-signals', 'industry-media', 'github-company-org', 'youtube-company-channels', 'telegram-company-channels', 'cbr-registry'])
       expect(getHiringEvidenceSourceIds()).toEqual(expect.arrayContaining([
         'career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters',
       ]))
@@ -1110,7 +1110,7 @@ describe('source-ingest', () => {
       })
       mockExecFile.mockImplementation((_cmd, args: any, _opts: any, callback: any) => {
         const script = String(args[0])
-        const stage = script.includes('source-company-site') || script.includes('source-company-newsrooms') || script.includes('source-funding-business-signals') || script.includes('source-industry-media') || script.includes('source-cbr-registry')
+        const stage = script.includes('source-company-site') || script.includes('source-company-newsrooms') || script.includes('source-funding-business-signals') || script.includes('source-industry-media') || script.includes('source-github-company-org') || script.includes('source-youtube-company-channels') || script.includes('source-telegram-company-channels') || script.includes('source-cbr-registry')
           ? 'supporting'
           : 'primary'
         events.push(stage)

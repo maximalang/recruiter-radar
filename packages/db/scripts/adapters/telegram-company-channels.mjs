@@ -6,7 +6,7 @@ export async function fetchTelegramCompanyChannels(targets, options = {}) {
   const now = options.now instanceof Date ? options.now : new Date();
   const cutoff = now.getTime() - 45 * 86_400_000;
   const fetchCompanyPage = options.fetchCompanyPage ?? defaultCompanyPage;
-  const records = [], diagnostics = [];
+  const records = [], diagnostics = [], cacheUpdates = [];
   for (const raw of targets.slice(0, 50)) {
     const target = normalize(raw);
     if (!target) { diagnostics.push({ ownershipVerified: false, error: 'invalid-target' }); continue; }
@@ -16,20 +16,27 @@ export async function fetchTelegramCompanyChannels(targets, options = {}) {
     try {
       const entity = await options.client.getEntity(target.username);
       if (String(entity?.username).toLowerCase() !== target.username.toLowerCase() || entity?.broadcast !== true || entity?.megagroup === true) { diagnostics.push({ channelUsername: target.username, ownershipVerified: false, error: 'not-public-broadcast-channel' }); continue; }
-      const messages = await options.client.getMessages(entity, { limit: 50 });
+      const lastMessageId = positiveInteger(options.cache?.[target.username]?.lastMessageId) ?? 0;
+      const messageOptions = lastMessageId > 0 ? { limit: 50, minId: lastMessageId } : { limit: 50 };
+      const messages = await options.client.getMessages(entity, messageOptions);
       let count = 0;
+      let maxMessageId = lastMessageId;
       for (const message of messages ?? []) {
         const occurred = date(message?.date);
         const body = text(message?.message);
-        if (!body || !occurred || occurred.getTime() < cutoff || !Number.isInteger(Number(message?.id))) continue;
+        const messageId = positiveInteger(message?.id);
+        if (!messageId || messageId <= lastMessageId) continue;
+        maxMessageId = Math.max(maxMessageId, messageId);
+        if (!body || !occurred || occurred.getTime() < cutoff) continue;
         const eventType = classify(body);
         if (!eventType) continue;
-        records.push({ external_id: `telegram-post:${target.username}:${message.id}`, company_name: target.companyName, company_domain: target.companyDomain, company_website_url: target.companyWebsiteUrl, source_url: `https://t.me/${target.username}/${message.id}`, headline: body.slice(0, 180), summary: body.slice(0, 1000), event_type: eventType, published_at: occurred.toISOString(), extraction_method: 'telegram-mtproto-public-channel-history', publisher: `Telegram public corporate channel @${target.username}`, category: 'company-channel-context' }); count += 1;
+        records.push({ external_id: `telegram-post:${target.username}:${messageId}`, company_name: target.companyName, company_domain: target.companyDomain, company_website_url: target.companyWebsiteUrl, source_url: `https://t.me/${target.username}/${messageId}`, headline: body.slice(0, 180), summary: body.slice(0, 1000), event_type: eventType, published_at: occurred.toISOString(), extraction_method: 'telegram-mtproto-public-channel-history', publisher: `Telegram public corporate channel @${target.username}`, category: 'company-channel-context' }); count += 1;
       }
+      if (maxMessageId > lastMessageId) cacheUpdates.push({ channelUsername: target.username, lastMessageId: maxMessageId });
       diagnostics.push({ channelUsername: target.username, ownershipVerified: true, records: count });
     } catch (error) { diagnostics.push({ channelUsername: target.username, ownershipVerified: false, error: error instanceof Error ? error.message.slice(0, 200) : 'mtproto-error' }); }
   }
-  return { records, diagnostics };
+  return { records, diagnostics, cacheUpdates };
 }
 
 export async function createTelegramMtprotoClient({ apiId, apiHash, session }) {
@@ -50,3 +57,4 @@ function text(v) { return typeof v === 'string' && v.trim() ? v.trim() : null; }
 function https(v) { try { const u = new URL(text(v)); return u.protocol === 'https:' ? u.href : null; } catch { return null; } }
 function host(v) { try { return new URL(v).hostname.toLowerCase().replace(/^www\./, ''); } catch { return null; } }
 function domain(v) { const s = text(v)?.toLowerCase().replace(/^www\./, ''); return s && s.includes('.') && !/[/:]/.test(s) ? s : null; }
+function positiveInteger(v) { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : null; }

@@ -358,19 +358,20 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     envPrefixes: ['GITHUB_COMPANY_ORG_', 'GITHUB_TOKEN'],
     searchEnvVars: ['GITHUB_COMPANY_ORG_TARGETS_JSON'],
     isPrimary: false,
+    dailyStage: 'supporting',
     category: 'business-signal',
   },
   {
     id: 'youtube-company-channels', name: 'YouTube company channels',
     description: 'Company-owned public video events through the quota-aware Data API; context only',
     script: 'source-youtube-company-channels.mjs', requiredEnvVars: ['YOUTUBE_API_KEY'],
-    envPrefixes: ['YOUTUBE_'], searchEnvVars: ['YOUTUBE_COMPANY_CHANNELS_TARGETS_JSON'], isPrimary: false, category: 'business-signal',
+    envPrefixes: ['YOUTUBE_'], searchEnvVars: ['YOUTUBE_COMPANY_CHANNELS_TARGETS_JSON'], isPrimary: false, dailyStage: 'supporting', category: 'business-signal',
   },
   {
     id: 'telegram-company-channels', name: 'Telegram company channels',
     description: 'Identity-bound public corporate broadcast channels through MTProto; context only',
     script: 'source-telegram-company-channels.mjs', requiredEnvVars: ['TELEGRAM_API_ID', 'TELEGRAM_API_HASH', 'TELEGRAM_SESSION'],
-    envPrefixes: ['TELEGRAM_COMPANY_CHANNELS_', 'TELEGRAM_API_', 'TELEGRAM_SESSION'], searchEnvVars: ['TELEGRAM_COMPANY_CHANNELS_TARGETS_JSON'], isPrimary: false, category: 'business-signal',
+    envPrefixes: ['TELEGRAM_COMPANY_CHANNELS_', 'TELEGRAM_API_', 'TELEGRAM_SESSION'], searchEnvVars: ['TELEGRAM_COMPANY_CHANNELS_TARGETS_JSON'], isPrimary: false, dailyStage: 'supporting', category: 'business-signal',
   },
   {
     id: 'fedresurs',
