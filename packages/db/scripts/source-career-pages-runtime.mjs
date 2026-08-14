@@ -17,6 +17,15 @@ const TARGET_PROVENANCE_SOURCES = new Set([
   'workable',
   'smartrecruiters',
 ]);
+const SOURCE_BY_ADAPTER = new Map([
+  ['greenhouse-board', 'greenhouse'],
+  ['lever-postings', 'lever'],
+  ['ashby-job-board', 'ashby'],
+  ['recruitee-careers', 'recruitee'],
+  ['workable-public-jobs', 'workable'],
+  ['smartrecruiters-postings', 'smartrecruiters'],
+  ['smartrecruiters-public-careers', 'smartrecruiters'],
+]);
 
 const argv = process.argv.slice(2);
 const action = argv[0]?.trim() || 'pipeline';
@@ -162,6 +171,10 @@ async function resolveTargetOrganizationId(client, target) {
 }
 
 function resolveTargetProvenanceSource(result, target) {
+  const adapter = nonEmptyText(result?.adapter ?? target?.adapter ?? target?.type)?.toLowerCase();
+  const adapterSource = adapter ? SOURCE_BY_ADAPTER.get(adapter) : null;
+  if (adapterSource) return adapterSource;
+
   const family = nonEmptyText(
     result?.hostedAtsFamily
       ?? result?.hosted_ats_family
