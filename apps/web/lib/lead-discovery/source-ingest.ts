@@ -98,6 +98,7 @@ export interface IngestResult {
 export type IngestOutcome =
   | 'ingested'
   | 'ingested-with-duplicates'
+  | 'idempotent-replay'
   | 'expected-zero'
   | 'unexpected-zero'
   | 'normalization-zero'
@@ -597,6 +598,23 @@ async function resolveCompanyPageTargetsEnv(
       orgs.website_url
     FROM orgs
     WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
+      AND (
+        NULLIF(BTRIM(orgs.domain), '') IS NULL
+        OR NOT EXISTS (
+          SELECT 1
+          FROM orgs AS domain_peer
+          WHERE domain_peer.id <> orgs.id
+            AND REGEXP_REPLACE(
+              LOWER(BTRIM(domain_peer.domain)),
+              '^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.',
+              ''
+            ) = REGEXP_REPLACE(
+              LOWER(BTRIM(orgs.domain)),
+              '^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.',
+              ''
+            )
+        )
+      )
       AND EXISTS (
         SELECT 1
         FROM signals
@@ -1015,6 +1033,17 @@ function classifyIngestMetrics(metrics: ParsedSourceMetrics): {
     }
   }
   if (upsertedCount === 0) {
+    const acceptedNormalizedCount = Math.max(
+      0,
+      (diagnostics.normalizedCount ?? 0)
+        - (diagnostics.organizationResolutionRejects ?? 0),
+    )
+    if (diagnostics.zeroReason === 'no-new-signals' && acceptedNormalizedCount > 0) {
+      return {
+        success: true,
+        outcome: 'idempotent-replay',
+      }
+    }
     return {
       success: false,
       outcome: 'ingestion-zero',

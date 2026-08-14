@@ -282,6 +282,35 @@ describe('source-ingest', () => {
       expect(normalizationZero).toEqual(expect.objectContaining({ success: false, outcome: 'normalization-zero' }))
       expect(ingestionZero).toEqual(expect.objectContaining({ success: false, outcome: 'ingestion-zero' }))
     })
+
+    it('accepts an idempotent replay only when at least one normalized record passed identity resolution', async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd, _args, _opts, callback) => {
+          callback(null, JSON.stringify({
+            source: 'company-newsrooms',
+            recordsReceived: 35,
+            normalizedRecords: 35,
+            organizationResolutionRejects: 25,
+            signalUpsertsCompleted: 0,
+            zeroReason: 'no-new-signals',
+          }), '')
+        })
+        .mockImplementationOnce((_cmd, _args, _opts, callback) => {
+          callback(null, JSON.stringify({
+            source: 'company-newsrooms',
+            recordsReceived: 35,
+            normalizedRecords: 35,
+            organizationResolutionRejects: 35,
+            signalUpsertsCompleted: 0,
+          }), '')
+        })
+
+      const replay = await ingestSource('company-newsrooms')
+      const allRejected = await ingestSource('company-newsrooms')
+
+      expect(replay).toEqual(expect.objectContaining({ success: true, outcome: 'idempotent-replay' }))
+      expect(allRejected).toEqual(expect.objectContaining({ success: false, outcome: 'ingestion-zero' }))
+    })
   })
 
   describe('profile-derived search queries (hh/superjob/rabota-rossii)', () => {
@@ -762,6 +791,9 @@ describe('source-ingest', () => {
       const targetQuery = pool.query.mock.calls.find((call) => call[0].includes('FROM orgs'))
       expect(targetQuery?.[0]).toContain("signals.signal_type = 'job_posting'")
       expect(targetQuery?.[0]).toContain('signals.source = ANY($4::text[])')
+      expect(targetQuery?.[0]).toContain('domain_peer.id <> orgs.id')
+      expect(targetQuery?.[0]).toContain('REGEXP_REPLACE(')
+      expect(targetQuery?.[0]).toContain("'^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.'")
       expect(targetQuery?.[0]).toContain('signals.updated_at >= NOW() - $3::interval')
       expect(targetQuery?.[1]?.[2]).toBe('7 days')
       expect(targetQuery?.[1]?.[3]).toContain('smartrecruiters')
@@ -895,6 +927,9 @@ describe('source-ingest', () => {
       const targetQuery = pool.query.mock.calls.find((call) => call[0].includes('FROM orgs'))
       expect(targetQuery?.[0]).toContain("signals.signal_type = 'job_posting'")
       expect(targetQuery?.[0]).toContain('signals.source = ANY($4::text[])')
+      expect(targetQuery?.[0]).toContain('domain_peer.id <> orgs.id')
+      expect(targetQuery?.[0]).toContain('REGEXP_REPLACE(')
+      expect(targetQuery?.[0]).toContain("'^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.'")
       expect(targetQuery?.[0]).toContain('signals.updated_at >= NOW() - $3::interval')
       expect(targetQuery?.[1]?.[2]).toBe('23 hours')
       expect(targetQuery?.[1]?.[3]).toContain('smartrecruiters')
