@@ -1,5 +1,12 @@
 const query = jest.fn()
 
+type CurrentState = {
+  leaseId: string
+  status: string
+  updatedAt: Date
+  attemptCount: number
+}
+
 jest.mock('@/lib/db-pool', () => ({
   getPool: () => ({ query }),
 }))
@@ -13,7 +20,7 @@ describe('daily radar fenced lease', () => {
   beforeEach(() => query.mockReset())
 
   test('a stale owner cannot finalize a takeover owner state', async () => {
-    let current: { leaseId: string; status: string; updatedAt: Date; attemptCount: number } | null = null
+    let current: CurrentState | null = null
 
     query.mockImplementation(async (sql: string, params: readonly unknown[]) => {
       if (sql.includes('INSERT INTO daily_radar_run_state')) {
@@ -65,10 +72,12 @@ describe('daily radar fenced lease', () => {
     expect(ownerB.leaseId).not.toBe(ownerA.leaseId)
 
     await expect(finishDailyRadarRun(ownerA, 'completed')).resolves.toBe(false)
-    expect(current?.status).toBe('running')
-    expect(current?.leaseId).toBe(ownerB.leaseId)
+    const afterStaleOwner = current as CurrentState | null
+    expect(afterStaleOwner?.status).toBe('running')
+    expect(afterStaleOwner?.leaseId).toBe(ownerB.leaseId)
 
     await expect(finishDailyRadarRun(ownerB, 'completed')).resolves.toBe(true)
-    expect(current?.status).toBe('completed')
+    const afterCurrentOwner = current as CurrentState | null
+    expect(afterCurrentOwner?.status).toBe('completed')
   })
 })
