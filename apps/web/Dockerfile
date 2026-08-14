@@ -102,6 +102,9 @@ COPY --from=builder /app/packages/db/source-policy.json ./packages/db/source-pol
 # Next standalone tracing cannot see a runtime-resolved execFile target.
 COPY --from=builder /app/packages/db/scripts/derive-source-temporal-intelligence.mjs ./packages/db/scripts/derive-source-temporal-intelligence.mjs
 COPY --from=builder /app/packages/db/scripts/lib/source-temporal-intelligence.mjs ./packages/db/scripts/lib/source-temporal-intelligence.mjs
+# The unified career-pages entrypoint is wrapped at runtime so target-level
+# fetch outcomes can be persisted before lifecycle reconciliation.
+COPY --from=builder /app/packages/db/scripts/source-career-pages-runtime.mjs ./packages/db/scripts/source-career-pages-runtime.mjs
 
 # Copy migration tooling for startup migrations
 COPY --from=builder /app/packages/db/scripts/migrate.mjs ./packages/db/scripts/migrate.mjs
