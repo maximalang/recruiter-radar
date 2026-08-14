@@ -4,8 +4,8 @@
  * The daily clock is delivery-oriented. Source refresh has its own persisted
  * cadence scheduler and hourly clock; this route only asks that scheduler to
  * run anything currently due before deriving temporal context and delivering.
- * A day-level lease prevents duplicate delivery when multiple external clocks
- * happen to trigger the route on the same UTC date.
+ * A fenced day-level lease prevents duplicate delivery when multiple external
+ * clocks race, while per-profile state reuses the original digest run on retry.
  *
  * A Commercial Signal canary is executed by its separate exact-lineage cron
  * stage and is deliberately excluded from legacy digest delivery here.
@@ -23,7 +23,17 @@ import {
   getCommercialSignalCanaryWorkspaceId,
   resolveCommercialSignalRollout,
 } from '@/lib/opportunities/commercial-signal-rollout'
-import { claimDailyRadarRun, finishDailyRadarRun } from '@/lib/daily-radar-run-state'
+import {
+  attachDailyRadarProfileDigestRun,
+  claimDailyRadarProfile,
+  claimDailyRadarRun,
+  finishDailyRadarProfile,
+  finishDailyRadarRun,
+  heartbeatDailyRadarRun,
+  recordDailyRadarSourceRefreshResult,
+  recordDailyRadarTemporalResult,
+  type DailyRadarLease,
+} from '@/lib/daily-radar-run-state'
 import { logEvent, logError, logWarn } from '@/lib/runtime'
 
 export const runtime = 'nodejs'
@@ -58,8 +68,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       skipped: true,
-      reason: 'daily-radar-already-claimed',
+      reason: lease.reason ?? 'daily-radar-already-claimed',
       runDate: lease.runDate,
+      attemptCount: lease.attemptCount,
+      nextRetryAt: lease.nextRetryAt ?? null,
     })
   }
 
@@ -105,6 +117,12 @@ export async function POST(request: NextRequest) {
         return counts
       }, {}),
     }
+    if (!await recordDailyRadarSourceRefreshResult(lease, { ok: ingestOk, ...ingestSummary })) {
+      throw new Error('Daily radar lease ownership was lost after source refresh.')
+    }
+    if (!await heartbeatDailyRadarRun(lease)) {
+      throw new Error('Daily radar lease ownership was lost before temporal intelligence.')
+    }
 
     const temporalResult = await runSourceTemporalIntelligence()
     const temporalPayload = {
@@ -118,8 +136,11 @@ export async function POST(request: NextRequest) {
     } else {
       logWarn('daily_radar.temporal_intelligence_failed', temporalPayload)
     }
+    if (!await recordDailyRadarTemporalResult(lease, temporalPayload)) {
+      throw new Error('Daily radar lease ownership was lost after temporal intelligence.')
+    }
 
-    const digestResults = await generateAndDeliverDigests()
+    const digestResults = await generateAndDeliverDigests(lease)
     const digestOk = digestResults.every(r => r.ok)
     const digestSummary = {
       total: digestResults.length,
@@ -134,6 +155,7 @@ export async function POST(request: NextRequest) {
 
     logEvent('daily_radar.run', {
       status: allOk ? 'ok' : 'partial',
+      attemptCount: lease.attemptCount,
       ingestOk: ingestSummary.succeeded,
       ingestTotal: ingestSummary.total,
       temporalOk: temporalResult.success,
@@ -155,13 +177,17 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    await finishDailyRadarRun(lease, 'completed')
+    const finalized = await finishDailyRadarRun(lease, allOk ? 'completed' : 'partial')
+    if (!finalized) {
+      throw new Error('Daily radar lease ownership was lost before finalization.')
+    }
     return NextResponse.json({
       success: allOk,
       data: {
         startedAt: new Date(startMs).toISOString(),
         completedAt: new Date().toISOString(),
         durationMs,
+        attemptCount: lease.attemptCount,
         ingest: { ok: ingestOk, ...ingestSummary, details: ingestResults },
         temporal: { ok: temporalResult.success, ...temporalResult },
         digest: { ok: digestOk, ...digestSummary, details: digestResults },
@@ -177,16 +203,20 @@ export async function POST(request: NextRequest) {
   }
 }
 
-interface DigestDeliveryResult {
+export interface DigestDeliveryResult {
   clientProfileId: string
   ok: boolean
   sent: number
   failed: number
   skipped: number
+  digestRunId?: string
+  retried?: boolean
   error?: string
 }
 
-async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
+export async function generateAndDeliverDigests(
+  lease: DailyRadarLease,
+): Promise<DigestDeliveryResult[]> {
   const pool = getPool()
   if (!pool) {
     return [{ clientProfileId: 'none', ok: false, sent: 0, failed: 0, skipped: 0, error: 'DATABASE_URL not set' }]
@@ -241,7 +271,7 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
 
   for (const profile of profiles.rows) {
     if (!shouldDeliverOnRun(
-      profile.delivery_frequency === "weekly" ? "weekly" : "daily",
+      profile.delivery_frequency === 'weekly' ? 'weekly' : 'daily',
       runUtc,
     )) {
       results.push({
@@ -254,9 +284,47 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
       continue
     }
 
+    if (!await heartbeatDailyRadarRun(lease)) {
+      throw new Error('Daily radar lease ownership was lost during profile delivery.')
+    }
+
+    const profileLease = await claimDailyRadarProfile(lease, profile.id)
+    if (!profileLease.acquired) {
+      if (profileLease.status === 'completed' || profileLease.status === 'skipped') {
+        results.push({
+          clientProfileId: profile.id,
+          ok: true,
+          sent: 0,
+          failed: 0,
+          skipped: 1,
+          digestRunId: profileLease.digestRunId ?? undefined,
+          retried: true,
+        })
+      } else {
+        results.push({
+          clientProfileId: profile.id,
+          ok: false,
+          sent: 0,
+          failed: 0,
+          skipped: 0,
+          digestRunId: profileLease.digestRunId ?? undefined,
+          retried: true,
+          error: `Profile delivery is not claimable (status=${profileLease.status}, attempts=${profileLease.attemptCount}).`,
+        })
+      }
+      continue
+    }
+
     try {
-      const { run } = await runDigestForClientProfile({ clientProfileId: profile.id })
-      const runId = run.id
+      let runId = profileLease.digestRunId
+      const retried = Boolean(runId)
+      if (!runId) {
+        const { run } = await runDigestForClientProfile({ clientProfileId: profile.id })
+        runId = run.id
+        if (!await attachDailyRadarProfileDigestRun(profileLease, runId)) {
+          throw new Error('Daily radar profile lease ownership was lost before digest run persistence.')
+        }
+      }
 
       try {
         await enrichRunCandidates(runId)
@@ -265,6 +333,16 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
       }
 
       const delivery = await deliverCandidatesForRun(runId)
+      const deliveryError = delivery.ok
+        ? null
+        : delivery.failures.map((failure) => failure.error).join('; ') || 'Digest delivery failed.'
+      if (!await finishDailyRadarProfile(
+        profileLease,
+        delivery.ok ? 'completed' : 'failed',
+        deliveryError,
+      )) {
+        throw new Error('Daily radar profile lease ownership was lost before delivery finalization.')
+      }
 
       results.push({
         clientProfileId: profile.id,
@@ -272,15 +350,21 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
         sent: delivery.sent,
         failed: delivery.failed,
         skipped: delivery.skipped,
+        digestRunId: runId,
+        retried,
+        ...(deliveryError ? { error: deliveryError } : {}),
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
+      await finishDailyRadarProfile(profileLease, 'failed', message).catch(() => undefined)
       results.push({
         clientProfileId: profile.id,
         ok: false,
         sent: 0,
         failed: 0,
         skipped: 0,
+        digestRunId: profileLease.digestRunId ?? undefined,
+        retried: Boolean(profileLease.digestRunId),
         error: message,
       })
     }
