@@ -60,14 +60,14 @@ RR_APP_DIR="$APP_DIR" \
 RR_DEPLOY_SHA="$DEPLOY_SHA" \
 RR_OPERATOR_AUTH_IMAGE="recruiter-radar-operator-auth:${DEPLOY_SHA}" \
 RR_MCP_OWNER_PASSWORD_HASH_FILE="$OWNER_HASH_FILE" \
-  "$AUTH_SCRIPT" --preflight
+  bash "$AUTH_SCRIPT" --preflight
 
 # A first bootstrap must not require the Timeweb compose override to exist yet.
 test ! -e "$APP_DIR/.rr-timeweb-mcp.compose.yml"
 
 RR_APP_DIR="$APP_DIR" \
 RR_TIMEWEB_MCP_TOKEN_FILE="$TOKEN_FILE" \
-  "$RUNTIME_SCRIPT" --preflight
+  bash "$RUNTIME_SCRIPT" --preflight
 
 # Preflight must remain side-effect free.
 test ! -e "$APP_DIR/.rr-timeweb-mcp.compose.yml"
