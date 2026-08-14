@@ -7,12 +7,19 @@ import {
   type VacancyLifecycleEventType,
   type VacancyLifecycleState,
 } from './canonical-vacancy-lifecycle'
+import { getAllSourceIds, type SourceId } from '@/lib/sources/source-registry'
+import { isTargetScopedHiringSource } from '@/lib/sources/source-schedules'
 
 type LifecycleDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
 
 interface LifecycleRow {
   id: string
   vacancyFingerprint: string
+  normalizedRole: string
+  location: string | null
+  canonicalDestinationUrl: string | null
+  sourceExternalIds: Record<string, string[]>
+  sourceTargetKeys: Record<string, string[]>
   active: boolean
   firstSeenAt: string
   lastSeenAt: string
@@ -27,6 +34,7 @@ interface LifecycleRow {
 interface SuccessfulRunRow {
   id: string
   sourceId: string
+  targetKey: string | null
   startedAt: string
   completedAt: string
 }
@@ -38,6 +46,9 @@ export interface CanonicalVacancyLifecycleStats {
   reopened: number
 }
 
+const KNOWN_SOURCE_IDS = new Set<string>(getAllSourceIds())
+const CANONICAL_MATCH_WINDOW_MS = 21 * 86_400_000
+
 export async function persistCanonicalVacancyLifecycle(
   organizationId: string,
   vacancies: CanonicalVacancy[],
@@ -46,46 +57,82 @@ export async function persistCanonicalVacancyLifecycle(
 ): Promise<CanonicalVacancyLifecycleStats> {
   const currentResult = await db.query<LifecycleRow>(
     `SELECT
-       id::TEXT AS id,
-       vacancy_fingerprint AS "vacancyFingerprint",
-       active,
-       first_seen_at::TEXT AS "firstSeenAt",
-       last_seen_at::TEXT AS "lastSeenAt",
-       last_source_seen_at::TEXT AS "lastSourceSeenAt",
-       closed_at::TEXT AS "closedAt",
-       reopened_at::TEXT AS "reopenedAt",
-       reopened_count AS "reopenedCount",
-       source_families AS "sourceFamilies",
-       successful_absence_observation_ids::TEXT[] AS "successfulAbsenceObservationIds"
-     FROM canonical_vacancies_v1
-     WHERE organization_id = $1
-     ORDER BY id`,
+       vacancy.id::TEXT AS id,
+       vacancy.vacancy_fingerprint AS "vacancyFingerprint",
+       vacancy.normalized_role AS "normalizedRole",
+       vacancy.location,
+       vacancy.canonical_destination_url AS "canonicalDestinationUrl",
+       vacancy.source_external_ids AS "sourceExternalIds",
+       COALESCE((
+         SELECT JSONB_OBJECT_AGG(targets.source_family, targets.target_keys)
+         FROM (
+           SELECT
+             publication.source_family,
+             ARRAY_AGG(DISTINCT publication.source_target_key ORDER BY publication.source_target_key) AS target_keys
+           FROM canonical_vacancy_publications_v1 publication
+           WHERE publication.canonical_vacancy_id = vacancy.id
+             AND publication.source_target_key IS NOT NULL
+           GROUP BY publication.source_family
+         ) targets
+       ), '{}'::JSONB) AS "sourceTargetKeys",
+       vacancy.active,
+       vacancy.first_seen_at::TEXT AS "firstSeenAt",
+       vacancy.last_seen_at::TEXT AS "lastSeenAt",
+       vacancy.last_source_seen_at::TEXT AS "lastSourceSeenAt",
+       vacancy.closed_at::TEXT AS "closedAt",
+       vacancy.reopened_at::TEXT AS "reopenedAt",
+       vacancy.reopened_count AS "reopenedCount",
+       vacancy.source_families AS "sourceFamilies",
+       vacancy.successful_absence_observation_ids::TEXT[] AS "successfulAbsenceObservationIds"
+     FROM canonical_vacancies_v1 vacancy
+     WHERE vacancy.organization_id = $1
+     ORDER BY vacancy.id`,
     [organizationId],
-  )
-  const currentByFingerprint = new Map(
-    currentResult.rows.map((row) => [row.vacancyFingerprint, row]),
   )
   const allSources = uniqueStrings([
     ...vacancies.flatMap((vacancy) =>
       vacancy.publications.map((publication) => publication.source)),
     ...currentResult.rows.flatMap((row) => row.sourceFamilies),
   ])
-  const successfulRuns = allSources.length === 0
+  const sourceRuns = allSources.length === 0
     ? []
     : (await db.query<SuccessfulRunRow>(
       `SELECT
          id::TEXT AS id,
          source_id AS "sourceId",
+         NULL::TEXT AS "targetKey",
          started_at::TEXT AS "startedAt",
          completed_at::TEXT AS "completedAt"
        FROM source_run_observations
        WHERE source_id = ANY($1::TEXT[])
+         AND scope = 'source'
          AND outcome = 'success'
          AND action = 'pipeline'
          AND completed_at <= $2::TIMESTAMPTZ
        ORDER BY completed_at, id`,
       [allSources, observedAt.toISOString()],
     )).rows
+  const targetRuns = allSources.length === 0
+    ? []
+    : (await db.query<SuccessfulRunRow>(
+      `SELECT
+         id::TEXT AS id,
+         source_id AS "sourceId",
+         target_key AS "targetKey",
+         started_at::TEXT AS "startedAt",
+         completed_at::TEXT AS "completedAt"
+       FROM source_run_observations
+       WHERE organization_id = $1
+         AND source_id = ANY($2::TEXT[])
+         AND scope = 'target'
+         AND outcome = 'success'
+         AND action = 'pipeline'
+         AND target_outcome IN ('parsed', 'no-vacancies-present')
+         AND completed_at <= $3::TIMESTAMPTZ
+       ORDER BY completed_at, id`,
+      [organizationId, allSources, observedAt.toISOString()],
+    )).rows
+  const successfulRuns = [...sourceRuns, ...targetRuns]
 
   const stats: CanonicalVacancyLifecycleStats = {
     observed: 0,
@@ -94,8 +141,11 @@ export async function persistCanonicalVacancyLifecycle(
     reopened: 0,
   }
   const presentFingerprints = new Set<string>()
-  for (const vacancy of vacancies) {
-    const current = currentByFingerprint.get(vacancy.vacancyFingerprint) ?? null
+  for (const incomingVacancy of vacancies) {
+    const current = resolveExistingCanonicalVacancy(incomingVacancy, currentResult.rows)
+    const vacancy = current && current.vacancyFingerprint !== incomingVacancy.vacancyFingerprint
+      ? { ...incomingVacancy, vacancyFingerprint: current.vacancyFingerprint }
+      : incomingVacancy
     if (!vacancyWasPresentInLatestSuccessfulRun(
       vacancy,
       current,
@@ -111,6 +161,7 @@ export async function persistCanonicalVacancyLifecycle(
       organizationId,
       vacancy,
       result.state,
+      current,
       db,
     )
     await upsertPublications(vacancyId, organizationId, vacancy, observedAt, db)
@@ -144,12 +195,10 @@ export async function persistCanonicalVacancyLifecycle(
     if (!current.active || presentFingerprints.has(current.vacancyFingerprint)) {
       continue
     }
-    const sourceRunObservationIds = successfulRuns
-      .filter((run) =>
-        current.sourceFamilies.includes(run.sourceId) &&
-        Date.parse(run.completedAt) > Date.parse(current.lastSourceSeenAt))
-      .map((run) => Number(run.id))
-      .filter(Number.isSafeInteger)
+    const sourceRunObservationIds = resolveSuccessfulAbsenceRunIds(
+      current,
+      successfulRuns,
+    )
     if (sourceRunObservationIds.length === 0) continue
 
     const result = reconcileVacancyLifecycle(mapLifecycleState(current), {
@@ -199,6 +248,73 @@ export async function persistCanonicalVacancyLifecycle(
   return stats
 }
 
+function resolveExistingCanonicalVacancy(
+  vacancy: CanonicalVacancy,
+  rows: LifecycleRow[],
+): LifecycleRow | null {
+  const direct = rows.find((row) => row.vacancyFingerprint === vacancy.vacancyFingerprint)
+  if (direct) return direct
+
+  const externalMatches = rows.filter((row) => vacancy.publications.some((publication) => {
+    if (!publication.externalVacancyId) return false
+    return (row.sourceExternalIds?.[publication.source] ?? [])
+      .includes(publication.externalVacancyId)
+  }))
+  if (externalMatches.length === 1) return externalMatches[0]
+
+  const incomingUrls = new Set(vacancy.publications
+    .map((publication) => normalizeCanonicalUrl(publication.sourceUrl))
+    .filter((value): value is string => Boolean(value)))
+  const urlMatches = rows.filter((row) => {
+    const url = normalizeCanonicalUrl(row.canonicalDestinationUrl)
+    return Boolean(url && incomingUrls.has(url))
+  })
+  if (urlMatches.length === 1) return urlMatches[0]
+
+  const incomingFirstSeenAt = Math.min(...vacancy.publications
+    .map((publication) => Date.parse(publication.occurredAt))
+    .filter(Number.isFinite))
+  if (!Number.isFinite(incomingFirstSeenAt)) return null
+  const fallbackMatches = rows.filter((row) =>
+    normalizeMatchText(row.normalizedRole) === normalizeMatchText(vacancy.title) &&
+    normalizeMatchText(row.location ?? '') === normalizeMatchText(vacancy.region ?? '') &&
+    Math.abs(Date.parse(row.firstSeenAt) - incomingFirstSeenAt) <= CANONICAL_MATCH_WINDOW_MS &&
+    !hasConflictingProviderId(row, vacancy))
+  return fallbackMatches.length === 1 ? fallbackMatches[0] : null
+}
+
+function hasConflictingProviderId(row: LifecycleRow, vacancy: CanonicalVacancy): boolean {
+  return vacancy.publications.some((publication) => {
+    if (!publication.externalVacancyId) return false
+    const existing = row.sourceExternalIds?.[publication.source] ?? []
+    return existing.length > 0 && !existing.includes(publication.externalVacancyId)
+  })
+}
+
+function normalizeMatchText(value: string): string {
+  return (value ?? '').trim().toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ')
+}
+
+function normalizeCanonicalUrl(value: string | null): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    if (!['http:', 'https:'].includes(url.protocol)) return null
+    url.hash = ''
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^utm_/i.test(key) || ['ref', 'from', 'source', 'campaign'].includes(key.toLowerCase())) {
+        url.searchParams.delete(key)
+      }
+    }
+    url.searchParams.sort()
+    url.hostname = url.hostname.toLowerCase()
+    url.pathname = url.pathname.replace(/\/+$/, '') || '/'
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
 function mapLifecycleState(row: LifecycleRow): VacancyLifecycleState {
   return {
     status: row.active ? 'active' : 'closed',
@@ -217,17 +333,28 @@ async function upsertCanonicalVacancy(
   organizationId: string,
   vacancy: CanonicalVacancy,
   state: VacancyLifecycleState,
+  current: LifecycleRow | null,
   db: LifecycleDb,
 ): Promise<string> {
   const sourceFamilies = uniqueStrings(
-    vacancy.publications.map((publication) => publication.source),
+    [
+      ...(current?.sourceFamilies ?? []),
+      ...vacancy.publications.map((publication) => publication.source),
+    ],
   )
-  const sourceExternalIds = Object.fromEntries(sourceFamilies.map((source) => [
+  const incomingSourceExternalIds = Object.fromEntries(sourceFamilies.map((source) => [
     source,
     uniqueStrings(vacancy.publications
       .filter((publication) => publication.source === source)
       .map((publication) => publication.externalVacancyId ?? '')),
   ]))
+  const sourceExternalIds = Object.fromEntries(uniqueStrings([
+    ...Object.keys(current?.sourceExternalIds ?? {}),
+    ...Object.keys(incomingSourceExternalIds),
+  ]).map((source) => [source, uniqueStrings([
+    ...(current?.sourceExternalIds?.[source] ?? []),
+    ...(incomingSourceExternalIds[source] ?? []),
+  ])]))
   const result = await db.query<{ id: string }>(
     `INSERT INTO canonical_vacancies_v1 (
        organization_id, vacancy_fingerprint, normalized_role, location,
@@ -289,11 +416,16 @@ async function upsertPublications(
     await db.query(
       `INSERT INTO canonical_vacancy_publications_v1 (
          canonical_vacancy_id, organization_id, signal_id, source_family,
-         external_vacancy_id, destination_url, first_seen_at, last_seen_at,
-         evidence_ids
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         external_vacancy_id, destination_url, source_target_key,
+         first_seen_at, last_seen_at, evidence_ids
+       ) VALUES (
+         $1,$2,$3,$4,$5,$6,
+         (SELECT NULLIF(signal.payload->>'raw_target_id', '') FROM signals signal WHERE signal.id = $3::BIGINT),
+         $7,$8,$9
+       )
        ON CONFLICT (signal_id) DO UPDATE SET
          last_seen_at = GREATEST(canonical_vacancy_publications_v1.last_seen_at, EXCLUDED.last_seen_at),
+         source_target_key = COALESCE(EXCLUDED.source_target_key, canonical_vacancy_publications_v1.source_target_key),
          evidence_ids = EXCLUDED.evidence_ids,
          updated_at = NOW()`,
       [
@@ -350,7 +482,9 @@ async function insertObservation(
       input.signalIds,
       input.evidenceIds,
       JSON.stringify({
-        rule: input.present ? 'canonical-publication-present' : 'ttl-and-successful-source-runs',
+        rule: input.present
+          ? 'canonical-publication-present'
+          : 'ttl-and-successful-scoped-source-runs',
       }),
       fingerprint,
     ],
@@ -387,8 +521,30 @@ async function insertEvent(
   )
 }
 
-function uniqueStrings(values: string[]): string[] {
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort()
+function resolveSuccessfulAbsenceRunIds(
+  current: LifecycleRow,
+  successfulRuns: SuccessfulRunRow[],
+): number[] {
+  const ids: number[] = []
+  for (const source of current.sourceFamilies) {
+    const runsAfterLastSeen = successfulRuns.filter((run) =>
+      run.sourceId === source &&
+      Date.parse(run.completedAt) > Date.parse(current.lastSourceSeenAt))
+    if (isTargetScopedSource(source)) {
+      const targetKeys = uniqueStrings(current.sourceTargetKeys?.[source] ?? [])
+      if (targetKeys.length === 0) return []
+      for (const targetKey of targetKeys) {
+        const matchingRuns = runsAfterLastSeen.filter((run) => run.targetKey === targetKey)
+        if (matchingRuns.length === 0) return []
+        ids.push(...matchingRuns.map((run) => Number(run.id)).filter(Number.isSafeInteger))
+      }
+    } else {
+      const matchingRuns = runsAfterLastSeen.filter((run) => run.targetKey === null)
+      if (matchingRuns.length === 0) return []
+      ids.push(...matchingRuns.map((run) => Number(run.id)).filter(Number.isSafeInteger))
+    }
+  }
+  return [...new Set(ids)].sort((left, right) => left - right)
 }
 
 function vacancyWasPresentInLatestSuccessfulRun(
@@ -398,8 +554,14 @@ function vacancyWasPresentInLatestSuccessfulRun(
   observedAt: Date,
 ): boolean {
   for (const publication of vacancy.publications) {
-    const latestRun = successfulRuns
-      .filter((run) => run.sourceId === publication.source)
+    const candidateRuns = isTargetScopedSource(publication.source)
+      ? successfulRuns.filter((run) =>
+        run.sourceId === publication.source &&
+        Boolean(run.targetKey) &&
+        (current?.sourceTargetKeys?.[publication.source] ?? []).includes(run.targetKey ?? ''))
+      : successfulRuns.filter((run) =>
+        run.sourceId === publication.source && run.targetKey === null)
+    const latestRun = candidateRuns
       .sort((left, right) =>
         Date.parse(right.completedAt) - Date.parse(left.completedAt) ||
         Number(right.id) - Number(left.id))[0]
@@ -414,6 +576,14 @@ function vacancyWasPresentInLatestSuccessfulRun(
         lastObservedAt >= Date.parse(latestRun.startedAt)) return true
   }
   return false
+}
+
+function isTargetScopedSource(value: string): boolean {
+  return KNOWN_SOURCE_IDS.has(value) && isTargetScopedHiringSource(value as SourceId)
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort()
 }
 
 function hash(value: unknown): string {
