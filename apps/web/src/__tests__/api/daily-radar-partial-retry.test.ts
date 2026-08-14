@@ -2,16 +2,31 @@ const profileRows = [
   { id: '101', delivery_frequency: 'daily' },
   { id: '202', delivery_frequency: 'daily' },
 ]
-const runDigestForClientProfile = jest.fn()
-const deliverCandidatesForRun = jest.fn()
-const enrichRunCandidates = jest.fn(async () => undefined)
-const heartbeatDailyRadarRun = jest.fn(async () => true)
+const runDigestForClientProfile = jest.fn(async (_arg: unknown) => ({ run: { id: 'unused' } }))
+const deliverCandidatesForRun = jest.fn(async (_runId: unknown) => ({
+  ok: true,
+  sent: 0,
+  failed: 0,
+  skipped: 0,
+  failures: [] as Array<{ digestCandidateId: number; error: string }>,
+}))
+const enrichRunCandidates = jest.fn(async (_runId: unknown) => undefined)
+const heartbeatDailyRadarRun = jest.fn(async (_lease: unknown) => true)
 const attachDailyRadarProfileDigestRun = jest.fn(async (lease: { digestRunId: string | null }, runId: string) => {
   lease.digestRunId = runId
   return true
 })
-const finishDailyRadarProfile = jest.fn(async () => true)
-const claimDailyRadarProfile = jest.fn()
+const finishDailyRadarProfile = jest.fn(async (_lease: unknown, _status: unknown, _error?: unknown) => true)
+const claimDailyRadarProfile = jest.fn(async (_lease: unknown, _profileId: unknown) => ({
+  acquired: false,
+  persisted: true,
+  runDate: '2026-08-14',
+  clientProfileId: '0',
+  leaseId: 'lease',
+  attemptCount: 0,
+  digestRunId: null as string | null,
+  status: 'failed',
+}))
 
 jest.mock('@/lib/db', () => ({
   getPool: () => ({ query: jest.fn(async () => ({ rows: profileRows })) }),
