@@ -51,7 +51,8 @@ import {
   MAX_COMPANY_SITE_TARGETS_PER_RUN,
   type CompanySiteTargetRow,
 } from './company-site-targets'
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { existsSync, writeFileSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { runSupportingSourceScheduler } from './supporting-source-scheduler'
 
 export type { SourceId } from '@/lib/sources/source-registry'
@@ -115,7 +116,32 @@ export interface IngestDiagnostics {
   skippedCount?: number
   organizationCount?: number
   evidenceCount?: number
+  organizationResolutionRejects?: number
   zeroReason?: string
+}
+
+const SNAPSHOT_INPUT_ENV_BY_SOURCE: Partial<Record<SourceId, string>> = {
+  'fns-open-data': 'FNS_OPEN_DATA_INPUT_FILE',
+  'government-procurement': 'GOVERNMENT_PROCUREMENT_INPUT_FILE',
+  'rosstat-open-data': 'ROSSTAT_OPEN_DATA_INPUT_FILE',
+  'rospatent-open-data': 'ROSPATENT_OPEN_DATA_INPUT_FILE',
+}
+
+/**
+ * A shared snapshot root is storage, not activation. Run a snapshot consumer
+ * only when its own reviewed override or active manifest exists.
+ */
+export function getRunnableDailySupportingSourceIds(
+  env: Record<string, string | undefined> = process.env,
+): SourceId[] {
+  const effectiveEnv = { ...process.env, ...env }
+  const snapshotRoot = effectiveEnv.SOURCE_SNAPSHOT_ROOT?.trim()
+  return getDailySupportingSourceIds(effectiveEnv).filter((source) => {
+    const inputEnvName = SNAPSHOT_INPUT_ENV_BY_SOURCE[source]
+    if (!inputEnvName) return true
+    if (effectiveEnv[inputEnvName]?.trim()) return true
+    return Boolean(snapshotRoot && existsSync(join(snapshotRoot, source, 'active.json')))
+  })
 }
 
 export interface TemporalIntelligenceResult {
@@ -866,7 +892,7 @@ export async function ingestDailyRadarSources(
   const primaryResults = await ingestAllPrimarySources(env)
   if (isNoActiveProfiles(primaryResults)) return primaryResults
 
-  const supportingSources = getDailySupportingSourceIds()
+  const supportingSources = getRunnableDailySupportingSourceIds(env)
   const supportingResults = await runSupportingSourceScheduler({
     sources: supportingSources,
     run: (source) => ingestSource(source, env),
@@ -910,6 +936,7 @@ function parseJsonMetrics(output: string): ParsedSourceMetrics | undefined {
               skippedCount: numberValue(parsed.skippedRecords),
               organizationCount: numberValue(parsed.orgsCreated),
               evidenceCount: numberValue(parsed.evidenceUpsertsCompleted),
+              organizationResolutionRejects: numberValue(parsed.organizationResolutionRejects),
               zeroReason: stringValue(parsed.zeroReason),
             },
           }

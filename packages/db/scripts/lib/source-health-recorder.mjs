@@ -12,7 +12,7 @@ export function buildSourceRunMetrics({ sourceId, action, startedAt, completedAt
     && Array.isArray(input?.normalizedRecords);
   return {
     sourceId, action, startedAt: new Date(startedAt).toISOString(), completedAt: new Date(completedAt).toISOString(), outcome,
-    recordsFetched: Number(input?.recordsReceived ?? 0), recordsAccepted: Number(input?.normalizedRecords?.length ?? 0), duplicateRecords: Number(input?.duplicateRecords ?? 0),
+    recordsFetched: Number(input?.recordsReceived ?? 0), recordsAccepted: Math.max(0, Number(input?.normalizedRecords?.length ?? 0) - Number(input?.organizationResolutionRejects ?? 0)), duplicateRecords: Number(input?.duplicateRecords ?? 0),
     organizationResolutionRejects: Number(input?.organizationResolutionRejects ?? 0), extractionMethods, latencyMs: Math.max(0, Number(completedAt) - Number(startedAt)),
     errorCode: error ? outcome : null, fetchSucceeded, normalizationSucceeded,
   };

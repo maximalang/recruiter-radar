@@ -22,14 +22,25 @@ const runtime = createStandardSourceRuntime({
   usageText: 'Set CBR_REGISTRY_INPUT_FILE or provide tracked INNs through GOVERNMENT_ENRICHMENT_INNS. The official CBR SOAP service is used without credentials.',
   extractRecords: (parsed) => extractSourceSection(parsed, 'cbr', parseGovernmentEnrichmentInns()),
   normalizeRecord: normalizeCbrRegistryRecord,
-  buildSummaryExtras: (input) => ({ liveProvider: input.liveProvider, innsRequested: input.innsRequested }),
+  buildSummaryExtras: (input) => ({ liveProvider: input.liveProvider, innsRequested: input.innsRequested, zeroReason: input.zeroReason ?? undefined }),
 });
 
 export async function resolveCbrRegistryInput() {
   const inputFilePath = process.env.CBR_REGISTRY_INPUT_FILE?.trim();
   if (inputFilePath) return runtime.resolveFileInput(inputFilePath);
   const inns = parseGovernmentEnrichmentInns(process.env.CBR_REGISTRY_INNS ?? process.env.GOVERNMENT_ENRICHMENT_INNS).slice(0, 50);
-  if (inns.length === 0) throw new Error('No CBR input configured. Set CBR_REGISTRY_INPUT_FILE or provide tracked 10-digit INNs.');
+  if (inns.length === 0) {
+    return runtime.buildInputFromRecords({
+      inputMode: 'expected-zero',
+      inputFilePath: null,
+      records: [],
+      extra: {
+        liveProvider: 'cbr-finorg-soap',
+        innsRequested: 0,
+        zeroReason: 'no-eligible-company-inns',
+      },
+    });
+  }
   const records = [];
   for (const inn of inns) {
     const record = await fetchCbrParticipantByInn(inn);

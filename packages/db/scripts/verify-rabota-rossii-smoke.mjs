@@ -48,6 +48,7 @@ assert.equal(
 );
 
 const liveMode = await runLiveModeSmoke();
+const emptyLiveMode = await runEmptyLiveModeSmoke();
 
 console.log(JSON.stringify({
   ok: true,
@@ -59,6 +60,7 @@ console.log(JSON.stringify({
   normalizedRecords: summary.normalizedRecords,
   skippedRecords: summary.skippedRecords,
   liveMode,
+  emptyLiveMode,
   evidenceBoundary: 'primary-platform, not promoted to digest until confidence gates pass',
   sideEffects: { databaseUrlUsed: false },
 }, null, 2));
@@ -120,6 +122,30 @@ async function runLiveModeSmoke() {
       requestedUrls: requestedUrls.length,
       normalizedRecords: liveInput.normalizedRecords.length,
     };
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+async function runEmptyLiveModeSmoke() {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => jsonResponse({
+    status: '200',
+    meta: { total: 0, limit: 1 },
+    results: { vacancies: [] },
+  });
+
+  try {
+    const input = await resolveRabotaRossiiLiveInput({
+      searchText: 'no matching vacancies',
+      regionCode: '7700000000000',
+      offset: 0,
+      limit: 1,
+    });
+    const emptySummary = buildFetchSummary(input);
+    assert.equal(emptySummary.recordsReceived, 0);
+    assert.equal(emptySummary.zeroReason, 'no-vacancies-for-query');
+    return { zeroReason: emptySummary.zeroReason };
   } finally {
     globalThis.fetch = originalFetch;
   }

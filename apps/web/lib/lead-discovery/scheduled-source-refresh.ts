@@ -1,10 +1,10 @@
 import { getPool } from '@/lib/db-pool'
 import {
-  getDailySupportingSourceIds,
   getPrimarySourceIds,
   type SourceId,
 } from '@/lib/sources/source-registry'
 import {
+  getRunnableDailySupportingSourceIds,
   ingestSource,
   type IngestResult,
   type NoActiveProfilesResult,
@@ -17,9 +17,10 @@ const SOURCE_REFRESH_LOCK_KEY = 'recruiter-radar:source-refresh-runtime:v1'
 
 /**
  * Cadence-aware source refresh independent from digest/delivery execution.
- * Primary and supporting sources share the same persisted scheduler state, so
+ * Primary and active supporting sources share the same persisted scheduler state, so
  * an hourly clock can safely call this function while each source keeps its own
- * 1h/3h/6h/12h/24h/7d cadence and cooldown policy.
+ * 1h/3h/6h/12h/24h/7d cadence and cooldown policy. The stages run in dependency
+ * order so company-derived crawls never race organization creation.
  *
  * A PostgreSQL session advisory lock covers the whole scheduler run. This is
  * deliberately above the per-host/global semaphores: only one scheduler process
@@ -32,16 +33,25 @@ export async function runScheduledSourceRefresh(
 ): Promise<ScheduledSourceRefreshResult> {
   const sources = uniqueSources([
     ...getPrimarySourceIds(),
-    ...getDailySupportingSourceIds(),
+    ...getRunnableDailySupportingSourceIds(env),
   ])
+  const primarySources = getPrimarySourceIds()
+  const supportingSources = getRunnableDailySupportingSourceIds(env)
   const pool = getPool()
   if (!pool) {
-    return runSupportingSourceScheduler({
-      sources,
+    const primaryResults = await runSupportingSourceScheduler({
+      sources: primarySources,
       run: (source) => ingestSource(source, env),
       db: null,
       env,
     })
+    const supportingResults = await runSupportingSourceScheduler({
+      sources: supportingSources,
+      run: (source) => ingestSource(source, env),
+      db: null,
+      env,
+    })
+    return [...primaryResults, ...supportingResults]
   }
 
   const client = await pool.connect()
@@ -75,12 +85,19 @@ export async function runScheduledSourceRefresh(
       }))
     }
 
-    return await runSupportingSourceScheduler({
-      sources,
+    const primaryResults = await runSupportingSourceScheduler({
+      sources: primarySources,
       run: (source) => ingestSource(source, env),
       db: client,
       env,
     })
+    const supportingResults = await runSupportingSourceScheduler({
+      sources: supportingSources,
+      run: (source) => ingestSource(source, env),
+      db: client,
+      env,
+    })
+    return [...primaryResults, ...supportingResults]
   } finally {
     if (lockAcquired) {
       await client.query(

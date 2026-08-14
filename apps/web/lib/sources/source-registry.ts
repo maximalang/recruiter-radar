@@ -517,10 +517,12 @@ export function getHiringEvidenceSourceIds(): SourceId[] {
 }
 
 /** Non-originating sources run after the primary hiring stage completes. */
-export function getDailySupportingSourceIds(): SourceId[] {
+export function getDailySupportingSourceIds(
+  env: Record<string, string | undefined> = process.env,
+): SourceId[] {
   return SOURCE_REGISTRY.filter(s =>
     s.dailyStage === 'supporting'
-    && (!s.dailyActivationEnvVars || s.dailyActivationEnvVars.some(name => Boolean(process.env[name])))
+    && (!s.dailyActivationEnvVars || s.dailyActivationEnvVars.some(name => Boolean(env[name])))
   ).map(s => s.id)
 }
 

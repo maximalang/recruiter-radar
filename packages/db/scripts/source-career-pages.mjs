@@ -38,6 +38,7 @@ import {
 } from './adapters/site-discovery.mjs';
 import {
   assertOrgSourceRefOwner,
+  isOrganizationIdentityConflict,
   resolveOrganizationOwner,
 } from './adapters/organization-resolution.mjs';
 import { loadEnvFile, normalizeDomain, runScriptCli } from './lib/common-utils.mjs';
@@ -138,6 +139,8 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
           evidenceUpsertsCompleted: stats.evidenceUpsertCount,
           evidenceCreated: stats.evidenceCreatedCount,
           lineageCreated: stats.lineageCreatedCount,
+          organizationResolutionRejects: stats.organizationResolutionRejects,
+          organizationResolutionRejectedTargetKeys: stats.organizationResolutionRejectedTargetKeys,
           health,
         },
         null,
@@ -2936,6 +2939,8 @@ export async function ingestCareerPages({ connectionString, input, persistenceMo
   let evidenceUpsertCount = 0;
   let evidenceCreatedCount = 0;
   let lineageCreatedCount = 0;
+  let organizationResolutionRejects = 0;
+  const organizationResolutionRejectedTargetKeys = new Set();
   const familyIngestionStats = {};
 
   await client.connect();
@@ -2945,7 +2950,15 @@ export async function ingestCareerPages({ connectionString, input, persistenceMo
 
     if (persistenceMode === 'legacy') {
       for (const record of input.normalizedRecords) {
-        const orgUpsertResult = await upsertOrgSourceRef(client, record);
+        let orgUpsertResult;
+        try {
+          orgUpsertResult = await upsertOrgSourceRef(client, record);
+        } catch (error) {
+          if (!isOrganizationIdentityConflict(error)) throw error;
+          organizationResolutionRejects += 1;
+          addRejectedTargetKeys(organizationResolutionRejectedTargetKeys, [record]);
+          continue;
+        }
         orgUpsertCount += orgUpsertResult.insertedOrg ? 1 : 0;
         const lineage = await upsertSignalEvidenceLineage(
           client,
@@ -2979,7 +2992,15 @@ export async function ingestCareerPages({ connectionString, input, persistenceMo
 
       const lineageInputs = [];
       for (const records of recordsByOrganization.values()) {
-        const orgUpsertResult = await upsertOrgSourceRef(client, records[0]);
+        let orgUpsertResult;
+        try {
+          orgUpsertResult = await upsertOrgSourceRef(client, records[0]);
+        } catch (error) {
+          if (!isOrganizationIdentityConflict(error)) throw error;
+          organizationResolutionRejects += records.length;
+          addRejectedTargetKeys(organizationResolutionRejectedTargetKeys, records);
+          continue;
+        }
         orgUpsertCount += orgUpsertResult.insertedOrg ? 1 : 0;
         for (const record of records) {
           lineageInputs.push(buildCareerLineageInput(record, orgUpsertResult));
@@ -2996,6 +3017,12 @@ export async function ingestCareerPages({ connectionString, input, persistenceMo
       throw new Error(`Unsupported career-pages persistence mode: ${persistenceMode}`);
     }
 
+    input.organizationResolutionRejects = organizationResolutionRejects;
+    if (input.normalizedRecords.length > 0
+      && organizationResolutionRejects === input.normalizedRecords.length) {
+      throw new Error('organization identity conflict: career-pages rejected every normalized record at the identity gate.');
+    }
+
     await client.query('COMMIT');
 
     return {
@@ -3005,12 +3032,23 @@ export async function ingestCareerPages({ connectionString, input, persistenceMo
       evidenceCreatedCount,
       lineageCreatedCount,
       familyIngestionStats,
+      organizationResolutionRejects,
+      organizationResolutionRejectedTargetKeys: [...organizationResolutionRejectedTargetKeys].sort(),
     };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
     await client.end();
+  }
+}
+
+function addRejectedTargetKeys(targetKeys, records) {
+  for (const record of records) {
+    const targetKey = toNonEmptyText(
+      record?.rawRecord?.raw_target_id ?? record?.rawRecord?.rawTargetId,
+    );
+    if (targetKey) targetKeys.add(targetKey);
   }
 }
 
@@ -3360,6 +3398,8 @@ function buildIngestSummary(input, stats) {
     evidenceUpsertsCompleted: stats.evidenceUpsertCount,
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
+    organizationResolutionRejects: stats.organizationResolutionRejects,
+    organizationResolutionRejectedTargetKeys: stats.organizationResolutionRejectedTargetKeys,
     health: buildHealthForInput(input, stats),
   };
 }

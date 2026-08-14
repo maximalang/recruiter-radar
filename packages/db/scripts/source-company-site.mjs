@@ -9,7 +9,7 @@ import {
   dedupeNormalizedRecords,
   stripBom,
 } from './adapters/source-records.mjs';
-import { assertOrgSourceRefOwner, resolveOrganizationOwner } from './adapters/organization-resolution.mjs';
+import { assertOrgSourceRefOwner, isOrganizationIdentityConflict, resolveOrganizationOwner } from './adapters/organization-resolution.mjs';
 import {
   extractCompanyOwnedSourceLinks,
   persistCompanyOwnedSourceLinks,
@@ -355,6 +355,7 @@ async function ingestCompanySite({ connectionString, input }) {
   let evidenceCreatedCount = 0;
   let lineageCreatedCount = 0;
   let discoveredSourceRefCount = 0;
+  let organizationResolutionRejects = 0;
 
   await client.connect();
 
@@ -362,7 +363,14 @@ async function ingestCompanySite({ connectionString, input }) {
     await client.query('BEGIN');
 
     for (const record of input.normalizedRecords) {
-      const orgResult = await upsertOrgSourceRef(client, record);
+      let orgResult;
+      try {
+        orgResult = await upsertOrgSourceRef(client, record);
+      } catch (error) {
+        if (!isOrganizationIdentityConflict(error)) throw error;
+        organizationResolutionRejects += 1;
+        continue;
+      }
       orgUpsertCount += orgResult.insertedOrg ? 1 : 0;
       discoveredSourceRefCount += await persistCompanyOwnedSourceLinks(client, {
         orgId: orgResult.orgId,
@@ -397,6 +405,11 @@ async function ingestCompanySite({ connectionString, input }) {
       lineageCreatedCount += lineage.lineageCreatedCount;
     }
 
+    if (input.normalizedRecords.length > 0
+      && organizationResolutionRejects === input.normalizedRecords.length) {
+      throw new Error('organization identity conflict: company-site rejected every normalized record at the identity gate.');
+    }
+
     await client.query('COMMIT');
 
     return {
@@ -406,6 +419,7 @@ async function ingestCompanySite({ connectionString, input }) {
       evidenceCreatedCount,
       lineageCreatedCount,
       discoveredSourceRefCount,
+      organizationResolutionRejects,
     };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -527,6 +541,7 @@ function buildIngestSummary(input, stats) {
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
     discoveredSourceRefs: stats.discoveredSourceRefCount,
+    organizationResolutionRejects: stats.organizationResolutionRejects,
     zeroReason: input.zeroReason ?? undefined,
   };
 }
@@ -548,6 +563,7 @@ function buildPipelineSummary(input, stats) {
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
     discoveredSourceRefs: stats.discoveredSourceRefCount,
+    organizationResolutionRejects: stats.organizationResolutionRejects,
     zeroReason: input.zeroReason ?? undefined,
   };
 }

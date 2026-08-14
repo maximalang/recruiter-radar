@@ -14,6 +14,8 @@ describe('source runtime final image', () => {
     expect(dockerfile).toContain('verify-source-runtime-image.mjs')
     expect(dockerfile).toContain('source-career-pages-runtime.mjs')
     expect(verifier).toContain("'source-career-pages-runtime.mjs'")
+    expect(dockerfile).toContain('/app/packages/db/industry-media-feed-registry.json')
+    expect(verifier).toContain("'packages/db/industry-media-feed-registry.json'")
     for (const dependency of [
       'teleproto',
       'big-integer',

@@ -38,6 +38,19 @@ const PUBLIC_SUFFIX_DOMAINS = new Set([
 
 const CORPORATE_SUBDOMAIN_PREFIXES = new Set(['www', 'career', 'careers', 'job', 'jobs', 'hr', 'vacancy', 'vacancies']);
 
+export class OrganizationIdentityConflictError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'OrganizationIdentityConflictError';
+    this.code = 'organization_identity_conflict';
+  }
+}
+
+export function isOrganizationIdentityConflict(error) {
+  return error instanceof OrganizationIdentityConflictError
+    || error?.code === 'organization_identity_conflict';
+}
+
 export function classifyStrongIdentityKey(value) {
   if (typeof value !== 'string') return null;
 
@@ -96,7 +109,7 @@ export async function resolveOrganizationOwner(client, sourceId, record) {
   }
 
   if (owners.size > 1) {
-    throw new Error(
+    throw new OrganizationIdentityConflictError(
       `organization identity conflict for ${strongKeys.join(', ')}: owners ${[...owners.keys()].join(', ')}`,
     );
   }
@@ -112,12 +125,12 @@ export async function resolveOrganizationOwner(client, sourceId, record) {
   );
 
   if (local.rows.length > 1) {
-    throw new Error(`source-local identity conflict for ${sourceId}: multiple organization owners`);
+    throw new OrganizationIdentityConflictError(`source-local identity conflict for ${sourceId}: multiple organization owners`);
   }
 
   const localOwnerId = local.rows[0] ? String(local.rows[0].org_id) : null;
   if (strongOwnerId && localOwnerId && strongOwnerId !== localOwnerId) {
-    throw new Error(
+    throw new OrganizationIdentityConflictError(
       `organization identity conflict for ${sourceId}: strong owner ${strongOwnerId}, source-local owner ${localOwnerId}`,
     );
   }
