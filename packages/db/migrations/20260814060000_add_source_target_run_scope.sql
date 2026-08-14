@@ -49,4 +49,28 @@ CREATE INDEX canonical_vacancy_publications_v1_target_idx
   )
   WHERE source_target_key IS NOT NULL;
 
+-- Scheduler semaphore objects are process-local. Persist a bounded lease so
+-- two cron/workflow processes cannot both pass the same cadence check and run
+-- the same source concurrently. A crashed runner becomes claimable after TTL.
+ALTER TABLE source_scheduler_state
+  DROP CONSTRAINT source_scheduler_state_last_scheduler_outcome_check;
+ALTER TABLE source_scheduler_state
+  ADD CONSTRAINT source_scheduler_state_last_scheduler_outcome_check CHECK (
+    last_scheduler_outcome IN (
+      'running', 'succeeded', 'failed', 'rate_limited', 'credential_gated'
+    )
+  ),
+  ADD COLUMN lease_owner TEXT,
+  ADD COLUMN lease_until TIMESTAMPTZ,
+  ADD CONSTRAINT source_scheduler_state_lease_contract CHECK (
+    (lease_owner IS NULL AND lease_until IS NULL)
+    OR (
+      NULLIF(BTRIM(lease_owner), '') IS NOT NULL
+      AND lease_until IS NOT NULL
+    )
+  );
+CREATE INDEX source_scheduler_state_lease_idx
+  ON source_scheduler_state (lease_until, source_id)
+  WHERE lease_until IS NOT NULL;
+
 COMMIT;
