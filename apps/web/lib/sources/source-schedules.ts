@@ -49,3 +49,17 @@ export const SOURCE_SCHEDULES: Record<SourceId, SourceSchedule> = {
 export function getSourceSchedule(source: SourceId): SourceSchedule {
   return SOURCE_SCHEDULES[source]
 }
+
+/**
+ * Map provenance identity to the source runtime that actually performs the
+ * fetch. Hosted ATS evidence keeps its provider identity, but execution and
+ * host-level scheduling are owned by the unified career-pages crawler.
+ */
+export function resolveSourceExecutionId(source: SourceId): SourceId {
+  return SOURCE_SCHEDULES[source].healthSourceId ?? source
+}
+
+/** Hiring sources whose absence must be proven at an organization/target scope. */
+export function isTargetScopedHiringSource(source: SourceId): boolean {
+  return resolveSourceExecutionId(source) === 'career-pages'
+}
