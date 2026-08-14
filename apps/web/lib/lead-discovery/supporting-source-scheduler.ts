@@ -1,4 +1,5 @@
-import { getSourceConfig, type SourceId } from '@/lib/sources/source-registry'
+import type { SourceId } from '@/lib/sources/source-registry'
+import { evaluateSourceActivation } from '@/lib/sources/source-activation'
 import {
   getSourceSchedule,
   type SourceSchedule,
@@ -45,8 +46,19 @@ class Semaphore {
   }
 }
 
-function schedulerResult(source: SourceId, outcome: IngestResult['outcome']): IngestResult {
-  return { source, success: true, outcome, fetchedCount: 0, upsertedCount: 0 }
+function schedulerResult(
+  source: SourceId,
+  outcome: IngestResult['outcome'],
+  zeroReason?: string,
+): IngestResult {
+  return {
+    source,
+    success: true,
+    outcome,
+    fetchedCount: 0,
+    upsertedCount: 0,
+    ...(zeroReason ? { diagnostics: { zeroReason } } : {}),
+  }
 }
 
 function isRateLimited(result: IngestResult): boolean {
@@ -134,16 +146,18 @@ export async function runSupportingSourceScheduler(
   for (const [index, source] of options.sources.entries()) {
     const baseSchedule = getSourceSchedule(source)
     const schedule = { ...baseSchedule, ...options.scheduleOverrides?.[source] }
-    const missingCredentials = getSourceConfig(source).requiredEnvVars.filter(
-      (name) => !suppliedEnv[name] && !inheritedEnv[name],
-    )
-    if (missingCredentials.length > 0) {
-      results[index] = schedulerResult(source, 'credential-gated')
+    const activation = evaluateSourceActivation(source, suppliedEnv, inheritedEnv)
+    if (activation.state === 'credential-gated') {
+      results[index] = schedulerResult(source, 'credential-gated', 'accepted-configuration-not-complete')
       await persistState({
         db: options.db, source, schedule, outcome: 'credential_gated',
         attemptedAt: null, nextEligibleAt: new Date(nowMs + 60 * 60 * 1_000),
         cooldownUntil: null, consecutiveFailures: 0, succeeded: false,
       })
+      continue
+    }
+    if (activation.state === 'unavailable') {
+      results[index] = schedulerResult(source, 'deferred', 'source-unavailable')
       continue
     }
 
