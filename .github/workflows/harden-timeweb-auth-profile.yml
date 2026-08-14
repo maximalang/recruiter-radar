@@ -1,0 +1,59 @@
+name: Harden Timeweb auth profile
+
+on:
+  pull_request:
+    types: [synchronize, opened, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.number == 206 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Enforce exact authorization resource and scope before provider interaction
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('operator-auth/src/timeweb-server.js')
+          source = path.read_text()
+          needle = "      if (req.method === 'GET' && url.pathname === '/healthz') { res.statusCode = 200; res.setHeader('Content-Type', 'application/json'); res.end('{\\\"ok\\\":true}'); return }\n"
+          block = """      if (req.method === 'GET' && url.pathname === `${OIDC_PREFIX}/auth`) {
+            const requestedScopes = new Set(String(url.searchParams.get('scope') ?? '').split(/\\s+/).filter(Boolean))
+            const resources = url.searchParams.getAll('resource')
+            const invalidScope = !requestedScopes.has(TIMEWEB_SCOPE)
+              || [...requestedScopes].some((scope) => !['openid', 'offline_access', TIMEWEB_SCOPE].includes(scope))
+            const invalidResource = resources.length !== 1 || resources[0] !== RESOURCE
+            if (invalidScope || invalidResource) {
+              securityHeaders(res)
+              res.statusCode = 400
+              res.setHeader('Content-Type', 'application/json; charset=utf-8')
+              res.end(JSON.stringify({ error: invalidResource ? 'invalid_target' : 'invalid_scope' }))
+              return
+            }
+          }
+          """
+          if block in source:
+              pass
+          elif needle in source:
+              source = source.replace(needle, needle + block, 1)
+              path.write_text(source)
+          else:
+              raise SystemExit('authorization insertion point not found')
+          PY
+          node --check operator-auth/src/timeweb-server.js
+      - name: Commit hardening and remove this one-shot workflow
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/harden-timeweb-auth-profile.yml
+          git add operator-auth/src/timeweb-server.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(timeweb-mcp): reject wrong OAuth resource and scope early"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
