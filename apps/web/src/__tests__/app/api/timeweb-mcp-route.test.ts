@@ -175,7 +175,7 @@ describe('Timeweb MCP fixed-upstream bridge', () => {
     expect(await response.json()).toEqual({ error: 'upstream_timeout' })
   })
 
-  it('rejects oversized bodies before OAuth discovery or Timeweb', async () => {
+  it('rejects declared oversized bodies before OAuth discovery or Timeweb', async () => {
     global.fetch = jest.fn() as unknown as typeof fetch
     const huge = 'x'.repeat(TIMEWEB_MCP_MAX_BODY_BYTES + 1)
     const response = await POST(new Request(TIMEWEB_MCP_RESOURCE, {
@@ -188,10 +188,9 @@ describe('Timeweb MCP fixed-upstream bridge', () => {
       },
       body: huge,
     }))
-    // Authorization is intentionally checked before body handling, but content-length
-    // still prevents the bridge from ever reading or forwarding the oversized body.
-    expect(response.status).toBe(401)
-    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(response.status).toBe(413)
+    expect(await response.json()).toEqual({ error: 'request_too_large' })
+    expect(global.fetch).not.toHaveBeenCalled()
   })
 
   it('keeps the legacy Recruiter Radar MCP endpoint fail-closed for every MCP method', async () => {
