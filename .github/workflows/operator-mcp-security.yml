@@ -1,4 +1,4 @@
-name: Operator MCP OAuth Security
+name: Timeweb MCP OAuth Security
 
 on:
   push:
@@ -12,13 +12,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: operator-mcp-oauth-security-${{ github.ref }}
+  group: timeweb-mcp-oauth-security-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  operator-oauth-security:
+  timeweb-oauth-security:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
     services:
       postgres:
         image: postgres:16.9-bookworm
@@ -46,54 +46,56 @@ jobs:
       - name: Install product dependencies
         run: npm ci
 
-      - name: Install locked operator auth dependencies
+      - name: Audit product production graph
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Install locked OAuth dependencies
         working-directory: operator-auth
         run: npm ci --no-audit --no-fund
 
-      - name: Verify pinned OAuth dependency and audit production graph
+      - name: Verify pinned OAuth dependency and audit auth production graph
         working-directory: operator-auth
         run: |
           node -e "const p=require('./package.json'); if(p.dependencies['oidc-provider']!=='9.11.1') process.exit(1)"
           npm audit --omit=dev --audit-level=high
 
-      - name: Check operator auth source
+      - name: Check OAuth source
         working-directory: operator-auth
         run: npm run check
 
-      - name: Run OAuth persistence and security flow
+      - name: Run legacy and Timeweb OAuth persistence/security suites
         working-directory: operator-auth
-        shell: bash
+        run: npm test
+
+      - name: Validate Timeweb deployment scripts and fail-closed bootstrap contract
         run: |
-          set +e
-          npm test > /tmp/operator-oauth-test.log 2>&1
-          status=$?
-          set -e
-          cat /tmp/operator-oauth-test.log
-          if [ "$status" -ne 0 ]; then
-            diagnostic="$(tail -n 30 /tmp/operator-oauth-test.log | base64 -w0)"
-            printf '::error file=operator-auth/test/security.test.js,line=1,title=Operator OAuth integration (base64)::%s\n' "$diagnostic"
-            exit "$status"
+          set -euo pipefail
+          bash -n scripts/deploy/configure-timeweb-mcp-auth.sh
+          bash -n scripts/deploy/configure-timeweb-mcp-runtime.sh
+          bash -n scripts/deploy/configure-timeweb-mcp-caddy.sh
+          bash scripts/deploy/test-timeweb-mcp-first-bootstrap.sh
+          test -f .github/workflows/timeweb-mcp-bootstrap.yml
+          test ! -f .github/workflows/operator-mcp-bootstrap.yml
+          grep -Fq 'RR_TIMEWEB_MCP_TOKEN:' .github/workflows/timeweb-mcp-bootstrap.yml
+          grep -Fq 'secrets.RR_TIMEWEB_MCP_TOKEN' .github/workflows/timeweb-mcp-bootstrap.yml
+          grep -Fq 'RR_MCP_ENABLED: "false"' scripts/deploy/configure-timeweb-mcp-runtime.sh
+          grep -Fq 'RR_MCP_MUTATIONS_ENABLED: "false"' scripts/deploy/configure-timeweb-mcp-runtime.sh
+          grep -Fq 'respond @rr_legacy_operator_mcp 404' scripts/deploy/configure-timeweb-mcp-caddy.sh
+          if grep -Fq 'https://recruiter-radar.ru/api/internal/mcp' operator-auth/src/timeweb-server.js; then
+            echo 'Timeweb auth service must not authorize the legacy MCP resource' >&2
+            exit 1
           fi
 
-      - name: Validate operator deployment scripts
-        run: |
-          bash -n scripts/deploy/configure-operator-mcp.sh
-          bash -n scripts/deploy/configure-operator-mcp-caddy.sh
-          sh -n scripts/deploy/configure-caddy-real-ip.sh
-          python3 -m py_compile scripts/operator-mcp/rr-operator-agent.py
-          python3 scripts/test/operator-mcp-agent.py
-          bash scripts/test/operator-mcp-caddy.sh
-          bash scripts/test/operator-mcp-bootstrap-security.sh
-          bash scripts/test/operator-mcp-bootstrap-first-run.sh
-          bash scripts/test/configure-caddy-production.sh
-
-      - name: Run MCP resource-server contract tests
-        run: npm test --workspace @recruiter-radar/web -- --runInBand src/__tests__/api/internal/operator-mcp-route.test.ts
+      - name: Run Timeweb MCP resource-server contract tests
+        run: >-
+          npm test --workspace @recruiter-radar/web -- --runInBand
+          src/__tests__/app/api/timeweb-mcp-route.test.ts
+          src/__tests__/lib/timeweb-mcp-auth.test.ts
 
       - name: Type and production-build checks
         run: |
           npm run check --workspace @recruiter-radar/web
           npm run build --workspace @recruiter-radar/web
 
-      - name: Build isolated operator auth image
-        run: docker build -f operator-auth/Dockerfile -t rr-operator-auth:test .
+      - name: Build isolated Timeweb OAuth image
+        run: docker build -f operator-auth/Dockerfile -t rr-timeweb-auth:test .
