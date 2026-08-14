@@ -59,12 +59,11 @@ describe('source-ingest', () => {
       expect(getSourceConfig('habr-career').searchEnvVars).toEqual([])
     })
 
-    it('allows career-pages crawl + post-loop write to finish (empirically ~300s)', () => {
-      // A manual prod run (2026-07-17: 30 targets, 716 records, EXIT_CODE=0)
-      // took ~5min end-to-end; a 240s execFile kill was discarding every fetched
-      // record because the row-by-row write never reached COMMIT in time. 420s
-      // = observed ~300s + headroom for parallel-source contention.
-      expect(getSourceConfig('career-pages').timeoutMs).toBe(420_000)
+    it('bounds career-pages fetch plus set-based persistence', () => {
+      // The 700-record disposable-DB benchmark guards persistence separately.
+      // Runtime keeps 90s beyond the default 90s fetch budget for DB/network
+      // contention without hiding a regression behind the former 420s cap.
+      expect(getSourceConfig('career-pages').timeoutMs).toBe(180_000)
     })
 
     it('returns success for HH ingestion with valid output', async () => {
@@ -1117,7 +1116,12 @@ describe('source-ingest', () => {
         callback(null, JSON.stringify({ source: stage, recordsReceived: 0, signalUpsertsCompleted: 0, zeroReason: 'smoke-zero' }), '')
       })
 
-      const result = await ingestDailyRadarSources()
+      const result = await ingestDailyRadarSources({
+        YOUTUBE_API_KEY: 'test-key',
+        TELEGRAM_API_ID: 'test-id',
+        TELEGRAM_API_HASH: 'test-hash',
+        TELEGRAM_SESSION: 'test-session',
+      })
       if (isNoActiveProfiles(result)) throw new Error('unexpected no_active_profiles')
 
       const primaryCount = getPrimarySourceIds().length

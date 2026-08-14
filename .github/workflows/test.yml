@@ -88,6 +88,10 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run db:validate
+      - name: Benchmark career-page set-based persistence
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run verify:career-pages:persistence-benchmark | tee /tmp/career-pages-persistence-benchmark.log
       - name: Verify Opportunity Engine and Outcome Ledger production runtime
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
@@ -166,6 +170,7 @@ jobs:
           path: |
             /tmp/jest-output.log
             /tmp/fiur-evaluation.json
+            /tmp/career-pages-persistence-benchmark.log
           if-no-files-found: warn
           retention-days: 7
 

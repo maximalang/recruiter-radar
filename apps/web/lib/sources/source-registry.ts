@@ -158,23 +158,14 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // (needs a domain), so it adds nothing until other sources have populated
     // orgs — a no-op, not a failure, on an empty DB.
     //
-    // Per-source timeout 420s (raised 120→240 on 2026-07-12, then 240→420 on
-    // 2026-07-17): the crawl (≤90s budget) + the DB upsert (runs once after the
-    // whole loop) empirically takes ~300s end-to-end for a ~700-record batch
-    // (verified by a manual prod run 2026-07-17: 30 targets, 716 records,
-    // EXIT_CODE=0 in ~5min). A 240s execFile kill was discarding EVERY fetched
-    // record because the write never reached the DB (career-pages reported
-    // success:false "Command failed" in every daily-radar while still writing 0
-    // signals). 420s = ~300s observed + headroom for the parallel-source CPU/DB
-    // contention from ingestAllPrimarySources' Promise.all over 5 sources.
-    // NOTE: the post-loop write is still row-by-row (per-record
-    // pg_advisory_xact_lock + SELECT + per-source-key INSERTs), so a much larger
-    // batch could still exceed 420s. The durable fix is a batched write in the
-    // script (deferred — see memory); until then this timeout + the 90s fetch
-    // budget bound the batch so crawl+write fits.
+    // Persistence is set-based: a controlled disposable-PostgreSQL benchmark
+    // writes 700 normalized vacancies in <120s and must remain at least 3x
+    // faster than the retained benchmark-only legacy path. 180s leaves 90s for
+    // the bounded fetch phase plus 90s of DB/network headroom without hiding a
+    // persistence regression behind the former 420s timeout.
     isPrimary: true,
     category: 'career-page',
-    timeoutMs: 420_000,
+    timeoutMs: 180_000,
   },
   {
     id: 'greenhouse',
@@ -186,7 +177,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: [],
     isPrimary: false,
     category: 'career-page',
-    timeoutMs: 420_000,
+    timeoutMs: 180_000,
   },
   {
     id: 'lever',
@@ -198,7 +189,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: [],
     isPrimary: false,
     category: 'career-page',
-    timeoutMs: 420_000,
+    timeoutMs: 180_000,
   },
   {
     id: 'ashby',
@@ -210,7 +201,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: [],
     isPrimary: false,
     category: 'career-page',
-    timeoutMs: 420_000,
+    timeoutMs: 180_000,
   },
   {
     id: 'recruitee',
@@ -222,7 +213,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: [],
     isPrimary: false,
     category: 'career-page',
-    timeoutMs: 420_000,
+    timeoutMs: 180_000,
   },
   {
     id: 'workable',
@@ -234,7 +225,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: [],
     isPrimary: false,
     category: 'career-page',
-    timeoutMs: 420_000,
+    timeoutMs: 180_000,
   },
   {
     id: 'smartrecruiters',
@@ -246,7 +237,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     searchEnvVars: [],
     isPrimary: false,
     category: 'career-page',
-    timeoutMs: 420_000,
+    timeoutMs: 180_000,
   },
   {
     id: 'egrul-fns',

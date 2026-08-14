@@ -52,6 +52,7 @@ import {
   type CompanySiteTargetRow,
 } from './company-site-targets'
 import { writeFileSync, mkdirSync } from 'node:fs'
+import { runSupportingSourceScheduler } from './supporting-source-scheduler'
 
 export type { SourceId } from '@/lib/sources/source-registry'
 
@@ -102,6 +103,9 @@ export type IngestOutcome =
   | 'ingestion-zero'
   | 'missing-summary'
   | 'invalid-summary'
+  | 'credential-gated'
+  | 'deferred'
+  | 'rate-limited'
   | 'failed'
 
 export interface IngestDiagnostics {
@@ -863,9 +867,12 @@ export async function ingestDailyRadarSources(
   if (isNoActiveProfiles(primaryResults)) return primaryResults
 
   const supportingSources = getDailySupportingSourceIds()
-  const supportingResults = await Promise.all(
-    supportingSources.map(source => ingestSource(source, env)),
-  )
+  const supportingResults = await runSupportingSourceScheduler({
+    sources: supportingSources,
+    run: (source) => ingestSource(source, env),
+    db: getPool(),
+    env,
+  })
   return [...primaryResults, ...supportingResults]
 }
 

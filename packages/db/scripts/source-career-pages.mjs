@@ -41,7 +41,10 @@ import {
   resolveOrganizationOwner,
 } from './adapters/organization-resolution.mjs';
 import { loadEnvFile, normalizeDomain, runScriptCli } from './lib/common-utils.mjs';
-import { upsertSignalEvidenceLineage } from './lib/source-lineage-writer.mjs';
+import {
+  upsertSignalEvidenceLineage,
+  upsertSignalEvidenceLineageBatch,
+} from './lib/source-lineage-writer.mjs';
 import {
   extractCareerPageContactPaths,
   toPersistableContactPaths,
@@ -2922,7 +2925,7 @@ function parseInputRecords(rawContent, inputFilePath) {
   );
 }
 
-async function ingestCareerPages({ connectionString, input }) {
+export async function ingestCareerPages({ connectionString, input, persistenceMode = 'batch' }) {
   const client = new Client({
     connectionString,
     connectionTimeoutMillis: dbConnectionTimeoutMillis,
@@ -2940,39 +2943,57 @@ async function ingestCareerPages({ connectionString, input }) {
   try {
     await client.query('BEGIN');
 
-    for (const record of input.normalizedRecords) {
-      const orgUpsertResult = await upsertOrgSourceRef(client, record);
-      orgUpsertCount += orgUpsertResult.insertedOrg ? 1 : 0;
+    if (persistenceMode === 'legacy') {
+      for (const record of input.normalizedRecords) {
+        const orgUpsertResult = await upsertOrgSourceRef(client, record);
+        orgUpsertCount += orgUpsertResult.insertedOrg ? 1 : 0;
+        const lineage = await upsertSignalEvidenceLineage(
+          client,
+          buildCareerLineageInput(record, orgUpsertResult),
+        );
+        signalUpsertCount += lineage.signalUpsertCount;
+        evidenceUpsertCount += lineage.evidenceUpsertCount;
+        evidenceCreatedCount += lineage.evidenceCreatedCount;
+        lineageCreatedCount += lineage.lineageCreatedCount;
+        const familyStats = familyIngestionStats[record.healthFamily] ??= {
+          signalUpsertCount: 0,
+          evidenceCreatedCount: 0,
+        };
+        familyStats.signalUpsertCount += lineage.signalUpsertCount;
+        familyStats.evidenceCreatedCount += lineage.evidenceCreatedCount;
+      }
+    } else if (persistenceMode === 'batch') {
+      const recordsByOrganization = new Map();
+      for (const record of input.normalizedRecords) {
+        const identityKey = JSON.stringify([
+          record.sourceId,
+          record.primarySourceKey,
+          [...record.orgSourceKeys].sort(),
+          [...record.orgSourceAliasKeys].sort(),
+          record.companyDomain,
+        ]);
+        const group = recordsByOrganization.get(identityKey) ?? [];
+        group.push(record);
+        recordsByOrganization.set(identityKey, group);
+      }
 
-      const lineage = await upsertSignalEvidenceLineage(client, {
-        orgId: orgUpsertResult.orgId,
-        signalType: 'job_posting',
-        source: record.sourceId,
-        sourceFamily: 'company-owned-career',
-        externalId: record.signalExternalId,
-        headline: record.jobTitle,
-        summary: buildSignalSummary(record),
-        sourceUrl: record.jobPostingUrl,
-        publishedAt: record.occurredAt,
-        normalizedAt: record.fetchedAt,
-        payload: buildSignalPayload(record),
-        sourceRecordType: record.sourceRecordType,
-        evidenceTier: 'direct',
-        extractionMethod: record.extractionMethod,
-        organizationResolutionReason: orgUpsertResult.resolutionReason,
-      });
+      const lineageInputs = [];
+      for (const records of recordsByOrganization.values()) {
+        const orgUpsertResult = await upsertOrgSourceRef(client, records[0]);
+        orgUpsertCount += orgUpsertResult.insertedOrg ? 1 : 0;
+        for (const record of records) {
+          lineageInputs.push(buildCareerLineageInput(record, orgUpsertResult));
+        }
+      }
 
-      signalUpsertCount += lineage.signalUpsertCount;
-      evidenceUpsertCount += lineage.evidenceUpsertCount;
-      evidenceCreatedCount += lineage.evidenceCreatedCount;
-      lineageCreatedCount += lineage.lineageCreatedCount;
-      const family = record.healthFamily;
-      const familyStats = familyIngestionStats[family] ??= {
-        signalUpsertCount: 0,
-        evidenceCreatedCount: 0,
-      };
-      familyStats.signalUpsertCount += lineage.signalUpsertCount;
-      familyStats.evidenceCreatedCount += lineage.evidenceCreatedCount;
+      const lineage = await upsertSignalEvidenceLineageBatch(client, lineageInputs);
+      signalUpsertCount = lineage.signalUpsertCount;
+      evidenceUpsertCount = lineage.evidenceUpsertCount;
+      evidenceCreatedCount = lineage.evidenceCreatedCount;
+      lineageCreatedCount = lineage.lineageCreatedCount;
+      Object.assign(familyIngestionStats, lineage.familyIngestionStats ?? {});
+    } else {
+      throw new Error(`Unsupported career-pages persistence mode: ${persistenceMode}`);
     }
 
     await client.query('COMMIT');
@@ -3340,6 +3361,27 @@ function buildIngestSummary(input, stats) {
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
     health: buildHealthForInput(input, stats),
+  };
+}
+
+function buildCareerLineageInput(record, orgUpsertResult) {
+  return {
+    orgId: orgUpsertResult.orgId,
+    signalType: 'job_posting',
+    source: record.sourceId,
+    sourceFamily: 'company-owned-career',
+    externalId: record.signalExternalId,
+    headline: record.jobTitle,
+    summary: buildSignalSummary(record),
+    sourceUrl: record.jobPostingUrl,
+    publishedAt: record.occurredAt,
+    normalizedAt: record.fetchedAt,
+    payload: buildSignalPayload(record),
+    sourceRecordType: record.sourceRecordType,
+    evidenceTier: 'direct',
+    extractionMethod: record.extractionMethod,
+    organizationResolutionReason: orgUpsertResult.resolutionReason,
+    healthFamily: record.healthFamily,
   };
 }
 

@@ -201,6 +201,7 @@
     "verify:career-pages:russian-ats-live-db": "node packages/db/scripts/run-source-live-db-verifier.mjs russian-ats",
     "verify:career-pages:russian-ats-fixtures": "node packages/db/scripts/verify-russian-ats-fixtures-smoke.mjs",
     "verify:career-pages:ingest": "node packages/db/scripts/verify-career-pages-ingest.mjs",
+    "verify:career-pages:persistence-benchmark": "node packages/db/scripts/run-career-pages-persistence-benchmark.mjs",
     "verify:career-pages:html-card-fallback": "node packages/db/scripts/verify-career-pages-html-card-fallback-smoke.mjs",
     "verify:digest:feedback": "node packages/db/scripts/verify-digest-feedback-smoke.mjs",
     "verify:digest:selection": "node packages/db/scripts/verify-digest-selection-smoke.mjs",

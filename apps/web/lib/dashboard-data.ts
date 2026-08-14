@@ -9,6 +9,7 @@ import { getPool } from "./db";
 import { getPool as getSharedPool } from "./db-pool";
 import { getEffectiveEntitlement, type EffectiveEntitlement } from "./entitlements";
 import { getSourceRegistry, type SourceId } from "./sources/source-registry";
+import { getSourceSchedule } from "./sources/source-schedules";
 import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem } from "./leads-data";
 import { listClientProfiles, resolveHiringMode } from "./clientProfiles";
 
@@ -53,7 +54,8 @@ export interface SourceHealth {
   recordsProcessed24h?: number;
   recordsProcessed7d?: number;
   errors: number;
-  status: "excellent" | "good" | "warning" | "critical";
+  status: "excellent" | "good" | "warning" | "critical" | "inactive";
+  expectedRefreshIntervalSeconds?: number;
   lastSuccessfulFetch?: string;
   lastSuccessfulNormalization?: string;
   duplicates?: number;
@@ -230,6 +232,7 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
       records_accepted_1h: string; records_accepted_24h: string; records_accepted_7d: string;
       duplicate_records: string; organization_resolution_rejects: string; blocked_count: string;
       rate_limited_count: string; extraction_methods: Record<string, number>; last_latency_ms: number; consecutive_failures: number;
+      scheduler_outcome: string | null;
     }>(`
       WITH observation_windows AS (
         SELECT source_id,
@@ -246,7 +249,8 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
         WHERE completed_at >= NOW() - INTERVAL '7 days'
         GROUP BY source_id
       )
-      SELECT health.source_id, health.last_attempt_at::TEXT,
+      SELECT COALESCE(health.source_id, scheduler.source_id) AS source_id,
+        health.last_attempt_at::TEXT,
         health.last_successful_fetch_at::TEXT,
         health.last_successful_normalization_at::TEXT,
         health.records_fetched::TEXT, health.records_accepted::TEXT,
@@ -257,9 +261,12 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
         health.organization_resolution_rejects::TEXT,
         health.blocked_count::TEXT, health.rate_limited_count::TEXT,
         health.extraction_methods, health.last_latency_ms,
-        health.consecutive_failures
+        health.consecutive_failures,
+        scheduler.last_scheduler_outcome AS scheduler_outcome
       FROM source_health_state health
-      LEFT JOIN observation_windows windows USING (source_id)
+      FULL OUTER JOIN source_scheduler_state scheduler USING (source_id)
+      LEFT JOIN observation_windows windows
+        ON windows.source_id = COALESCE(health.source_id, scheduler.source_id)
     `);
 
     // Build a lookup from the query result
@@ -268,25 +275,34 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
     );
 
     return registry.map((src) => {
-      const stats = statsBySource.get(src.id);
+      const schedule = getSourceSchedule(src.id as SourceId);
+      const stats = statsBySource.get(schedule.healthSourceId ?? src.id);
+      const schedulerStats = statsBySource.get(src.id);
       const records = parseInt(stats?.records_accepted ?? "0", 10);
-      const lastRun = stats?.last_attempt_at ?? "";
-      const syncAgeMs = stats?.last_attempt_at
-        ? Date.now() - new Date(stats.last_attempt_at).getTime()
+      const successfulTimestamps = [
+        stats?.last_successful_fetch_at,
+        stats?.last_successful_normalization_at,
+      ].filter((value): value is string => Boolean(value));
+      const lastRun = successfulTimestamps.sort((a, b) =>
+        new Date(b).getTime() - new Date(a).getTime())[0] ?? "";
+      const syncAgeMs = lastRun
+        ? Math.max(0, Date.now() - new Date(lastRun).getTime())
         : Infinity;
+      const cadenceRatio = syncAgeMs / schedule.expectedRefreshIntervalMs;
+      const credentialGated = schedulerStats?.scheduler_outcome === "credential_gated";
 
-      // Compute overall health for this source (0-100)
-      let overall = 100;
-      // Penalty for stale sync: <1h → 100, 1-6h → 80, 6-24h → 50, 24h+ → 20
-      if (syncAgeMs > 24 * 60 * 60 * 1000) overall = 20;
-      else if (syncAgeMs > 6 * 60 * 60 * 1000) overall = 50;
-      else if (syncAgeMs > 60 * 60 * 1000) overall = 80;
-      // Penalty for no records
-      if (records === 0 && syncAgeMs > 60 * 60 * 1000) overall -= 20;
+      // Freshness is relative to the declared cadence; a successful
+      // expected-zero run remains healthy because volume is not availability.
+      let overall = credentialGated ? 0
+        : cadenceRatio <= 1 ? 100
+        : cadenceRatio <= 1.5 ? 80
+        : cadenceRatio <= 2.5 ? 50
+        : 20;
       overall -= Math.min(60, Number(stats?.consecutive_failures ?? 0) * 20);
       overall = Math.max(0, overall);
 
       const status: SourceHealth["status"] =
+        credentialGated ? "inactive" :
         overall >= 80 ? "excellent" :
         overall >= 60 ? "good" :
         overall >= 40 ? "warning" :
@@ -312,6 +328,7 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
         extractionMethods: stats?.extraction_methods ?? {},
         latencyMs: Number(stats?.last_latency_ms ?? 0),
         consecutiveFailures: Number(stats?.consecutive_failures ?? 0),
+        expectedRefreshIntervalSeconds: Math.round(schedule.expectedRefreshIntervalMs / 1000),
       };
     });
   } catch {

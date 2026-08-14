@@ -1,5 +1,5 @@
 export const EXPECTED_LATEST_MIGRATION =
-  '20260814030000_add_source_temporal_health'
+  '20260814050000_add_source_scheduler_state'
 
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/
 
