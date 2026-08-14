@@ -49,6 +49,9 @@ export interface SourceHealth {
   overall: number;
   lastRun: string;
   recordsProcessed: number;
+  recordsProcessed1h?: number;
+  recordsProcessed24h?: number;
+  recordsProcessed7d?: number;
   errors: number;
   status: "excellent" | "good" | "warning" | "critical";
   lastSuccessfulFetch?: string;
@@ -224,14 +227,39 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
     const statsResult = await pool.query<{
       source_id: string; last_attempt_at: string; last_successful_fetch_at: string | null;
       last_successful_normalization_at: string | null; records_fetched: string; records_accepted: string;
+      records_accepted_1h: string; records_accepted_24h: string; records_accepted_7d: string;
       duplicate_records: string; organization_resolution_rejects: string; blocked_count: string;
       rate_limited_count: string; extraction_methods: Record<string, number>; last_latency_ms: number; consecutive_failures: number;
     }>(`
-      SELECT source_id, last_attempt_at::TEXT, last_successful_fetch_at::TEXT,
-        last_successful_normalization_at::TEXT, records_fetched::TEXT, records_accepted::TEXT,
-        duplicate_records::TEXT, organization_resolution_rejects::TEXT, blocked_count::TEXT,
-        rate_limited_count::TEXT, extraction_methods, last_latency_ms, consecutive_failures
-      FROM source_health_state
+      WITH observation_windows AS (
+        SELECT source_id,
+          COALESCE(SUM(records_accepted) FILTER (
+            WHERE completed_at >= NOW() - INTERVAL '1 hour'
+          ), 0)::TEXT AS records_accepted_1h,
+          COALESCE(SUM(records_accepted) FILTER (
+            WHERE completed_at >= NOW() - INTERVAL '24 hours'
+          ), 0)::TEXT AS records_accepted_24h,
+          COALESCE(SUM(records_accepted) FILTER (
+            WHERE completed_at >= NOW() - INTERVAL '7 days'
+          ), 0)::TEXT AS records_accepted_7d
+        FROM source_run_observations
+        WHERE completed_at >= NOW() - INTERVAL '7 days'
+        GROUP BY source_id
+      )
+      SELECT health.source_id, health.last_attempt_at::TEXT,
+        health.last_successful_fetch_at::TEXT,
+        health.last_successful_normalization_at::TEXT,
+        health.records_fetched::TEXT, health.records_accepted::TEXT,
+        COALESCE(windows.records_accepted_1h, '0') AS records_accepted_1h,
+        COALESCE(windows.records_accepted_24h, '0') AS records_accepted_24h,
+        COALESCE(windows.records_accepted_7d, '0') AS records_accepted_7d,
+        health.duplicate_records::TEXT,
+        health.organization_resolution_rejects::TEXT,
+        health.blocked_count::TEXT, health.rate_limited_count::TEXT,
+        health.extraction_methods, health.last_latency_ms,
+        health.consecutive_failures
+      FROM source_health_state health
+      LEFT JOIN observation_windows windows USING (source_id)
     `);
 
     // Build a lookup from the query result
@@ -270,6 +298,9 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
         overall,
         lastRun,
         recordsProcessed: records,
+        recordsProcessed1h: parseInt(stats?.records_accepted_1h ?? "0", 10),
+        recordsProcessed24h: parseInt(stats?.records_accepted_24h ?? "0", 10),
+        recordsProcessed7d: parseInt(stats?.records_accepted_7d ?? "0", 10),
         errors: Number(stats?.consecutive_failures ?? 0),
         status,
         lastSuccessfulFetch: stats?.last_successful_fetch_at ?? undefined,

@@ -9,12 +9,28 @@ test('builds extraction metrics including ATS modes and classifies outcomes safe
   assert.equal(metrics.latencyMs, 250);
 });
 
+test('tracks fetch and normalization success from the requested action', () => {
+  const input = { recordsReceived: 1, normalizedRecords: [] };
+  const fetch = buildSourceRunMetrics({ sourceId: 'hh', action: 'fetch', startedAt: 100, completedAt: 200, input });
+  const ingest = buildSourceRunMetrics({ sourceId: 'hh', action: 'ingest', startedAt: 100, completedAt: 200, input });
+  const pipeline = buildSourceRunMetrics({ sourceId: 'hh', action: 'pipeline', startedAt: 100, completedAt: 200, input });
+
+  assert.equal(fetch.fetchSucceeded, true);
+  assert.equal(fetch.normalizationSucceeded, false);
+  assert.equal(ingest.fetchSucceeded, false);
+  assert.equal(ingest.normalizationSucceeded, true);
+  assert.equal(pipeline.fetchSucceeded, true);
+  assert.equal(pipeline.normalizationSucceeded, true);
+});
+
 test('persists append-only run and updates consecutive-failure projection', async () => {
   const queries = [];
   await recordSourceRunObservation({ query: async (sql, values) => { queries.push({ sql, values }); } }, buildSourceRunMetrics({ sourceId: 'hh', action: 'fetch', startedAt: 100, completedAt: 200, error: new Error('HTTP 429 rate limited') }));
   assert.equal(queries.length, 2);
   assert.match(queries[0].sql, /INSERT INTO source_run_observations/);
-  assert.match(queries[1].sql, /consecutive_failures=CASE WHEN .*source_health_state\.consecutive_failures \+ 1/);
+  assert.match(queries[1].sql, /consecutive_failures\s*=\s*CASE[\s\S]*source_health_state\.consecutive_failures \+ 1/);
+  assert.match(queries[1].sql, /jsonb_each_text/i);
+  assert.match(queries[1].sql, /sum\(/i);
   assert.equal(queries[0].values.includes('rate_limited'), true);
   assert.equal(queries[0].values.some((v) => String(v).includes('HTTP 429')), false);
 });

@@ -56,7 +56,9 @@ export async function GET(request: NextRequest) {
         ? {
             status: h.status,
             overall: h.overall,
-            recordsLast24h: h.recordsProcessed,
+            recordsLast1h: h.recordsProcessed1h ?? 0,
+            recordsLast24h: h.recordsProcessed24h ?? 0,
+            recordsLast7d: h.recordsProcessed7d ?? 0,
             lastRun: h.lastRun || null,
             lastSuccessfulFetch: h.lastSuccessfulFetch || null,
             lastSuccessfulNormalization: h.lastSuccessfulNormalization || null,
