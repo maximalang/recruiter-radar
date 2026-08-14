@@ -16,6 +16,7 @@ import {
 } from './adapters/company-owned-source-discovery.mjs';
 import { loadEnvFile, normalizeDomain } from './lib/common-utils.mjs';
 import { upsertSignalEvidenceLineage } from './lib/source-lineage-writer.mjs';
+import { resolveSuccessfulIngestZeroReason } from './adapters/rf-source-runtime.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -542,7 +543,7 @@ function buildIngestSummary(input, stats) {
     lineageCreated: stats.lineageCreatedCount,
     discoveredSourceRefs: stats.discoveredSourceRefCount,
     organizationResolutionRejects: stats.organizationResolutionRejects,
-    zeroReason: input.zeroReason ?? undefined,
+    zeroReason: resolveSuccessfulIngestZeroReason(input, stats),
   };
 }
 
@@ -564,7 +565,7 @@ function buildPipelineSummary(input, stats) {
     lineageCreated: stats.lineageCreatedCount,
     discoveredSourceRefs: stats.discoveredSourceRefCount,
     organizationResolutionRejects: stats.organizationResolutionRejects,
-    zeroReason: input.zeroReason ?? undefined,
+    zeroReason: resolveSuccessfulIngestZeroReason(input, stats),
   };
 }
 

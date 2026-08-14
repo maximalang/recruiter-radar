@@ -28,6 +28,11 @@ assert.ok(
   /COUNT\(DISTINCT\s+signals\.id\)\s*>\s*0/i.test(seedsQuery),
   'HAVING clause must require at least one non-career-pages signal',
 );
+assert.ok(
+  /domain_peer\.id\s*<>\s*orgs\.id/i.test(seedsQuery)
+    && /REGEXP_REPLACE\([\s\S]*domain_peer\.domain[\s\S]*REGEXP_REPLACE\([\s\S]*orgs\.domain/i.test(seedsQuery),
+  'auto-discovery must exclude domains with multiple organization owners',
+);
 
 const greenhouseHtml = `
   <html>

@@ -50,6 +50,7 @@ import {
   extractCareerPageContactPaths,
   toPersistableContactPaths,
 } from './lib/career-page-contacts.mjs';
+import { resolveSuccessfulIngestZeroReason } from './adapters/rf-source-runtime.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -141,6 +142,7 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
           lineageCreated: stats.lineageCreatedCount,
           organizationResolutionRejects: stats.organizationResolutionRejects,
           organizationResolutionRejectedTargetKeys: stats.organizationResolutionRejectedTargetKeys,
+          zeroReason: resolveSuccessfulIngestZeroReason(input, stats),
           health,
         },
         null,
@@ -381,6 +383,23 @@ export function buildCareerPagesDiscoverySeedsQuery() {
           ON signals.org_id = orgs.id
          AND signals.source <> 'career-pages'
         WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
+          AND (
+            NULLIF(BTRIM(orgs.domain), '') IS NULL
+            OR NOT EXISTS (
+              SELECT 1
+              FROM orgs AS domain_peer
+              WHERE domain_peer.id <> orgs.id
+                AND REGEXP_REPLACE(
+                  LOWER(BTRIM(domain_peer.domain)),
+                  '^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.',
+                  ''
+                ) = REGEXP_REPLACE(
+                  LOWER(BTRIM(orgs.domain)),
+                  '^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.',
+                  ''
+                )
+            )
+          )
         GROUP BY orgs.id, orgs.name, orgs.domain, orgs.website_url
         HAVING COUNT(DISTINCT signals.id) > 0
         ORDER BY MAX(signals.occurred_at) DESC NULLS LAST, orgs.id DESC
@@ -3400,6 +3419,7 @@ function buildIngestSummary(input, stats) {
     lineageCreated: stats.lineageCreatedCount,
     organizationResolutionRejects: stats.organizationResolutionRejects,
     organizationResolutionRejectedTargetKeys: stats.organizationResolutionRejectedTargetKeys,
+    zeroReason: resolveSuccessfulIngestZeroReason(input, stats),
     health: buildHealthForInput(input, stats),
   };
 }

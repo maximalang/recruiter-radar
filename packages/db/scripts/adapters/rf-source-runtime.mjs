@@ -30,6 +30,16 @@ export { loadEnvFile, normalizeDomain };
 const { Client } = pg;
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
 
+export function resolveSuccessfulIngestZeroReason(input, stats) {
+  if (input?.zeroReason) return input.zeroReason;
+  const normalizedCount = Array.isArray(input?.normalizedRecords) ? input.normalizedRecords.length : 0;
+  const rejectedCount = Math.max(0, Number(stats?.organizationResolutionRejects ?? 0));
+  const acceptedCount = Math.max(0, normalizedCount - rejectedCount);
+  return acceptedCount > 0 && Number(stats?.signalUpsertCount ?? 0) === 0
+    ? 'no-new-signals'
+    : undefined;
+}
+
 export function createStandardSourceRuntime(config) {
   const sourceId = config.sourceId;
 
@@ -296,7 +306,7 @@ export function createStandardSourceRuntime(config) {
       evidenceCreated: stats.evidenceCreatedCount,
       lineageCreated: stats.lineageCreatedCount,
       organizationResolutionRejects: stats.organizationResolutionRejects,
-      zeroReason: input.zeroReason ?? undefined,
+      zeroReason: resolveSuccessfulIngestZeroReason(input, stats),
     };
   }
 
@@ -320,7 +330,7 @@ export function createStandardSourceRuntime(config) {
       evidenceCreated: stats.evidenceCreatedCount,
       lineageCreated: stats.lineageCreatedCount,
       organizationResolutionRejects: stats.organizationResolutionRejects,
-      zeroReason: input.zeroReason ?? undefined,
+      zeroReason: resolveSuccessfulIngestZeroReason(input, stats),
     };
   }
 
