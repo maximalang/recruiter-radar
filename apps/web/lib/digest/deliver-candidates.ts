@@ -4,8 +4,8 @@
  * Used by both the `/api/digest/delivery` route (single profile)
  * and the `/api/cron/daily-radar` pipeline (all active profiles).
  *
- * Idempotent: delivery attempts are claimed with a token and
- * stale processing claims are reclaimed after DELIVERY_STALE_SECONDS.
+ * Idempotent: each channel has a durable claim. Ambiguous processing/terminal
+ * states are surfaced to the operator and are never replayed automatically.
  */
 
 import { getPool, sendBatchDigestForRun } from '@/lib/db'
@@ -17,16 +17,23 @@ import {
   hasActiveNotificationEndpoint,
 } from '@/lib/notification-dispatch'
 import { tryRecordProductEvent } from '@/lib/telemetry'
-import { logError, logEvent, logWarn } from '@/lib/runtime'
+import { isChannelDeliveryFailure } from '@/lib/delivery/channel-state'
+import type { ChannelDeliveryState } from '@/lib/delivery/channel-state'
+import { logEvent, logWarn } from '@/lib/runtime'
 import { randomUUID } from 'node:crypto'
-
-const DELIVERY_STALE_SECONDS = 120
 
 export interface DeliveryCounters {
   sent: number
   failed: number
   skipped: number
-  failures: Array<{ digestCandidateId: number; error: string }>
+  failures: Array<{
+    digestCandidateId: number
+    error: string
+    channel?: string
+    state?: ChannelDeliveryState
+    retryable?: boolean
+    attempt?: number
+  }>
 }
 
 export interface DeliverRunResult {
@@ -34,7 +41,7 @@ export interface DeliverRunResult {
   sent: number
   failed: number
   skipped: number
-  failures: Array<{ digestCandidateId: number; error: string }>
+  failures: DeliveryCounters['failures']
 }
 
 async function recordChannelSuccess(input: {
@@ -83,11 +90,17 @@ function recordDeliveryFailure(
   counters: DeliveryCounters,
   clientProfileId: string,
   channel: string,
+  state: ChannelDeliveryState = 'failed_terminal',
+  attempt = 1,
 ): void {
   counters.failed += 1
   counters.failures.push({
     digestCandidateId: 0,
-    error: `${clientProfileId}: ${channel} delivery failed`,
+    error: `${clientProfileId}: ${channel} (${state}) delivery failed`,
+    channel,
+    state,
+    retryable: state === 'failed_retryable',
+    attempt,
   })
 }
 
@@ -116,8 +129,8 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
 
   try {
     await enrichRunCandidates(runId)
-  } catch (error) {
-    logError('ai.enrichment.pre_delivery_failed', error, { runId })
+  } catch {
+    logWarn('ai.enrichment.pre_delivery_failed', { runId, reasonCode: 'enrichment_failed' })
   }
 
   const profiles = await pool.query<{ client_profile_id: string; candidate_count: number; anchor_candidate_id: string }>(`
@@ -145,100 +158,126 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
     })
 
     const claim = await pool.query<{ id: number; status: string; ownsClaim: boolean }>(`
-      INSERT INTO digest_delivery_attempts (
-        digest_candidate_id, idempotency_key, channel, status, processing_claimed_at, processing_claim_token
+      WITH inserted AS (
+        INSERT INTO digest_delivery_attempts (
+          digest_candidate_id, idempotency_key, channel, status,
+          processing_claimed_at, processing_claim_token
+        )
+        VALUES ($3, $1, 'telegram', 'processing', NOW(), $2)
+        ON CONFLICT (digest_candidate_id, idempotency_key) DO UPDATE SET
+          status = 'processing',
+          attempted_at = NOW(),
+          error_message = NULL,
+          processing_claim_token = EXCLUDED.processing_claim_token
+        WHERE digest_delivery_attempts.status = 'failed_retryable'
+        RETURNING id, status::TEXT AS status, processing_claim_token = $2 AS "ownsClaim"
       )
-      VALUES ($4, $1, 'telegram', 'processing', NOW(), $2)
-      ON CONFLICT (digest_candidate_id, idempotency_key)
-      DO UPDATE SET
-        processing_claimed_at = CASE
-          WHEN digest_delivery_attempts.status = 'failed'
-            OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($3::int * INTERVAL '1 second'))
-          THEN NOW() ELSE digest_delivery_attempts.processing_claimed_at END,
-        processing_claim_token = CASE
-          WHEN digest_delivery_attempts.status = 'failed'
-            OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($3::int * INTERVAL '1 second'))
-          THEN EXCLUDED.processing_claim_token ELSE digest_delivery_attempts.processing_claim_token END,
-        status = CASE
-          WHEN digest_delivery_attempts.status = 'failed'
-            OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($3::int * INTERVAL '1 second'))
-          THEN 'processing' ELSE digest_delivery_attempts.status END
-      RETURNING id, status::TEXT AS status, processing_claim_token = $2 AS "ownsClaim"
-    `, [idempotencyKey, claimToken, DELIVERY_STALE_SECONDS, anchorCandidateId])
+      SELECT id, status, "ownsClaim" FROM inserted
+      UNION ALL
+      SELECT id, status::TEXT AS status, false AS "ownsClaim"
+      FROM digest_delivery_attempts
+      WHERE digest_candidate_id = $3
+        AND idempotency_key = $1
+        AND NOT EXISTS (SELECT 1 FROM inserted)
+      LIMIT 1
+    `, [idempotencyKey, claimToken, anchorCandidateId])
 
     const attempt = claim.rows[0]
-    if (attempt.status === 'sent' || !attempt.ownsClaim) {
+    const telegramAlreadyDelivered = attempt.status === 'sent'
+      || attempt.status === 'skipped_not_configured'
+    if (telegramAlreadyDelivered) {
       counters.skipped += 1
-      continue
+    } else if (!attempt.ownsClaim) {
+      recordDeliveryFailure(
+        counters,
+        clientProfileId,
+        'telegram',
+        attempt.status === 'processing' ? 'processing' : 'failed_terminal',
+      )
     }
 
-    try {
-      const customTelegram = await hasActiveNotificationEndpoint({
-        clientProfileId,
-        provider: 'telegram',
-      })
-
-      let telegramOk = false
-      let telegramSkipped = false
-      let telegramError: string | null = null
-      if (customTelegram) {
-        const customResult = await dispatchDigestNotifications({
-          runId,
+    if (attempt.ownsClaim && !telegramAlreadyDelivered) {
+      try {
+        const customTelegram = await hasActiveNotificationEndpoint({
           clientProfileId,
-          providers: ['telegram'],
+          provider: 'telegram',
         })
 
-        telegramOk = customResult.failed === 0 && (customResult.sent > 0 || customResult.skipped > 0)
-        telegramError = customResult.errors.join('; ') || null
+        let telegramOk = false
+        let telegramSkipped = false
+        let telegramError: string | null = null
+        let telegramFailureState: ChannelDeliveryState = 'failed_terminal'
+        if (customTelegram) {
+          const customResult = await dispatchDigestNotifications({
+            runId,
+            clientProfileId,
+            providers: ['telegram'],
+          })
 
-        if (!telegramOk && customResult.sent === 0) {
-          const legacyResult = await sendBatchDigestForRun({ runId, clientProfileId })
-          telegramOk = legacyResult.ok
-          telegramError = legacyResult.ok
-            ? null
-            : [telegramError, legacyResult.error].filter(Boolean).join('; ')
-        }
-      } else {
-        const legacyResult = await sendBatchDigestForRun({ runId, clientProfileId })
-        if (legacyResult.ok) {
-          telegramOk = true
+          telegramOk = customResult.failed === 0 && (customResult.sent > 0 || customResult.skipped > 0)
+          telegramError = customResult.failed > 0 ? 'custom_notification_delivery_failed' : null
+          telegramFailureState = customResult.sent === 0
+            && (customResult.retryableFailed ?? 0) > 0
+            && (customResult.terminalFailed ?? 0) === 0
+            && (customResult.processing ?? 0) === 0
+            ? 'failed_retryable'
+            : 'failed_terminal'
         } else {
-          telegramSkipped = legacyResult.error === 'Client profile has no linked Telegram chat.'
-          telegramOk = telegramSkipped
-          telegramError = telegramSkipped ? null : legacyResult.error
+          const legacyResult = await sendBatchDigestForRun({ runId, clientProfileId })
+          if (legacyResult.ok) {
+            telegramOk = true
+          } else {
+            telegramSkipped = legacyResult.error === 'Client profile has no linked Telegram chat.'
+            telegramOk = telegramSkipped
+            telegramError = telegramSkipped ? null : 'legacy_telegram_delivery_failed'
+          }
         }
-      }
 
-      if (telegramOk) {
+        if (telegramOk) {
+          const finalized = await pool.query(
+            `UPDATE digest_delivery_attempts
+             SET status = $3, error_message = NULL, processing_claim_token = NULL
+             WHERE id = $1 AND processing_claim_token = $2 AND status = 'processing'`,
+            [attempt.id, claimToken, telegramSkipped ? 'skipped_not_configured' : 'sent']
+          )
+          if (finalized.rowCount !== 1) {
+            throw new Error('Telegram delivery ownership was lost before finalization.')
+          }
+          if (telegramSkipped) counters.skipped += 1
+          else counters.sent += 1
+          logEvent(telegramSkipped ? 'digest.telegram_skipped' : 'digest.telegram_sent', {
+            runId,
+            clientProfileId,
+          })
+        } else {
+          const error = telegramError ?? 'telegram_delivery_failed'
+          await pool.query(
+            `UPDATE digest_delivery_attempts
+             SET status = $4, error_message = LEFT($3, 1000), processing_claim_token = NULL
+             WHERE id = $1 AND processing_claim_token = $2 AND status = 'processing'`,
+            [attempt.id, claimToken, error, telegramFailureState]
+          )
+          counters.failed += 1
+          counters.failures.push({
+            digestCandidateId: 0,
+            error: `${clientProfileId}: ${error}`,
+            channel: 'telegram',
+            state: telegramFailureState,
+            retryable: telegramFailureState === 'failed_retryable',
+            attempt: 1,
+          })
+          logWarn('digest.telegram_failed', { runId, clientProfileId, reasonCode: 'send_failed' })
+        }
+      } catch {
         await pool.query(
-          `UPDATE digest_delivery_attempts SET status = 'sent', error_message = NULL WHERE id = $1 AND processing_claim_token = $2`,
-          [attempt.id, claimToken]
+          `UPDATE digest_delivery_attempts
+           SET status = 'failed_terminal', error_message = $3, processing_claim_token = NULL
+           WHERE id = $1 AND processing_claim_token = $2 AND status = 'processing'`,
+          [attempt.id, claimToken, 'telegram_delivery_exception']
         )
-        if (telegramSkipped) counters.skipped += 1
-        else counters.sent += 1
-        logEvent(telegramSkipped ? 'digest.telegram_skipped' : 'digest.telegram_sent', {
-          runId,
-          clientProfileId,
-        })
-      } else {
-        const error = telegramError ?? 'Telegram delivery failed.'
-        await pool.query(
-          `UPDATE digest_delivery_attempts SET status = 'failed', error_message = LEFT($3, 1000) WHERE id = $1 AND processing_claim_token = $2`,
-          [attempt.id, claimToken, error]
-        )
-        counters.failed += 1
-        counters.failures.push({ digestCandidateId: 0, error: `${clientProfileId}: ${error}` })
-        logWarn('digest.telegram_failed', { runId, clientProfileId, reasonCode: 'send_failed' })
+        recordDeliveryFailure(counters, clientProfileId, 'telegram', 'failed_terminal')
+        logWarn('digest.telegram_failed', { runId, clientProfileId, reasonCode: 'delivery_exception' })
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Delivery exception.'
-      await pool.query(
-        `UPDATE digest_delivery_attempts SET status = 'failed', error_message = LEFT($3, 1000) WHERE id = $1 AND processing_claim_token = $2`,
-        [attempt.id, claimToken, message]
-      )
-      counters.failed += 1
-      counters.failures.push({ digestCandidateId: 0, error: `${clientProfileId}: ${message}` })
-      logError('digest.telegram_failed', error, { runId, clientProfileId })
     }
 
     try {
@@ -251,6 +290,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
         const metadata = {
           sent: pushResult.result.sent,
           failed: pushResult.result.failed,
+          ambiguous: pushResult.result.ambiguous,
           pruned: pushResult.result.pruned,
         }
         if (pushResult.result.sent > 0) {
@@ -262,21 +302,45 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
           })
           counters.sent += 1
         }
-        if (pushResult.result.failed > 0 || pushResult.result.sent === 0) {
-          await recordChannelFailure({
-            runId,
-            clientProfileId,
-            provider: 'web_push',
-            reason: pushResult.result.sent > 0 ? 'partial_failure' : 'send_failed',
-            metadata,
-          })
-          recordDeliveryFailure(counters, clientProfileId, 'web_push')
-        }
+      } else if (isChannelDeliveryFailure(pushResult.state)) {
+        const metadata = pushResult.result
+          ? {
+              sent: pushResult.result.sent,
+              failed: pushResult.result.failed,
+              ambiguous: pushResult.result.ambiguous,
+              pruned: pushResult.result.pruned,
+            }
+          : undefined
+        await recordChannelFailure({
+          runId,
+          clientProfileId,
+          provider: 'web_push',
+          reason: pushResult.state,
+          metadata,
+        })
+        recordDeliveryFailure(
+          counters,
+          clientProfileId,
+          'web_push',
+          pushResult.state,
+          pushResult.attempt ?? 1,
+        )
+        logWarn('digest.channel_failed', {
+          runId,
+          clientProfileId,
+          channel: 'web_push',
+          state: pushResult.state,
+          retryable: pushResult.state === 'failed_retryable',
+          attempt: pushResult.attempt ?? 0,
+          reasonCode: 'channel_state',
+        })
+      } else if (pushResult.state === 'already_successfully_delivered') {
+        counters.skipped += 1
       }
-    } catch (error) {
-      logError('webpush.notify_run_failed', error, { runId, clientProfileId })
+    } catch {
+      logWarn('webpush.notify_run_failed', { runId, clientProfileId, reasonCode: 'channel_exception' })
       await recordChannelFailure({ runId, clientProfileId, provider: 'web_push', reason: 'exception' })
-      recordDeliveryFailure(counters, clientProfileId, 'web_push')
+      recordDeliveryFailure(counters, clientProfileId, 'web_push', 'failed_terminal')
     }
 
     try {
@@ -289,14 +353,25 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
           metadata: { leadCount: emailResult.leadCount },
         })
         counters.sent += 1
-      } else if (emailResult.reason === 'send_failed') {
-        await recordChannelFailure({ runId, clientProfileId, provider: 'email', reason: emailResult.reason })
-        recordDeliveryFailure(counters, clientProfileId, 'email')
+      } else if (isChannelDeliveryFailure(emailResult.state)) {
+        await recordChannelFailure({ runId, clientProfileId, provider: 'email', reason: emailResult.state })
+        recordDeliveryFailure(counters, clientProfileId, 'email', emailResult.state)
+        logWarn('digest.channel_failed', {
+          runId,
+          clientProfileId,
+          channel: 'email',
+          state: emailResult.state,
+          retryable: emailResult.state === 'failed_retryable',
+          attempt: 1,
+          reasonCode: 'channel_state',
+        })
+      } else if (emailResult.state === 'already_successfully_delivered') {
+        counters.skipped += 1
       }
-    } catch (error) {
-      logError('email.digest_send_exception', error, { runId, clientProfileId })
+    } catch {
+      logWarn('email.digest_send_exception', { runId, clientProfileId, reasonCode: 'channel_exception' })
       await recordChannelFailure({ runId, clientProfileId, provider: 'email', reason: 'exception' })
-      recordDeliveryFailure(counters, clientProfileId, 'email')
+      recordDeliveryFailure(counters, clientProfileId, 'email', 'failed_terminal')
     }
 
     try {
@@ -312,16 +387,30 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
         counters.failures.push({
           digestCandidateId: 0,
           error: `${clientProfileId}: additional notification delivery failed (${additional.failed})`,
+          channel: 'notification_endpoint',
+          state: (additional.terminalFailed ?? 0) > 0
+            ? 'failed_terminal'
+            : (additional.processing ?? 0) > 0 ? 'processing' : 'failed_retryable',
+          retryable: (additional.terminalFailed ?? 0) === 0 && (additional.processing ?? 0) === 0,
+          attempt: 1,
         })
-        logError('notifications.additional_delivery_failed', new Error(additional.errors.join('; ')), {
+        logWarn('notifications.additional_delivery_failed', {
           runId,
           clientProfileId,
           failed: additional.failed,
+          terminalFailed: additional.terminalFailed ?? 0,
+          retryableFailed: additional.retryableFailed ?? 0,
+          processing: additional.processing ?? 0,
+          reasonCode: 'channel_delivery_failed',
         })
       }
-    } catch (error) {
-      recordDeliveryFailure(counters, clientProfileId, 'additional notification')
-      logError('notifications.additional_delivery_exception', error, { runId, clientProfileId })
+    } catch {
+      recordDeliveryFailure(counters, clientProfileId, 'additional notification', 'failed_terminal')
+      logWarn('notifications.additional_delivery_exception', {
+        runId,
+        clientProfileId,
+        reasonCode: 'channel_exception',
+      })
     }
   }
 

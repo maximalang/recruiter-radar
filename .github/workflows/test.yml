@@ -91,6 +91,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run db:validate
+      - name: Verify daily radar and delivery state migration lifecycle
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+          DAILY_RADAR_DB_TEST_ACK: isolated
+        run: npm run test:daily-radar:db
       - name: Benchmark career-page set-based persistence
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test

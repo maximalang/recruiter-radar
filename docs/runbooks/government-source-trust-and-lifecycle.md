@@ -86,23 +86,19 @@ company INN, OGRN, name and domain fields are rejected.
 npm.cmd run source:sync:rosstat-open-data
 ```
 
-### Host schedule
+### GitHub Actions schedule
 
 Run refreshes outside `daily-radar` because EIS rate limiting and government
 bulk archives must not extend the delivery request. The production image
 contains all four sync entrypoints. Mount a persistent, non-root-writable source
-volume, set `SOURCE_SNAPSHOT_ROOT` inside `web`, and install these host cron
-entries (server local time):
-
-```cron
-5 0 * * * /opt/recruiter-radar/scripts/deploy/run-government-source-sync.sh government-procurement
-15 1 * * 0 /opt/recruiter-radar/scripts/deploy/run-government-source-sync.sh rosstat-open-data
-```
+volume and set `SOURCE_SNAPSHOT_ROOT` inside `web`. The only repository-authorized
+clock is `.github/workflows/government-source-clocks.yml`; it invokes the allowlisted
+host runner over SSH. Do not install a second host cron for these sources.
 
 The runner uses one non-blocking `flock`, verifies `DATABASE_URL`, the mounted
 snapshot root and source ID, and executes inside the non-root `web` container.
 An overlap fails closed instead of running concurrent activation. Cron
-installation and the persistent volume are deployment operations; repository
+workflow activation and the persistent volume are deployment operations; repository
 delivery alone does not prove that production scheduling is enabled.
 
 The web image stores mutable ETag, cooldown and incremental-crawl state under
@@ -111,19 +107,19 @@ The web image stores mutable ETag, cooldown and incremental-crawl state under
 `SOURCE_SNAPSHOT_ROOT` in the image: an explicit, read-write persistent mount is the
 activation boundary for government snapshots.
 
-After installing the two cron entries, run the fail-closed production preflight:
+After configuring the persistent mounts and GitHub workflow secrets, run the fail-closed production preflight:
 
 ```bash
 /opt/recruiter-radar/scripts/deploy/verify-source-production-runtime.sh
 ```
 
 It verifies that both state roots are covered by read-write Docker mounts, the exact
-government cron cadences are installed, all 27 dynamically launched source entrypoints
+repository-controlled clock ownership is preserved, all 27 dynamically launched source entrypoints
 and dependencies exist, Chromium and the CA bundles work, the latest source migrations
 and health/lifecycle tables exist, and the authenticated Source Status API returns the
 canonical registry. The deployment workflow runs the same preflight before disarming its
 rollback guard. Repository CI runs an isolated final-image equivalent, but that is not
-evidence that production cron or mounts are currently active.
+evidence that GitHub schedules or mounts are currently active.
 
 The 2026-08-13 controlled live proof activated 50 EIS contract records and 96
 Rosstat aggregates in a disposable snapshot root. A fresh isolated

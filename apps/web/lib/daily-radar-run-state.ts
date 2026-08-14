@@ -1,8 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { getPool } from '@/lib/db-pool'
 
-export type DailyRadarRunStatus = 'completed' | 'partial' | 'failed'
-export type DailyRadarProfileStatus = 'completed' | 'failed' | 'skipped'
+export type DailyRadarRunStatus = 'completed' | 'partial' | 'failed' | 'terminal'
+export type DailyRadarProfileStatus = 'completed' | 'failed_retryable' | 'failed_terminal' | 'skipped'
+
+export interface DailyRadarRunSummary {
+  profilesTotal: number
+  profilesCompleted: number
+  profilesFailed: number
+  profilesSkipped: number
+  terminalReason?: string | null
+}
 
 export interface DailyRadarLease {
   acquired: boolean
@@ -10,7 +18,7 @@ export interface DailyRadarLease {
   leaseId: string
   attemptCount: number
   persisted: boolean
-  reason?: 'already-completed' | 'retry-backoff' | 'attempt-limit' | 'already-running'
+  reason?: 'already-completed' | 'retry-backoff' | 'attempt-limit' | 'already-running' | 'terminal'
   nextRetryAt?: string | null
 }
 
@@ -29,6 +37,16 @@ const STALE_RUNNING_INTERVAL = '2 hours'
 const MAX_DAILY_ATTEMPTS = 3
 const MAX_PROFILE_ATTEMPTS = 3
 const RETRY_BASE_SECONDS = 30
+
+export function dailyRadarNextRetryAt(
+  lease: Pick<DailyRadarLease, 'attemptCount'>,
+  status: DailyRadarRunStatus,
+  now: Date,
+): string | null {
+  if (!['partial', 'failed'].includes(status) || lease.attemptCount >= MAX_DAILY_ATTEMPTS) return null
+  const retrySeconds = RETRY_BASE_SECONDS * (2 ** Math.max(0, lease.attemptCount - 1))
+  return new Date(now.getTime() + retrySeconds * 1000).toISOString()
+}
 
 export async function claimDailyRadarRun(now = new Date()): Promise<DailyRadarLease> {
   const runDate = now.toISOString().slice(0, 10)
@@ -96,6 +114,8 @@ export async function claimDailyRadarRun(now = new Date()): Promise<DailyRadarLe
   const current = state.rows[0]
   const reason = current?.status === 'completed'
     ? 'already-completed'
+    : current?.status === 'terminal'
+      ? 'terminal'
     : (current?.attemptCount ?? 0) >= MAX_DAILY_ATTEMPTS
       ? 'attempt-limit'
       : current?.status === 'running'
@@ -169,11 +189,18 @@ export async function finishDailyRadarRun(
   lease: DailyRadarLease,
   status: DailyRadarRunStatus,
   now = new Date(),
+  summary?: DailyRadarRunSummary,
 ): Promise<boolean> {
   if (!lease.persisted || !lease.acquired) return true
   const pool = getPool()
   if (!pool) return false
-  const retrySeconds = RETRY_BASE_SECONDS * (2 ** Math.max(0, lease.attemptCount - 1))
+  const nextRetryAt = dailyRadarNextRetryAt(lease, status, now)
+  const persistedStatus = status !== 'completed' && lease.attemptCount >= MAX_DAILY_ATTEMPTS
+    ? 'terminal'
+    : status
+  const terminalReason = persistedStatus === 'terminal'
+    ? summary?.terminalReason ?? (lease.attemptCount >= MAX_DAILY_ATTEMPTS ? 'daily_attempt_limit_reached' : 'terminal_profile_delivery')
+    : null
   const result = await pool.query(
     `UPDATE daily_radar_run_state
      SET status = $3,
@@ -183,6 +210,11 @@ export async function finishDailyRadarRun(
              THEN $4::TIMESTAMPTZ + ($6::INT * INTERVAL '1 second')
            ELSE NULL
          END,
+         profiles_total = $7::INT,
+         profiles_completed = $8::INT,
+         profiles_failed = $9::INT,
+         profiles_skipped = $10::INT,
+         terminal_reason = $11,
          updated_at = $4::TIMESTAMPTZ
      WHERE run_date = $1::DATE
        AND lease_id = $2::UUID
@@ -190,10 +222,15 @@ export async function finishDailyRadarRun(
     [
       lease.runDate,
       lease.leaseId,
-      status,
+      persistedStatus,
       now.toISOString(),
       MAX_DAILY_ATTEMPTS,
-      retrySeconds,
+      nextRetryAt === null ? 0 : Math.max(0, Math.round((Date.parse(nextRetryAt) - now.getTime()) / 1000)),
+      summary?.profilesTotal ?? 0,
+      summary?.profilesCompleted ?? 0,
+      summary?.profilesFailed ?? 0,
+      summary?.profilesSkipped ?? 0,
+      terminalReason,
     ],
   )
   return result.rowCount === 1
@@ -225,7 +262,7 @@ export async function claimDailyRadarProfile(
       leaseId: lease.leaseId,
       attemptCount: 0,
       digestRunId: null,
-      status: 'failed',
+      status: 'failed_terminal',
       persisted: true,
     }
   }
@@ -254,7 +291,7 @@ export async function claimDailyRadarProfile(
        attempt_count = daily_radar_profile_run_state.attempt_count + 1,
        last_error = NULL,
        updated_at = EXCLUDED.updated_at
-     WHERE daily_radar_profile_run_state.status = 'failed'
+     WHERE daily_radar_profile_run_state.status = 'failed_retryable'
        AND daily_radar_profile_run_state.attempt_count < $5
        AND EXISTS (
          SELECT 1 FROM daily_radar_run_state
@@ -303,7 +340,7 @@ export async function claimDailyRadarProfile(
     leaseId: lease.leaseId,
     attemptCount: row?.attemptCount ?? 0,
     digestRunId: row?.digestRunId ?? null,
-    status: row?.status ?? 'failed',
+    status: row?.status ?? 'failed_terminal',
     persisted: true,
   }
 }
@@ -341,6 +378,14 @@ export async function finishDailyRadarProfile(
   if (!profileLease.persisted || !profileLease.acquired) return true
   const pool = getPool()
   if (!pool) return false
+  const persistedStatus = status === 'failed_retryable' && profileLease.attemptCount >= MAX_PROFILE_ATTEMPTS
+    ? 'failed_terminal'
+    : status
+  const persistedError = persistedStatus === 'failed_terminal'
+    && status === 'failed_retryable'
+    && profileLease.attemptCount >= MAX_PROFILE_ATTEMPTS
+    ? 'profile_attempt_limit_reached'
+    : error
   const result = await pool.query(
     `UPDATE daily_radar_profile_run_state
      SET status = $4,
@@ -355,9 +400,9 @@ export async function finishDailyRadarProfile(
       profileLease.runDate,
       profileLease.clientProfileId,
       profileLease.leaseId,
-      status,
+      persistedStatus,
       now.toISOString(),
-      error,
+      persistedError,
     ],
   )
   return result.rowCount === 1

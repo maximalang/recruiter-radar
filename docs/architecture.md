@@ -11,7 +11,7 @@ Recruiter Radar каждый день находит компании с док�
 ## Architecture principles
 
 - **Next.js + PostgreSQL** — product core и единственный владелец бизнес-решений.
-- **VPS cron + product APIs** — production orchestration.
+- **GitHub Actions clocks + product APIs** — production orchestration; PostgreSQL owns eligibility, leases and backoff.
 - **n8n** — не обязательная часть production. Клиент может подключить собственный n8n через signed webhook.
 - **AI** — узкий слой поверх evidence/scoring, не источник истины.
 - **Notification providers** — delivery и feedback transport, не отдельный источник бизнес-логики.

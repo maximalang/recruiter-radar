@@ -52,8 +52,8 @@ describe('deliverCandidatesForRun (batch)', () => {
       discoveryConsidered: 0,
       discoveryDiscovered: 0,
     })
-    mockPush.mockReset().mockResolvedValue({ delivered: false, reason: 'not_configured' })
-    mockEmail.mockReset().mockResolvedValue({ delivered: false, reason: 'not_configured' })
+    mockPush.mockReset().mockResolvedValue({ delivered: false, state: 'skipped_not_configured', reason: 'not_configured' })
+    mockEmail.mockReset().mockResolvedValue({ delivered: false, state: 'skipped_not_configured', reason: 'not_configured' })
     mockHasEndpoint.mockReset().mockResolvedValue(false)
     mockDispatch.mockReset().mockResolvedValue({ sent: 0, failed: 0, skipped: 0, errors: [] })
     mockTelemetry.mockReset().mockResolvedValue(true)
@@ -106,6 +106,39 @@ describe('deliverCandidatesForRun (batch)', () => {
     expect(mockSendBatch).not.toHaveBeenCalled()
   })
 
+  it('keeps processing additive channels when Telegram was already delivered', async () => {
+    const pool = makeMockPool()
+    mockGetPool.mockReturnValue(pool)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ client_profile_id: 'cp-retry', candidate_count: 2, anchor_candidate_id: '211' }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 210, status: 'sent', ownsClaim: false }],
+      rowCount: 1,
+    } as never)
+    mockEmail.mockResolvedValueOnce({ delivered: false, state: 'failed_terminal', reason: 'send_failed' })
+
+    const result = await deliverCandidatesForRun('run-retry')
+
+    expect(mockSendBatch).not.toHaveBeenCalled()
+    expect(mockPush).toHaveBeenCalledWith({
+      clientProfileId: 'cp-retry',
+      digestRunId: 'run-retry',
+      count: 2,
+    })
+    expect(mockEmail).toHaveBeenCalledWith({
+      clientProfileId: 'cp-retry',
+      digestRunId: 'run-retry',
+    })
+    expect(mockDispatch).toHaveBeenCalledWith({
+      runId: 'run-retry',
+      clientProfileId: 'cp-retry',
+      providers: ['vk', 'webhook'],
+    })
+    expect(result).toMatchObject({ ok: false, failed: 1, skipped: 1 })
+  })
+
   it('records a failure when the batch send returns ok:false', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
@@ -124,8 +157,100 @@ describe('deliverCandidatesForRun (batch)', () => {
 
     expect(result.failed).toBe(1)
     expect(result.sent).toBe(0)
-    expect(result.failures[0].error).toContain('Telegram API timeout')
+    expect(result.failures[0]).toMatchObject({
+      channel: 'telegram',
+      state: 'failed_terminal',
+      retryable: false,
+    })
+    expect(result.failures[0].error).toContain('legacy_telegram_delivery_failed')
+    expect(result.failures[0].error).not.toContain('Telegram API timeout')
     expect(result.ok).toBe(false)
+    expect(String(pool.query.mock.calls[2][0])).toContain('SET status = $4')
+    expect(pool.query.mock.calls[2][1]?.[3]).toBe('failed_terminal')
+  })
+
+  it('does not replay a terminal ambiguous Telegram failure', async () => {
+    const pool = makeMockPool()
+    mockGetPool.mockReturnValue(pool)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ client_profile_id: 'cp-terminal', candidate_count: 1, anchor_candidate_id: '351' }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 350, status: 'failed_terminal', ownsClaim: false }],
+      rowCount: 1,
+    } as never)
+
+    const result = await deliverCandidatesForRun('run-terminal')
+
+    expect(result).toMatchObject({ ok: false, sent: 0, failed: 1 })
+    expect(result.failures[0]?.error).toContain('telegram (failed_terminal)')
+    expect(mockSendBatch).not.toHaveBeenCalled()
+  })
+
+  it('does not fall back to legacy Telegram after a terminal custom-route failure', async () => {
+    const pool = makeMockPool()
+    mockGetPool.mockReturnValue(pool)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ client_profile_id: 'cp-custom', candidate_count: 1, anchor_candidate_id: '371' }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 370, status: 'processing', ownsClaim: true }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
+    mockHasEndpoint.mockResolvedValueOnce(true)
+    mockDispatch
+      .mockResolvedValueOnce({
+        sent: 0,
+        failed: 1,
+        skipped: 0,
+        errors: ['ambiguous provider outcome'],
+        terminalFailed: 1,
+      })
+      .mockResolvedValueOnce({ sent: 0, failed: 0, skipped: 0, errors: [] })
+
+    const result = await deliverCandidatesForRun('run-custom-terminal')
+
+    expect(result).toMatchObject({ ok: false, sent: 0, failed: 1 })
+    expect(mockSendBatch).not.toHaveBeenCalled()
+  })
+
+  it('persists a safe custom Telegram retry without falling back to legacy delivery', async () => {
+    const pool = makeMockPool()
+    mockGetPool.mockReturnValue(pool)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ client_profile_id: 'cp-custom-retry', candidate_count: 1, anchor_candidate_id: '381' }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 380, status: 'processing', ownsClaim: true }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
+    mockHasEndpoint.mockResolvedValueOnce(true)
+    mockDispatch.mockResolvedValueOnce({
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+      errors: ['rate limited'],
+      retryableFailed: 1,
+      terminalFailed: 0,
+      processing: 0,
+    })
+
+    const result = await deliverCandidatesForRun('run-custom-retry')
+
+    expect(result).toMatchObject({ ok: false, sent: 0, failed: 1 })
+    expect(result.failures[0]).toMatchObject({
+      channel: 'telegram',
+      state: 'failed_retryable',
+      retryable: true,
+    })
+    expect(String(pool.query.mock.calls[2][0])).toContain('SET status = $4')
+    expect(pool.query.mock.calls[2][1]?.[3]).toBe('failed_retryable')
+    expect(mockSendBatch).not.toHaveBeenCalled()
   })
 
   it('does not fail additive delivery when the profile has no Telegram chat', async () => {
@@ -168,9 +293,11 @@ describe('deliverCandidatesForRun (batch)', () => {
     pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
     mockPush.mockResolvedValueOnce({
       delivered: true,
-      result: { sent: 2, failed: 0, pruned: 0 },
+      state: 'sent',
+      attempt: 1,
+      result: { sent: 2, failed: 0, ambiguous: 0, retryable: 0, pruned: 0 },
     })
-    mockEmail.mockResolvedValueOnce({ delivered: true, leadCount: 2 })
+    mockEmail.mockResolvedValueOnce({ delivered: true, state: 'sent', leadCount: 2 })
 
     const result = await deliverCandidatesForRun('run-multi')
 
@@ -204,19 +331,22 @@ describe('deliverCandidatesForRun (batch)', () => {
       error: 'Client profile has no linked Telegram chat.',
     })
     pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
-    mockEmail.mockResolvedValueOnce({ delivered: false, reason: 'send_failed' })
+    mockEmail.mockResolvedValueOnce({ delivered: false, state: 'failed_terminal', reason: 'send_failed' })
 
     const result = await deliverCandidatesForRun('run-email-fail')
 
     expect(result).toMatchObject({ ok: false, failed: 1, skipped: 1 })
-    expect(result.failures).toEqual([{
+    expect(result.failures).toEqual([expect.objectContaining({
       digestCandidateId: 0,
-      error: 'cp-email: email delivery failed',
-    }])
+      error: 'cp-email: email (failed_terminal) delivery failed',
+      channel: 'email',
+      state: 'failed_terminal',
+      retryable: false,
+    })])
     expect(mockTelemetry).toHaveBeenCalledWith(expect.objectContaining({
       eventName: 'delivery_failed',
       provider: 'email',
-      outcome: 'send_failed',
+      outcome: 'failed_terminal',
     }))
     expect(JSON.stringify(mockTelemetry.mock.calls)).not.toContain('SMTP')
   })
@@ -284,7 +414,7 @@ describe('deliverCandidatesForRun (batch)', () => {
     const claimCall = pool.query.mock.calls[1]
     const params = claimCall[1] as unknown[]
     expect(params[0]).toBe('digest:run-abc:profile:cp-9:telegram-batch')
-    expect(params[3]).toBe('601')
+    expect(params[2]).toBe('601')
   })
 
   it('runs AI enrichment before delivery and survives its failure', async () => {

@@ -452,7 +452,7 @@ export async function sendSignedWebhook(input: {
 }
 
 export function classifyNotificationProviderError(error: unknown): {
-  kind: "retryable" | "rate_limited" | "auth" | "permanent";
+  kind: "retryable" | "rate_limited" | "auth" | "permanent" | "ambiguous";
   status?: number;
   code?: string;
   retryAfterSeconds?: number;
@@ -472,8 +472,14 @@ export function classifyNotificationProviderError(error: unknown): {
   if (status === 401 || status === 403) {
     return { kind: "auth", status, code: provider.code, retryAfterSeconds, message };
   }
-  if (!status || status >= 500) {
-    return { kind: "retryable", status, code: provider.code, retryAfterSeconds, message };
+  if (!status) {
+    return { kind: "ambiguous", status, code: provider.code, retryAfterSeconds, message };
+  }
+  if (status >= 500) {
+    // The provider may have committed the user-visible side effect before its
+    // gateway returned a 5xx. Without an authoritative idempotency receipt, a
+    // replay is unsafe for Telegram, VK, and customer webhooks.
+    return { kind: "ambiguous", status, code: provider.code, retryAfterSeconds, message };
   }
   return { kind: "permanent", status, code: provider.code, retryAfterSeconds, message };
 }

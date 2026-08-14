@@ -23,7 +23,7 @@ Source refresh and daily delivery are separate production clocks:
 
 1. `.github/workflows/source-refresh-clock.yml` runs hourly and asks the persisted scheduler to execute only sources currently due;
 2. primary/direct hiring and supporting/context sources therefore keep their declared 1h/3h/6h/12h/24h/7d cadence instead of inheriting a daily clock;
-3. `.github/workflows/daily-radar-clock.yml` runs the delivery pipeline once per UTC day; `daily_radar_run_state` rejects duplicate same-day delivery triggers and permits retry after a failed or stale running attempt;
+3. `.github/workflows/daily-radar-clock.yml` provides the 06:15 UTC primary trigger and 09:15 UTC recovery probe; `daily_radar_run_state` rejects healthy duplicates, owns retry eligibility/backoff, and permits a fenced retry or stale takeover;
 4. official snapshot refreshes run from `.github/workflows/government-source-clocks.yml`, then the normal source scheduler consumes the activated snapshot on its next eligible run;
 5. temporal observations/events and digest delivery consume the resulting persisted evidence.
 

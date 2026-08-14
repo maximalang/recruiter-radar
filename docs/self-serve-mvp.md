@@ -56,8 +56,8 @@ Held candidates остаются доступными оператору и не
 
 Production не использует n8n как обязательный orchestration layer.
 
-- VPS cron вызывает `/api/cron/daily-radar`.
-- Retry scheduler вызывает `/api/cron/notification-delivery-retry`.
+- GitHub Actions вызывает fenced `/api/cron/daily-radar` основным и recovery-триггером; PostgreSQL владеет eligibility/backoff.
+- Repository-controlled retry workflow вызывает `/api/cron/notification-delivery-retry`.
 - Клиентский n8n может принимать signed webhook как один из notification endpoints.
 - Scoring, billing, feedback, suppression, digest state и entitlement остаются в приложении/PostgreSQL.
 

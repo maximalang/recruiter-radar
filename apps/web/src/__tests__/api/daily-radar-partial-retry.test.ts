@@ -64,7 +64,10 @@ jest.mock('@/lib/lead-discovery/source-ingest', () => ({
 jest.mock('@/lib/lead-discovery/scheduled-source-refresh', () => ({ runScheduledSourceRefresh: jest.fn() }))
 jest.mock('@/lib/runtime', () => ({ logEvent: jest.fn(), logError: jest.fn(), logWarn: jest.fn() }))
 
-import { generateAndDeliverDigests } from '@/app/api/cron/daily-radar/route'
+import {
+  generateAndDeliverDigests,
+  resolveDailyRadarFinalStatus,
+} from '@/app/api/cron/daily-radar/route'
 import type { DailyRadarLease } from '@/lib/daily-radar-run-state'
 
 const dailyLease = (attemptCount: number): DailyRadarLease => ({
@@ -76,6 +79,27 @@ const dailyLease = (attemptCount: number): DailyRadarLease => ({
 })
 
 describe('daily radar partial retry', () => {
+  test('keeps the run recoverable while any profile still has a safe retry', () => {
+    expect(resolveDailyRadarFinalStatus({
+      allOk: false,
+      attemptCount: 1,
+      terminalProfiles: 1,
+      retryableFailedProfiles: 1,
+    })).toBe('partial')
+    expect(resolveDailyRadarFinalStatus({
+      allOk: false,
+      attemptCount: 1,
+      terminalProfiles: 1,
+      retryableFailedProfiles: 0,
+    })).toBe('terminal')
+    expect(resolveDailyRadarFinalStatus({
+      allOk: false,
+      attemptCount: 3,
+      terminalProfiles: 0,
+      retryableFailedProfiles: 1,
+    })).toBe('terminal')
+  })
+
   beforeEach(() => {
     jest.clearAllMocks()
     runDigestForClientProfile

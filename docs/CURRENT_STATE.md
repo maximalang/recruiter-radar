@@ -11,7 +11,7 @@
 - PostgreSQL хранит аккаунты, workspace membership, профили Radar, evidence, opportunities, feedback, entitlement grants, checkout orders и delivery audit state.
 - Tenant boundary задаётся `user -> workspace -> data owner -> client profile`; платёж не определяет владельца данных.
 - FIUR остаётся детерминированной моделью `Fit + Intent + Urgency + Reachability`. LLM может сжимать уже существующее evidence, но не создаёт факт найма и не обходит confidence gate.
-- Основной workflow запускается через `POST /api/cron/daily-radar`; retry доставки — через `POST /api/cron/notification-delivery-retry`. n8n не владеет продуктовой бизнес-логикой.
+- GitHub Actions является единственным repository-authorized production clock: основной и recovery-триггеры вызывают fenced `POST /api/cron/daily-radar`, а PostgreSQL владеет eligibility/backoff; retry notification jobs идёт через `POST /api/cron/notification-delivery-retry`. n8n не владеет продуктовой бизнес-логикой.
 
 ## Authentication
 

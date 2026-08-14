@@ -3,6 +3,7 @@ name: Daily Radar Clock
 on:
   schedule:
     - cron: '15 6 * * *'
+    - cron: '15 9 * * *'
   workflow_dispatch:
 
 permissions:
@@ -26,60 +27,56 @@ jobs:
           ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Trigger fenced once-per-day radar delivery
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
         run: |
           set -euo pipefail
+          if [ "$EVENT_NAME" = 'workflow_dispatch' ]; then
+            trigger='workflow_dispatch'
+          else
+            case "$EVENT_SCHEDULE" in
+              '15 6 * * *') trigger='primary' ;;
+              '15 9 * * *') trigger='recovery' ;;
+              *) echo "Unknown schedule: $EVENT_SCHEDULE" >&2; exit 64 ;;
+            esac
+          fi
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
-            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} <<'SSH_EOF'
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "DAILY_RADAR_TRIGGER='$trigger' bash -s" <<'SSH_EOF'
           set -euo pipefail
           cd /opt/recruiter-radar
-          docker compose exec -T web node --input-type=module - <<'NODE'
+          docker compose exec -T -e DAILY_RADAR_TRIGGER="$DAILY_RADAR_TRIGGER" web node --input-type=module - <<'NODE'
           const key = process.env.CRON_API_KEY?.trim()
           if (!key) throw new Error('CRON_API_KEY is not configured in the web runtime.')
 
-          const maxAttempts = 3
-          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-          let completed = false
+          const response = await fetch('http://127.0.0.1:3000/api/cron/daily-radar', {
+            method: 'POST',
+            headers: { 'x-api-key': key, 'content-type': 'application/json' },
+            body: '{}',
+          })
+          const body = await response.json().catch(() => ({}))
+          console.log(JSON.stringify({
+            trigger: process.env.DAILY_RADAR_TRIGGER || 'unknown',
+            status: response.status,
+            success: body?.success ?? false,
+            skipped: body?.skipped ?? false,
+            terminal: body?.terminal ?? false,
+            reason: body?.reason ?? null,
+            runAttemptCount: body?.data?.attemptCount ?? body?.attemptCount ?? null,
+            nextRetryAt: body?.nextRetryAt ?? null,
+            durationMs: body?.data?.durationMs ?? null,
+            sent: body?.data?.digest?.totalSent ?? 0,
+          }))
 
-          for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-            const response = await fetch('http://127.0.0.1:3000/api/cron/daily-radar', {
-              method: 'POST',
-              headers: { 'x-api-key': key, 'content-type': 'application/json' },
-              body: '{}',
-            })
-            const body = await response.json().catch(() => ({}))
-            console.log(JSON.stringify({
-              attempt,
-              status: response.status,
-              success: body?.success ?? false,
-              skipped: body?.skipped ?? false,
-              reason: body?.reason ?? null,
-              runAttemptCount: body?.data?.attemptCount ?? body?.attemptCount ?? null,
-              durationMs: body?.data?.durationMs ?? null,
-              sent: body?.data?.digest?.totalSent ?? 0,
-            }))
-
-            if (response.status === 200 || response.status === 422) {
-              if (body?.reason === 'retry-backoff' && attempt < maxAttempts) {
-                await sleep(attempt * 60_000)
-                continue
-              }
-              completed = true
-              break
-            }
-
-            if (response.status === 207 || response.status >= 500) {
-              if (attempt < maxAttempts) {
-                await sleep(attempt * 60_000)
-                continue
-              }
-              throw new Error(`daily-radar remained incomplete after ${maxAttempts} bounded attempts (HTTP ${response.status})`)
-            }
-
-            throw new Error(`daily-radar returned HTTP ${response.status}`)
+          const cleanNoop = body?.reason === 'retry-backoff'
+            || body?.reason === 'already-running'
+            || body?.reason === 'already-completed'
+          if (response.status === 200 && (body?.success === true || cleanNoop)) process.exit(0)
+          if (response.status === 422) process.exit(0)
+          if (body?.reason === 'attempt-limit' || body?.reason === 'terminal' || body?.terminal === true) {
+            throw new Error(`daily-radar reached a terminal state: ${body?.reason ?? 'terminal'}`)
           }
-
-          if (!completed) {
-            throw new Error('daily-radar did not reach a completed or terminal no-op state')
-          }
+          throw new Error(`daily-radar requires a later DB-eligible recovery trigger (HTTP ${response.status})`)
           NODE
           SSH_EOF

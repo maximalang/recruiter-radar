@@ -7,7 +7,7 @@ GitHub Actions is the only repository-authorized production clock for Recruiter 
 The production clocks are:
 
 - `.github/workflows/source-refresh-clock.yml` — hourly source-refresh clock. Persisted PostgreSQL scheduler state still decides which source is due, and the runtime PostgreSQL advisory lock remains the cross-process overlap guard.
-- `.github/workflows/daily-radar-clock.yml` — once-per-day delivery clock. Partial/catastrophic outcomes use bounded retry with backoff; the application-level fenced lease and per-profile run state provide correctness.
+- `.github/workflows/daily-radar-clock.yml` — 06:15 UTC primary trigger plus 09:15 UTC recovery probe. Each invocation calls the same fenced endpoint once; PostgreSQL alone owns retry eligibility, backoff and attempt limits.
 - `.github/workflows/government-source-clocks.yml` — EIS daily; FNS, Rosstat, and Rospatent weekly according to the workflow contract.
 
 `cron/railway.toml` is manual/deprecated compatibility tooling only and MUST NOT contain `cronSchedule`. `n8n/workflows/hh-daily.json` MUST remain `"active": false`.

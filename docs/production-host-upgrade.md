@@ -32,7 +32,7 @@ In-place переход с 18.04 до 24.04 требует последоват�
 | Backups | локальные `recruiter_radar_YYYYMMDD_0100.sql.gz`, 4–11 августа | Off-host copy и restore verification не доказаны |
 | Config | `/opt/recruiter-radar/.env`, compose overlays, `/etc/caddy/Caddyfile` | Переносить через защищённый канал; не печатать значения в logs |
 | Services | Docker, containerd, Caddy, cron, SSH, unattended-upgrades, Zabbix | Воспроизвести только нужные зависимости; проверить Zabbix отдельно |
-| Cron | `run-daily-radar.sh`, `backup-db.sh`, `run-auth-challenge-cleanup.sh` | На target держать disabled до cutover, затем включить без дублирования |
+| Scheduled jobs | GitHub Actions clocks; host-only `backup-db.sh` and `run-auth-challenge-cleanup.sh` | Product-write schedules stay in GitHub Actions; never install `run-daily-radar.sh` on the host |
 | Firewall / SSH | UFW inactive; root/password login разрешены | Target: default-deny firewall, key-only SSH, запрет root/password после проверки аварийного доступа |
 
 ## Stop gates
@@ -54,7 +54,7 @@ In-place переход с 18.04 до 24.04 требует последоват�
 
 До окна миграции:
 
-1. Остановить только cron, который создаёт новые product writes; web пока остаётся доступным.
+1. Остановить GitHub Actions product-write clocks; host web пока остаётся доступным.
 2. Создать свежий PostgreSQL 16 logical dump с владельцами/ACL в согласованном формате и gzip-сжатием.
 3. Сохранить SHA-256 checksum и metadata: source host, database version, start/end UTC, row-count summary.
 4. Скопировать dump и необходимые config-файлы в encrypted off-host storage. `.env` не добавлять в git и не передавать через CI artifacts.
@@ -87,7 +87,7 @@ Restore drill является обязательным доказательст
 2. Передать image на target или собрать из exact SHA в доверенном CI; не использовать плавающий source checkout.
 3. Проверить digest до `docker load`/pull.
 4. Развернуть compose с теми же service names (`db`, `web`) и отдельным новым volume.
-5. Не запускать customer-facing cron и delivery до завершения restore и smoke.
+5. Не запускать customer-facing scheduled delivery до завершения restore и smoke.
 6. Сохранить предыдущий production SHA как явный rollback target; не выполнять broad image prune.
 
 ## 4. PostgreSQL data migration
@@ -111,16 +111,15 @@ Raw copy Docker volume допустима только как дополните
 5. Перед переключением записать старые DNS values и команду/владельца rollback.
 6. После переключения проверить DNS с нескольких resolvers и TLS certificate chain.
 
-## 6. Cron, systemd и delivery
+## 6. Scheduled jobs, systemd и delivery
 
-На новом host должны быть воспроизведены и проверены:
+На новом host должны быть воспроизведены и проверены только host-local services:
 
 - `caddy.service`, Docker/containerd и monitoring;
-- daily radar: `run-daily-radar.sh` в 03:00 server time;
 - database backup: `backup-db.sh` в 01:00;
 - auth challenge cleanup: `run-auth-challenge-cleanup.sh` в 02:15.
 
-До DNS cutover cron остаётся disabled. После cutover сначала убедиться, что cron на старом host остановлен, и только затем включить target, чтобы исключить двойные radar/delivery/cleanup runs.
+Daily Radar, source refresh и government-source clocks остаются только в GitHub Actions. На target host нельзя устанавливать или включать `run-daily-radar.sh`, Railway cron или n8n HH Daily. До DNS cutover GitHub workflows должны быть временно остановлены оператором; после cutover их можно возобновить только после проверки default branch и нового target, не создавая второй clock authority.
 
 ## 7. Cutover smoke test
 
@@ -133,21 +132,21 @@ Raw copy Docker volume допустима только как дополните
 5. login/magic-link request без account enumeration;
 6. authenticated `/leads`, lead detail, `/opportunities`, Evidence Radar desktop/mobile;
 7. критические API routes возвращают ожидаемые auth/feature-gate статусы;
-8. cron пока disabled; затем один controlled dry-run/healthcheck без массовой доставки;
+8. GitHub product clocks пока остановлены; затем один controlled `workflow_dispatch` dry-run/healthcheck без массовой доставки;
 9. logs не содержат новых errors и secrets;
 10. backup job на target создаёт файл, off-host copy и checksum.
 
 ## 8. Rollback
 
-Rollback запускается при любом из условий: health != 200, migration mismatch, data-count mismatch, auth failure, TLS failure, tenant boundary anomaly или невозможность безопасно запустить cron.
+Rollback запускается при любом из условий: health != 200, migration mismatch, data-count mismatch, auth failure, TLS failure, tenant boundary anomaly или невозможность безопасно возобновить scheduled workflows.
 
 Порядок:
 
 1. Не выполнять новые migrations/writes на неисправном target.
-2. Остановить target cron и delivery.
+2. Остановить GitHub product-write workflows и delivery.
 3. Вернуть DNS на зафиксированные старые values либо восстановить старый upstream route.
 4. Убедиться, что старый host всё ещё использует сохранённый healthy image и исходный database volume.
-5. Включить старый cron только после подтверждения, что target cron остановлен.
+5. Не включать host cron для product writes; GitHub Actions остаётся единственным clock authority и возобновляется только после подтверждения rollback target.
 6. Проверить public health, authenticated smoke и отсутствие двойной доставки.
 7. Сохранить target, logs и migration receipt для анализа; не удалять данные до решения владельца.
 
@@ -157,4 +156,4 @@ Rollback запускается при любом из условий: health !=
 
 Планировать 30–60 минут write freeze для final dump/restore, checks и DNS cutover; фактическое окно уточняется после измеренного restore drill. Старый host, rollback image и backup сохраняются минимум на согласованный hold period.
 
-Миграция считается завершённой только когда exact deployed SHA, public health, authenticated smoke, cron single-owner state, first target backup/off-host copy и monitoring подтверждены и записаны. Удаление старого host — отдельное явно разрешённое действие.
+Миграция считается завершённой только когда exact deployed SHA, public health, authenticated smoke, GitHub Actions single-owner clock state, first target backup/off-host copy и monitoring подтверждены и записаны. Удаление старого host — отдельное явно разрешённое действие.

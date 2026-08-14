@@ -75,13 +75,25 @@ describe('sendDigestEmailForProfile', () => {
     mockSendEmail.mockResolvedValue({ ok: true })
   })
 
-  it('returns not_configured when SMTP is absent (no DB/leads touched)', async () => {
+  it('fails terminal when delivery persistence is unavailable', async () => {
     mockIsConfigured.mockReturnValue(false)
 
     const res = await sendDigestEmailForProfile({ clientProfileId: '1', digestRunId: '99' })
 
-    expect(res).toEqual({ delivered: false, reason: 'not_configured' })
-    expect(mockGetPool).not.toHaveBeenCalled()
+    expect(res).toEqual({ delivered: false, state: 'failed_terminal', reason: 'no_database' })
+    expect(mockGetPool).toHaveBeenCalledTimes(1)
+    expect(mockGetLeads).not.toHaveBeenCalled()
+    expect(mockSendEmail).not.toHaveBeenCalled()
+  })
+
+  it('fails terminal when an enabled profile has no SMTP transport', async () => {
+    const { pool } = makeMockPool([{ rows: [PREFS_ROW], rowCount: 1 }])
+    mockGetPool.mockReturnValue(pool)
+    mockIsConfigured.mockReturnValue(false)
+
+    const res = await sendDigestEmailForProfile({ clientProfileId: '1', digestRunId: '99' })
+
+    expect(res).toEqual({ delivered: false, state: 'failed_terminal', reason: 'not_configured' })
     expect(mockGetLeads).not.toHaveBeenCalled()
     expect(mockSendEmail).not.toHaveBeenCalled()
   })
@@ -94,7 +106,7 @@ describe('sendDigestEmailForProfile', () => {
 
     const res = await sendDigestEmailForProfile({ clientProfileId: '1', digestRunId: '99' })
 
-    expect(res).toEqual({ delivered: false, reason: 'disabled' })
+    expect(res).toEqual({ delivered: false, state: 'skipped_disabled', reason: 'disabled' })
     expect(mockSendEmail).not.toHaveBeenCalled()
   })
 
@@ -106,7 +118,7 @@ describe('sendDigestEmailForProfile', () => {
 
     const res = await sendDigestEmailForProfile({ clientProfileId: '1', digestRunId: '99' })
 
-    expect(res).toEqual({ delivered: false, reason: 'no_email' })
+    expect(res).toEqual({ delivered: false, state: 'failed_terminal', reason: 'no_email' })
     expect(mockSendEmail).not.toHaveBeenCalled()
   })
 
@@ -118,7 +130,7 @@ describe('sendDigestEmailForProfile', () => {
 
     const res = await sendDigestEmailForProfile({ clientProfileId: '1', digestRunId: '99' })
 
-    expect(res).toEqual({ delivered: false, reason: 'no_leads' })
+    expect(res).toEqual({ delivered: false, state: 'not_attempted', reason: 'no_leads' })
     expect(mockSendEmail).not.toHaveBeenCalled()
   })
 
@@ -137,7 +149,7 @@ describe('sendDigestEmailForProfile', () => {
       now: new Date('2026-06-27T09:00:00.000Z'),
     })
 
-    expect(res).toEqual({ delivered: true, leadCount: 2 })
+    expect(res).toEqual({ delivered: true, state: 'sent', leadCount: 2 })
 
     const claimCall = query.mock.calls[1]
     const claimSql = String(claimCall[0])
@@ -181,7 +193,7 @@ describe('sendDigestEmailForProfile', () => {
     })
   })
 
-  it('bails (disabled) when the profile has no owner, never reading leads', async () => {
+  it('fails terminal when the profile has no owner, never reading leads', async () => {
     const { pool } = makeMockPool([
       { rows: [{ ...PREFS_ROW, owner_id: null }], rowCount: 1 },
     ])
@@ -189,22 +201,57 @@ describe('sendDigestEmailForProfile', () => {
 
     const res = await sendDigestEmailForProfile({ clientProfileId: '7', digestRunId: '42' })
 
-    expect(res).toEqual({ delivered: false, reason: 'disabled' })
+    expect(res).toEqual({ delivered: false, state: 'failed_terminal', reason: 'failed_terminal' })
     expect(mockGetLeads).not.toHaveBeenCalled()
     expect(mockSendEmail).not.toHaveBeenCalled()
   })
 
-  it('returns already_sent and does NOT send when the dedupe row exists', async () => {
+  it('returns already_successfully_delivered and does NOT send when a sent dedupe row exists', async () => {
     const { pool } = makeMockPool([
       { rows: [PREFS_ROW], rowCount: 1 }, // prefs
       { rows: [], rowCount: 0 }, // claim loses — ON CONFLICT DO NOTHING
+      { rows: [], rowCount: 0 }, // processing row is not stale
+      { rows: [{ delivery_status: 'sent' }], rowCount: 1 },
     ])
     mockGetPool.mockReturnValue(pool)
     mockGetLeads.mockResolvedValue({ leads: [makeLead()], total: 1 })
 
     const res = await sendDigestEmailForProfile({ clientProfileId: '1', digestRunId: '99' })
 
-    expect(res).toEqual({ delivered: false, reason: 'already_sent' })
+    expect(res).toEqual({ delivered: false, state: 'already_successfully_delivered', reason: 'already_successfully_delivered' })
+    expect(mockSendEmail).not.toHaveBeenCalled()
+  })
+
+  it('keeps a prior failed SMTP claim terminal instead of reporting it as already sent', async () => {
+    const { pool } = makeMockPool([
+      { rows: [PREFS_ROW], rowCount: 1 },
+      { rows: [], rowCount: 0 },
+      { rows: [], rowCount: 0 },
+      { rows: [{ delivery_status: 'failed' }], rowCount: 1 },
+    ])
+    mockGetPool.mockReturnValue(pool)
+    mockGetLeads.mockResolvedValue({ leads: [makeLead()], total: 1 })
+
+    const res = await sendDigestEmailForProfile({ clientProfileId: '1', digestRunId: '99' })
+
+    expect(res).toEqual({ delivered: false, state: 'failed_terminal', reason: 'failed_terminal' })
+    expect(mockSendEmail).not.toHaveBeenCalled()
+  })
+
+  it('terminalizes a stale processing claim instead of replaying an ambiguous SMTP send', async () => {
+    const { pool, query } = makeMockPool([
+      { rows: [PREFS_ROW], rowCount: 1 },
+      { rows: [], rowCount: 0 },
+      { rows: [], rowCount: 1 },
+      { rows: [{ delivery_status: 'failed_terminal' }], rowCount: 1 },
+    ])
+    mockGetPool.mockReturnValue(pool)
+    mockGetLeads.mockResolvedValue({ leads: [makeLead()], total: 1 })
+
+    const res = await sendDigestEmailForProfile({ clientProfileId: '1', digestRunId: '99' })
+
+    expect(res).toEqual({ delivered: false, state: 'failed_terminal', reason: 'failed_terminal' })
+    expect(String(query.mock.calls[2][0])).toContain("last_error_reason = 'ambiguous_stale_processing'")
     expect(mockSendEmail).not.toHaveBeenCalled()
   })
 
@@ -220,9 +267,10 @@ describe('sendDigestEmailForProfile', () => {
 
     const res = await sendDigestEmailForProfile({ clientProfileId: '1', digestRunId: '99' })
 
-    expect(res).toEqual({ delivered: false, reason: 'send_failed' })
+    expect(res).toEqual({ delivered: false, state: 'failed_terminal', reason: 'send_failed' })
     expect(mockSendEmail).toHaveBeenCalledTimes(1)
-    expect(String(query.mock.calls[2][0])).toContain("delivery_status = 'failed'")
+    expect(String(query.mock.calls[2][0])).toContain("delivery_status = 'failed_terminal'")
+    expect(String(query.mock.calls[2][0])).toContain("last_error_reason = 'smtp_ambiguous_failure'")
     expect(String(query.mock.calls[2][0])).toContain('delivered_at = NULL')
   })
 })

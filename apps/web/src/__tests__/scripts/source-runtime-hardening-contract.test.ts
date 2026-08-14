@@ -8,6 +8,8 @@ const targetScopeMigration = read('packages/db/migrations/20260814060000_add_sou
 const targetScopeDown = read('packages/db/migrations/20260814060000_add_source_target_run_scope.down.sql')
 const dailyLeaseMigration = read('packages/db/migrations/20260814070000_add_daily_radar_run_lease.sql')
 const dailyLeaseDown = read('packages/db/migrations/20260814070000_add_daily_radar_run_lease.down.sql')
+const dailyRecoveryMigration = read('packages/db/migrations/20260814090000_harden_daily_radar_recovery.sql')
+const dailyRecoveryDown = read('packages/db/migrations/20260814090000_harden_daily_radar_recovery.down.sql')
 const careerRuntime = read('packages/db/scripts/source-career-pages-runtime.mjs')
 const lifecycle = read('apps/web/lib/opportunities/canonical-vacancy-lifecycle-repository.ts')
 const sourceSchedules = read('apps/web/lib/sources/source-schedules.ts')
@@ -68,6 +70,7 @@ describe('source runtime hardening contract', () => {
     expect(sourceClock).toContain("cron: '45 * * * *'")
     expect(sourceClock).toContain('/api/cron/source-refresh')
     expect(dailyClock).toContain("cron: '15 6 * * *'")
+    expect(dailyClock).toContain("cron: '15 9 * * *'")
     expect(dailyClock).toContain('/api/cron/daily-radar')
     for (const source of [
       'government-procurement',
@@ -81,6 +84,11 @@ describe('source runtime hardening contract', () => {
     expect(dailyLeaseMigration).toContain('CREATE TABLE daily_radar_run_state')
     expect(dailyLeaseMigration).toContain("status IN ('running', 'completed', 'partial', 'failed')")
     expect(dailyLeaseDown).toContain('DROP TABLE IF EXISTS daily_radar_run_state')
+    expect(dailyRecoveryMigration).toContain("'failed_retryable'")
+    expect(dailyRecoveryMigration).toContain("'failed_terminal'")
+    expect(dailyRecoveryMigration).toContain('terminal_reason')
+    expect(dailyRecoveryDown).toContain("SET status = 'failed_terminal'")
+    expect(dailyRecoveryDown).not.toContain("WHERE status IN ('failed_retryable', 'failed_terminal')")
     expect(productionPreflight).toContain('"productionScheduled":false')
     expect(productionPreflight).toContain('"scheduleAuthority":"github-actions"')
     expect(productionPreflight).toContain('"scheduleVerification":"external-after-merge"')

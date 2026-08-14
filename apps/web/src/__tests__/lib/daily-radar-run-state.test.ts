@@ -13,6 +13,7 @@ jest.mock('@/lib/db-pool', () => ({
 
 import {
   claimDailyRadarRun,
+  dailyRadarNextRetryAt,
   finishDailyRadarRun,
 } from '@/lib/daily-radar-run-state'
 
@@ -79,5 +80,37 @@ describe('daily radar fenced lease', () => {
     await expect(finishDailyRadarRun(ownerB, 'completed')).resolves.toBe(true)
     const afterCurrentOwner = current as CurrentState | null
     expect(afterCurrentOwner?.status).toBe('completed')
+  })
+
+  test('the last failed DB-owned attempt is persisted as terminal', async () => {
+    let persistedStatus: string | null = null
+    query.mockImplementation(async (sql: string, params: readonly unknown[]) => {
+      if (sql.includes('UPDATE daily_radar_run_state') && sql.includes('completed_at')) {
+        persistedStatus = String(params[2])
+        return { rowCount: 1, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const lease = {
+      acquired: true,
+      persisted: true,
+      runDate: '2026-08-14',
+      leaseId: '00000000-0000-4000-8000-000000000003',
+      attemptCount: 3,
+    }
+    await expect(finishDailyRadarRun(lease, 'failed')).resolves.toBe(true)
+
+    expect(persistedStatus).toBe('terminal')
+  })
+
+  test('reports the same DB-owned retry timestamp used by finalization', () => {
+    const now = new Date('2026-08-14T06:15:00.000Z')
+    expect(dailyRadarNextRetryAt({ attemptCount: 1 }, 'partial', now))
+      .toBe('2026-08-14T06:15:30.000Z')
+    expect(dailyRadarNextRetryAt({ attemptCount: 2 }, 'failed', now))
+      .toBe('2026-08-14T06:16:00.000Z')
+    expect(dailyRadarNextRetryAt({ attemptCount: 3 }, 'partial', now)).toBeNull()
+    expect(dailyRadarNextRetryAt({ attemptCount: 1 }, 'terminal', now)).toBeNull()
   })
 })

@@ -41,7 +41,7 @@ describe("admin user detail", () => {
 
     expect(query).toHaveBeenCalledWith(expect.stringContaining("ws.id = $2::BIGINT"), ["42", "9"]);
     const detailSql = String(query.mock.calls[0]?.[0] ?? "");
-    expect(detailSql).toContain("delivery_status IN ('failed', 'partial')");
+    expect(detailSql).toContain("delivery_status IN ('failed_retryable', 'failed_terminal')");
     expect(detailSql).toContain("attempted_at AS error_at");
     expect(detailSql).toContain("MAX(delivered_at)");
     expect(getEffectiveEntitlement).toHaveBeenCalledWith("7", { workspaceId: "9" });

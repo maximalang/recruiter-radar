@@ -60,7 +60,7 @@ Planned expansion остаётся phased:
    `npm run dev`
 
 По умолчанию Next.js будет доступен на `http://localhost:3000`.
-В production расписание запускает VPS cron через `/api/cron/daily-radar`. n8n выведен из production-контура и не является частью обязательного локального запуска.
+В production единственный repository-authorized clock — GitHub Actions: основной и recovery-триггеры вызывают fenced `/api/cron/daily-radar`, а PostgreSQL решает eligibility/backoff. n8n выведен из production-контура и не является частью обязательного локального запуска.
 
 ## Рабочий процесс разработки
 
