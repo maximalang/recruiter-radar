@@ -37,13 +37,17 @@ describe("production observability contract", () => {
     expect(`${payments}\n${webhook}`).not.toMatch(/log(?:Event|Warn|Error)\([^\n]+\{[^}]*(customer|payload|signature|secret)/i);
   });
 
-  it("covers radar outcomes, zero-result anomalies and per-channel delivery", () => {
+  it("covers source refresh, radar outcomes, zero-result anomalies and per-channel delivery", () => {
     const radar = source("app/api/cron/daily-radar/route.ts");
+    const sourceRefresh = source("app/api/cron/source-refresh/route.ts");
     const delivery = source("lib/digest/deliver-candidates.ts");
+    expect(sourceRefresh).toContain("source_refresh.run");
+    expect(sourceRefresh).toContain("source_refresh.partial");
+    expect(sourceRefresh).toContain("source_refresh.failed");
     expect(radar).toContain("daily_radar.run");
     expect(radar).toContain("daily_radar.pipeline_failed");
-    expect(radar).toContain("daily_radar.source_ingest_completed");
-    expect(radar).toContain("daily_radar.source_ingest_failed");
+    expect(radar).toContain("daily_radar.source_refresh_completed");
+    expect(radar).toContain("daily_radar.source_refresh_failed");
     expect(radar).toContain("daily_radar.zero_opportunity_anomaly");
     expect(delivery).toContain("digest.delivery_attempted");
     expect(delivery).toContain("digest.telegram_sent");
