@@ -1,14 +1,20 @@
 # N8N Setup Guide
 
+> Historical/manual templates only. n8n is not a production scheduler authority.
+> Do not activate HH Daily, Career Pages Daily, or Digest Delivery schedules;
+> repository-controlled GitHub Actions own all production source and delivery clocks.
+
 ## Workflows Overview
 
 ### 1. HH Daily Pipeline (`hh-daily.json`)
-- **Schedule**: 06:00 MSK daily
+- **Status**: archived compatibility template; keep inactive
+- **Historical schedule**: 06:00 MSK daily
 - **Purpose**: Runs `npm run source:pipeline:hh` to fetch and ingest HH vacancies
 - **Notifications**: Success message or Telegram alert on failure
 
 ### 2. Career Pages Daily Pipeline (`career-pages-daily.json`)
-- **Schedule**: 07:00 MSK daily  
+- **Status**: archived compatibility template; keep inactive
+- **Historical schedule**: 07:00 MSK daily
 - **Purpose**: Runs career pages pipeline with smoke targets
 - **Notifications**: Success message or Telegram alert on failure
 
@@ -45,9 +51,9 @@ RR_APP_BASE_URL=https://your-domain.com
    - Run workflows manually first
    - Check notifications are delivered
 
-3. **Schedule Activation**
-   - Enable scheduled triggers
-   - Monitor first few runs
+3. **Production safety**
+   - Do not activate any scheduled trigger from these templates
+   - Use the repository-controlled GitHub Actions workflows instead
 
 ## Monitoring
 

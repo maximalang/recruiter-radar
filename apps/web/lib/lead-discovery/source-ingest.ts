@@ -25,12 +25,13 @@ import { fileURLToPath } from 'node:url'
 import {
   getSourceConfig,
   getPrimarySourceIds,
+  getHiringEvidenceSourceIds,
+  getDailySupportingSourceIds,
   getAllEnvPrefixes,
   getSearchEnvVars,
   type SourceId,
 } from '@/lib/sources/source-registry'
 import { getPool } from '@/lib/db-pool'
-import { deriveHabrKeywordsFromProfiles } from './habr-keywords'
 import {
   buildProfileSearchEnv,
   type ProfileSearchInput,
@@ -41,13 +42,17 @@ import {
   industryDemoteTerms,
   type FeedbackPatternEvent,
 } from './query-feedback-tuning'
-import { buildProfileGdeltQueries } from './gdelt-query-builder'
+import {
+  buildTrackedCompanyGdeltQueries,
+  MAX_GDELT_QUERIES,
+} from './gdelt-query-builder'
 import {
   buildCompanySiteTargets,
   MAX_COMPANY_SITE_TARGETS_PER_RUN,
   type CompanySiteTargetRow,
 } from './company-site-targets'
 import { writeFileSync, mkdirSync } from 'node:fs'
+import { runSupportingSourceScheduler } from './supporting-source-scheduler'
 
 export type { SourceId } from '@/lib/sources/source-registry'
 
@@ -98,6 +103,9 @@ export type IngestOutcome =
   | 'ingestion-zero'
   | 'missing-summary'
   | 'invalid-summary'
+  | 'credential-gated'
+  | 'deferred'
+  | 'rate-limited'
   | 'failed'
 
 export interface IngestDiagnostics {
@@ -108,6 +116,69 @@ export interface IngestDiagnostics {
   organizationCount?: number
   evidenceCount?: number
   zeroReason?: string
+}
+
+export interface TemporalIntelligenceResult {
+  success: boolean
+  observations: number
+  derivedEvents: number
+  error?: string
+}
+
+/**
+ * Run the bounded temporal derivation after all daily source ingestion.
+ * A failure is returned explicitly so the cron route can report a partial run
+ * instead of silently delivering without refreshing temporal intelligence.
+ */
+export function runSourceTemporalIntelligence(): Promise<TemporalIntelligenceResult> {
+  const scriptDir = getScriptDir()
+  const scriptPath = resolve(scriptDir, 'derive-source-temporal-intelligence.mjs')
+  if (!scriptPath.startsWith(scriptDir)) {
+    return Promise.resolve({
+      success: false,
+      observations: 0,
+      derivedEvents: 0,
+      error: 'Temporal intelligence script path escapes scripts directory.',
+    })
+  }
+
+  return new Promise((resolvePromise) => {
+    getExecFile()('node', [scriptPath], {
+      env: process.env,
+      timeout: 120_000,
+      maxBuffer: 1024 * 1024,
+      windowsHide: true,
+    }, (error, stdout, stderr) => {
+      if (error) {
+        resolvePromise({
+          success: false,
+          observations: 0,
+          derivedEvents: 0,
+          error: stderr?.trim() || error.message,
+        })
+        return
+      }
+
+      try {
+        const summary = JSON.parse(stdout.trim()) as Record<string, unknown>
+        if (!Number.isInteger(summary.observations) || !Number.isInteger(summary.derivedEvents)) {
+          throw new Error('Temporal intelligence summary is missing integer counts.')
+        }
+        resolvePromise({
+          success: true,
+          observations: summary.observations as number,
+          derivedEvents: summary.derivedEvents as number,
+        })
+      } catch (parseError) {
+        resolvePromise({
+          success: false,
+          observations: 0,
+          derivedEvents: 0,
+          error: parseError instanceof Error ? parseError.message : 'Invalid temporal intelligence summary.',
+        })
+      }
+    })
+  })
 }
 
 /**
@@ -198,24 +269,6 @@ async function loadSearchPrefsFromDb(source: SourceId): Promise<Record<string, s
 }
 
 /**
- * Load the `roles` arrays of every active client profile.
- *
- * Used only by habr-career keyword derivation: ingestion is global, so the
- * search must reflect the union of all active profiles' ICP roles, not one
- * profile's. Returns [] when no pool (test/dev) — caller falls back to ENV.
- */
-async function loadActiveProfileRoles(): Promise<string[][]> {
-  const pool = getPool()
-  if (!pool) return []
-  const { rows } = await pool.query<{ roles: string[] | null }>(`
-    SELECT roles
-    FROM client_profiles
-    WHERE is_active = TRUE
-  `)
-  return rows.map(r => r.roles ?? [])
-}
-
-/**
  * Load the ICP search fields of every active client profile.
  *
  * Ingestion is global: `ingestAllPrimarySources()` fills ONE shared signal
@@ -262,8 +315,7 @@ async function loadActiveProfileSearchInputs(): Promise<ProfileSearchInput[]> {
  * ingestion. Operator includeKeywords and excludeKeywords are unioned across
  * profiles; role/industry/exclusion arrays are unioned and deduped. This keeps
  * ingestion global (one fetch per source) while the query reflects every
- * active profile's ICP — the same pattern `loadActiveProfileRoles` uses for
- * habr-career, generalised to all supported search sources.
+ * active profile's ICP.
  */
 function unionProfileSearchInputs(inputs: readonly ProfileSearchInput[]): ProfileSearchInput {
   const union = (arrs: ReadonlyArray<readonly string[]>): string[] => {
@@ -333,7 +385,7 @@ async function loadActiveFeedbackPatterns(): Promise<FeedbackPatternEvent[]> {
  * Resolve the profile-derived search env for a source from the UNION of all
  * active client profiles, with feedback-driven demote terms applied.
  *
- * Precedence (matches the habr-career contract): an explicit operator override
+ * Precedence: an explicit operator override
  * already present in `dbSearchEnv` (from `user_search_preferences`) or in the
  * caller's filtered env ALWAYS wins — operators can pin a query. Only keys the
  * operator has NOT set are derived from profiles. When the profile union yields
@@ -347,7 +399,7 @@ async function loadActiveFeedbackPatterns(): Promise<FeedbackPatternEvent[]> {
  * inside the operator's ICP while poor-fit industries are de-emphasised.
  * Operator-pinned includeKeywords are exempt from demotion (human pin > loop).
  *
- * Sources with no supported search params (career-pages, tech-job-boards) get
+ * Sources with no supported search params (for example career-pages) get
  * an empty env — their ingestion is not keyword-driven.
  */
 async function resolveProfileSearchEnv(
@@ -376,72 +428,73 @@ async function resolveProfileSearchEnv(
   return result
 }
 
-/**
- * Resolve the habr-career keyword search env from active profiles' roles.
- *
- * Precedence: an explicit DB/ENV keyword pref (HABR_CAREER_KEYWORD or the
- * multi-value HABR_CAREER_KEYWORDS already present in `dbSearchEnv`) always
- * wins — operators can override the heuristic. Otherwise we derive keywords
- * from the union of active profiles' roles and inject them as
- * HABR_CAREER_KEYWORDS. When neither yields anything, we inject nothing and the
- * adapter falls back to its own default keyword.
- */
-async function resolveHabrKeywordEnv(
+const MAX_GOVERNMENT_ENRICHMENT_INNS_PER_RUN = 50
+const MAX_INDUSTRY_MEDIA_TARGETS_PER_RUN = 100
+const GOVERNMENT_ENRICHMENT_SOURCE_IDS = new Set<SourceId>([
+  'fns-open-data',
+  'government-procurement',
+  'cbr-registry',
+  'rospatent-open-data',
+])
+
+async function resolveGovernmentEnrichmentInnsEnv(
   dbSearchEnv: Record<string, string>
 ): Promise<Record<string, string>> {
-  if (dbSearchEnv.HABR_CAREER_KEYWORD || dbSearchEnv.HABR_CAREER_KEYWORDS) return {}
-
-  const roleLists = await loadActiveProfileRoles()
-  const keywords = deriveHabrKeywordsFromProfiles(roleLists)
-  if (keywords.length === 0) return {}
-
-  return { HABR_CAREER_KEYWORDS: keywords.join(',') }
-}
-
-/**
- * Maximum 10-digit legal-entity INNs to enrich per egrul-fns run. Each INN is
- * one request to the public JSON mirror, so bounding the count bounds load on
- * the public endpoint. The most-recently-seen orgs are prioritised so the
- * enrichment tracks the freshest signal pool.
- */
-const MAX_EGRUL_INNS_PER_RUN = 50
-
-/**
- * Resolve the egrul-fns INN list from the DB: 10-digit legal-entity INNs on
- * orgs that still need registry verification (ogrn IS NULL), most-recent first,
- * capped to MAX_EGRUL_INNS_PER_RUN.
- *
- * Precedence (matches the other resolvers): an explicit operator override in
- * `dbSearchEnv` (EGRUL_FNS_INNS pinned via user_search_preferences), in
- * process.env, file mode, or provider mode ALWAYS wins — derivation only fills
- * when nobody pinned the input. Returns {} when there are no candidate orgs or
- * no pool — the source then falls back to its own no-input error (unchanged).
- *
- * Only 10-digit INNs (юрлицо) are selected; 12-digit ИП/person INNs are
- * excluded per the source readiness policy (enrichment-only, never
- * lead-originating). This is enforced at the SQL level (inn ~ '^\d{10}$').
- */
-async function resolveEgrulInnsEnv(
-  dbSearchEnv: Record<string, string>
-): Promise<Record<string, string>> {
-  if (dbSearchEnv.EGRUL_FNS_INNS) return {}
-  if (process.env.EGRUL_FNS_INNS) return {}
-  if (process.env.EGRUL_FNS_INPUT_FILE) return {}
-  if (process.env.EGRUL_FNS_PROVIDER_API_URL) return {}
+  if (dbSearchEnv.GOVERNMENT_ENRICHMENT_INNS) return {}
+  if (process.env.GOVERNMENT_ENRICHMENT_INNS) return {}
 
   const pool = getPool()
   if (!pool) return {}
   const { rows } = await pool.query<{ inn: string }>(`
-    SELECT inn
+    SELECT orgs.inn
     FROM orgs
-    WHERE inn ~ '^\\d{10}$'
-      AND ogrn IS NULL
-    ORDER BY updated_at DESC
+    JOIN signals ON signals.org_id = orgs.id
+    WHERE orgs.inn ~ '^\\d{10}$'
+      AND signals.signal_type = 'job_posting'
+      AND signals.source = ANY($2::text[])
+    GROUP BY orgs.inn
+    ORDER BY MAX(signals.occurred_at) DESC, orgs.inn
     LIMIT $1
-  `, [MAX_EGRUL_INNS_PER_RUN])
+  `, [MAX_GOVERNMENT_ENRICHMENT_INNS_PER_RUN, getHiringEvidenceSourceIds()])
 
   if (rows.length === 0) return {}
-  return { EGRUL_FNS_INNS: rows.map(r => r.inn).join(',') }
+  return { GOVERNMENT_ENRICHMENT_INNS: rows.map(row => row.inn).join(',') }
+}
+
+async function resolveIndustryMediaTargetsEnv(
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  if (dbSearchEnv.INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON) return {}
+  if (process.env.INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON) return {}
+
+  const pool = getPool()
+  if (!pool) return { INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON: '[]' }
+  const { rows } = await pool.query<{ company_name: string; company_domain: string }>(`
+    SELECT
+      o.name AS company_name,
+      o.domain AS company_domain
+    FROM orgs o
+    JOIN signals hiring_signal
+      ON hiring_signal.org_id = o.id
+      AND hiring_signal.signal_type = 'job_posting'
+      AND hiring_signal.source = ANY($2::text[])
+    WHERE o.domain IS NOT NULL
+      AND o.domain <> ''
+      AND o.name IS NOT NULL
+      AND o.name <> ''
+      AND NOT EXISTS (
+        SELECT 1
+        FROM signals media_signal
+        WHERE media_signal.org_id = o.id
+          AND media_signal.source = 'industry-media'
+          AND media_signal.occurred_at >= NOW() - INTERVAL '23 hours'
+      )
+    GROUP BY o.id, o.name, o.domain
+    ORDER BY MAX(hiring_signal.occurred_at) DESC, o.id
+    LIMIT $1
+  `, [MAX_INDUSTRY_MEDIA_TARGETS_PER_RUN, getHiringEvidenceSourceIds()])
+
+  return { INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON: JSON.stringify(rows) }
 }
 
 /**
@@ -464,6 +517,8 @@ interface CompanyPageTargetsConfig {
   providerApiEnv?: 'COMPANY_NEWSROOMS_PROVIDER_API_URL'
   /** Temp-file basename written under packages/db/scripts/.cache/. */
   tempFileName: 'company-site-derived-targets.json' | 'company-newsrooms-derived-targets.json'
+  /** Minimum age of the latest completed crawl before an org is eligible again. */
+  refreshInterval: string
 }
 
 /**
@@ -482,24 +537,24 @@ interface CompanyPageTargetsConfig {
  * Precedence (matches the other resolvers): an explicit operator override in
  * `dbSearchEnv` (the targets/input/provider env pinned via
  * user_search_preferences), process.env, or the source's file-mode env ALWAYS
- * wins — derivation only fills when nobody pinned the input. Returns {} when
- * there are no candidate orgs or no pool — the source then falls back to its
- * own no-input error (unchanged). On any FS write error, derivation is skipped
- * (returns {}) so the source falls back rather than crashing the whole
- * ingestion batch.
+ * wins — derivation only fills when nobody pinned the input. With a DB but no
+ * eligible orgs, an empty target file is written so the source reports an
+ * explicit expected-zero result. With no pool, or on any FS write error,
+ * derivation is skipped (returns {}) so the source falls back without crashing
+ * the whole ingestion batch.
  *
- * Both sources are non-primary and never lead-originating (company-site is
+ * Both sources are never lead-originating (company-site is
  * supporting-evidence-only; company-newsrooms is context-only, Gate D) — we
  * only target orgs the radar is ALREADY tracking (HAVING a hiring signal),
  * never cold domains, so the crawl corroborates existing leads instead of
- * originating new ones. Excludes orgs that already have a `<source>` signal so
- * a re-run doesn't re-crawl the same pages.
+ * originating new ones. A freshness guard permits recurring refresh without
+ * re-crawling the same company inside the configured interval.
  */
 async function resolveCompanyPageTargetsEnv(
   dbSearchEnv: Record<string, string>,
   cfg: CompanyPageTargetsConfig,
 ): Promise<Record<string, string>> {
-  const { source, targetsFileEnv, inputFileEnv, providerApiEnv, tempFileName } = cfg
+  const { source, targetsFileEnv, inputFileEnv, providerApiEnv, tempFileName, refreshInterval } = cfg
   if (dbSearchEnv[targetsFileEnv]) return {}
   if (dbSearchEnv[inputFileEnv]) return {}
   if (process.env[targetsFileEnv]) return {}
@@ -520,13 +575,15 @@ async function resolveCompanyPageTargetsEnv(
         SELECT 1
         FROM signals
         WHERE signals.org_id = orgs.id
-          AND signals.source IN ('hh', 'superjob', 'habr-career', 'rabota-rossii', 'career-pages')
+          AND signals.signal_type = 'job_posting'
+          AND signals.source = ANY($4::text[])
       )
       AND NOT EXISTS (
         SELECT 1
         FROM signals
         WHERE signals.org_id = orgs.id
           AND signals.source = $2
+          AND signals.updated_at >= NOW() - $3::interval
       )
     ORDER BY (
       SELECT MAX(signals.occurred_at)
@@ -534,10 +591,9 @@ async function resolveCompanyPageTargetsEnv(
       WHERE signals.org_id = orgs.id
     ) DESC NULLS LAST, orgs.id DESC
     LIMIT $1
-  `, [MAX_COMPANY_SITE_TARGETS_PER_RUN, source])
+  `, [MAX_COMPANY_SITE_TARGETS_PER_RUN, source, refreshInterval, getHiringEvidenceSourceIds()])
 
   const targets = buildCompanySiteTargets(rows)
-  if (targets.length === 0) return {}
 
   const cacheDir = resolve(getScriptDir(), '.cache')
   const targetsFilePath = resolve(cacheDir, tempFileName)
@@ -559,6 +615,7 @@ const COMPANY_SITE_TARGETS_CONFIG: CompanyPageTargetsConfig = {
   targetsFileEnv: 'COMPANY_SITE_TARGETS_FILE',
   inputFileEnv: 'COMPANY_SITE_INPUT_FILE',
   tempFileName: 'company-site-derived-targets.json',
+  refreshInterval: '7 days',
 }
 
 /** company-newsrooms config for the shared company-page targets resolver. */
@@ -568,6 +625,7 @@ const COMPANY_NEWSROOMS_TARGETS_CONFIG: CompanyPageTargetsConfig = {
   inputFileEnv: 'COMPANY_NEWSROOMS_INPUT_FILE',
   providerApiEnv: 'COMPANY_NEWSROOMS_PROVIDER_API_URL',
   tempFileName: 'company-newsrooms-derived-targets.json',
+  refreshInterval: '23 hours',
 }
 
 /** Resolve the company-site targets FILE (thin wrapper over the shared resolver). */
@@ -585,38 +643,55 @@ function resolveCompanyNewsroomsTargetsEnv(
 }
 
 /**
- * Resolve the funding-business-signals GDELT query env from the union of all
- * active client profiles' ICP.
- *
- * Precedence (matches the habr/job-board contract): an explicit operator
- * override already present in `dbSearchEnv` (FUNDING_SIGNALS_GDELT_QUERIES
- * pinned via user_search_preferences) or in process.env ALWAYS wins. Only when
- * nobody pinned it do we derive GDELT queries from the profiles' industries and
- * inject them as FUNDING_SIGNALS_GDELT_QUERIES (newline-joined, the shape
- * parseGdeltQueries consumes). When the profile union yields no industries, we
- * inject nothing and the source falls back to file/provider/no-input.
- *
- * This unlocks funding-business-signals' FREE live-public GDELT mode with zero
- * manual ENV curation: the source runs live-public whenever at least one
- * active profile declares an industry, no paid key needed. The source stays
- * isPrimary:false (admin-triggered, not daily-cron) and context-only (Gate D).
+ * Resolve free GDELT queries for already tracked companies. Broad profile or
+ * industry queries cannot identify the subject company and are therefore not
+ * eligible for automatic ingestion. Each generated query carries the existing
+ * organization name and strong domain identity, and only organizations with
+ * prior hiring evidence are selected. A 23-hour freshness guard prevents the
+ * supporting stage from repeatedly querying the same company.
  */
 async function resolveFundingGdeltEnv(
   dbSearchEnv: Record<string, string>
 ): Promise<Record<string, string>> {
   if (dbSearchEnv.FUNDING_SIGNALS_GDELT_QUERIES) return {}
+  if (dbSearchEnv.FUNDING_SIGNALS_GDELT_QUERIES_JSON) return {}
   if (process.env.FUNDING_SIGNALS_GDELT_QUERIES) return {}
   if (process.env.FUNDING_SIGNALS_GDELT_QUERIES_JSON) return {}
   if (process.env.FUNDING_BUSINESS_SIGNALS_INPUT_FILE) return {}
   if (process.env.FUNDING_SIGNALS_PROVIDER_API_URL) return {}
 
-  const inputs = await loadActiveProfileSearchInputs()
-  if (inputs.length === 0) return {}
-  const unionInput = unionProfileSearchInputs(inputs)
-  const queries = buildProfileGdeltQueries(unionInput)
-  if (queries.length === 0) return {}
+  const pool = getPool()
+  if (!pool) return {}
+  const hiringSources = getHiringEvidenceSourceIds()
+  const { rows } = await pool.query<{ company_name: string | null; company_domain: string | null }>(`
+    SELECT
+      o.name AS company_name,
+      o.domain AS company_domain
+    FROM orgs o
+    JOIN signals hiring_signal ON hiring_signal.org_id = o.id
+    WHERE o.domain IS NOT NULL
+      AND BTRIM(o.domain) <> ''
+      AND o.name IS NOT NULL
+      AND BTRIM(o.name) <> ''
+      AND hiring_signal.signal_type = 'job_posting'
+      AND hiring_signal.source = ANY($1::text[])
+      AND NOT EXISTS (
+        SELECT 1
+        FROM signals context_signal
+        WHERE context_signal.org_id = o.id
+          AND context_signal.source = 'funding-business-signals'
+          AND context_signal.occurred_at >= NOW() - INTERVAL '23 hours'
+      )
+    GROUP BY o.id, o.name, o.domain
+    ORDER BY MAX(hiring_signal.occurred_at) DESC, o.id
+    LIMIT $2
+  `, [hiringSources, MAX_GDELT_QUERIES])
+  const queries = buildTrackedCompanyGdeltQueries(rows.map(row => ({
+    companyName: row.company_name,
+    companyDomain: row.company_domain,
+  })))
 
-  return { FUNDING_SIGNALS_GDELT_QUERIES: queries }
+  return { FUNDING_SIGNALS_GDELT_QUERIES_JSON: JSON.stringify({ queries }) }
 }
 
 /**
@@ -648,19 +723,10 @@ export async function ingestSource(
   const dbSearchEnv = await loadSearchPrefsFromDb(source)
   const searchEnvVars = getSearchEnvVars(source)
 
-  // habr-career: derive search keywords from the union of active profiles'
-  // roles (ingestion is global), unless an explicit keyword pref is set.
-  const habrDerivedEnv =
-    source === 'habr-career' ? await resolveHabrKeywordEnv(dbSearchEnv) : {}
-  // funding-business-signals: derive free live-public GDELT queries from the
-  // union of active profiles' industries, unless an operator pinned them.
+  // funding-business-signals: derive free public GDELT context queries from
+  // tracked companies that already have direct hiring evidence.
   const fundingDerivedEnv =
     source === 'funding-business-signals' ? await resolveFundingGdeltEnv(dbSearchEnv) : {}
-  // egrul-fns: derive the INN list from orgs that still need registry
-  // verification (10-digit legal-entity INNs, ogrn IS NULL), unless an
-  // operator pinned the input.
-  const egrulDerivedEnv =
-    source === 'egrul-fns' ? await resolveEgrulInnsEnv(dbSearchEnv) : {}
   // company-site: derive the targets FILE from orgs the radar is already
   // tracking (domain/website_url + a hiring signal), written to a temp
   // .cache/ file, unless an operator pinned the targets/input file. The
@@ -673,19 +739,24 @@ export async function ingestSource(
   // .cache/ file, unless an operator pinned the targets/input/provider.
   const companyNewsroomsDerivedEnv =
     source === 'company-newsrooms' ? await resolveCompanyNewsroomsTargetsEnv(dbSearchEnv) : {}
+  const governmentDerivedEnv =
+    GOVERNMENT_ENRICHMENT_SOURCE_IDS.has(source)
+      ? await resolveGovernmentEnrichmentInnsEnv(dbSearchEnv)
+      : {}
+  const industryMediaDerivedEnv =
+    source === 'industry-media' ? await resolveIndustryMediaTargetsEnv(dbSearchEnv) : {}
   // Generalised profile-derived search env for the other search-capable
-  // sources (hh, superjob, rabota-rossii). For habr-career,
-  // funding-business-signals, egrul-fns, company-site, and company-newsrooms
-  // the specialised resolvers above already emit their keys (or nothing —
-  // neither company-* source has keyword params), so the generalised resolver
-  // is skipped for them to avoid double-deriving / unnecessary profile loads.
+  // sources (hh, superjob, rabota-rossii). Habr Career accepts only a reviewed
+  // snapshot or explicitly permitted provider and has no derived search keys.
+  // The other specialised sources above already emit their keys. egrul-fns
+  // accepts only an operator-provided official snapshot.
   // Operator overrides in dbSearchEnv always win (resolver strips already-pinned
   // keys).
   const profileDerivedEnv =
-    (source === 'habr-career' || source === 'funding-business-signals' || source === 'egrul-fns' || source === 'company-site' || source === 'company-newsrooms')
+    (source === 'habr-career' || source === 'funding-business-signals' || source === 'industry-media' || source === 'egrul-fns' || source === 'company-site' || source === 'company-newsrooms' || GOVERNMENT_ENRICHMENT_SOURCE_IDS.has(source))
       ? {}
       : await resolveProfileSearchEnv(source, dbSearchEnv)
-  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv, ...egrulDerivedEnv, ...companySiteDerivedEnv, ...companyNewsroomsDerivedEnv }
+  const derivedSearchEnv = { ...profileDerivedEnv, ...fundingDerivedEnv, ...companySiteDerivedEnv, ...companyNewsroomsDerivedEnv, ...governmentDerivedEnv, ...industryMediaDerivedEnv }
 
   return new Promise<IngestResult>((resolvePromise) => {
     // Filter env vars through whitelist — prevent injection of
@@ -782,6 +853,27 @@ export async function ingestAllPrimarySources(
   }
   const sources = getPrimarySourceIds()
   return Promise.all(sources.map(source => ingestSource(source, env)))
+}
+
+/**
+ * Daily dependency-ordered source pipeline: hiring originators first, then
+ * bounded company-owned supporting/context crawls derived from the resulting
+ * organizations. Supporting failures remain visible in the combined result.
+ */
+export async function ingestDailyRadarSources(
+  env?: Record<string, string>
+): Promise<IngestResult[] | NoActiveProfilesResult> {
+  const primaryResults = await ingestAllPrimarySources(env)
+  if (isNoActiveProfiles(primaryResults)) return primaryResults
+
+  const supportingSources = getDailySupportingSourceIds()
+  const supportingResults = await runSupportingSourceScheduler({
+    sources: supportingSources,
+    run: (source) => ingestSource(source, env),
+    db: getPool(),
+    env,
+  })
+  return [...primaryResults, ...supportingResults]
 }
 
 interface ParsedSourceMetrics {

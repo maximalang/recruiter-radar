@@ -28,8 +28,14 @@ const runtime = createStandardSourceRuntime({
     ? {
       liveProvider: input.liveProvider,
       targetsFilePath: input.targetsFilePath,
+      targetsProcessed: input.targetsProcessed,
       crawlSuccesses: input.crawlSuccesses,
       crawlErrors: input.crawlErrors,
+      newsroomPagesDiscovered: input.newsroomPagesDiscovered,
+      feedsDiscovered: input.feedsDiscovered,
+      pagesFetched: input.pagesFetched,
+      feedsFetched: input.feedsFetched,
+      zeroReason: input.zeroReason ?? undefined,
     }
     : {},
 });
@@ -50,8 +56,8 @@ export function resolveCompanyNewsroomsInput() {
   throw new Error('No input configured for company-newsrooms. Set COMPANY_NEWSROOMS_INPUT_FILE, COMPANY_NEWSROOMS_TARGETS_FILE, or provider env.');
 }
 
-export async function resolveCompanyNewsroomsLiveInput({ targetsFilePath }) {
-  const { fetchCompanyPages } = await import('./adapters/company-site-crawl.mjs');
+export async function resolveCompanyNewsroomsLiveInput({ targetsFilePath }, { dependencies = {} } = {}) {
+  const { fetchCompanyNewsrooms } = await import('./adapters/company-newsroom-crawl.mjs');
   const resolvedPath = resolve(process.cwd(), targetsFilePath);
 
   if (!existsSync(resolvedPath)) {
@@ -61,18 +67,41 @@ export async function resolveCompanyNewsroomsLiveInput({ targetsFilePath }) {
   const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const targets = parseJson(rawContent, resolvedPath);
 
-  if (!Array.isArray(targets) || targets.length === 0) {
-    throw new Error('COMPANY_NEWSROOMS_TARGETS_FILE must contain a non-empty JSON array.');
+  if (!Array.isArray(targets)) {
+    throw new Error('COMPANY_NEWSROOMS_TARGETS_FILE must contain a JSON array.');
   }
 
-  const crawlResults = await fetchCompanyPages(targets);
-  const crawlErrors = crawlResults.filter((result) => result.error).length;
-  const records = crawlResults
-    .filter((result) => result.record !== null)
-    .map((result) => mapCrawledNewsroomRecord(result.record));
+  if (targets.length === 0) {
+    return runtime.buildInputFromRecords({
+      inputMode: 'live-public',
+      inputFilePath: null,
+      records: [],
+      extra: buildLiveExtras(resolvedPath, [], 'no-eligible-company-targets'),
+    });
+  }
 
-  if (records.length === 0) {
-    throw new Error(`company-newsrooms live crawl produced 0 usable pages from ${targets.length} targets.`);
+  const crawlResults = await fetchCompanyNewsrooms(targets, { dependencies });
+  const records = crawlResults.flatMap((result) => result.records);
+  const reachableTargets = crawlResults.filter((result) => result.rootFetched).length;
+  const resourcesDiscovered = sum(crawlResults, 'pagesDiscovered') + sum(crawlResults, 'feedsDiscovered');
+  const resourcesFetched = sum(crawlResults, 'pagesFetched') + sum(crawlResults, 'feedsFetched');
+
+  if (reachableTargets === 0) {
+    const details = crawlResults
+      .flatMap((result) => result.errors)
+      .filter(Boolean)
+      .slice(0, 3)
+      .join('; ');
+    throw new Error(
+      `company-newsrooms live crawl could not reach any of ${targets.length} targets.`
+        + (details ? ` ${details}` : ''),
+    );
+  }
+
+  if (records.length === 0 && resourcesDiscovered > 0 && resourcesFetched === 0) {
+    throw new Error(
+      `company-newsrooms discovered ${resourcesDiscovered} newsroom resources, but all were unreachable.`,
+    );
   }
 
   return runtime.buildInputFromRecords({
@@ -80,12 +109,11 @@ export async function resolveCompanyNewsroomsLiveInput({ targetsFilePath }) {
     inputFilePath: null,
     records,
     rejectAllSkipped: true,
-    extra: {
-      liveProvider: 'curated-company-newsrooms',
-      targetsFilePath: resolvedPath,
-      crawlSuccesses: records.length,
-      crawlErrors,
-    },
+    extra: buildLiveExtras(
+      resolvedPath,
+      crawlResults,
+      records.length === 0 ? 'no-company-newsroom-items' : null,
+    ),
   });
 }
 
@@ -108,20 +136,24 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   await runCompanyNewsroomsCli();
 }
 
-function mapCrawledNewsroomRecord(record) {
+function buildLiveExtras(targetsFilePath, crawlResults, zeroReason) {
   return {
-    company_name: record.company_name,
-    company_domain: record.company_domain,
-    company_website_url: record.company_website_url,
-    source_url: record.page_url,
-    headline: record.page_title,
-    title: record.page_title,
-    summary: record.summary,
-    event_type: inferNewsroomEventType(record.signals),
-    publisher: 'company-newsroom',
+    liveProvider: 'company-owned-newsroom-discovery',
+    targetsFilePath,
+    targetsProcessed: crawlResults.length,
+    crawlSuccesses: crawlResults.filter((result) => result.rootFetched).length,
+    crawlErrors: crawlResults.reduce(
+      (total, result) => total + (Array.isArray(result.errors) ? result.errors.length : 0),
+      0,
+    ),
+    newsroomPagesDiscovered: sum(crawlResults, 'pagesDiscovered'),
+    feedsDiscovered: sum(crawlResults, 'feedsDiscovered'),
+    pagesFetched: sum(crawlResults, 'pagesFetched'),
+    feedsFetched: sum(crawlResults, 'feedsFetched'),
+    zeroReason,
   };
 }
 
-function inferNewsroomEventType(signals) {
-  return Array.isArray(signals) && signals.length > 0 ? signals[0] : 'company_news';
+function sum(items, key) {
+  return items.reduce((total, item) => total + (Number(item?.[key]) || 0), 0);
 }

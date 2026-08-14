@@ -15,16 +15,30 @@ export const EVIDENCE_RUNTIME_SOURCE_BINDINGS = {
   'habr-career': 'professional-job-boards',
   'linkedin-company-pages': 'public-vacancy-social-channels',
   'career-pages': 'company-career-pages',
+  greenhouse: 'public-ats',
+  lever: 'public-ats',
+  ashby: 'public-ats',
+  recruitee: 'public-ats',
+  workable: 'public-ats',
+  smartrecruiters: 'public-ats',
   'egrul-fns': 'egrul-egrip',
   'rabota-rossii': 'rabota-rossii-open-data',
   'company-site': 'official-product-surfaces',
-  'tech-job-boards': 'professional-job-boards',
-  'regional-job-boards': 'professional-job-boards',
   'funding-business-signals': 'funding-business-signals',
   fedresurs: 'official-risk-registers',
   'transparent-business-fns': 'official-risk-registers',
   'company-newsrooms': 'official-company-news',
   'industry-media': 'industry-media',
+  'github-company-org': 'industry-media',
+  'youtube-company-channels': 'industry-media',
+  'telegram-company-channels': 'public-vacancy-social-channels',
+  'fns-open-data': 'sme-registry',
+  'government-procurement': 'eis-procurement',
+  'cbr-registry': 'official-address-license-registers',
+  // Rosstat remains a distinct runtime provenance. This binding only selects the
+  // closest governed Evidence Radar policy family for official regional context.
+  'rosstat-open-data': 'government-regional-news',
+  'rospatent-open-data': 'official-address-license-registers',
 } as const satisfies Record<SourceId, string>
 
 export type EvidenceRuntimeSourceBinding = {

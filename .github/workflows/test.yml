@@ -58,6 +58,8 @@ jobs:
           bash -n scripts/deploy/rollback-guard.sh
           bash -n scripts/deploy/recover-deployment.sh
           bash -n scripts/deploy/run-commercial-signal-production-canary.sh
+          bash -n scripts/deploy/run-government-source-sync.sh
+          bash -n scripts/deploy/verify-source-production-runtime.sh
           sh -n scripts/deploy/validate-metrika-id.sh
           bash -n scripts/test/configure-caddy-production.sh
           bash -n scripts/test/deploy-rollback-guard.sh
@@ -65,6 +67,8 @@ jobs:
           bash -n scripts/test/commercial-signal-canary-host-runner.sh
           bash -n scripts/test/docker-entrypoint-reconciliation.sh
           bash -n scripts/test/landing-events-caddy-smoke.sh
+          bash -n scripts/test/government-source-sync-runner.sh
+          bash -n scripts/test/source-production-runtime-preflight.sh
           bash -n scripts/test/landing-events-caddy-smoke-contract.sh
       - name: Verify deployment rollback and runtime preflights
         run: |
@@ -74,6 +78,8 @@ jobs:
           bash scripts/test/configure-caddy-production.sh
           bash scripts/test/docker-entrypoint-reconciliation.sh
           bash scripts/test/landing-events-caddy-smoke-contract.sh
+          bash scripts/test/government-source-sync-runner.sh
+          bash scripts/test/source-production-runtime-preflight.sh
           bash scripts/test/validate-metrika-id.sh
       - name: Validate database migrations
         run: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
@@ -85,6 +91,15 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run db:validate
+      - name: Verify daily radar and delivery state migration lifecycle
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+          DAILY_RADAR_DB_TEST_ACK: isolated
+        run: npm run test:daily-radar:db
+      - name: Benchmark career-page set-based persistence
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run verify:career-pages:persistence-benchmark | tee /tmp/career-pages-persistence-benchmark.log
       - name: Verify Opportunity Engine and Outcome Ledger production runtime
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
@@ -154,6 +169,7 @@ jobs:
           npm run verify:sources:readiness
           npm run verify:sources:coverage
           npm run verify:source:confidence
+          npm run verify:smartrecruiters:confidence
       - name: Upload contract reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -162,6 +178,7 @@ jobs:
           path: |
             /tmp/jest-output.log
             /tmp/fiur-evaluation.json
+            /tmp/career-pages-persistence-benchmark.log
           if-no-files-found: warn
           retention-days: 7
 
@@ -170,6 +187,7 @@ jobs:
     timeout-minutes: 35
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome
       AUTH_V2_DISPOSABLE_DB_CONFIRMED: 'true'
       ENTITLEMENT_DISPOSABLE_DB_CONFIRMED: 'true'
       WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED: 'true'
@@ -195,7 +213,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Install acceptance browser
-        run: npx playwright install --with-deps chromium
+        run: |
+          test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+          npx playwright install-deps chromium
       - name: Verify entitlement migration lifecycle
         run: npm run test:entitlements:migration:db
       - name: Run production acceptance scenarios
@@ -234,6 +254,7 @@ jobs:
     timeout-minutes: 20
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome
       LANDING_BASE_URL: http://127.0.0.1:3000
       LANDING_REQUIRE_ANALYTICS_CONSENT: 'true'
       LANDING_E2E_ALLOW_DB_FIXTURES: 'true'
@@ -275,7 +296,9 @@ jobs:
       - name: Prepare standalone static assets
         run: node apps/web/scripts/prepare-standalone.mjs
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+          npx playwright install-deps chromium
       - name: Start production server
         shell: bash
         env:
@@ -349,6 +372,7 @@ jobs:
           - gate: security-smoke
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome
       AUTH_V2_DISPOSABLE_DB_CONFIRMED: 'true'
       SESSION_SECRET: auth-v2-ci-session-secret-at-least-32-characters
       AUTH_RATE_LIMIT_SECRET: auth-v2-ci-rate-limit-secret-at-least-32-characters
@@ -402,7 +426,9 @@ jobs:
         run: npm run test:auth-v2:tenancy:db
       - name: Install Chromium
         if: matrix.gate == 'e2e' || matrix.gate == 'accessibility'
-        run: npx playwright install --with-deps chromium
+        run: |
+          test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+          npx playwright install-deps chromium
       - name: Auth browser end-to-end contracts
         if: matrix.gate == 'e2e'
         run: |
@@ -451,6 +477,37 @@ jobs:
       - uses: actions/checkout@v7
       - name: Build Docker image
         run: docker build -f apps/web/Dockerfile -t ${{ github.repository }}:${{ github.sha }} .
+      - name: Verify source runtime final image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image='${{ github.repository }}:${{ github.sha }}'
+          network="rr-source-runtime-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          database="rr-source-runtime-db-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cleanup() {
+            docker rm -f "$database" >/dev/null 2>&1 || true
+            docker network rm "$network" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker network create "$network" >/dev/null
+          docker run -d --name "$database" --network "$network" \
+            -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=source_runtime \
+            postgres:16-alpine >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec "$database" pg_isready -U postgres -d source_runtime >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec "$database" pg_isready -U postgres -d source_runtime
+          docker run --rm --network "$network" "$image" \
+            node packages/db/scripts/verify-source-runtime-image.mjs --filesystem --browser
+          docker run --rm --network "$network" \
+            -e DATABASE_URL=postgres://postgres:postgres@"$database":5432/source_runtime \
+            "$image" node packages/db/scripts/migrate.mjs
+          docker run --rm --network "$network" \
+            -e DATABASE_URL=postgres://postgres:postgres@"$database":5432/source_runtime \
+            "$image" node packages/db/scripts/verify-source-runtime-image.mjs --database
       - name: Caddy landing events smoke
         shell: bash
         env:

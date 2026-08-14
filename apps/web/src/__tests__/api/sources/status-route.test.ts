@@ -5,6 +5,7 @@
 
 import { GET } from '@/app/api/sources/status/route';
 import { getDashboardSourceHealth } from '@/lib/dashboard-data';
+import { getAllSourceIds } from '@/lib/sources/source-registry';
 
 jest.mock('@/lib/dashboard-data', () => ({
   getDashboardSourceHealth: jest.fn(),
@@ -48,15 +49,28 @@ describe('GET /api/sources/status', () => {
 
   it('returns the source registry + health with a valid key', async () => {
     mockHealth.mockResolvedValue([
-      { id: 'career-pages', name: 'Career Pages', overall: 90, lastRun: '2026-06-30T00:00:00Z', recordsProcessed: 5, errors: 0, status: 'excellent' },
+      {
+        id: 'career-pages',
+        name: 'Career Pages',
+        overall: 90,
+        lastRun: '2026-06-30T00:00:00Z',
+        recordsProcessed: 500,
+        recordsProcessed1h: 2,
+        recordsProcessed24h: 5,
+        recordsProcessed7d: 40,
+        errors: 0,
+        status: 'excellent',
+      },
     ]);
     const res = await req('secret-key');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body.sources)).toBe(true);
-    expect(body.summary.total).toBe(15);
+    expect(body.summary.total).toBe(getAllSourceIds().length);
     const cp = body.sources.find((s: { id: string }) => s.id === 'career-pages');
     expect(cp.health.recordsLast24h).toBe(5);
+    expect(cp.health.recordsLast1h).toBe(2);
+    expect(cp.health.recordsLast7d).toBe(40);
     expect(cp.isPrimary).toBe(true);
     for (const contextSourceId of ['company-newsrooms', 'industry-media', 'linkedin-company-pages']) {
       const source = body.sources.find((item: { id: string }) => item.id === contextSourceId);
@@ -65,6 +79,17 @@ describe('GET /api/sources/status', () => {
     }
     const superjob = body.sources.find((item: { id: string }) => item.id === 'superjob');
     expect(superjob.requiredEnvVars).toEqual([]);
+    for (const atsSourceId of ['greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters']) {
+      const source = body.sources.find((item: { id: string }) => item.id === atsSourceId);
+      expect(source).toBeDefined();
+      expect(source.isPrimary).toBe(false);
+      expect(source.requiredEnvVars).toEqual([]);
+    }
+    for (const governmentSourceId of ['fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data']) {
+      const source = body.sources.find((item: { id: string }) => item.id === governmentSourceId);
+      expect(source).toBeDefined();
+      expect(source.isPrimary).toBe(false);
+    }
   });
 
   it('still returns registry when health computation fails', async () => {

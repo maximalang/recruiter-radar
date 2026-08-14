@@ -10,6 +10,10 @@ import {
   stripBom,
 } from './adapters/source-records.mjs';
 import { assertOrgSourceRefOwner, resolveOrganizationOwner } from './adapters/organization-resolution.mjs';
+import {
+  extractCompanyOwnedSourceLinks,
+  persistCompanyOwnedSourceLinks,
+} from './adapters/company-owned-source-discovery.mjs';
 import { loadEnvFile, normalizeDomain } from './lib/common-utils.mjs';
 import { upsertSignalEvidenceLineage } from './lib/source-lineage-writer.mjs';
 
@@ -90,7 +94,7 @@ export function resolveCompanySiteInput() {
   );
 }
 
-export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
+export async function resolveCompanySiteLiveInput({ targetsFilePath }, { dependencies = {} } = {}) {
   const { fetchCompanyPages } = await import('./adapters/company-site-crawl.mjs');
   const resolvedPath = resolve(process.cwd(), targetsFilePath);
 
@@ -106,10 +110,21 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
   }
 
   if (targets.length === 0) {
-    throw new Error('COMPANY_SITE_TARGETS_FILE must contain at least one target.');
+    return {
+      inputMode: 'live-public',
+      inputFilePath: null,
+      targetsFilePath: resolvedPath,
+      recordsReceived: 0,
+      crawlSuccesses: 0,
+      crawlErrors: 0,
+      duplicateRecords: 0,
+      normalizedRecords: [],
+      skippedRecords: 0,
+      zeroReason: 'no-eligible-company-targets',
+    };
   }
 
-  const crawlResults = await fetchCompanyPages(targets);
+  const crawlResults = await fetchCompanyPages(targets, { dependencies });
   const crawlErrors = crawlResults.filter((r) => r.error).length;
   const records = crawlResults
     .filter((r) => r.record !== null)
@@ -163,6 +178,7 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
     duplicateRecords: dedupeResult.duplicateRecords,
     normalizedRecords: dedupeResult.records,
     skippedRecords,
+    zeroReason: null,
   };
 }
 
@@ -237,6 +253,13 @@ function normalizeCompanySiteRecord(record, fetchedAt, lineNumber) {
   const summary = toNonEmptyText(record.summary ?? record.description);
   const signals = Array.isArray(record.signals) ? record.signals : parseKeywords(record.keywords);
   const contactPaths = normalizeContactPaths(record.contact_paths ?? record.contactPaths);
+  const rawOwnedSourceLinks = record.owned_source_links ?? record.ownedSourceLinks;
+  const ownedSourceLinks = extractCompanyOwnedSourceLinks(
+    Array.isArray(rawOwnedSourceLinks)
+      ? rawOwnedSourceLinks.map((value) => value?.providerUrl ?? value?.provider_url ?? value)
+      : [],
+    pageUrl,
+  );
   const detectedAt = toTimestampOrNull(record.detected_at ?? record.occurred_at) ?? fetchedAt;
   const externalId = toNonEmptyText(record.external_id ?? record.id);
   const inferredDomain = companyDomain
@@ -279,6 +302,7 @@ function normalizeCompanySiteRecord(record, fetchedAt, lineNumber) {
     summary,
     signals,
     contactPaths,
+    ownedSourceLinks,
     orgName,
     orgDisplayName: companyName ?? inferredDomain,
     primarySourceKey,
@@ -330,6 +354,7 @@ async function ingestCompanySite({ connectionString, input }) {
   let evidenceUpsertCount = 0;
   let evidenceCreatedCount = 0;
   let lineageCreatedCount = 0;
+  let discoveredSourceRefCount = 0;
 
   await client.connect();
 
@@ -339,6 +364,14 @@ async function ingestCompanySite({ connectionString, input }) {
     for (const record of input.normalizedRecords) {
       const orgResult = await upsertOrgSourceRef(client, record);
       orgUpsertCount += orgResult.insertedOrg ? 1 : 0;
+      discoveredSourceRefCount += await persistCompanyOwnedSourceLinks(client, {
+        orgId: orgResult.orgId,
+        companyName: record.orgDisplayName,
+        companyDomain: record.companyDomain,
+        companyWebsiteUrl: record.companyWebsiteUrl,
+        links: record.ownedSourceLinks,
+        observedAt: record.fetchedAt,
+      });
 
       const lineage = await upsertSignalEvidenceLineage(client, {
         orgId: orgResult.orgId,
@@ -366,7 +399,14 @@ async function ingestCompanySite({ connectionString, input }) {
 
     await client.query('COMMIT');
 
-    return { orgUpsertCount, signalUpsertCount, evidenceUpsertCount, evidenceCreatedCount, lineageCreatedCount };
+    return {
+      orgUpsertCount,
+      signalUpsertCount,
+      evidenceUpsertCount,
+      evidenceCreatedCount,
+      lineageCreatedCount,
+      discoveredSourceRefCount,
+    };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -466,6 +506,7 @@ export function buildFetchSummary(input) {
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    zeroReason: input.zeroReason ?? undefined,
   };
 }
 
@@ -485,6 +526,8 @@ function buildIngestSummary(input, stats) {
     evidenceUpsertsCompleted: stats.evidenceUpsertCount,
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
+    discoveredSourceRefs: stats.discoveredSourceRefCount,
+    zeroReason: input.zeroReason ?? undefined,
   };
 }
 
@@ -504,6 +547,8 @@ function buildPipelineSummary(input, stats) {
     evidenceUpsertsCompleted: stats.evidenceUpsertCount,
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
+    discoveredSourceRefs: stats.discoveredSourceRefCount,
+    zeroReason: input.zeroReason ?? undefined,
   };
 }
 
@@ -577,6 +622,7 @@ function buildSignalPayload(record) {
     summary: record.summary,
     signals: record.signals,
     contact_paths: record.contactPaths,
+    owned_source_links: record.ownedSourceLinks,
     fetched_at: record.fetchedAt,
   };
 }

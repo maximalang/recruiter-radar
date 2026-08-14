@@ -9,6 +9,7 @@ import {
   defineSource,
 } from './source-contract.mjs';
 import {
+  DIGEST_SOURCES,
   SOURCE_COVERAGE_TIERS,
   validateSourceCoverage,
 } from './source-coverage-requirements.mjs';
@@ -28,12 +29,18 @@ const hhFetchAbsoluteScriptPath = resolve(scriptDir, './fetch-hh.mjs');
 const hhIngestAbsoluteScriptPath = resolve(scriptDir, './ingest-hh.mjs');
 const careerPagesScriptPath = './packages/db/scripts/source-career-pages.mjs';
 const careerPagesAbsoluteScriptPath = resolve(scriptDir, './source-career-pages.mjs');
+const publicAtsSources = Object.freeze([
+  ['greenhouse', './packages/db/scripts/source-greenhouse.mjs', './source-greenhouse.mjs', 'Greenhouse public job boards discovered from company career pages.'],
+  ['lever', './packages/db/scripts/source-lever.mjs', './source-lever.mjs', 'Lever public postings discovered from company career pages.'],
+  ['ashby', './packages/db/scripts/source-ashby.mjs', './source-ashby.mjs', 'Ashby public Job Posting API boards discovered from company career pages.'],
+  ['recruitee', './packages/db/scripts/source-recruitee.mjs', './source-recruitee.mjs', 'Recruitee public Careers Site API boards discovered from company career pages.'],
+  ['workable', './packages/db/scripts/source-workable.mjs', './source-workable.mjs', 'Workable public account jobs discovered from company career pages.'],
+  ['smartrecruiters', './packages/db/scripts/source-smartrecruiters.mjs', './source-smartrecruiters.mjs', 'SmartRecruiters public Posting API boards discovered from company career pages.'],
+]);
 const companySiteScriptPath = './packages/db/scripts/source-company-site.mjs';
 const companySiteAbsoluteScriptPath = resolve(scriptDir, './source-company-site.mjs');
 const linkedinScriptPath = './packages/db/scripts/source-linkedin-company-pages.mjs';
 const linkedinAbsoluteScriptPath = resolve(scriptDir, './source-linkedin-company-pages.mjs');
-const techJobBoardsScriptPath = './packages/db/scripts/source-tech-job-boards.mjs';
-const techJobBoardsAbsoluteScriptPath = resolve(scriptDir, './source-tech-job-boards.mjs');
 const egrulFnsScriptPath = './packages/db/scripts/source-egrul-fns.mjs';
 const egrulFnsAbsoluteScriptPath = resolve(scriptDir, './source-egrul-fns.mjs');
 const fundingScriptPath = './packages/db/scripts/source-funding-business-signals.mjs';
@@ -52,17 +59,30 @@ const companyNewsroomsScriptPath = './packages/db/scripts/source-company-newsroo
 const companyNewsroomsAbsoluteScriptPath = resolve(scriptDir, './source-company-newsrooms.mjs');
 const industryMediaScriptPath = './packages/db/scripts/source-industry-media.mjs';
 const industryMediaAbsoluteScriptPath = resolve(scriptDir, './source-industry-media.mjs');
-const regionalJobBoardsScriptPath = './packages/db/scripts/source-regional-job-boards.mjs';
-const regionalJobBoardsAbsoluteScriptPath = resolve(scriptDir, './source-regional-job-boards.mjs');
+const githubCompanyOrgScriptPath = './packages/db/scripts/source-github-company-org.mjs';
+const githubCompanyOrgAbsoluteScriptPath = resolve(scriptDir, './source-github-company-org.mjs');
+const youtubeCompanyChannelsScriptPath = './packages/db/scripts/source-youtube-company-channels.mjs';
+const youtubeCompanyChannelsAbsoluteScriptPath = resolve(scriptDir, './source-youtube-company-channels.mjs');
+const telegramCompanyChannelsScriptPath = './packages/db/scripts/source-telegram-company-channels.mjs';
+const telegramCompanyChannelsAbsoluteScriptPath = resolve(scriptDir, './source-telegram-company-channels.mjs');
+const officialGovernmentSources = Object.freeze([
+  ['fns-open-data', './packages/db/scripts/source-fns-open-data.mjs', './source-fns-open-data.mjs', 'Official FNS bulk datasets for company-size, financial, SME, support and tax context.'],
+  ['government-procurement', './packages/db/scripts/source-government-procurement.mjs', './source-government-procurement.mjs', 'Official EIS/Treasury contract awards and supplier context.'],
+  ['cbr-registry', './packages/db/scripts/source-cbr-registry.mjs', './source-cbr-registry.mjs', 'Official Bank of Russia financial-market participant and license context.'],
+  ['rosstat-open-data', './packages/db/scripts/source-rosstat-open-data.mjs', './source-rosstat-open-data.mjs', 'Official aggregate Rosstat market, industry and regional context without company attribution.'],
+  ['rospatent-open-data', './packages/db/scripts/source-rospatent-open-data.mjs', './source-rospatent-open-data.mjs', 'Official Rospatent trademark and patent context for legal entities.'],
+]);
 const registry = new Map();
 const sourceReadinessContract = getSourceReadinessContract();
 // Mirrors the TS registry `isPrimary: true` set (apps/web/lib/sources/source-registry.ts):
 // sources enrolled in the daily-radar ingestion pipeline. Kept in sync manually
 // because the TS registry is not importable from this .mjs build context.
-// `inDigest` below is derived as (primary ingestion) AND (promotionStatus 'digest-allowed'),
-// so a source that regresses out of digest-allowed auto-drops from the digest.
+// Scheduling and digest eligibility are separate: hosted ATS aliases are
+// ingested by the unified career-pages scheduler but persist under their real
+// provider ids. `inDigest` therefore uses the canonical digest list + policy,
+// not membership in this scheduler set.
 const PRIMARY_INGESTION_SOURCES = Object.freeze(
-  new Set(['hh', 'superjob', 'habr-career', 'rabota-rossii', 'career-pages'])
+  new Set(['hh', 'superjob', 'rabota-rossii', 'career-pages'])
 );
 registerSource(
   defineSource({
@@ -154,6 +174,20 @@ registerSource(
   }),
 );
 
+for (const [id, scriptPath, localScriptPath, description] of publicAtsSources) {
+  registerRunnableScriptSource({
+    id,
+    kind: 'career-page',
+    sourceClass: 'company-surface',
+    evidenceTier: 'high-signal',
+    defaultConfidence: 0.9,
+    fetchModes: ['live-public'],
+    description,
+    scriptPath,
+    absoluteScriptPath: resolve(scriptDir, localScriptPath),
+  });
+}
+
 registerSource(
   defineSource({
     id: 'linkedin-company-pages',
@@ -189,47 +223,14 @@ registerSource(
 
 registerSource(
   defineSource({
-    id: 'tech-job-boards',
-    kind: 'job-board',
-    sourceClass: 'primary-platform',
-    evidenceTier: 'medium-signal',
-    defaultConfidence: 0.68,
-    status: 'active',
-    fetchModes: ['file', 'live-public', 'provider-token'],
-    description: 'Specialized tech job boards and compliant job snapshot providers beyond HH for additional market coverage.',
-    capabilities: SOURCE_ACTIONS,
-    scripts: {
-      fetch: techJobBoardsScriptPath,
-      ingest: techJobBoardsScriptPath,
-      pipeline: techJobBoardsScriptPath,
-    },
-    actionMap: createActionMap({
-      status: 'active',
-      capabilities: SOURCE_ACTIONS,
-      scripts: {
-        fetch: techJobBoardsScriptPath,
-        ingest: techJobBoardsScriptPath,
-        pipeline: techJobBoardsScriptPath,
-      },
-    }),
-    runner: {
-      fetch: () => runSourceScript(techJobBoardsAbsoluteScriptPath, 'fetch'),
-      ingest: () => runSourceScript(techJobBoardsAbsoluteScriptPath, 'ingest'),
-      pipeline: () => runSourceScript(techJobBoardsAbsoluteScriptPath, 'pipeline'),
-    },
-  }),
-);
-
-registerSource(
-  defineSource({
     id: 'egrul-fns',
     kind: 'company-registry',
     sourceClass: 'registry-reference',
     evidenceTier: 'high-signal',
     defaultConfidence: 0.9,
     status: 'active',
-    fetchModes: ['file', 'live-public', 'provider-token'],
-    description: 'EGRUL/FNS company registry data for legal entity verification and enrichment.',
+    fetchModes: ['file'],
+    description: 'Reviewed snapshots from the official FNS integration for legal entity verification and enrichment.',
     capabilities: SOURCE_ACTIONS,
     scripts: {
       fetch: egrulFnsScriptPath,
@@ -343,6 +344,25 @@ registerRunnableScriptSource({
   absoluteScriptPath: fedresursAbsoluteScriptPath,
 });
 
+for (const [id, scriptPath, relativeScriptPath, description] of officialGovernmentSources) {
+  const isRegistry = id === 'fns-open-data' || id === 'cbr-registry' || id === 'rospatent-open-data';
+  registerRunnableScriptSource({
+    id,
+    kind: isRegistry ? 'company-registry' : 'business-signal',
+    sourceClass: isRegistry ? 'registry-reference' : 'market-signal',
+    evidenceTier: 'context-only',
+    defaultConfidence: id === 'cbr-registry' ? 0.9 : id === 'fns-open-data' ? 0.88 : 0.66,
+    fetchModes: id === 'cbr-registry'
+      ? ['file', 'live-public']
+      : id === 'fns-open-data' || id === 'rospatent-open-data'
+        ? ['file', 'official-snapshot']
+        : ['file'],
+    description,
+    scriptPath,
+    absoluteScriptPath: resolve(scriptDir, relativeScriptPath),
+  });
+}
+
 registerRunnableScriptSource({
   id: 'superjob',
   kind: 'job-board',
@@ -350,7 +370,7 @@ registerRunnableScriptSource({
   evidenceTier: 'medium-signal',
   defaultConfidence: 0.66,
   fetchModes: ['file', 'provider-token'],
-  description: 'SuperJob vacancy coverage through app-key/provider mode; not promoted to digest until confidence gates pass.',
+  description: 'SuperJob vacancy coverage through the official app-key API with explicit direct-employer eligibility.',
   scriptPath: superjobScriptPath,
   absoluteScriptPath: superjobAbsoluteScriptPath,
 });
@@ -361,8 +381,8 @@ registerRunnableScriptSource({
   sourceClass: 'primary-platform',
   evidenceTier: 'medium-signal',
   defaultConfidence: 0.69,
-  fetchModes: ['file', 'live-public', 'provider-token'],
-  description: 'Habr Career IT vacancy coverage via snapshots/provider/live HTML; live-public pending robots/legal review and confidence gates before digest use.',
+  fetchModes: ['file', 'provider-token'],
+  description: 'Habr Career evidence from reviewed snapshots or an explicitly permitted provider; direct commercial HTML collection is disabled.',
   scriptPath: habrCareerScriptPath,
   absoluteScriptPath: habrCareerAbsoluteScriptPath,
 });
@@ -385,22 +405,33 @@ registerRunnableScriptSource({
   sourceClass: 'market-signal',
   evidenceTier: 'context-only',
   defaultConfidence: 0.52,
-  fetchModes: ['file', 'provider-token'],
-  description: 'Curated industry media context after manual/legal source review; never lead-originating.',
+  fetchModes: ['file', 'live-public', 'provider-token'],
+  description: 'Curated public RSS/Atom company mentions from allowlisted publishers; context-only and never lead-originating.',
   scriptPath: industryMediaScriptPath,
   absoluteScriptPath: industryMediaAbsoluteScriptPath,
 });
 
 registerRunnableScriptSource({
-  id: 'regional-job-boards',
-  kind: 'job-board',
-  sourceClass: 'primary-platform',
-  evidenceTier: 'medium-signal',
-  defaultConfidence: 0.58,
-  fetchModes: ['file', 'provider-token'],
-  description: 'Regional job-board snapshots/provider feeds after legal and robots review; not in digest by default.',
-  scriptPath: regionalJobBoardsScriptPath,
-  absoluteScriptPath: regionalJobBoardsAbsoluteScriptPath,
+  id: 'github-company-org',
+  kind: 'company-site',
+  sourceClass: 'company-surface',
+  evidenceTier: 'context-only',
+  defaultConfidence: 0.45,
+  fetchModes: ['file', 'live-public'],
+  description: 'Recent public repository context from identity-verified company GitHub organizations; never lead-originating.',
+  scriptPath: githubCompanyOrgScriptPath,
+  absoluteScriptPath: githubCompanyOrgAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'youtube-company-channels', kind: 'company-site', sourceClass: 'company-surface', evidenceTier: 'context-only', defaultConfidence: 0.48,
+  fetchModes: ['file', 'provider-token'], description: 'Public videos from automatically ownership-proven company channels via the quota-aware YouTube Data API; never lead-originating.',
+  scriptPath: youtubeCompanyChannelsScriptPath, absoluteScriptPath: youtubeCompanyChannelsAbsoluteScriptPath,
+});
+registerRunnableScriptSource({
+  id: 'telegram-company-channels', kind: 'company-site', sourceClass: 'company-surface', evidenceTier: 'context-only', defaultConfidence: 0.5,
+  fetchModes: ['file', 'provider-token'], description: 'Identity-bound public corporate broadcast channels read through authenticated MTProto only; never lead-originating.',
+  scriptPath: telegramCompanyChannelsScriptPath, absoluteScriptPath: telegramCompanyChannelsAbsoluteScriptPath,
 });
 
 export function listSources() {
@@ -745,7 +776,7 @@ export function exportSourceCoverageDetails() {
         )?.[0] || 'none',
         // Runtime capability and policy eligibility do not establish live readiness.
         inDigest:
-          PRIMARY_INGESTION_SOURCES.has(source.id) &&
+          DIGEST_SOURCES.includes(source.id) &&
           source.promotionStatus === 'digest-allowed',
       };
     }),

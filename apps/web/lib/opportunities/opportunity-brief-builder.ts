@@ -1,5 +1,6 @@
 import type { HiringEpisodeCandidate } from './hiring-episode-detection'
 import type { OpportunityScoreResult } from './opportunity-scoring'
+import { temporalContextFromMetadata } from './temporal-context'
 
 export interface OpportunityBrief {
   title: string
@@ -37,7 +38,7 @@ export class OpportunityBriefBuilder {
 
     return {
       title: buildTitle(organizationName, input.episode, family),
-      whyNow: buildWhyNow(input.episode),
+      whyNow: appendTemporalWhyNow(buildWhyNow(input.episode), input.episode),
       problemHypothesis: buildProblemHypothesis(input.episode),
       recommendedAngle: buildRecommendedAngle(input.episode, family),
       recommendedPersona: buildRecommendedPersona(family),
@@ -48,6 +49,17 @@ export class OpportunityBriefBuilder {
         'Оценка основана на публичных сигналах найма и не подтверждает коммерческие условия, готовность работать с агентством или конкретного ЛПР.',
     }
   }
+}
+
+function appendTemporalWhyNow(
+  base: string,
+  episode: HiringEpisodeCandidate,
+): string {
+  const acceleration = temporalContextFromMetadata(
+    episode.metadata,
+  ).strongestAcceleration
+  if (!acceleration || acceleration.change <= 0) return base
+  return `${base} Активные вакансии выросли с ${acceleration.previous} до ${acceleration.current} за ${acceleration.windowDays} дней (+${acceleration.change}).`
 }
 
 function buildAgencyFitExplanation(context: AgencyBriefContext): string {

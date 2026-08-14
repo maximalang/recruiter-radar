@@ -1,6 +1,7 @@
 import {
   DEFAULT_HIRING_EPISODE_CONFIG,
   HiringEpisodeDetectionService,
+  canonicalizeVacancies,
   isEpisodeContinuation,
   isEpisodeInactive,
   type HiringSignalInput,
@@ -185,6 +186,76 @@ describe('HiringEpisodeDetectionService', () => {
     expect(cluster?.signalIds).toEqual(['hh-java', 'career-java', 'node', 'python'])
     expect(cluster?.vacancyCount).toBe(3)
     expect(cluster?.metadata.publicationCount).toBe(4)
+  })
+
+  it('keeps cross-source provenance while fallback-matching one vacancy once', () => {
+    const vacancies = canonicalizeVacancies([
+      signal('ats-java', 7, {
+        title: 'Senior Java Developer',
+        region: 'Москва',
+        source: 'career-pages',
+        sourceUrl: 'https://employer.example/jobs/java',
+        evidenceIds: ['evidence-owned'],
+      }),
+      signal('hh-java-copy', 6, {
+        title: 'senior java developer',
+        region: 'москва',
+        source: 'hh',
+        sourceUrl: 'https://hh.ru/vacancy/999',
+        evidenceIds: ['evidence-platform'],
+      }),
+    ])
+
+    expect(vacancies).toHaveLength(1)
+    expect(vacancies[0].publications.map((item) => item.id)).toEqual([
+      'ats-java',
+      'hh-java-copy',
+    ])
+    expect(vacancies[0].evidenceIds).toEqual([
+      'evidence-owned',
+      'evidence-platform',
+    ])
+  })
+
+  it('does not collapse a newly reopened role outside the publication window', () => {
+    const vacancies = canonicalizeVacancies([
+        signal('old-java', 55, { title: 'Java developer', sourceUrl: null }),
+        signal('new-java', 2, { title: 'java developer', sourceUrl: null }),
+        signal('node', 4, { title: 'Node.js developer' }),
+      ])
+
+    expect(vacancies).toHaveLength(3)
+  })
+
+  it('does not bridge fallback matches across the publication window', () => {
+    const vacancies = canonicalizeVacancies([
+      signal('day-40', 40, { title: 'Java developer', sourceUrl: null }),
+      signal('day-20', 20, { title: 'java developer', sourceUrl: null }),
+      signal('day-0', 0, { title: 'JAVA DEVELOPER', sourceUrl: null }),
+    ])
+
+    expect(vacancies).toHaveLength(2)
+    expect(vacancies.every((vacancy) => vacancy.publications.length < 3)).toBe(true)
+  })
+
+  it('canonicalizes tracking parameters before comparing destination URLs', () => {
+    const vacancies = canonicalizeVacancies([
+        signal('owned', 5, {
+          title: 'Backend developer',
+          source: 'career-pages',
+          sourceUrl: 'https://jobs.example.test/opening/42?utm_source=careers#apply',
+        }),
+        signal('platform', 4, {
+          title: 'Ведущий разработчик',
+          source: 'hh',
+          sourceUrl: 'https://jobs.example.test/opening/42?ref=hh',
+        }),
+        signal('node', 3, { title: 'Node.js developer' }),
+        signal('python', 2, { title: 'Python developer' }),
+      ])
+
+    expect(vacancies).toHaveLength(3)
+    expect(vacancies.find((vacancy) => vacancy.publications.length === 2)).toBeDefined()
   })
 
   it('keeps one canonical vacancy when a stable external id outlives title changes', () => {

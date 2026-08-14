@@ -1,6 +1,6 @@
 # Recruiter Radar — текущее состояние
 
-**Обновлено:** 2026-08-12
+**Обновлено:** 2026-08-14
 **Назначение:** единая runtime-grounded точка входа для архитектуры, доступа, платежей, доставки, Commercial Signal quality и production readiness.
 
 При конфликте применяются `AGENTS.md` и `CLAUDE.md`, затем фактический runtime-код и миграции. Датированные планы, отчёты и rollout notes являются историческими. Production-статусы ниже относятся только к явно указанным SHA, workflow run и live-проверкам; один статус не выводится из другого.
@@ -11,7 +11,7 @@
 - PostgreSQL хранит аккаунты, workspace membership, профили Radar, evidence, opportunities, feedback, entitlement grants, checkout orders и delivery audit state.
 - Tenant boundary задаётся `user -> workspace -> data owner -> client profile`; платёж не определяет владельца данных.
 - FIUR остаётся детерминированной моделью `Fit + Intent + Urgency + Reachability`. LLM может сжимать уже существующее evidence, но не создаёт факт найма и не обходит confidence gate.
-- Основной workflow запускается через `POST /api/cron/daily-radar`; retry доставки — через `POST /api/cron/notification-delivery-retry`. n8n не владеет продуктовой бизнес-логикой.
+- GitHub Actions является единственным repository-authorized production clock: основной и recovery-триггеры вызывают fenced `POST /api/cron/daily-radar`, а PostgreSQL владеет eligibility/backoff; retry notification jobs идёт через `POST /api/cron/notification-delivery-retry`. n8n не владеет продуктовой бизнес-логикой.
 
 ## Authentication
 
@@ -97,13 +97,40 @@ Stage 2 operational states:
 
 ## Source registry
 
+Standard source runs persist PII-free operational outcomes in append-only
+`source_run_observations` and project current counters through `source_health_state`.
+The protected source status endpoint reports successful fetch/normalization timestamps,
+accepted/duplicate/rejected counts, blocked/rate-limited outcomes, extraction methods,
+latency and consecutive failures. These metrics require migration
+`20260814030000_add_source_temporal_health.sql`; signal freshness is no longer used as
+a substitute for source runtime health.
+
+Temporal intelligence stores daily organization/source observations in
+`source_temporal_observations` and deterministic transitions in
+`source_temporal_derived_events`. Vacancy 7/14/30-day deltas, role reopenings,
+geography/function expansion, FNS trajectories, procurement acceleration and
+Rospatent changes are derived events, not new raw source IDs. The first observation
+is a baseline and emits no transition.
+
+Supporting sources use persisted `source_scheduler_state` with source-specific cadence,
+global/per-host concurrency, `next_eligible_run_at`, cooldown and credential-gated outcomes.
+Source health compares successful fetch/normalization against that source cadence; expected-zero
+success is healthy and an attempted-but-failed run is never presented as fresh.
+
+Vacancies use canonical identity, publication, observation and lifecycle tables under the
+`canonical_*_v1` contract. Closed/reopened/changed events and 7/14/30-day derived deltas feed
+why-now, scoring, Commercial Signal and Evidence Radar with typed temporal evidence.
+
 `status: active` означает runnable contract, а не одновременно live-configured, legally approved и digest-allowed. Machine-readable source of truth для priority, confidence, lead eligibility и promotion status — `packages/db/source-policy.json`; `packages/db/scripts/source-registry.mjs` проецирует эту policy в runtime readiness и coverage report.
 
-Operational readiness отдельно зафиксирован в `packages/db/source-readiness.json`. На 2026-08-12
-все 15 источников имеют implemented/fixture-tested/contract-tested состояние; только
-`career-pages` и `rabota-rossii` подтверждены как live-reachable, ни один источник не заявлен
-live-verified. Для остальных явно перечислены provider/config, legal, confidence или внешний
-network blocker. Policy eligibility нельзя трактовать как текущее runtime health.
+Operational readiness отдельно зафиксирован в `packages/db/source-readiness.json`, а классы
+доступа A/B/C/D и credential names без значений — в `packages/db/source-credentials.json`.
+Текущая таблица по всем canonical sources, live proof, blockers и user actions генерируется
+в `docs/source-status.generated.md`; narrative не дублирует эти изменяемые статусы.
+HH application OAuth реализован, но authenticated live proof ждёт уже поданную заявку и
+`HH_CLIENT_ID`/`HH_CLIENT_SECRET`; повторная регистрация не требуется. SuperJob уже
+зарегистрирован, настроен и live-verified. Policy eligibility нельзя трактовать как текущее
+runtime health или production scheduling.
 
 Source ingestion сохраняет append-only `source_signal_evidence_lineage_v1`: signal и evidence
 привязаны к одной organization вместе с source family, original URL/external ID,
@@ -111,15 +138,13 @@ fetch/publish/normalize timestamps, extraction method, confidence snapshot и or
 resolution reason. Payload digest candidate хранит точные signal/evidence/source-record IDs и
 URLs, выбранные для candidate, вместо восстановления provenance из изменяемого состояния.
 
-На 2026-08-11 `superjob` и `habr-career` имеют `blocked-from-digest-pending-confidence-tests`. Наличие runnable ingestion path или исторически успешного live probe не делает их digest-delivering; документация не должна опережать canonical promotion status.
+ATS обнаруживаются единым `career-pages` crawler и хранятся под
+реальными source IDs; тонкие per-provider scripts — operator entrypoints, а не
+дублирующие daily crawlers. Live-verified transport и independent digest promotion остаются
+раздельными gates; итоговое решение берётся только из canonical policy.
 
-Зарегистрированные source IDs:
-
-- `hh`, `rabota-rossii`, `career-pages` — primary hiring evidence;
-- `habr-career`, `tech-job-boards`, `superjob`, `regional-job-boards`, `linkedin-company-pages` — secondary/provider-gated hiring evidence;
-- `egrul-fns`, `transparent-business-fns`, `fedresurs`, `company-site`, `company-newsrooms`, `industry-media`, `funding-business-signals` — enrichment/context, не самостоятельный обход direct-hiring proof.
-
-Promotion разрешается только registry policy и live verifier. Фиксированное количество источников в narrative документации не является контрактом.
+Promotion разрешается только registry policy и live verifier. Фиксированное количество или
+ручной перечень источников в narrative документации не является контрактом.
 
 ## Serving contract lead и opportunity
 
@@ -187,7 +212,7 @@ Promotion разрешается только registry policy и live verifier. 
 
 - реальные production secrets и provider credentials;
 - выбранный и зарегистрированный RF payment provider, договор, чеки и refund/cancellation process;
-- реальный идентифицируемый `HH_USER_AGENT`, controlled live source matrix и legal/robots/provider approvals;
+- завершение уже поданной HH application review, затем OAuth credentials; controlled live source matrix и legal/robots/provider approvals;
 - production Redis/shared rate-limit store для multi-instance deployment;
 - внешний monitoring/alerting backend, SLO и retention;
 - реальные independent human labels для anonymized frozen gold set и достаточный validation/temporal holdout до любого `QUALITY_VALIDATED` или Quality canary claim.
@@ -200,6 +225,10 @@ npm run web:check
 npm run test:types --workspace @recruiter-radar/web
 npm test --workspace @recruiter-radar/web -- --runInBand
 npm run db:validate
+npm run verify:sources:readiness
+npm run verify:source:credentials
+npm run verify:docs:source-status
+npm run verify:source:temporal-health
 npm run test:commercial-signal:evaluation-v2
 node --test packages/db/scripts/lib/commercial-signal-gold-set-v1.test.mjs packages/db/scripts/lib/commercial-signal-gold-set-export-v1.test.mjs
 npm run test:production:acceptance

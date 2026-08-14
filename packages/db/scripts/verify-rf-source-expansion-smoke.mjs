@@ -8,7 +8,6 @@ import { buildFetchSummary as buildSuperjobSummary, resolveSuperjobConfiguredInp
 import { buildFetchSummary as buildHabrSummary, resolveHabrCareerConfiguredInput } from './source-habr-career.mjs';
 import { buildFetchSummary as buildNewsroomsSummary, resolveCompanyNewsroomsConfiguredInput } from './source-company-newsrooms.mjs';
 import { buildFetchSummary as buildMediaSummary, resolveIndustryMediaConfiguredInput } from './source-industry-media.mjs';
-import { buildFetchSummary as buildRegionalSummary, resolveRegionalJobBoardsConfiguredInput } from './source-regional-job-boards.mjs';
 
 const scriptDir = fileURLToPath(new URL('.', import.meta.url));
 const jobFixturePath = resolve(scriptDir, './rf-job-sources-smoke-fixture.json');
@@ -91,19 +90,6 @@ fileModeResults.push(await verifyFileMode({
   expectedRecordsReceived: 4,
   expectedSkippedRecords: 2,
 }));
-fileModeResults.push(await verifyFileMode({
-  source: 'regional-job-boards',
-  env: 'REGIONAL_JOB_BOARDS_INPUT_FILE',
-  fixturePath: jobFixturePath,
-  resolveInput: resolveRegionalJobBoardsConfiguredInput,
-  buildSummary: buildRegionalSummary,
-  expectedPrimaryKey: 'domain:tech-rf-smoke.example',
-  expectedOrgExternalId: null,
-  expectedSignalType: 'job_posting',
-  expectedRecordsReceived: 4,
-  expectedSkippedRecords: 2,
-}));
-
 const providerMode = await verifyProviderMode();
 const newsroomsLiveMode = await verifyNewsroomsLiveMode();
 
@@ -218,9 +204,9 @@ async function verifyNewsroomsLiveMode() {
     ok: true,
     status: 200,
     statusText: 'OK',
-    url: 'https://newsroom-smoke.example/news/region-launch',
+    url: 'https://newsroom-smoke.example/news/',
     headers: { get: () => 'text/html; charset=utf-8' },
-    text: async () => '<!doctype html><html><head><title>Regional launch</title><meta name="description" content="Newsroom Smoke Co opens a regional operations hub"></head><body><main>Newsroom Smoke Co announces a regional launch and expansion.</main></body></html>',
+    text: async () => '<!doctype html><html><body><main><a href="/news/region-launch">12 августа 2026 Newsroom Smoke Co opens a regional operations hub</a></main></body></html>',
   });
 
   try {
@@ -229,9 +215,10 @@ async function verifyNewsroomsLiveMode() {
     const input = await resolveCompanyNewsroomsConfiguredInput();
     const summary = buildNewsroomsSummary(input);
     assert.equal(summary.inputMode, 'live-public');
-    assert.equal(summary.liveProvider, 'curated-company-newsrooms');
+    assert.equal(summary.liveProvider, 'company-owned-newsroom-discovery');
     assert.equal(summary.recordsReceived, 1);
     assert.equal(summary.normalizedRecords, 1);
+    assert.equal(summary.newsroomPagesDiscovered, 1);
     assert.equal(input.normalizedRecords[0].evidenceRole, 'context');
     return { inputMode: summary.inputMode, normalizedRecords: summary.normalizedRecords };
   } finally {

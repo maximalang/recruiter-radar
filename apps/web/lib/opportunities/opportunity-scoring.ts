@@ -3,6 +3,7 @@ import type {
   HiringEpisodeCandidate,
   HiringEpisodeStatus,
 } from './hiring-episode-detection'
+import { temporalContextFromMetadata } from './temporal-context'
 
 export const OPPORTUNITY_SCORING_VERSION = 'opportunity-v1' as const
 
@@ -294,21 +295,35 @@ function scoreTiming(
 ): OpportunityComponentScore {
   const trend = stringMetadata(episode.metadata, 'activityTrend')
   const repeated = numberMetadata(episode.metadata, 'repeatedVacancyCount')
+  const temporal = temporalContextFromMetadata(episode.metadata)
+  const acceleration = temporal.strongestAcceleration
+  const temporalBoost = acceleration && acceleration.change > 0
+    ? Math.min(0.15, 0.05 + acceleration.change * 0.01)
+    : 0
   const score = clamp01(
     episode.freshnessScore * 0.55 +
       episode.strengthScore * 0.25 +
       (trend === 'rising' || trend === 'restart' ? 0.12 : 0) +
-      (repeated > 0 || trend === 'repeated' ? 0.08 : 0),
+      (repeated > 0 || trend === 'repeated' ? 0.08 : 0) +
+      temporalBoost,
   )
+  const reasons = [evidenceReason(
+    episode.freshnessScore >= 0.7 ? 'FRESH_EPISODE' : 'AGING_EPISODE',
+    episode.freshnessScore >= 0.7
+      ? 'Новые сигналы появились в актуальном окне.'
+      : 'Актуальное окно episode приближается к завершению.',
+    evidenceIds,
+  )]
+  if (temporalBoost > 0 && acceleration) {
+    reasons.push(evidenceReason(
+      'TEMPORAL_HIRING_ACCELERATION',
+      `Активные вакансии выросли на ${acceleration.change} за ${acceleration.windowDays} дней.`,
+      temporal.evidenceIds.length > 0 ? temporal.evidenceIds : evidenceIds,
+    ))
+  }
   return {
     score,
-    reasons: [evidenceReason(
-      episode.freshnessScore >= 0.7 ? 'FRESH_EPISODE' : 'AGING_EPISODE',
-      episode.freshnessScore >= 0.7
-        ? 'Новые сигналы появились в актуальном окне.'
-        : 'Актуальное окно episode приближается к завершению.',
-      evidenceIds,
-    )],
+    reasons,
   }
 }
 

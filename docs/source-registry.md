@@ -1,288 +1,103 @@
-# Source Registry — canonical state
+# Source registry
 
-> **Human-readable projection of "what feeds the radar, and how far each source is trusted."**
-> `packages/db/source-policy.json` is the machine-readable source of truth for priority,
-> confidence, lead eligibility, and promotion status. `packages/db/scripts/source-registry.mjs`
-> projects that policy into runtime readiness and coverage reporting. When this document
-> disagrees with either runtime input, update the document to match the machine-readable
-> policy; never relax policy to preserve prose. Per-source legal/robots reviews live in
-> `docs/source-review/`; cross-cutting policy in `docs/source-priority-policy.md`.
+The canonical source inventory and its current operational state are generated in
+[`source-status.generated.md`](source-status.generated.md). The generator reads
+`source-policy.json`, `source-readiness.json`, and `source-credentials.json` directly;
+manual status tables are intentionally not maintained here.
 
-Last reconciled: **2026-08-12** against `source-policy.json`, `source-readiness.json`,
-`source-registry.mjs`, `source-digest-evidence.sql`, and `docs/source-review/`.
+## Contract ownership
 
----
+- `packages/db/scripts/source-registry.mjs` owns adapter registration and runtime actions.
+- `apps/web/lib/sources/source-registry.ts` owns web ingestion enrollment and safe env allowlists.
+- `apps/web/lib/sources/source-schedules.ts` owns source cadence, host keys and provenance-to-execution mapping.
+- `packages/db/source-policy.json` is the only promotion/lead-eligibility authority.
+- `packages/db/source-readiness.json` separates implementation, fixture/contract proof, configuration, reachability, live DB proof, and blockers.
+- `packages/db/source-credentials.json` classifies A/B/C/D access without storing secrets.
 
-## Policy and observed-runtime snapshot (2026-08-12 reconciliation)
+`status: active` means a runnable registered contract. It does not imply digest eligibility,
+current production configuration, legal approval, live verification, deployment, or scheduling.
 
-**Digest-allowed by canonical policy: 3** — `hh`, `career-pages`, and `rabota-rossii`.
-`superjob` and `habr-career` remain
-`blocked-from-digest-pending-confidence-tests`: runnable or historically healthy probes do not
-make either source digest-delivering. Operational health is separate from promotion status and
-must be verified against the current environment.
+## Pipeline and scheduling
 
-| source | live probe | status | note |
-|---|---|---|---|
-| rabota-rossii | current live fetch+normalize: 200/200 records | digest-allowed; live-reachable, not full-path verified | isolated live ingest/evidence run still required |
-| career-pages | current controlled crawl: 5/12 targets parsed, 381 normalized | digest-allowed; live-reachable, not full-path verified | 7 targets explicitly page-unreachable; isolated live ingest/evidence run still required |
-| habr-career | historical HTTP 200 | blocked from digest | confidence and legal/robots gates remain open in policy |
-| superjob | historical HTTP 301 without app-id | blocked from digest | app-id/provider path still requires confidence promotion |
-| hh | current `/areas` HTTP 200; `/vacancies` HTTP 403 | digest-allowed; operationally blocked | requires verified RU egress or `HH_PROXY_URL`, then the isolated live-pipeline verifier |
-| egrul-fns / transparent-business / fedresurs | n/a | enrichment/context only | never originate leads |
-| tech-job-boards / linkedin / regional / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set |
+Source refresh and daily delivery are separate production clocks:
 
-**Still blocked, documented in `docs/source-review/`:** avito (robots disallow `/api/`+catalog),
-rabota.ru (BI.ZONE WAF), zarplata.ru (= HH backend, same 403), Telegram channels (rejected by
-policy — social/personal scraping is out of product scope; see Rejected table + `telegram-channels-review.md`).
+1. `.github/workflows/source-refresh-clock.yml` runs hourly and asks the persisted scheduler to execute only sources currently due;
+2. primary/direct hiring and supporting/context sources therefore keep their declared 1h/3h/6h/12h/24h/7d cadence instead of inheriting a daily clock;
+3. `.github/workflows/daily-radar-clock.yml` provides the 06:15 UTC primary trigger and 09:15 UTC recovery probe; `daily_radar_run_state` rejects healthy duplicates, owns retry eligibility/backoff, and permits a fenced retry or stale takeover;
+4. official snapshot refreshes run from `.github/workflows/government-source-clocks.yml`, then the normal source scheduler consumes the activated snapshot on its next eligible run;
+5. temporal observations/events and digest delivery consume the resulting persisted evidence.
 
-**Coverage improvement this cycle:** rabota-rossii went from one ~25–50-record federal page to
-region-iterated paged fetch (each of ~85 RF region codes exposes an independent offset window),
-and career-pages — the only direct high-signal surface — now runs on every daily-radar cycle
-instead of never. Net: the highest-trust source is scheduled daily, and the broadest official RF
-feed multiplies its per-run company coverage; scheduling alone is not live verification.
+A PostgreSQL session advisory lock serializes the whole source-refresh scheduler across processes.
+Inside that lock, `source_scheduler_state` persists `next_eligible_run_at`, cooldown and outcome
+state, while the scheduler enforces its global concurrency bound and per-host limits. Missing
+registration credentials are inactive/credential-gated rather than a daily-radar failure. HTTP
+429 outcomes persist a cooldown instead of retrying inside the same run.
 
----
+GitHub Actions schedule files are repository evidence, not proof that the default-branch schedule
+is currently active. Before merge/deploy the host preflight therefore reports
+`productionScheduled:false` with `scheduleAuthority:"github-actions"`; schedule activation must be
+verified independently after the workflow exists on `main`.
 
-## How to read this
+## Evidence and target provenance
 
-Every source carries five governance fields (from `sourceReadinessPolicy` in the registry):
+Every accepted source record resolves to a company-level organization, then persists signal,
+evidence, and append-only lineage with source ownership, URL/external ID, timestamps,
+extraction method, confidence snapshot, and organization-resolution reason. Personal profiles,
+personal contact data, participants, subscribers, and individual developer identities are not
+source inputs.
 
-| Field | Meaning |
-|---|---|
-| **priority** | P1 = core coverage, P2 = expansion, P3 = context/long-tail. |
-| **leadEligibility** | Whether a signal from this source can *originate* a lead. See vocabulary below. |
-| **maturity** | How production-ready the fetch path is. |
-| **promotionStatus** | The operative gate: may this source's signals reach the Telegram digest *today*? |
-| **productionBlockers** | What must be true before the source advances. |
+Concrete ATS providers keep their concrete provenance source IDs even when the unified
+`career-pages` crawler performs the network execution. `resolveSourceExecutionId()` is the
+canonical provenance-to-execution resolver: Greenhouse/Lever/Ashby/Recruitee/Workable/
+SmartRecruiters evidence remains attributed to its provider while execution, health and host
+policy are owned by `career-pages`.
 
-### `leadEligibility` vocabulary
+For company career/ATS surfaces, `source_run_observations` also records a target-scoped run with
+`organization_id`, `target_key`, provenance `source_id`, `execution_source_id`, and exact target
+outcome. A source-level `career-pages` success is never treated as proof that an unrelated
+company or hosted ATS board was successfully observed.
 
-- **digest-lead-originating** — a clean signal here alone can produce a delivered lead.
-- **confidence-gated-evidence** — can originate a lead *only after* its confidence tests pass;
-  until then it ingests to the signal pool but is held out of the digest.
-- **enrichment-only** — never a lead by itself; enriches an existing org (size, INN, risk).
-- **context-only** — supporting context (funding, news, events); never originates a lead.
+## Lead boundaries
 
-### `promotionStatus` vocabulary
+- `digest-lead-originating` plus `digest-allowed` may independently enter digest selection.
+- `confidence-gated-evidence` remains excluded until canonical policy promotes it.
+- `supporting-evidence-only`, `context-only`, and `never-lead-originating` cannot manufacture a lead.
+- A live-verified transport does not override promotion policy.
 
-- **digest-allowed** — signals flow to digest selection and can be delivered.
-- **blocked-from-digest-pending-confidence-tests** — ingests to the signal pool; held out of
-  digest until the named confidence tests pass.
-- **supporting-evidence-only** — may corroborate a lead but never originate one.
-- **never-lead-originating** — enrichment/context plumbing only; structurally cannot deliver a lead.
+Company sites, newsrooms, GDELT, GitHub organizations, YouTube channels, Telegram channels,
+government datasets, registries, and industry feeds remain corroboration/context unless the
+canonical policy explicitly says otherwise.
 
----
+## Health and temporal state
 
-## The two-layer digest gate (read this before trusting any table below)
+Standard source runs append PII-free `source_run_observations` and project current status into
+`source_health_state`. Metrics include successful fetch/normalization timestamps, fetched and
+accepted records, duplicates, organization rejects, blocked/rate-limited outcomes, extraction
+methods, latency, and consecutive failures. ATS extraction methods distinguish static,
+rendered-DOM, RSS/XML/API, and fallback outcomes.
 
-A source reaching the digest is gated in **two** independent places. Both must allow it.
+The daily pipeline also stores `source_temporal_observations` and deterministic
+`source_temporal_derived_events`. Vacancy deltas/reopenings/expansion, FNS trajectories,
+procurement changes, and Rospatent changes are derived events, not new source IDs. A first
+observation is a baseline and produces no false transition.
 
-1. **SQL whitelist** — `packages/db/scripts/source-digest-evidence.sql` line ~89:
-   ```
-   signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob',
-                      'habr-career', 'tech-job-boards',
-                      'linkedin-company-pages', 'regional-job-boards')
-   ```
-   Only `signal_type = 'job_posting'` rows from these 8 sources are even *considered*.
+Vacancy identity and lifecycle are canonicalized separately in `canonical_vacancies_v1`,
+`canonical_vacancy_publications_v1`, `canonical_vacancy_observations_v1`, and
+`canonical_vacancy_events_v1`. Adding another publication/source must not create a new canonical
+vacancy: persistence first reconciles by existing fingerprint, provider external ID, canonical
+URL, then a bounded role/location/time fallback that rejects conflicting provider IDs.
 
-2. **`promotionStatus`** — even when a source is in the SQL whitelist, if its
-   `promotionStatus` is `blocked-from-digest-pending-confidence-tests` it is held out of
-   delivery until its confidence verifier passes. The SQL whitelist is *permissive on purpose*:
-   it lets blocked sources accumulate evidence and dedupe-overlap data while the confidence
-   gate decides whether they graduate.
+Absence is fail-closed. A target-scoped vacancy can advance toward `closed` only after successful
+`parsed` or explicit `no-vacancies-present` observations of its exact organization + provenance
+source + target. Unrelated target success, robots/access block, HTTP 403/429, parser/extractor
+failure, timeout, and `not-modified` are not absence proof. The existing TTL + repeated-success
+rule is then applied to those scoped observation IDs.
 
-> `exportSourceCoverageDetails()` in the registry derives
-> `inDigest` as `(source in PRIMARY_INGESTION_SOURCES) AND (promotionStatus === 'digest-allowed')`.
-> As of the 2026-08-11 policy reconciliation that set is `hh`, `career-pages`, and
-> `rabota-rossii`. `superjob`, `habr-career`, and the other whitelisted sources are present in
-> ingestion or SQL paths but remain `blocked-from-digest-pending-confidence-tests`. Promote a
-> source only by satisfying its gates and changing the canonical machine-readable policy; never
-> by editing this document alone.
+## Verification
 
-**Policy-allowed digest sources today: `hh`, `career-pages`, and `rabota-rossii`.** Everything
-else is blocked-from-digest, supporting-evidence-only, or never-lead-originating. This policy
-statement does not prove that any source is currently configured or healthy in production.
-
----
-
-## P1 — core coverage
-
-| id | class / evidence tier | leadEligibility | promotionStatus | live? |
-|---|---|---|---|---|
-| **hh** | primary-platform / medium-signal (0.74) | digest-lead-originating | **digest-allowed** | blocked: search API returns 403 from current egress |
-| **career-pages** | company-surface / high-signal (0.92) | digest-lead-originating | **digest-allowed** | live-reachable (partial), not live-verified |
-| **rabota-rossii** | primary-platform / medium-signal (0.70) | confidence-gated-evidence | **digest-allowed** | live-reachable, not live-verified |
-| **egrul-fns** | registry-reference / high-signal (0.90) | enrichment-only | never-lead-originating | live + provider |
-| **transparent-business-fns** | registry-reference / high-signal (0.86) | enrichment-only | never-lead-originating | provider/snapshot only |
-| **fedresurs** | market-signal / context-only (0.62) | context-only | never-lead-originating | provider/snapshot only |
-
-**hh** — primary platform. Code paths: `fetch-hh.mjs` → `ingest-hh.mjs` → `report-hh-digest.mjs`.
-- Blocker (policy): `HH_USER_AGENT` must identify a real registered app/contact before broad
-  production live checks; controlled live matrix (roles × regions × pages) must be recorded.
-- **Operational blocker (current):** `/areas` returns HTTP 200 but `/vacancies` returns HTTP 403
-  from the current egress. The transport no longer mixes `fetch-socks`, global fetch, and a
-  dispatcher from different Undici copies: the adapter builds the SOCKS connector and Agent
-  with the installed Undici package and pairs it with that package's `fetch`. This removes the
-  `invalid onRequestStart` architecture bug, but it cannot remove HH's geo/IP restriction.
-  `npm run verify:hh:live-pipeline` is the required proof in a disposable isolated DB after a
-  verified RU-resident runner or `HH_PROXY_URL` is available. Until it passes, HH is blocked,
-  not live-verified.
-
-**career-pages** — the highest-trust source (direct company hiring surface, default confidence
-0.92, the only source SQL classifies as `direct_hiring_proof` unconditionally). Guarded against
-the "N records but 0 normalized" silent-zero-leads bug (commit `d43b9a7`). **Promoted to primary
-(daily-radar) on 2026-06-30**: it now ingests on every daily run, self-limited by a wall-clock
-fetch budget (`CAREER_PAGES_FETCH_BUDGET_MS`, default 90s) so a long sequential crawl stays under
-the 120s per-source ingest timeout and partial batches still reach ingestion; remaining
-discovered targets are picked up next run. Auto-discovery seeds from existing orgs+signals that
-carry a domain, so on a cold DB it is a no-op until other sources populate orgs.
-
-**Same-domain HTML-card fallback (2026-07-06):** the `same-domain-jsonld` adapter previously read
-schema.org JSON-LD exclusively — a Russian company career page that publishes vacancies as HTML
-cards with no JSON-LD (common on Bitrix/1C-Bitrix and custom-CMS RU corporate sites) silently
-yielded 0 records, losing the company's direct hiring proof after the page was already fetched.
-`fetchSameDomainJsonLdRecords` now runs `extractVacancyCardsFromSameDomainHtml` when JSON-LD is
-empty: it pulls vacancy titles from same-domain anchor links (title + same-host URL required, no
-fabricated company/contact/salary, navigation boilerplate rejected). Records are tagged
-`extraction_method: 'html-card-fallback'` in the signal payload. The fetch/ingest/pipeline
-summary now carries an `extractionBreakdown` (per-extractor target counts +
-`zeroRecordSameDomainTargets`: discovered same-domain pages that yielded NEITHER JSON-LD nor
-usable HTML cards — the previously-silent gap). The dashboard "Качество доказательств по
-источникам" section surfaces per-source gate A/B/C distribution + direct-hiring-proof share +
-average freshness, so the fallback's contribution is visible as more `direct_hiring_proof`
-leads under `career-pages`. Confidence gates are unchanged: HTML-card signals are still
-`direct_hiring_proof` (company-owned surface); only the extraction path broadened.
-
-The 2026-08-12 controlled crawl also records per-target `outcome`, `pageFetched`, resolved URL,
-and bounded `errorCategory`. A fetched page with no supported vacancy extraction is
-`extraction-zero-unexpected`; HTTP/network failure is `page-unreachable`; a successful empty
-board response is `no-vacancies-present`. Current evidence is intentionally partial: five of
-twelve targets parsed 381 records, while seven were explicitly unreachable.
-
-**rabota-rossii** — official trudvsem open-data. In the SQL whitelist and **`digest-allowed` as
-of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
-`source-review/trudvsem-review.md` and memory `project_rabota_rossii_live`).
-- Coverage: trudvsem caps the **global** (region-less) result window at `offset < 50` regardless
-  of `meta.total`, so a single federal query surfaced only ~25–50 of thousands of matches. The
-  adapter now pages offset windows (`RABOTA_ROSSII_PAGES`) **and** iterates region codes
-  (`RABOTA_ROSSII_REGION_CODES`) — each region exposes its own independent window, which is the
-  real coverage lever. A curated default of 12 major RF economic centres is active when no region
-  env is set (set `RABOTA_ROSSII_REGION_CODES=federal` to opt back into the single region-less
-  feed; a single `RABOTA_ROSSII_REGION_CODE` still wins for back-compat). Measured live
-  2026-06-30: default mode yields ~300 normalized records/run across 12 regions vs ~50 federal —
-  a ~6× per-run company-coverage gain. Single-region signature preserved for the confidence verifier.
-- Re-check freshness/contract with `npm run verify:rabota-rossii:confidence`
-  (needs `RABOTA_ROSSII_LIVE=1`; optional `DATABASE_URL` adds HH-overlap dedupe). Live verifier
-  **PASSES** as of 2026-08-12: 200 records received and 200 normalized across Moscow, Saint
-  Petersburg, and federal queries. This proves current fetch/normalization reachability, not the
-  DB evidence path; an isolated live ingest is still required before `live-verified`. Do **not**
-  relax the 60% freshness threshold; filter the fetch to recent postings instead.
-- For `rabota-rossii`, an INN-based `org_external_id` *is* org-level → but INN-match is now
-  classified as `platform_aggregation` (gate C), not `direct_hiring_proof` — only career-pages is
-  a direct surface (see memory `project_trudvsem_platform_aggregation`).
-
-**egrul-fns / transparent-business-fns / fedresurs** — registry/context enrichment. Never
-originate leads. `egrul-fns`: 10-digit legal-entity INN only; skip 12-digit IP/person records.
-`transparent-business-fns`: no approved stable public API — do **not** scrape pb.nalog.ru.
-`fedresurs`: public site blocked by Qrator/401 — official/compliant provider only.
-
----
-
-## P2 — expansion
-
-| id | class / evidence tier | leadEligibility | promotionStatus | live? |
-|---|---|---|---|---|
-| **superjob** | primary-platform / medium-signal (0.66) | confidence-gated-evidence | **blocked-from-digest-pending-confidence-tests** | app-id / provider path |
-| **habr-career** | primary-platform / medium-signal (0.69) | confidence-gated-evidence | **blocked-from-digest-pending-confidence-tests** | public/provider path; legal and confidence gates open |
-| **tech-job-boards** | primary-platform / medium-signal (0.68) | confidence-gated-evidence | blocked-from-digest | live + provider |
-| **linkedin-company-pages** | primary-platform / medium-signal (0.72) | confidence-gated-evidence | blocked-from-digest | provider-token only |
-| **company-site** | company-surface / medium-signal (0.68) | enrichment-only | supporting-evidence-only | live-public |
-| **funding-business-signals** | market-signal / context-only (0.58) | context-only | never-lead-originating | live + provider |
-
-**superjob** — needs `SUPERJOB_API_APP_ID` (live API) or a compliant provider snapshot;
-anonymous API is not a production path. It may participate in primary ingestion, but policy
-holds it out of digest delivery until confidence tests justify promotion. Pagination is built in
-(5 pages × 100 = 500-result cap, the API's own ceiling).
-
-**habr-career** — public HTML/provider paths exist, but policy holds the source out of digest
-delivery until the outstanding legal/robots review and confidence tests are complete. Only
-public `/vacancies` listings are in scope; candidate/PII surfaces remain prohibited.
-Single-source platform aggregation → gated at C until corroborated.
-Keyword breadth is derived from active profiles' roles at ingest time
-(`deriveHabrKeywordsFromProfiles`); was a contributor to the leads=0 pipeline gap (see memory
-`project_leads_pipeline_gaps`). Live probe 200 as of 2026-06-30.
-
-**tech-job-boards** — API-mega-list providers + greenhouse/lever ATS adapters. Must pass fixture
-shape, sensitive-field rejection, freshness, region, salary, and org-identity gates before digest
-use. No RF greenhouse/lever tokens configured, so contributes nothing in production today.
-
-**linkedin-company-pages** — **compliant provider snapshots only.** Discard employee, profile,
-email, and phone fields. No direct scraping.
-
-**company-site** — generic company pages stay enrichment; only explicit hiring surfaces can
-corroborate lead evidence (they do not originate one — that's `career-pages`' job).
-
-**funding-business-signals** — funding/growth context; must not create a lead without direct
-hiring evidence elsewhere.
-
----
-
-## P3 — context / long-tail
-
-| id | class / evidence tier | leadEligibility | promotionStatus | live? |
-|---|---|---|---|---|
-| **company-newsrooms** | company-surface / context-only (0.60) | context-only | never-lead-originating | live + provider |
-| **industry-media** | market-signal / context-only (0.52) | context-only | never-lead-originating | provider-token |
-| **regional-job-boards** | primary-platform / medium-signal (0.58) | confidence-gated-evidence | blocked-from-digest | provider-token |
-
-**company-newsrooms / industry-media** — curated/reviewed context only; an article publisher
-domain must **never** become company identity. Supporting context never originates a lead alone.
-
-**regional-job-boards** — each board needs its own legal/robots/provider review and confidence
-gates before digest use.
-
----
-
-## Rejected / not adopted
-
-Reviewed and deliberately **not** integrated. Re-opening any of these requires a new
-`docs/source-review/` entry and a policy sign-off.
-
-| candidate | verdict | reason |
-|---|---|---|
-| **avito jobs** | rejected | See `source-review/avito-jobs-review.md` — live checks failed adoption bar. |
-| **rabota.ru** | rejected | See `source-review/rabota-ru-review.md`. |
-| **trudvsem (direct)** | superseded | Covered via `rabota-rossii` open-data; direct review in `source-review/trudvsem-review.md`. |
-| **zarplata.ru** | rejected | See `source-review/zarplata-ru-review.md`. |
-| **Telegram / WhatsApp / social scrapers** | rejected by policy | See `source-review/telegram-channels-review.md` (re-evaluated 2026-06-30) + `source-priority-policy.md` §"Rejected by default" — social/personal scraping is out of scope, has no compliant evidence-grade path, and conflicts with the product's evidence/privacy stance. Overrides any ad-hoc request to add Telegram-channel scraping. |
-| **VC.ru / Tenchat** | rejected by policy | Social networks → fall under the same personal/social-scraping prohibition. |
-
-> All decisions above are commit-backed: `78b4160` (avito, rabota-ru, trudvsem, zarplata-ru
-> rejection after live checks).
-
----
-
-## Privacy & identity invariants (apply to every source)
-
-These are enforced in normalizers and the live confidence verifiers (e.g.
-`verify-rabota-rossii-confidence.mjs`), and they are non-negotiable:
-
-1. **Platform domain is never company identity.** A signal's source platform (`hh.ru`,
-   `trudvsem.ru`, a publisher domain) must never leak as `companyDomain` / `primarySourceKey`.
-2. **No personal contact fields survive into payload** — `email`, `phone`, `contact_person`,
-   `contact_email` are stripped at normalization.
-3. **Cross-source dedupe is by strong key only** — `inn:` / `ogrn:` / `domain:`.
-   `company-name:` keys are weak and not used for HH-overlap dedupe.
-4. **Evidence quality is earned, not assumed** — HH `employer_id` / `hh_employer_id` are
-   *platform aggregator IDs*, not org identity; their presence alone does **not** grant
-   `direct_hiring_proof` (see `source-digest-evidence.sql` ~line 114).
-
----
-
-## Maintenance
-
-- Change source governance in `source-registry.mjs` → reflect here in the same commit.
-- Change the SQL whitelist in `source-digest-evidence.sql` → update the two-layer-gate section.
-- New source → add a `docs/source-review/` entry first; policy decision; then register.
-- Confidence-gate state changes (e.g. rabota-rossii freshness improving) → update the relevant
-  row's `promotionStatus` and the freshness figure, citing the verifier run.
+Run `npm run verify:sources:readiness`, `npm run verify:source:credentials`,
+`npm run verify:docs:source-status`, `npm run verify:source:temporal-health`, and
+`npm run db:validate`. The final-image verifier additionally requires the target-observation
+wrapper, migrations `060000`/`070000`, target-scope columns, daily-run state, browser/runtime
+dependencies and database tables. Live claims additionally require a controlled live verifier and
+isolated DB evidence where applicable. Production schedule activation remains separate evidence.

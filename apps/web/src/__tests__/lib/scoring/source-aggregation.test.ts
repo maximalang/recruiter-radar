@@ -67,6 +67,18 @@ describe('aggregateSourceSignals', () => {
       expect(careerPages.weight).toBeGreaterThan(unknown.weight)
     })
 
+    it('keeps owned ATS above major platforms, specialist boards, media, and aggregators', () => {
+      const weight = (source: string) => aggregateSourceSignals([
+        { source, tier: 'direct', fetchedAt: '2026-05-25T00:00:00Z' },
+      ]).weight
+
+      expect(weight('greenhouse')).toBeGreaterThan(weight('hh'))
+      expect(weight('hh')).toBeGreaterThan(weight('habr-career'))
+      expect(weight('habr-career')).toBeGreaterThan(weight('industry-media'))
+      expect(weight('industry-media')).toBeGreaterThan(weight('unknown-source'))
+      expect(weight('industry-media')).toBeGreaterThan(weight('platform-aggregator'))
+    })
+
     it('hh direct outweighs rabota_rossii corroboration', () => {
       const hhOnly = aggregateSourceSignals([hh])
       const rrOnly = aggregateSourceSignals([rabotaRossii])

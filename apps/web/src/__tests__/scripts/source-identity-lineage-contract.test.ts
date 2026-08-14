@@ -93,7 +93,6 @@ describe('source identity and evidence lineage contract', () => {
     const lineageSources = [
       'ingest-hh.mjs',
       'source-career-pages.mjs',
-      'source-tech-job-boards.mjs',
       'source-linkedin-company-pages.mjs',
       'source-company-site.mjs',
       'source-funding-business-signals.mjs',
@@ -108,7 +107,7 @@ describe('source identity and evidence lineage contract', () => {
     const egrul = readFileSync(resolve(repoRoot, 'packages', 'db', 'scripts', 'source-egrul-fns.mjs'), 'utf8')
     expect(egrul).toContain('resolveOrganizationOwner')
     expect(egrul).toContain('assertOrgSourceRefOwner')
-    expect(egrul).not.toContain('upsertSignalEvidenceLineage')
+    expect(egrul).toContain('upsertSignalEvidenceLineage')
 
     const hh = readFileSync(resolve(repoRoot, 'packages', 'db', 'scripts', 'ingest-hh.mjs'), 'utf8')
     expect(hh).toContain('`domain:${vacancy.employerDomain}`')

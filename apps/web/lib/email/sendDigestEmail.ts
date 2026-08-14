@@ -5,10 +5,10 @@
  * `lead_channel_deliveries` keyed `(email, profile, day:<YYYY-MM-DD>)`, the same
  * spam-guard pattern as web-push (`notifyNewLeadsForRun`): the INSERT ... ON
  * CONFLICT DO NOTHING is the claim point — if it inserts we own delivery, if it
- * does not another worker already owns or completed today's email and we bail.
- * The claim starts as `processing`; only a successful provider send receives a
- * real `delivered_at`. Provider failures are finalized as `failed` so operator
- * surfaces never treat an attempted email as a successful delivery.
+ * does not, the persisted state determines whether this is a safe success skip
+ * or an unresolved/terminal failure. The claim starts as `processing`; only a
+ * successful provider send receives a real `delivered_at`. An ambiguous SMTP
+ * result is terminal because replay could duplicate a user-visible email.
  *
  * This module does NOT decide which leads are worth sending — it reuses the
  * digest candidates the pipeline already produced (`getLeadsForAllProfiles`,
@@ -20,23 +20,29 @@
 
 import { getPool } from "../db-pool";
 import { getLeadsForAllProfiles, type LeadItem } from "../leads-data";
-import { logError, logEvent } from "../runtime";
+import { logError, logEvent, logWarn } from "../runtime";
+import type { ChannelDeliveryState } from "../delivery/channel-state";
+import { persistedChannelDeliveryState } from "../delivery/channel-state";
 import type { WhyMatchProfile } from "../leads/why-match";
 
 import { renderDigestEmail } from "./digestEmail";
 import { isEmailConfigured, sendEmail } from "./transport";
 
 export type SendDigestEmailResult =
-  | { delivered: true; leadCount: number }
+  | { delivered: true; state: 'sent'; leadCount: number }
   | {
       delivered: false;
+      state: Exclude<ChannelDeliveryState, 'sent'>;
       reason:
         | "not_configured"
         | "no_database"
         | "disabled"
         | "no_email"
         | "no_leads"
-        | "already_sent"
+        | "processing"
+        | "failed_retryable"
+        | "failed_terminal"
+        | "already_successfully_delivered"
         | "send_failed";
     };
 
@@ -132,7 +138,7 @@ function resolveAppBaseUrl(): string {
  * The dedupe row is claimed BEFORE sending so two concurrent runs cannot both
  * send. A failed send keeps the failed claim in place (at-most-once — we do not
  * retry the same day to avoid duplicate inboxing on an ambiguous SMTP failure),
- * but `delivered_at` remains NULL and `delivery_status` becomes `failed`.
+ * but `delivered_at` remains NULL and `delivery_status` becomes `failed_terminal`.
  */
 export async function sendDigestEmailForProfile(input: {
   clientProfileId: string;
@@ -146,29 +152,28 @@ export async function sendDigestEmailForProfile(input: {
   /** Injected for testability; defaults to wall-clock. */
   now?: Date;
 }): Promise<SendDigestEmailResult> {
-  if (!isEmailConfigured()) {
-    return { delivered: false, reason: "not_configured" };
-  }
-
   const pool = getPool();
   if (!pool) {
-    return { delivered: false, reason: "no_database" };
+    return { delivered: false, state: "failed_terminal", reason: "no_database" };
   }
 
   const prefs = await getProfileEmailPrefs(input.clientProfileId);
   if (!prefs || !prefs.emailDigestEnabled) {
-    return { delivered: false, reason: "disabled" };
+    return { delivered: false, state: "skipped_disabled", reason: "disabled" };
   }
   const to = prefs.digestEmail?.trim();
   if (!to) {
-    return { delivered: false, reason: "no_email" };
+    return { delivered: false, state: "failed_terminal", reason: "no_email" };
   }
   if (!prefs.ownerId) {
-    // Legacy profile created before owner attribution. Bail and fix the profile first.
-    logError("email.digest_no_owner", new Error("Profile has no owner."), {
+    logWarn("email.digest_no_owner", {
       clientProfileId: input.clientProfileId,
+      reasonCode: "missing_owner_attribution",
     });
-    return { delivered: false, reason: "disabled" };
+    return { delivered: false, state: "failed_terminal", reason: "failed_terminal" };
+  }
+  if (!isEmailConfigured()) {
+    return { delivered: false, state: "failed_terminal", reason: "not_configured" };
   }
 
   // Reuse the pipeline's candidates for THIS run; keep only auto-deliverable
@@ -182,7 +187,7 @@ export async function sendDigestEmailForProfile(input: {
     AUTO_DELIVER_GATES.has(lead.confidenceGate),
   );
   if (deliverable.length === 0) {
-    return { delivered: false, reason: "no_leads" };
+    return { delivered: false, state: "not_attempted", reason: "no_leads" };
   }
 
   // Atomic dedupe claim: one email per (profile, day). First caller wins.
@@ -199,11 +204,34 @@ export async function sendDigestEmailForProfile(input: {
     [input.clientProfileId, dedupeKey, deliverable.length],
   );
   if (claim.rowCount !== 1) {
-    return { delivered: false, reason: "already_sent" };
+    await pool.query(
+      `UPDATE lead_channel_deliveries
+       SET delivery_status = 'failed_terminal',
+           processing_claim_token = NULL,
+           next_retry_at = NULL,
+           last_error_reason = 'ambiguous_stale_processing'
+       WHERE channel = 'email'
+         AND client_profile_id = $1
+         AND dedupe_key = $2
+         AND delivery_status = 'processing'
+         AND attempted_at < NOW() - INTERVAL '2 hours'`,
+      [input.clientProfileId, dedupeKey],
+    );
+    const existing = await pool.query<{ delivery_status: string }>(
+      `SELECT delivery_status
+       FROM lead_channel_deliveries
+       WHERE channel = 'email'
+         AND client_profile_id = $1
+         AND dedupe_key = $2
+       LIMIT 1`,
+      [input.clientProfileId, dedupeKey],
+    );
+    const state = persistedChannelDeliveryState(existing.rows[0]?.delivery_status) ?? "failed_terminal";
+    return { delivered: false, state, reason: state };
   }
   const claimId = claim.rows[0]?.id;
   if (!claimId) {
-    return { delivered: false, reason: "send_failed" };
+    return { delivered: false, state: "failed_terminal", reason: "send_failed" };
   }
 
   const rendered = renderDigestEmail(deliverable, {
@@ -222,16 +250,18 @@ export async function sendDigestEmailForProfile(input: {
   if (!sendResult.ok) {
     await pool.query(
       `UPDATE lead_channel_deliveries
-       SET delivery_status = 'failed', delivered_at = NULL
+       SET delivery_status = 'failed_terminal', delivered_at = NULL,
+           last_error_reason = 'smtp_ambiguous_failure'
        WHERE id = $1 AND delivery_status = 'processing'`,
       [claimId],
     ).catch((error) => logError("email.digest_claim_finalize_failed", error, {
       clientProfileId: input.clientProfileId,
     }));
-    logError("email.digest_send_failed", new Error(sendResult.reason), {
+    logWarn("email.digest_send_failed", {
       clientProfileId: input.clientProfileId,
+      reasonCode: "smtp_ambiguous_failure",
     });
-    return { delivered: false, reason: "send_failed" };
+    return { delivered: false, state: "failed_terminal", reason: "send_failed" };
   }
 
   const finalized = await pool.query(
@@ -249,5 +279,5 @@ export async function sendDigestEmailForProfile(input: {
     leadCount: deliverable.length,
     dedupeKey,
   });
-  return { delivered: true, leadCount: deliverable.length };
+  return { delivered: true, state: 'sent', leadCount: deliverable.length };
 }

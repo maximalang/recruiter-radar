@@ -126,6 +126,20 @@
       "confidence": "not-applicable",
       "opportunityEligibility": "not-applicable",
       "observability": "contract-tested"
+    },
+    "context-discovered": {
+      "discover": "contract-tested",
+      "fetch": "contract-tested",
+      "parse": "fixture-tested",
+      "normalize": "fixture-tested",
+      "organizationResolution": "contract-tested",
+      "dedupe": "contract-tested",
+      "ingest": "contract-tested",
+      "evidence": "contract-tested",
+      "signal": "contract-tested",
+      "confidence": "not-applicable",
+      "opportunityEligibility": "not-applicable",
+      "observability": "contract-tested"
     }
   },
   "sources": {
@@ -134,14 +148,14 @@
       "fixture": "tested",
       "contract": "tested",
       "configuration": {
-        "mode": "launch-required",
-        "acceptedEnvSets": [["HH_USER_AGENT"]]
+        "mode": "registration-required",
+        "acceptedEnvSets": [["HH_CLIENT_ID", "HH_CLIENT_SECRET", "HH_USER_AGENT"]]
       },
       "live": {
         "state": "blocked",
         "verifiedAt": null,
         "evidence": [
-          "2026-08-12 direct probe: api.hh.ru/areas returned HTTP 200, while api.hh.ru/vacancies returned HTTP 403 forbidden from the current egress."
+          "A previous unauthenticated vacancy-search request returned HTTP 403. An authenticated application request remains pending until the registered application credentials are supplied."
         ]
       },
       "requiresLiveVerification": true,
@@ -150,12 +164,10 @@
       "legalReview": "not-required",
       "pipelineProfile": "hiring-primary",
       "verification": {
-        "fixture": ["npm run verify:hh:smoke"],
+        "fixture": ["npm run verify:hh:oauth", "npm run verify:hh:smoke"],
         "contract": ["npm run verify:source:readiness", "npm run verify:hh:live-pipeline"]
       },
-      "blockers": [
-        "The current egress is blocked by HH search with HTTP 403. A verified RU-resident runner or HH_PROXY_URL is required before the isolated live pipeline verifier can pass."
-      ]
+      "blockers": ["credential-not-supplied"]
     },
     "career-pages": {
       "implementation": "implemented",
@@ -163,13 +175,16 @@
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["CAREER_PAGES_INPUT_FILE"], ["CAREER_PAGES_TARGETS_FILE"]]
+        "acceptedEnvSets": [["DATABASE_URL"], ["CAREER_PAGES_INPUT_FILE"], ["CAREER_PAGES_TARGETS_FILE"]]
       },
       "live": {
-        "state": "reachable",
-        "verifiedAt": null,
+        "state": "verified",
+        "verifiedAt": "2026-08-14T01:55:15+03:00",
         "evidence": [
-          "2026-08-12 controlled 12-target live crawl with SOURCE_ENV_FILE_DISABLED=true: 381 records fetched and normalized from 5 targets; 7 targets reported explicit page-unreachable diagnostics (HTTP 404 or network-error)."
+          "2026-08-13 public ATS live verifier normalized 331 of 331 real vacancies across Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters, Teamtailor RSS and Personio XML.",
+          "2026-08-13 hosted ATS live verifier normalized 232 of 232 real vacancies across Workday, BambooHR, Pinpoint, Breezy, Comeet, JazzHR, iCIMS, Oracle/Taleo, Oracle Cloud and SAP SuccessFactors using official feeds, structured HTML or rendered DOM.",
+          "2026-08-13 isolated disposable PostgreSQL verifier persisted 20 FICO Workday rendered vacancies as 20 signals, 20 evidence items and 20 lineage rows with public source URLs, owner consistency and no sensitive payload fields.",
+          "2026-08-14 current Russian ATS verification parsed 7 Huntflow vacancies through static HTML, 1 active FriendWork vacancy through rendered detail DOM, and 10 Lamoda vacancies through an e-staff fingerprint plus the robots-advertised sitemap and public detail pages. An isolated production-schema PostgreSQL verifier persisted all 18 as signals, evidence items and lineage rows across three owner-consistent organizations with public vacancy URLs and zero sensitive payload fields. Potok and Talantix employer surfaces were correctly stopped by robots policy before page collection. Skillaz remains research-only: its official material confirms public application forms, but no current lawful employer vacancy surface was proven, so no live claim is made."
         ]
       },
       "requiresLiveVerification": true,
@@ -178,12 +193,58 @@
       "legalReview": "not-required",
       "pipelineProfile": "hiring-primary",
       "verification": {
-        "fixture": ["npm run verify:career-pages:smoke", "npm run verify:career-pages:html-card-fallback"],
-        "contract": ["npm run verify:career-pages:ingest", "npm run verify:source:readiness"]
+        "fixture": ["npm run verify:career-pages:smoke", "npm run verify:career-pages:health", "npm run verify:career-pages:html-card-fallback", "npm run verify:career-pages:russian-ats-fixtures"],
+        "contract": ["npm run verify:career-pages:ingest", "npm run verify:career-pages:public-ats-live", "node packages/db/scripts/verify-career-pages-hosted-ats-live.mjs", "node packages/db/scripts/run-source-live-db-verifier.mjs hosted-ats", "npm run verify:career-pages:russian-ats-live", "SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:career-pages:russian-ats-live-db", "npm run verify:source:readiness"]
       },
-      "blockers": [
-        "The controlled crawl is partially reachable, but 7 of 12 targets are stale or unreachable and live ingest/evidence/lineage still requires a disposable isolated database run."
-      ]
+      "blockers": []
+    },
+    "greenhouse": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T18:52:42Z", "evidence": ["2026-08-12 production-runtime disposable DB verifier: official public Greenhouse Job Board API produced 50 signals, 50 evidence items, and 50 lineage rows with direct evidence, source ownership, URL, namespace, and extraction-method consistency."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "lever": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T18:52:42Z", "evidence": ["2026-08-12 production-runtime disposable DB verifier: official public Lever postings endpoint produced 130 signals, 130 evidence items, and 130 lineage rows with direct evidence, source ownership, URL, namespace, and extraction-method consistency."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "ashby": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T18:52:42Z", "evidence": ["2026-08-12 production-runtime disposable DB verifier: official Ashby public Job Posting API produced 57 signals, 57 evidence items, and 57 lineage rows with direct evidence, source ownership, URL, namespace, and extraction-method consistency."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "recruitee": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T18:52:42Z", "evidence": ["2026-08-12 production-runtime disposable DB verifier: official Recruitee Careers Site API produced 50 signals, 50 evidence items, and 50 lineage rows with direct evidence, source ownership, URL, namespace, and extraction-method consistency; 100 sensitive provider fields were stripped before persistence across the ATS batch."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "workable": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T18:52:42Z", "evidence": ["2026-08-12 production-runtime disposable DB verifier: official Workable public account endpoint produced 12 signals, 12 evidence items, and 12 lineage rows with direct evidence, source ownership, URL, namespace, and extraction-method consistency; corporate-page discovery resolved the account automatically."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "smartrecruiters": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-14T08:36:00+03:00", "evidence": ["2026-08-14 representative confidence gate passed 32 labeled cases (24 positive, 8 negative) covering Russian, multilingual, remote, hybrid, unusual-title and missing-field inputs: precision 1.00, recall 1.00, zero false positives, zero false negatives, organization/evidence/dedupe rates 1.00 and zero sensitive fields persisted.", "2026-08-14 fresh official unauthenticated Posting API confidence run fetched and normalized 8 of 8 current SmartRecruiters Inc vacancies with official evidence URLs, exact company-domain identity and zero sensitive persisted fields.", "2026-08-13 disposable production-schema DB verifier fetched 8 current postings through the official unauthenticated Posting API and persisted 8 signals, evidence items and lineage rows under source=smartrecruiters with transport=official-api and zero sensitive payload fields.", "2026-08-13 the same isolated verifier exercised the real public SmartRecruiters careers surface independently of the API. The official careers URL resolved to the employer public careers domain; the cheap static-public-careers path extracted 2 current vacancy records and persisted 2 signals, evidence items and lineage rows under source=smartrecruiters with owner-consistent provenance and zero sensitive payload fields."] },
+      "requiresLiveVerification": true, "confidence": "approved", "eligibility": "digest-eligible", "legalReview": "not-required", "pipelineProfile": "hiring-primary-standard",
+      "verification": { "fixture": ["npm run verify:career-pages:discovery", "npm run verify:smartrecruiters:confidence"], "live": ["SMARTRECRUITERS_CONFIDENCE_LIVE=1 npm run verify:smartrecruiters:confidence", "SOURCE_LIVE_DB_TEST_ACK=isolated PUBLIC_ATS_LIVE_EXCLUDE=greenhouse,lever,ashby,recruitee,workable SMARTRECRUITERS_LIVE_PUBLIC_CAREERS=1 npm run verify:career-pages:public-ats-live-db"], "contract": ["npm run verify:career-pages:public-ats-live", "npm run verify:source:readiness"] },
+      "blockers": []
     },
     "rabota-rossii": {
       "implementation": "implemented",
@@ -191,10 +252,11 @@
       "contract": "tested",
       "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
       "live": {
-        "state": "reachable",
-        "verifiedAt": null,
+        "state": "verified",
+        "verifiedAt": "2026-08-12T18:08:56Z",
         "evidence": [
-          "2026-08-12 RABOTA_ROSSII_LIVE=1 npm run verify:rabota-rossii:confidence: 200 received and 200 normalized across Moscow, Saint Petersburg, and federal queries; all confidence assertions passed."
+          "2026-08-12 RABOTA_ROSSII_LIVE=1 npm run verify:rabota-rossii:confidence: 200 received and 200 normalized across Moscow, Saint Petersburg, and federal queries; all confidence assertions passed.",
+          "2026-08-12 production-runtime disposable DB verifier: official Rabota Rossii API fetched and ingested 100 live vacancies into an isolated database; 100 signals, evidence items, and lineage rows across 80 organizations preserved source URLs, extraction mode, and ownership."
         ]
       },
       "requiresLiveVerification": true,
@@ -204,22 +266,24 @@
       "pipelineProfile": "hiring-primary-standard",
       "verification": {
         "fixture": ["npm run verify:rabota-rossii:smoke"],
-        "contract": ["npm run verify:rabota-rossii:confidence", "npm run verify:source:readiness"]
+        "contract": ["npm run verify:rabota-rossii:confidence", "SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:rabota-rossii:live-db", "npm run verify:source:readiness"]
       },
-      "blockers": [
-        "Current live fetch and normalization are verified reachable, but live ingest/evidence/lineage still requires a disposable isolated database run."
-      ]
+      "blockers": []
     },
     "habr-career": {
       "implementation": "implemented",
       "fixture": "tested",
       "contract": "tested",
       "configuration": {
-        "mode": "launch-required",
-        "acceptedEnvSets": [["HABR_CAREER_INPUT_FILE"], ["HABR_CAREER_KEYWORD"], ["HABR_CAREER_PROVIDER_API_URL", "HABR_CAREER_PROVIDER_API_TOKEN"]]
+        "mode": "provider-required",
+        "acceptedEnvSets": [["HABR_CAREER_INPUT_FILE"], ["HABR_CAREER_PROVIDER_API_URL", "HABR_CAREER_PROVIDER_API_TOKEN"]]
       },
-      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
-      "requiresLiveVerification": true,
+      "live": {
+        "state": "blocked",
+        "verifiedAt": "2026-08-12T21:30:00Z",
+        "evidence": ["The agreement effective 2026-08-10 restricts copying and commercial use without permission (sections 5.3-5.4). robots.txt allows the listings path but does not grant commercial reuse. Direct HTML collection is disabled."]
+      },
+      "requiresLiveVerification": false,
       "confidence": "pending",
       "eligibility": "supporting-evidence-only",
       "legalReview": "required",
@@ -228,47 +292,33 @@
         "fixture": ["npm run verify:habr-career:smoke"],
         "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
       },
-      "blockers": ["Robots/legal review and confidence approval are pending."]
+      "blockers": ["A reviewed lawful snapshot or explicitly permitted provider is required; direct commercial HTML collection is disabled."]
     },
     "superjob": {
       "implementation": "implemented",
       "fixture": "tested",
       "contract": "tested",
       "configuration": {
-        "mode": "provider-required",
+        "mode": "registration-required",
         "acceptedEnvSets": [["SUPERJOB_INPUT_FILE"], ["SUPERJOB_API_APP_ID"], ["SUPERJOB_PROVIDER_API_URL", "SUPERJOB_API_APP_ID"]]
       },
-      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-08-12T18:13:26Z",
+        "evidence": [
+          "2026-08-12 production-runtime disposable DB verifier: official SuperJob API fetched and ingested 40 live vacancies into an isolated database; 40 signals, evidence items, and lineage rows preserved source URLs and ownership. Publisher attribution found 32 direct-employer and 8 non-direct rows with zero eligibility mismatches, 40/40 fresh within 30 days, and zero sensitive payload fields."
+        ]
+      },
       "requiresLiveVerification": true,
-      "confidence": "pending",
-      "eligibility": "supporting-evidence-only",
+      "confidence": "approved",
+      "eligibility": "digest-eligible",
       "legalReview": "approved",
-      "pipelineProfile": "hiring-gated-standard",
+      "pipelineProfile": "hiring-primary-standard",
       "verification": {
-        "fixture": ["npm run verify:source:confidence"],
-        "contract": ["npm run verify:source:readiness"]
+        "fixture": ["npm run verify:superjob:smoke"],
+        "contract": ["SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:superjob:live-db", "npm run verify:source:readiness"]
       },
-      "blockers": ["SUPERJOB_API_APP_ID or a compliant provider snapshot is required for production use."]
-    },
-    "tech-job-boards": {
-      "implementation": "implemented",
-      "fixture": "tested",
-      "contract": "tested",
-      "configuration": {
-        "mode": "launch-required",
-        "acceptedEnvSets": [["TECH_JOB_BOARDS_INPUT_FILE"], ["TECH_JOB_BOARDS_GREENHOUSE_TOKENS"], ["TECH_JOB_BOARDS_LEVER_SLUGS"], ["TECH_JOB_BOARDS_PROVIDER_API_URL", "TECH_JOB_BOARDS_PROVIDER_API_TOKEN"]]
-      },
-      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
-      "requiresLiveVerification": true,
-      "confidence": "pending",
-      "eligibility": "supporting-evidence-only",
-      "legalReview": "approved",
-      "pipelineProfile": "hiring-gated",
-      "verification": {
-        "fixture": ["npm run verify:tech-job-boards:smoke"],
-        "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
-      },
-      "blockers": ["Production configuration and confidence approval are absent."]
+      "blockers": []
     },
     "linkedin-company-pages": {
       "implementation": "implemented",
@@ -290,45 +340,25 @@
       },
       "blockers": ["A compliant provider or reviewed company-level snapshot is required; personal-profile data is prohibited."]
     },
-    "regional-job-boards": {
-      "implementation": "implemented",
-      "fixture": "tested",
-      "contract": "tested",
-      "configuration": {
-        "mode": "provider-required",
-        "acceptedEnvSets": [["REGIONAL_JOB_BOARDS_INPUT_FILE"], ["REGIONAL_JOB_BOARDS_PROVIDER_API_URL", "REGIONAL_JOB_BOARDS_PROVIDER_API_TOKEN"]]
-      },
-      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
-      "requiresLiveVerification": true,
-      "confidence": "pending",
-      "eligibility": "supporting-evidence-only",
-      "legalReview": "required",
-      "pipelineProfile": "hiring-gated-standard",
-      "verification": {
-        "fixture": ["npm run verify:rf-source-expansion:smoke"],
-        "contract": ["npm run verify:source:confidence", "npm run verify:source:readiness"]
-      },
-      "blockers": ["Each board needs a reviewed provider/legal path and confidence approval."]
-    },
     "egrul-fns": {
       "implementation": "implemented",
       "fixture": "tested",
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["EGRUL_FNS_INPUT_FILE"], ["EGRUL_FNS_INNS"], ["EGRUL_FNS_PROVIDER_API_URL", "EGRUL_FNS_PROVIDER_API_TOKEN"]]
+        "acceptedEnvSets": [["EGRUL_FNS_INPUT_FILE"]]
       },
       "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "enrichment-only",
-      "legalReview": "approved",
+      "legalReview": "required",
       "pipelineProfile": "enrichment-only",
       "verification": {
         "fixture": ["npm run verify:egrul-fns:smoke"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["Registry records do not currently expose a stable original source URL, so evidence_items lineage remains blocked."]
+      "blockers": ["Official FNS integration access/subscription and a reviewed snapshot are unavailable in the production runtime. Third-party mirrors and arbitrary provider endpoints are disabled; every accepted record must carry an official FNS source URL."]
     },
     "transparent-business-fns": {
       "implementation": "implemented",
@@ -376,9 +406,13 @@
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["COMPANY_SITE_INPUT_FILE"], ["COMPANY_SITE_TARGETS_FILE"]]
+        "acceptedEnvSets": [["DATABASE_URL"], ["COMPANY_SITE_INPUT_FILE"], ["COMPANY_SITE_TARGETS_FILE"]]
       },
-      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-08-12T19:31:04Z",
+        "evidence": ["Production-runtime disposable DB: official VK company page produced 1 context signal/evidence/lineage row with one owner and zero sensitive payload rows."]
+      },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "supporting-evidence-only",
@@ -386,9 +420,10 @@
       "pipelineProfile": "supporting-evidence",
       "verification": {
         "fixture": ["npm run verify:company-site:smoke"],
+        "live": ["npm run verify:company-context:live-db"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["No current curated target run is verified; generic company pages cannot originate leads."]
+      "blockers": []
     },
     "funding-business-signals": {
       "implementation": "implemented",
@@ -396,9 +431,9 @@
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["FUNDING_BUSINESS_SIGNALS_INPUT_FILE"], ["FUNDING_SIGNALS_GDELT_QUERIES"], ["FUNDING_SIGNALS_GDELT_QUERIES_JSON"], ["FUNDING_SIGNALS_PROVIDER_API_URL", "FUNDING_SIGNALS_PROVIDER_API_TOKEN"]]
+        "acceptedEnvSets": [["DATABASE_URL"], ["FUNDING_BUSINESS_SIGNALS_INPUT_FILE"], ["FUNDING_SIGNALS_GDELT_QUERIES"], ["FUNDING_SIGNALS_GDELT_QUERIES_JSON"], ["FUNDING_SIGNALS_PROVIDER_API_URL", "FUNDING_SIGNALS_PROVIDER_API_TOKEN"]]
       },
-      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "live": { "state": "reachable", "verifiedAt": "2026-08-14T01:34:53+03:00", "evidence": ["2026-08-14 low-frequency controlled verifier made one request after the prior cooldown and again received HTTP 429 without Retry-After. No live article or DB success is claimed. The production client now persists a jittered 30-minute no-Retry-After cooldown across processes, honors explicit Retry-After, and exposes a deferred state without issuing another request."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
@@ -406,9 +441,10 @@
       "pipelineProfile": "context-only",
       "verification": {
         "fixture": ["npm run verify:funding-business-signals:smoke"],
+        "live": ["npm run verify:funding-business-signals:live", "SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:funding-business-signals:live-db"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["Publisher-versus-subject identity confidence still requires production review."]
+      "blockers": ["rate-limited: the fresh controlled request returned HTTP 429 without Retry-After, so live normalization and source-to-DB lineage remain unverified. The next verifier run must occur only after the persisted cooldown and will use the isolated article-to-organization-to-context-to-evidence-to-lineage contract."]
     },
     "company-newsrooms": {
       "implementation": "implemented",
@@ -416,39 +452,156 @@
       "contract": "tested",
       "configuration": {
         "mode": "launch-required",
-        "acceptedEnvSets": [["COMPANY_NEWSROOMS_INPUT_FILE"], ["COMPANY_NEWSROOMS_TARGETS_FILE"], ["COMPANY_NEWSROOMS_PROVIDER_API_URL", "COMPANY_NEWSROOMS_PROVIDER_API_TOKEN"]]
+        "acceptedEnvSets": [["DATABASE_URL"], ["COMPANY_NEWSROOMS_INPUT_FILE"], ["COMPANY_NEWSROOMS_TARGETS_FILE"], ["COMPANY_NEWSROOMS_PROVIDER_API_URL", "COMPANY_NEWSROOMS_PROVIDER_API_TOKEN"]]
       },
-      "live": { "state": "unverified", "verifiedAt": null, "evidence": [] },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-08-12T19:31:04Z",
+        "evidence": ["Production-runtime disposable DB: official VK newsroom produced 30 same-company context signal/evidence/lineage rows, one owner, zero foreign source domains, and zero sensitive payload rows."]
+      },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
       "legalReview": "approved",
-      "pipelineProfile": "context-standard",
+      "pipelineProfile": "context-discovered",
       "verification": {
-        "fixture": ["npm run verify:rf-source-expansion:smoke"],
+        "fixture": ["npm run verify:company-newsrooms:discovery", "npm run verify:rf-source-expansion:smoke"],
+        "live": ["npm run verify:company-context:live-db"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["No current curated target/provider run is verified; context cannot originate a lead."]
+      "blockers": []
     },
     "industry-media": {
       "implementation": "implemented",
       "fixture": "tested",
       "contract": "tested",
       "configuration": {
-        "mode": "provider-required",
-        "acceptedEnvSets": [["INDUSTRY_MEDIA_INPUT_FILE"], ["INDUSTRY_MEDIA_PROVIDER_API_URL", "INDUSTRY_MEDIA_PROVIDER_API_TOKEN"]]
+        "mode": "launch-required",
+        "acceptedEnvSets": [["DATABASE_URL"], ["INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON"], ["INDUSTRY_MEDIA_INPUT_FILE"], ["INDUSTRY_MEDIA_FEED_REGISTRY_FILE"], ["INDUSTRY_MEDIA_PROVIDER_API_URL", "INDUSTRY_MEDIA_PROVIDER_API_TOKEN"]]
       },
-      "live": { "state": "blocked", "verifiedAt": null, "evidence": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-13T01:15:00+03:00", "evidence": ["Production-runtime disposable DB verification of the checked-in official Bank of Russia RSS feed passed the allowlisted-host and public-DNS guards and created 6 signals, 6 evidence items, and 6 lineage rows for one organization. Official source URLs, context-only tier, source ownership, payload attribution, curated-rss-atom extraction, and zero sensitive payload fields were asserted; the temporary database was dropped and zero matching databases remained."] },
       "requiresLiveVerification": false,
       "confidence": "not-applicable",
       "eligibility": "context-only",
-      "legalReview": "required",
+      "legalReview": "approved",
       "pipelineProfile": "context-standard",
       "verification": {
-        "fixture": ["npm run verify:rf-source-expansion:smoke"],
+        "fixture": ["npm run verify:rf-source-expansion:smoke", "npm run verify:industry-media:feeds"],
+        "live": ["npm run verify:company-context:live-db"],
         "contract": ["npm run verify:source:readiness"]
       },
-      "blockers": ["A reviewed provider/input is required and publisher identity must never become subject-company identity."]
+      "blockers": []
+    },
+    "github-company-org": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["DATABASE_URL"], ["GITHUB_COMPANY_ORG_TARGETS_JSON"], ["GITHUB_COMPANY_ORG_TARGETS_FILE"], ["GITHUB_COMPANY_ORG_INPUT_FILE"]] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-14T02:03:08+03:00", "evidence": ["Fresh unauthenticated GitHub REST verification accepted the identity-verified VKCOM Organization whose published corporate website domain matches vk.com and normalized 17 recent public non-fork repository events. No user, member, contributor, subscriber, email, or other personal-profile endpoint is queried."] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-discovered",
+      "verification": { "fixture": ["npm run verify:github-company-org:smoke"], "live": ["npm run source:fetch:github-company-org"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "youtube-company-channels": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "registration-required", "acceptedEnvSets": [["DATABASE_URL", "YOUTUBE_API_KEY"], ["YOUTUBE_API_KEY", "YOUTUBE_COMPANY_CHANNELS_TARGETS_JSON"], ["YOUTUBE_API_KEY", "YOUTUBE_COMPANY_CHANNELS_TARGETS_FILE"], ["YOUTUBE_COMPANY_CHANNELS_INPUT_FILE"]] },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": ["Fixture contract proves DB-native company-site enrollment, exact official-site ownership linking for channel IDs and handles, channels.list handle resolution, uploads-playlist-only collection, ETag reuse, daily quota budgeting, event normalization and fail-closed behavior. No runtime API key is configured, so no live API or DB claim is made."] },
+      "requiresLiveVerification": true, "confidence": "not-applicable", "eligibility": "context-only", "legalReview": "approved", "pipelineProfile": "context-discovered",
+      "verification": { "fixture": ["npm run verify:youtube-company-channels:smoke"], "live": ["npm run source:fetch:youtube-company-channels"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": ["credential-not-supplied"]
+    },
+    "telegram-company-channels": {
+      "implementation": "implemented", "fixture": "tested", "contract": "tested",
+      "configuration": { "mode": "registration-required", "acceptedEnvSets": [["DATABASE_URL", "TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION"], ["TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION", "TELEGRAM_COMPANY_CHANNELS_TARGETS_JSON"], ["TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION", "TELEGRAM_COMPANY_CHANNELS_TARGETS_FILE"], ["TELEGRAM_COMPANY_CHANNELS_INPUT_FILE"]] },
+      "live": { "state": "blocked", "verifiedAt": null, "evidence": ["Fixture contract uses the maintained teleproto MTProto client boundary and proves DB-native company-site enrollment, official-domain channel linking, public broadcast-only enforcement, bounded incremental history reads with a non-secret message cursor, event classification, and rejection of groups/private/mismatched channels. Bot API is not used for discovery or reading. No application credentials or authorized user session are configured, so no live claim is made."] },
+      "requiresLiveVerification": true, "confidence": "not-applicable", "eligibility": "context-only", "legalReview": "approved", "pipelineProfile": "context-discovered",
+      "verification": { "fixture": ["npm run verify:telegram-company-channels:smoke"], "live": ["npm run source:fetch:telegram-company-channels"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": ["credential-not-supplied", "authorized-mtproto-session-not-supplied"]
+    },
+    "fns-open-data": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["DATABASE_URL", "SOURCE_SNAPSHOT_ROOT"], ["GOVERNMENT_ENRICHMENT_INNS", "SOURCE_SNAPSHOT_ROOT"]] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-13T10:05:18Z", "evidence": ["Official FNS open-data passports and current file.nalog.ru dataset archives were reachable; fixture coverage verifies INN filtering and derived headcount, revenue and government-support context.", "The 2026-08-13 live sync discovered the current official headcount archive, downloaded all 98,434,553 bytes in verified HTTP ranges, matched SHA-256 265eca8b05a234ff629f57779ebbc647d07e42c7e43612b40e9ae84340de1464, streamed the bulk XML and atomically activated one company-level record for controlled INN 9102013580.", "The checksum-verified active snapshot normalized one of one record with zero skips and zero sensitive fields. An isolated production-schema PostgreSQL verifier persisted the record as a context-only signal, evidence item and lineage row with official source URL and consistent organization ownership before dropping the disposable database."] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke", "npm run verify:fns-open-data:sync"], "live": ["npm run verify:fns-open-data:catalog-live", "FNS_LIVE_SNAPSHOT_VERIFY=1 SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:government-open-data:live-db"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "government-procurement": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["SOURCE_SNAPSHOT_ROOT"], ["GOVERNMENT_PROCUREMENT_INPUT_FILE"]] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-13T17:54:00+03:00", "evidence": ["The fingerprint-pinned Gosuslugi chain verified the current EIS catalogue with TLS checks enabled; automatic discovery found all 86 regional 44-FZ contract passports.", "The robots-allowed official contract RSS, filtered by controlled legal-entity INN 9102013580 and respecting the published 60-second crawl delay, returned 50 current contract records. The sync checksummed the catalogue/feed, staged a versioned snapshot and atomically activated it.", "The active snapshot produced 25 deterministic context events with zero skips or sensitive fields. A new isolated production-schema PostgreSQL verifier persisted 25 signals, 23 evidence items and 25 lineage rows with official HTTPS provenance, owner consistency and never-hiring-proof assertions, then dropped the disposable database."] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke", "npm run verify:government-procurement:sync"], "live": ["npm run source:sync:government-procurement -- --validate-only --inns 9102013580"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "cbr-registry": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "not-required", "acceptedEnvSets": [] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-12T20:46:00Z", "evidence": ["Official Bank of Russia FinOrg SOAP GetFullInfoByINN returned and normalized the current participant status, types and licences for a controlled legal-entity INN without credentials; phone and email fields were not persisted.", "The government-open-data live verifier ingested the official CBR response together with reviewed FNS, EIS, Rosstat and Rospatent fixtures into a new isolated production-runtime PostgreSQL database, verified evidence and lineage ownership, context-only classification, official HTTPS provenance and zero sensitive payload fields, then dropped the database and confirmed no temporary database remained."] },
+      "requiresLiveVerification": true,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke"], "live": ["npm run source:fetch:cbr-registry"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "rosstat-open-data": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["SOURCE_SNAPSHOT_ROOT"], ["ROSSTAT_OPEN_DATA_INPUT_FILE"]] },
+      "live": { "state": "verified", "verifiedAt": "2026-08-13T17:54:00+03:00", "evidence": ["The fingerprint-pinned Gosuslugi chain verified the official Rosstat catalogue with TLS checks enabled. Automatic title/metadata discovery selected current dataset 7708234640-unemploymentrate6 for 2026-Q1.", "The sync downloaded and checksummed the official aggregate CSV, normalized 96 federal/district/regional unemployment-rate records, staged a versioned snapshot and atomically activated it with no company identifiers.", "A new isolated production-schema PostgreSQL verifier persisted 96 context-only signals and lineage rows with one shared official dataset evidence item, asserted zero company-attributed or sensitive rows and consistent ownership/provenance, then dropped the disposable database."] },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": { "fixture": ["npm run verify:government-open-data:smoke", "npm run verify:rosstat-open-data:sync"], "live": ["npm run source:sync:rosstat-open-data -- --validate-only"], "contract": ["npm run verify:source:readiness"] },
+      "blockers": []
+    },
+    "rospatent-open-data": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": { "mode": "launch-required", "acceptedEnvSets": [["DATABASE_URL", "SOURCE_SNAPSHOT_ROOT"], ["GOVERNMENT_ENRICHMENT_INNS", "SOURCE_SNAPSHOT_ROOT"]] },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-08-13T08:42:00Z",
+        "evidence": [
+          "2026-08-13 official Rospatent trademark metadata discovery selected data-20260805-structure-20180828.csv; bounded range streaming consumed 687174811 bytes, verified SHA-256 08a93ddcf22e5dbb3f850888f1b567c9a4ea1a914dd77597105d44e3999bd3b7, and deterministically selected 502 records for controlled legal-entity INN 7707083893.",
+          "2026-08-13 checksum-verified active snapshot normalized 502 of 502 trademark records with zero skips and zero sensitive fields. An isolated production-schema PostgreSQL verifier persisted 502 signals and lineage rows, 284 evidence items and one organization; official source URLs, context-only classification, owner consistency, never-hiring-proof and zero sensitive payload rows were asserted before the disposable database was dropped."
+        ]
+      },
+      "requiresLiveVerification": false,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": {
+        "fixture": ["npm run verify:government-open-data:smoke", "node --test packages/db/scripts/sync-rospatent-open-data-snapshot.test.mjs"],
+        "live": ["npm run verify:rospatent-open-data:catalog-live -- --inns <tracked-inns>", "ROSPATENT_LIVE_SNAPSHOT_VERIFY=1 SOURCE_LIVE_DB_TEST_ACK=isolated npm run verify:government-open-data:live-db"],
+        "contract": ["npm run verify:source:readiness"]
+      },
+      "blockers": []
     }
   }
 }

@@ -1,6 +1,8 @@
 # Source Review: zarplata-ru (zarplata.ru)
 
 **Date:** 2026-06-21
+**Re-checked:** 2026-08-13 — the live robots surface still exposes HH-specific
+parameters and policy; duplicate-source decision unchanged.
 **Status:** ❌ NOT ADDED — zarplata.ru is an HH Group backend; duplicate of `hh` + bot-blocked
 **Decision:** Do not implement a separate `zarplata-ru` source.
 

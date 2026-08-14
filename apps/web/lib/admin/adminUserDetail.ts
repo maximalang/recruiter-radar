@@ -384,7 +384,7 @@ const ADMIN_USER_DETAIL_SQL = `
           channel || '_' || delivery_status AS error_code
         FROM lead_channel_deliveries
         WHERE client_profile_id = profile.id
-          AND delivery_status IN ('failed', 'partial')
+          AND delivery_status IN ('failed_retryable', 'failed_terminal')
         UNION ALL
         SELECT
           last_error_at AS error_at,

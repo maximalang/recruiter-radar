@@ -34,19 +34,28 @@ const SOURCE_BASE_WEIGHTS: Record<string, number> = {
   // Canonical source IDs from the ingestion registry.
   'career-pages': 0.45,
   career_page: 0.45,
+  greenhouse: 0.45,
+  lever: 0.45,
+  ashby: 0.45,
+  recruitee: 0.45,
+  workable: 0.45,
+  smartrecruiters: 0.45,
   hh: 0.35,
-  'tech-job-boards': 0.25,
-  'regional-job-boards': 0.2,
-  superjob: 0.2,
-  'habr-career': 0.25,
+  superjob: 0.3,
+  'rabota-rossii': 0.3,
+  rabota_rossii: 0.3,
+  'habr-career': 0.22,
+  'tech-job-boards': 0.2,
   'linkedin-company-pages': 0.2,
-  'rabota-rossii': 0.2,
-  rabota_rossii: 0.2,
   'company-site': 0.15,
-  'company-newsrooms': 0.1,
-  'industry-media': 0.1,
-  news: 0.1,
-  social: 0.08,
+  'company-newsrooms': 0.12,
+  'industry-media': 0.08,
+  'github-company-org': 0.04,
+  'youtube-company-channels': 0.05,
+  'telegram-company-channels': 0.05,
+  news: 0.08,
+  social: 0.05,
+  'platform-aggregator': 0.04,
   'egrul-fns': 0.15,
   egrul: 0.15,
   'transparent-business-fns': 0.15,
@@ -55,7 +64,7 @@ const SOURCE_BASE_WEIGHTS: Record<string, number> = {
   funding: 0.18,
 }
 
-const DEFAULT_SOURCE_WEIGHT = 0.1
+const DEFAULT_SOURCE_WEIGHT = 0.06
 
 const TIER_MULTIPLIER: Record<EvidenceTier, number> = {
   direct: 1.0,

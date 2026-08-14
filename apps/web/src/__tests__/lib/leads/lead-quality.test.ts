@@ -105,6 +105,10 @@ describe('passesMinimumSignalGate', () => {
     expect(passesMinimumSignalGate({ ...base, sourceFamilies: ['career-pages'] })).toBe(true)
   })
 
+  it('passes on a direct corporate surface enrolled on a hosted ATS', () => {
+    expect(passesMinimumSignalGate({ ...base, sourceFamilies: ['workable'] })).toBe(true)
+  })
+
   it('passes on an A/B gate', () => {
     expect(passesMinimumSignalGate({ ...base, confidenceGate: 'A' })).toBe(true)
   })

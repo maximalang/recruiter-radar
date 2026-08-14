@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // Import source utilities
 import { normalizeJobPostingRecord } from './adapters/rf-source-normalizers.mjs';
@@ -29,36 +29,6 @@ const CONFIDENCE_THRESHOLDS = {
 
 // Test fixtures data
 const confidenceFixtures = {
-  'tech-job-boards': [
-    {
-      external_id: 'tjb-conf-1',
-      job_title: 'Senior Software Engineer',
-      company_name: 'TechCorp Inc',
-      company_domain: 'techcorp.example',
-      company_website_url: 'https://techcorp.example',
-      inn: '1234567890',
-      location: 'Москва',
-      salary: '200 000 — 300 000 ₽',
-      published_at: new Date().toISOString(),
-      board: 'greenhouse',
-      tags: ['typescript', 'react', 'node.js'],
-      // Sensitive fields that should be rejected
-      // employee_email: 'john@techcorp.example', // Should be dropped
-      // employee_phone: '+79991234567', // Should be dropped
-    },
-    {
-      external_id: 'tjb-conf-2',
-      job_title: 'DevOps Engineer',
-      company_name: 'CloudSystems',
-      company_domain: 'cloudsystems.ru',
-      location: 'Санкт-Петербург',
-      salary: '180 000 — 250 000 ₽',
-      published_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-      board: 'lever',
-      tags: ['aws', 'docker', 'kubernetes'],
-    },
-  ],
-
   'linkedin-company-pages': [
     {
       external_id: 'linkedin-conf-1',
@@ -135,9 +105,9 @@ function testOrgIdentityConfidence(records, sourceId) {
 
     if (hasVerifiedId) {
       passed++;
-      console.log(`  ✅ ${record.companyName}: has verified identity`);
+      console.log(`  ✅ ${record.companyName ?? record.company_name}: has verified identity`);
     } else {
-      console.log(`  ❌ ${record.companyName}: missing verified identity`);
+      console.log(`  ❌ ${record.companyName ?? record.company_name}: missing verified identity`);
     }
   }
 
@@ -183,10 +153,16 @@ function testSensitiveFieldRejection(records, sourceId) {
 
 // Test data freshness
 function testFreshness(records, sourceId) {
-  console.log(`\n⏰ Testing data freshness for ${sourceId}`);
+  console.log(`\n⏰ Testing fixture freshness distribution for ${sourceId}`);
 
-  const now = new Date();
-  const freshThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days
+  const timestamps = records
+    .map((record) => new Date(record.published_at || record.occurredAt).getTime())
+    .filter(Number.isFinite);
+  assert.equal(timestamps.length, records.length, `${sourceId} fixture dates must be valid`);
+  // Fixture confidence must stay deterministic as wall-clock time advances.
+  // Actual current freshness is a separate live-verifier assertion.
+  const referenceNow = Math.max(...timestamps) + 24 * 60 * 60 * 1000;
+  const freshThreshold = new Date(referenceNow - 7 * 24 * 60 * 60 * 1000);
   let fresh = 0;
 
   for (const record of records) {
@@ -246,6 +222,7 @@ async function runConfidenceTests() {
       results[source.id] = { error: 'No fixture' };
       continue;
     }
+  }
 
   // Summary report
   console.log('\n📋 Confidence Test Summary');
@@ -266,7 +243,7 @@ async function runConfidenceTests() {
   console.log(`\nOverall: ${passedCount}/${totalCount} sources passed confidence gates`);
 
   if (passedCount === totalCount) {
-    console.log('🎉 All P2 sources ready for digest promotion!');
+    console.log('🎉 All P2 fixture confidence checks passed; live, legal, and readiness gates remain independent.');
     process.exit(0);
   } else {
     console.log('⚠️  Some sources need improvements before digest promotion');
@@ -280,7 +257,6 @@ function runSingleSourceConfidenceTest(sourceId) {
 }
 
 // Run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   runConfidenceTests().catch(console.error);
-}
 }

@@ -126,6 +126,11 @@ describe('MultiSourceLeadGenerator', () => {
       expect(sourceIdToEvidenceType('unregistered-source')).toBe('news')
       expect(sourceIdToEvidenceType('fedresurs')).toBe('registry')
     })
+
+    it('classifies enrolled hosted ATS sources as direct career-page evidence', () => {
+      expect(sourceIdToEvidenceType('greenhouse')).toBe('career-page')
+      expect(sourceIdToEvidenceType('smartrecruiters')).toBe('career-page')
+    })
   })
 
   describe('deduplication', () => {
@@ -172,11 +177,17 @@ describe('MultiSourceLeadGenerator', () => {
 
       expect(activeSources).toEqual([
         'hh',
+        'superjob',
         'career-pages',
+        'greenhouse',
+        'lever',
+        'ashby',
+        'recruitee',
+        'workable',
+        'smartrecruiters',
         'egrul-fns',
         'rabota-rossii',
       ])
-      expect(activeSources).not.toContain('superjob')
       expect(activeSources).not.toContain('linkedin-company-pages')
       expect(activeSources).not.toContain('funding-business-signals')
     })
@@ -254,12 +265,11 @@ describe('MultiSourceLeadGenerator', () => {
     })
 
     it.each([
-      ['superjob'],
       ['habr-career'],
       ['linkedin-company-pages'],
       ['tech-job-boards'],
       ['regional-job-boards'],
-    ])('does not enable provider-gated source %s in the canonical default set', (source) => {
+    ])('does not enable blocked source %s in the canonical default set', (source) => {
       expect(generator['activeSources']).not.toContain(source)
     })
 

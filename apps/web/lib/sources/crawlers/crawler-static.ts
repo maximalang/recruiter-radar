@@ -26,6 +26,7 @@ interface FetchTextResponse {
     url: string
     headers: {
       get: (name: string) => string | null
+      forEach: (callback: (value: string, key: string) => void) => void
     }
   }
   body: string
@@ -81,7 +82,6 @@ export function createStaticEngine(
     id: 'static',
     capabilities: {
       rendersJs: false,
-      bypassesCloudflare: false,
       returnsMarkdown: false,
       supportsPdf: false,
       selfHosted: true,
@@ -100,12 +100,15 @@ export function createStaticEngine(
       }
 
       try {
-        const { response, body: html } = await fetchText(url, {
-          sourceName: `static crawler fetch`,
-          headers: init.headers as Record<string, string>,
-          signal: init.signal ?? undefined,
-          redirect: 'follow',
-        })
+        const fetched = options.fetcher
+          ? await fetchWithInjectedFetcher(fetcher, url, init)
+          : await fetchText(url, {
+              sourceName: `static crawler fetch`,
+              headers: init.headers as Record<string, string>,
+              signal: init.signal ?? undefined,
+              redirect: 'follow',
+            })
+        const { response, body: html } = fetched
 
         // Create Headers-compatible object
         const headers = new Map()
@@ -126,5 +129,22 @@ export function createStaticEngine(
         clearTimeout(timer)
       }
     },
+  }
+}
+
+async function fetchWithInjectedFetcher(
+  fetcher: StaticFetcher,
+  url: string,
+  init: RequestInit,
+): Promise<FetchTextResponse> {
+  const response = await fetcher(url, init)
+  return {
+    response: {
+      ok: response.ok,
+      status: response.status,
+      url: response.url || url,
+      headers: response.headers,
+    },
+    body: await response.text(),
   }
 }

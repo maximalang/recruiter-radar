@@ -8,6 +8,7 @@
 import { getPool } from "./db";
 import { formatReason, type ScoringReason } from "./scoring/scoring-reasons";
 import { parseStoredEnrichment, type StoredAiEnrichment } from "./ai/enrichment/enrichmentStore";
+import { hasCompanyHiringSource } from "./sources/company-hiring-sources";
 
 // ─── Reason parsing ──────────────────────────────────────────────
 
@@ -168,14 +169,14 @@ export function deriveNegativeSignals(input: {
   }
 
   // Single source — only flag when no direct corporate surface is present.
-  // A single career-pages source IS a direct hiring surface (gate A/B), so
+  // A single company career/hosted-ATS source IS a direct hiring surface, so
   // "только один источник" would be misleading noise there; reserve the flag
   // for platform-only aggregation where corroboration genuinely is missing.
   const hasDirectSurface =
     keys.includes('reachability.career-page') ||
     keys.includes('reachability.corporate-contact') ||
     keys.includes('reachability.direct-surface') ||
-    input.sourceFamilies.includes('career-pages')
+    hasCompanyHiringSource(input.sourceFamilies)
   if (input.sourceFamilies.length <= 1 && !hasDirectSurface) {
     signals.push('Только один источник — нет независимого подтверждения')
   }

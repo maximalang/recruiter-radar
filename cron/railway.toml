@@ -1,19 +1,17 @@
-# Railway config for the daily-radar cron trigger (separate from web + n8n).
-# This service's Root Directory MUST be set to cron/ in the Railway Dashboard,
-# so Railway auto-discovers this railway.toml and resolves paths relative to it.
+# Legacy Railway daily-radar compatibility image.
 #
-# NOTE: with Root Directory = cron/, the build context and dockerfilePath are
-# relative to cron/ (NOT the repo root) — so dockerfilePath is just "Dockerfile".
+# IMPORTANT: this repository no longer authorizes Railway as a production
+# scheduler. GitHub Actions is the only production clock authority. This file
+# intentionally has NO `cronSchedule`; an existing Railway cron service must be
+# disabled/deleted by an operator after the GitHub workflows land on `main`.
+#
+# The image is retained only for explicit/manual compatibility invocations while
+# migration is completed. Do not add a schedule here.
 [build]
   builder = "DOCKERFILE"
   dockerfilePath = "Dockerfile"
 
 [deploy]
-  # cronSchedule turns this into a scheduled one-off: Railway starts the
-  # container on this cron, runs CMD to completion, then stops it. The schedule
-  # is in UTC. 03:00 UTC = 06:00 MSK (Europe/Moscow, UTC+3) — the daily window.
-  cronSchedule = "0 3 * * *"
-
-  # No long-running process to health-check; just retry a failed run.
+  # Manual/deprecated compatibility tooling only. There is no automatic clock.
   restartPolicyType = "ON_FAILURE"
   restartPolicyMaxRetries = 3

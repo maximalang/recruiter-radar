@@ -110,6 +110,12 @@ jobs:
           scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             scripts/deploy/run-commercial-signal-production-canary.sh \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/run-commercial-signal-production-canary.${DEPLOY_SHA}.sh
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/run-government-source-sync.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/run-government-source-sync.${DEPLOY_SHA}.sh
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/verify-source-production-runtime.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/verify-source-production-runtime.${DEPLOY_SHA}.sh
 
       - name: Deploy image with local rollback
         id: deploy
@@ -127,6 +133,8 @@ jobs:
           staged_recovery="/opt/recruiter-radar/recover-deployment.${DEPLOY_SHA}.sh"
           staged_caddy="/opt/recruiter-radar/configure-caddy-real-ip.${DEPLOY_SHA}.sh"
           staged_canary_runner="/opt/recruiter-radar/run-commercial-signal-production-canary.${DEPLOY_SHA}.sh"
+          staged_government_runner="/opt/recruiter-radar/run-government-source-sync.${DEPLOY_SHA}.sh"
+          staged_source_preflight="/opt/recruiter-radar/verify-source-production-runtime.${DEPLOY_SHA}.sh"
 
           cleanup_staged() {
             rm -f \
@@ -135,7 +143,9 @@ jobs:
               "$staged_rollback_guard" \
               "$staged_recovery" \
               "$staged_caddy" \
-              "$staged_canary_runner"
+              "$staged_canary_runner" \
+              "$staged_government_runner" \
+              "$staged_source_preflight"
           }
           trap cleanup_staged EXIT
 
@@ -262,6 +272,13 @@ jobs:
 
           echo "=== Waiting for local health (up to 60s) ==="
           wait_for_health
+
+          echo "=== Verifying production source runtime and schedules ==="
+          install -m 700 "$staged_government_runner" \
+            /opt/recruiter-radar/scripts/deploy/run-government-source-sync.sh
+          install -m 700 "$staged_source_preflight" \
+            /opt/recruiter-radar/scripts/deploy/verify-source-production-runtime.sh
+          /opt/recruiter-radar/scripts/deploy/verify-source-production-runtime.sh
           rollback_guard_disarm
           SSH_EOF
 
@@ -385,10 +402,14 @@ jobs:
           set -euo pipefail
           staged_configurator="/opt/recruiter-radar/configure-notification-encryption.${DEPLOY_SHA}.sh"
           staged_canary_runner="/opt/recruiter-radar/run-commercial-signal-production-canary.${DEPLOY_SHA}.sh"
+          staged_government_runner="/opt/recruiter-radar/run-government-source-sync.${DEPLOY_SHA}.sh"
+          staged_source_preflight="/opt/recruiter-radar/verify-source-production-runtime.${DEPLOY_SHA}.sh"
           deployment_marker="/opt/recruiter-radar/.deployment-switched"
           if [ ! -e "$deployment_marker" ] && [ ! -L "$deployment_marker" ]; then
             rm -f -- "$staged_configurator"
             rm -f -- "$staged_canary_runner"
+            rm -f -- "$staged_government_runner"
+            rm -f -- "$staged_source_preflight"
           else
             echo "Deployment recovery is pending; preserving the staged preflight configurator."
           fi

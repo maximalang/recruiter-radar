@@ -5,6 +5,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { redactSourceRuntimeSecrets } from './source-secret-redaction.mjs';
 
 /**
  * Load environment file and return parsed variables
@@ -77,7 +78,10 @@ export async function runScriptCli(scriptName, mainHandler) {
   try {
     await mainHandler(process.argv.slice(2));
   } catch (error) {
-    console.error(`Error in ${scriptName}:`, error.message);
+    console.error(
+      `Error in ${scriptName}:`,
+      redactSourceRuntimeSecrets(error instanceof Error ? error.message : error),
+    );
     process.exit(1);
   }
 }

@@ -1,5 +1,5 @@
-import { ingestSource, ingestAllPrimarySources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
-import { getPrimarySourceIds, getSourceConfig } from '@/lib/sources/source-registry'
+import { ingestSource, ingestAllPrimarySources, ingestDailyRadarSources, isNoActiveProfiles, runSourceTemporalIntelligence } from '@/lib/lead-discovery/source-ingest'
+import { getDailySupportingSourceIds, getHiringEvidenceSourceIds, getPrimarySourceIds, getSourceConfig } from '@/lib/sources/source-registry'
 
 // Mock the execFile accessor (production resolves execFile via
 // process.getBuiltinModule, which bypasses jest's require-cache mock —
@@ -24,17 +24,46 @@ describe('source-ingest', () => {
     mockGetPool.mockReturnValue(null)
   })
 
-  describe('ingestSource', () => {
-    it('allows the Habr Career scraper to finish its multi-keyword run', () => {
-      expect(getSourceConfig('habr-career').timeoutMs).toBe(240_000)
+  describe('runSourceTemporalIntelligence', () => {
+    it('runs the bounded DB derivation job and parses its summary', async () => {
+      mockExecFile.mockImplementation((_cmd, args: any, opts: any, callback: any) => {
+        expect(args[0]).toContain('derive-source-temporal-intelligence.mjs')
+        expect(opts.timeout).toBe(120_000)
+        callback(null, JSON.stringify({ observations: 4, derivedEvents: 2 }), '')
+      })
+
+      await expect(runSourceTemporalIntelligence()).resolves.toEqual({
+        success: true,
+        observations: 4,
+        derivedEvents: 2,
+      })
     })
 
-    it('allows career-pages crawl + post-loop write to finish (empirically ~300s)', () => {
-      // A manual prod run (2026-07-17: 30 targets, 716 records, EXIT_CODE=0)
-      // took ~5min end-to-end; a 240s execFile kill was discarding every fetched
-      // record because the row-by-row write never reached COMMIT in time. 420s
-      // = observed ~300s + headroom for parallel-source contention.
-      expect(getSourceConfig('career-pages').timeoutMs).toBe(420_000)
+    it('keeps a failed derivation visible to the daily pipeline', async () => {
+      mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+        callback(new Error('exit 1'), '', 'source_temporal_observations is missing')
+      })
+
+      await expect(runSourceTemporalIntelligence()).resolves.toEqual({
+        success: false,
+        observations: 0,
+        derivedEvents: 0,
+        error: 'source_temporal_observations is missing',
+      })
+    })
+  })
+
+  describe('ingestSource', () => {
+    it('keeps Habr Career out of automatic primary ingestion', () => {
+      expect(getSourceConfig('habr-career').isPrimary).toBe(false)
+      expect(getSourceConfig('habr-career').searchEnvVars).toEqual([])
+    })
+
+    it('bounds career-pages fetch plus set-based persistence', () => {
+      // The 700-record disposable-DB benchmark guards persistence separately.
+      // Runtime keeps 90s beyond the default 90s fetch budget for DB/network
+      // contention without hiding a regression behind the former 420s cap.
+      expect(getSourceConfig('career-pages').timeoutMs).toBe(180_000)
     })
 
     it('returns success for HH ingestion with valid output', async () => {
@@ -127,20 +156,14 @@ describe('source-ingest', () => {
       expect(result.upsertedCount).toBe(3)
     })
 
-    it('passes EGRUL/FNS NON-search config through the env whitelist (search vars excluded)', async () => {
-      // EGRUL_FNS_INNS is now a searchEnvVar → excluded from caller env (it is
-      // derived from the DB orgs needing verification, not passed by callers).
-      // EGRUL_FNS_PUBLIC_BASE_URL is NOT a search var (prefix EGRUL_FNS_ is
-      // whitelisted) → still passes through the caller env whitelist.
+    it('passes only the configured official EGRUL/FNS snapshot input to the source', async () => {
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        expect(opts.env.EGRUL_FNS_INNS).toBeUndefined()
-        expect(opts.env.EGRUL_FNS_PUBLIC_BASE_URL).toBe('https://egrul.example/api')
+        expect(opts.env.EGRUL_FNS_INPUT_FILE).toBe('C:\\snapshots\\egrul-official.json')
         callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
       })
 
       const result = await ingestSource('egrul-fns', {
-        EGRUL_FNS_INNS: '7707083893',
-        EGRUL_FNS_PUBLIC_BASE_URL: 'https://egrul.example/api',
+        EGRUL_FNS_INPUT_FILE: 'C:\\snapshots\\egrul-official.json',
       })
 
       expect(result.success).toBe(true)
@@ -258,103 +281,6 @@ describe('source-ingest', () => {
 
       expect(normalizationZero).toEqual(expect.objectContaining({ success: false, outcome: 'normalization-zero' }))
       expect(ingestionZero).toEqual(expect.objectContaining({ success: false, outcome: 'ingestion-zero' }))
-    })
-  })
-
-  describe('habr-career keyword derivation', () => {
-    // Route queries by shape: count SELECT vs search-prefs SELECT vs
-    // active-profile ICP SELECT. `profiles` carries the full column set the
-    // generalised profile-search loader reads (roles, industries, exclusions,
-    // operator keywords, target city); `roles` is the legacy roles-only shape
-    // used by the habr resolver path.
-    function mockPoolWith({
-      roles,
-      searchParams,
-      profiles,
-      count,
-    }: {
-      roles?: string[][]
-      searchParams?: Record<string, string>
-      profiles?: Array<{
-        roles?: string[] | null
-        industries?: string[] | null
-        excluded_industries?: string[] | null
-        include_keywords?: string[] | null
-        exclude_keywords?: string[] | null
-        target_city?: string | null
-      }>
-      count?: string;
-    }) {
-      const query = jest.fn((sql: string) => {
-        if (sql.includes('COUNT(*)')) {
-          return Promise.resolve({ rows: [{ count: count ?? '0' }] })
-        }
-        if (sql.includes('user_search_preferences')) {
-          return Promise.resolve({ rows: searchParams ? [{ params: searchParams }] : [] })
-        }
-        if (sql.includes('excluded_industries') || sql.includes('include_keywords')) {
-          // Generalised profile-search loader (selects multiple ICP columns).
-          return Promise.resolve({ rows: profiles ?? [] })
-        }
-        if (sql.includes('client_profiles')) {
-          // Legacy roles-only SELECT (habr resolver path).
-          return Promise.resolve({ rows: (roles ?? []).map(r => ({ roles: r })) })
-        }
-        return Promise.resolve({ rows: [] })
-      })
-      return { query }
-    }
-
-    it('injects HABR_CAREER_KEYWORDS derived from active profiles roles', async () => {
-      mockGetPool.mockReturnValue(mockPoolWith({ roles: [['hr'], ['it-engineering']] }))
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'habr-career', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
-      })
-
-      await ingestSource('habr-career')
-
-      expect(capturedEnv?.HABR_CAREER_KEYWORDS).toBeDefined()
-      const kws = capturedEnv!.HABR_CAREER_KEYWORDS.split(',')
-      expect(kws).toContain('рекрутер') // hr
-      expect(kws).toContain('разработчик') // it-engineering
-    })
-
-    it('does not derive keywords when an explicit search pref keyword is set', async () => {
-      mockGetPool.mockReturnValue(
-        mockPoolWith({ roles: [['hr']], searchParams: { HABR_CAREER_KEYWORD: 'devops' } })
-      )
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'habr-career', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
-      })
-
-      await ingestSource('habr-career')
-
-      expect(capturedEnv?.HABR_CAREER_KEYWORD).toBe('devops')
-      expect(capturedEnv?.HABR_CAREER_KEYWORDS).toBeUndefined()
-    })
-
-    it('does not derive HABR_CAREER_KEYWORDS for non-habr sources', async () => {
-      mockGetPool.mockReturnValue(
-        mockPoolWith({ profiles: [{ roles: ['hr'] }] }),
-      )
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
-      })
-
-      await ingestSource('hh')
-
-      // hh derives its OWN search text from the profile, but must NOT emit the
-      // habr-only HABR_CAREER_KEYWORDS param.
-      expect(capturedEnv?.HABR_CAREER_KEYWORDS).toBeUndefined()
     })
   })
 
@@ -596,25 +522,25 @@ describe('source-ingest', () => {
     })
   })
 
-  describe('funding-business-signals GDELT (free live-public from profile ICP)', () => {
-    function mockPool(profiles: Array<Record<string, unknown>>) {
+  describe('funding-business-signals GDELT (free context for tracked companies)', () => {
+    function mockPool(targets: Array<Record<string, unknown>>) {
       const query = jest.fn((sql: string) => {
         if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
-        if (sql.includes('excluded_industries') || sql.includes('include_keywords')) {
-          return Promise.resolve({ rows: profiles })
+        if (sql.includes('FROM orgs')) {
+          return Promise.resolve({ rows: targets })
         }
         return Promise.resolve({ rows: [] })
       })
       return { query }
     }
 
-    it('derives FUNDING_SIGNALS_GDELT_QUERIES from the union of active profiles industries', async () => {
-      mockGetPool.mockReturnValue(
-        mockPool([
-          { roles: ['hr'], industries: ['it', 'finance'], excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null },
-        ]),
-      )
+    it('derives identity-bound GDELT query objects from companies with hiring evidence', async () => {
+      const pool = mockPool([
+        { company_name: 'ООО Рокет Скейл', company_domain: 'rocketscale.ru' },
+      ])
+      mockGetPool.mockReturnValue(pool)
 
+      let targetSql = ''
       let capturedEnv: Record<string, string> | undefined
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
         capturedEnv = opts.env
@@ -623,21 +549,26 @@ describe('source-ingest', () => {
 
       await ingestSource('funding-business-signals')
 
-      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES).toBeDefined()
-      const queries = (capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES ?? '').split('\n')
-      // at least one query combining an industry term with a context verb
-      expect(queries.length).toBeGreaterThan(0)
-      expect(queries.some(q => q.includes('финансирование') || q.includes('инвестиции'))).toBe(true)
+      const parsed = JSON.parse(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES_JSON ?? '{}')
+      expect(parsed.queries).toEqual([expect.objectContaining({
+        company_name: 'ООО Рокет Скейл',
+        company_domain: 'rocketscale.ru',
+      })])
+      expect(parsed.queries[0].query).toContain('"ООО Рокет Скейл"')
+      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES).toBeUndefined()
+
+      targetSql = String(pool.query.mock.calls
+        .find(([sql]: [string]) => sql.includes('FROM orgs'))?.[0] ?? '')
+      expect(targetSql).toContain("signal_type = 'job_posting'")
+      expect(targetSql).toContain("source = 'funding-business-signals'")
+      expect(targetSql).toContain('o.domain IS NOT NULL')
     })
 
-    it('lets an explicit operator DB pref override the profile-derived GDELT queries', async () => {
+    it('lets an explicit operator DB pref override automatic company queries', async () => {
       const mockPoolWithOverride = {
         query: jest.fn((sql: string) => {
           if (sql.includes('user_search_preferences')) {
             return Promise.resolve({ rows: [{ params: { FUNDING_SIGNALS_GDELT_QUERIES: 'operator-pinned-query' } }] })
-          }
-          if (sql.includes('excluded_industries') || sql.includes('include_keywords')) {
-            return Promise.resolve({ rows: [{ roles: ['hr'], industries: ['it'], excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null }] })
           }
           return Promise.resolve({ rows: [] })
         }),
@@ -653,27 +584,10 @@ describe('source-ingest', () => {
       await ingestSource('funding-business-signals')
 
       expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES).toBe('operator-pinned-query')
+      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES_JSON).toBeUndefined()
     })
 
-    it('omits GDELT queries when no active profiles declare an industry', async () => {
-      mockGetPool.mockReturnValue(
-        mockPool([
-          { roles: ['hr'], industries: [], excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null },
-        ]),
-      )
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'funding-business-signals', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
-      })
-
-      await ingestSource('funding-business-signals')
-
-      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES).toBeUndefined()
-    })
-
-    it('does NOT emit GDELT queries when no active profiles exist', async () => {
+    it('emits explicit expected-zero query JSON when no tracked company needs refresh', async () => {
       mockGetPool.mockReturnValue(mockPool([]))
 
       let capturedEnv: Record<string, string> | undefined
@@ -684,89 +598,120 @@ describe('source-ingest', () => {
 
       await ingestSource('funding-business-signals')
 
-      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES).toBeUndefined()
-    })
-  })
-
-  describe('egrul-fns INNs (live-public from DB orgs needing verification)', () => {
-    function mockPoolWithInns(innRows: Array<{ inn: string }>) {
-      const query = jest.fn((sql: string) => {
-        if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
-        if (sql.includes("inn ~") || sql.includes('FROM orgs')) {
-          return Promise.resolve({ rows: innRows })
-        }
-        return Promise.resolve({ rows: [] })
-      })
-      return { query }
-    }
-
-    it('derives EGRUL_FNS_INNS from orgs with 10-digit INNs and no ogrn', async () => {
-      mockGetPool.mockReturnValue(
-        mockPoolWithInns([{ inn: '7707083893' }, { inn: '7701234567' }]),
-      )
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 2, signalUpsertsCompleted: 2 }), '')
-      })
-
-      await ingestSource('egrul-fns')
-
-      expect(capturedEnv?.EGRUL_FNS_INNS).toBeDefined()
-      const inns = (capturedEnv?.EGRUL_FNS_INNS ?? '').split(',')
-      expect(inns).toContain('7707083893')
-      expect(inns).toContain('7701234567')
+      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES_JSON).toBe('{"queries":[]}')
     })
 
-    it('lets an explicit operator DB pref override the derived INN list', async () => {
-      const mockPoolWithOverride = {
-        query: jest.fn((sql: string) => {
-          if (sql.includes('user_search_preferences')) {
-            return Promise.resolve({ rows: [{ params: { EGRUL_FNS_INNS: '1111111111' } }] })
-          }
-          return Promise.resolve({ rows: [] })
-        }),
-      }
-      mockGetPool.mockReturnValue(mockPoolWithOverride)
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
-      })
-
-      await ingestSource('egrul-fns')
-
-      expect(capturedEnv?.EGRUL_FNS_INNS).toBe('1111111111')
-    })
-
-    it('omits EGRUL_FNS_INNS when no orgs need verification', async () => {
-      mockGetPool.mockReturnValue(mockPoolWithInns([]))
-
-      let capturedEnv: Record<string, string> | undefined
-      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
-      })
-
-      await ingestSource('egrul-fns')
-
-      expect(capturedEnv?.EGRUL_FNS_INNS).toBeUndefined()
-    })
-
-    it('omits EGRUL_FNS_INNS when no pool is configured (test/dev)', async () => {
+    it('does not claim expected-zero when no database pool is available', async () => {
       mockGetPool.mockReturnValue(null)
 
       let capturedEnv: Record<string, string> | undefined
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
         capturedEnv = opts.env
-        callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
+        callback(null, JSON.stringify({ source: 'funding-business-signals', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
       })
 
-      await ingestSource('egrul-fns')
+      await ingestSource('funding-business-signals')
 
-      expect(capturedEnv?.EGRUL_FNS_INNS).toBeUndefined()
+      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES_JSON).toBeUndefined()
+    })
+  })
+
+  describe('industry-media curated public feeds', () => {
+    it('derives bounded tracked-company targets only from existing hiring evidence', async () => {
+      let targetSql = ''
+      mockGetPool.mockReturnValue({
+        query: jest.fn((sql: string) => {
+          if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
+          if (sql.includes('FROM orgs')) {
+            targetSql = sql
+            return Promise.resolve({ rows: [
+              { company_name: 'Acme Bank', company_domain: 'acme.example' },
+            ] })
+          }
+          return Promise.resolve({ rows: [] })
+        }),
+      })
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'industry-media', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('industry-media')
+
+      expect(JSON.parse(capturedEnv?.INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON ?? '[]')).toEqual([
+        { company_name: 'Acme Bank', company_domain: 'acme.example' },
+      ])
+      expect(targetSql).toContain("signal_type = 'job_posting'")
+      expect(targetSql).toContain("media_signal.source = 'industry-media'")
+      expect(targetSql).toContain("INTERVAL '23 hours'")
+    })
+
+    it('emits an explicit empty target set when no company needs refresh', async () => {
+      mockGetPool.mockReturnValue({
+        query: jest.fn((sql: string) => Promise.resolve({
+          rows: sql.includes('user_search_preferences') ? [] : [],
+        })),
+      })
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'industry-media', recordsReceived: 0, signalUpsertsCompleted: 0, zeroReason: 'no-eligible-company-targets' }), '')
+      })
+
+      await ingestSource('industry-media')
+
+      expect(capturedEnv?.INDUSTRY_MEDIA_TRACKED_COMPANIES_JSON).toBe('[]')
+    })
+  })
+
+  describe('government source enrichment INNs', () => {
+    it('derives the bounded legal-entity INN pool from freshest hiring signals', async () => {
+      let enrichmentSql = ''
+      mockGetPool.mockReturnValue({
+        query: jest.fn((sql: string) => {
+          if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
+          if (sql.includes('JOIN signals')) {
+            enrichmentSql = sql
+            return Promise.resolve({ rows: [{ inn: '7707083893' }, { inn: '7701234567' }] })
+          }
+          return Promise.resolve({ rows: [] })
+        }),
+      })
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'cbr-registry', recordsReceived: 2, signalUpsertsCompleted: 2 }), '')
+      })
+
+      await ingestSource('cbr-registry')
+
+      expect(capturedEnv?.GOVERNMENT_ENRICHMENT_INNS).toBe('7707083893,7701234567')
+      expect(enrichmentSql).toContain("orgs.inn ~ '^\\d{10}$'")
+      expect(enrichmentSql).toContain('ORDER BY MAX(signals.occurred_at) DESC, orgs.inn')
+    })
+
+    it('keeps an explicit operator INN pool authoritative', async () => {
+      mockGetPool.mockReturnValue({
+        query: jest.fn((sql: string) => {
+          if (sql.includes('user_search_preferences')) {
+            return Promise.resolve({ rows: [{ params: { GOVERNMENT_ENRICHMENT_INNS: '1111111111' } }] })
+          }
+          return Promise.resolve({ rows: [] })
+        }),
+      })
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'cbr-registry', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('cbr-registry')
+
+      expect(capturedEnv?.GOVERNMENT_ENRICHMENT_INNS).toBe('1111111111')
     })
   })
 
@@ -783,7 +728,7 @@ describe('source-ingest', () => {
     })
 
     function mockPoolWithOrgs(orgRows: Array<{ id: string | number; name: string | null; domain: string | null; website_url: string | null }>) {
-      const query = jest.fn((sql: string) => {
+      const query = jest.fn((sql: string, _params?: unknown[]) => {
         if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
         if (sql.includes('FROM orgs')) {
           return Promise.resolve({ rows: orgRows })
@@ -794,12 +739,11 @@ describe('source-ingest', () => {
     }
 
     it('derives COMPANY_SITE_TARGETS_FILE from orgs with a domain + a hiring signal, writes the file', async () => {
-      mockGetPool.mockReturnValue(
-        mockPoolWithOrgs([
-          { id: 1, name: 'АО Ромашка', domain: 'romashka.ru', website_url: null },
-          { id: 2, name: 'ООО Вектор', domain: null, website_url: 'https://vector.ru' },
-        ]),
-      )
+      const pool = mockPoolWithOrgs([
+        { id: 1, name: 'АО Ромашка', domain: 'romashka.ru', website_url: null },
+        { id: 2, name: 'ООО Вектор', domain: null, website_url: 'https://vector.ru' },
+      ])
+      mockGetPool.mockReturnValue(pool)
 
       let capturedEnv: Record<string, string> | undefined
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
@@ -815,6 +759,13 @@ describe('source-ingest', () => {
       expect(written).toHaveLength(2)
       expect(written[0]).toEqual({ url: 'https://romashka.ru', company_name: 'АО Ромашка', company_domain: 'romashka.ru' })
       expect(written[1].url).toBe('https://vector.ru')
+      const targetQuery = pool.query.mock.calls.find((call) => call[0].includes('FROM orgs'))
+      expect(targetQuery?.[0]).toContain("signals.signal_type = 'job_posting'")
+      expect(targetQuery?.[0]).toContain('signals.source = ANY($4::text[])')
+      expect(targetQuery?.[0]).toContain('signals.updated_at >= NOW() - $3::interval')
+      expect(targetQuery?.[1]?.[2]).toBe('7 days')
+      expect(targetQuery?.[1]?.[3]).toContain('smartrecruiters')
+      expect(targetQuery?.[1]?.[3]).not.toContain('company-site')
     })
 
     it('lets an explicit operator DB pref override the derived targets file', async () => {
@@ -841,7 +792,7 @@ describe('source-ingest', () => {
       expect(fs.existsSync(targetsFilePath)).toBe(false)
     })
 
-    it('omits COMPANY_SITE_TARGETS_FILE when no candidate orgs exist', async () => {
+    it('writes an empty COMPANY_SITE_TARGETS_FILE when no candidate orgs exist', async () => {
       mockGetPool.mockReturnValue(mockPoolWithOrgs([]))
 
       let capturedEnv: Record<string, string> | undefined
@@ -852,8 +803,8 @@ describe('source-ingest', () => {
 
       await ingestSource('company-site')
 
-      expect(capturedEnv?.COMPANY_SITE_TARGETS_FILE).toBeUndefined()
-      expect(fs.existsSync(targetsFilePath)).toBe(false)
+      expect(capturedEnv?.COMPANY_SITE_TARGETS_FILE).toBe(targetsFilePath)
+      expect(JSON.parse(fs.readFileSync(targetsFilePath, 'utf8'))).toEqual([])
     })
 
     it('omits COMPANY_SITE_TARGETS_FILE when no pool is configured (test/dev)', async () => {
@@ -888,8 +839,9 @@ describe('source-ingest', () => {
       })
 
       // Caller-provided COMPANY_SITE_TARGETS_FILE is excluded (search var); with
-      // no candidate orgs nothing is derived either, so it is undefined.
-      expect(capturedEnv?.COMPANY_SITE_TARGETS_FILE).toBeUndefined()
+      // an empty derived target set is explicit expected-zero input.
+      expect(capturedEnv?.COMPANY_SITE_TARGETS_FILE).toBe(targetsFilePath)
+      expect(JSON.parse(fs.readFileSync(targetsFilePath, 'utf8'))).toEqual([])
       expect(capturedEnv?.NODE_OPTIONS).toBeUndefined()
     })
   })
@@ -908,7 +860,7 @@ describe('source-ingest', () => {
     })
 
     function mockPoolWithOrgs(orgRows: Array<{ id: string | number; name: string | null; domain: string | null; website_url: string | null }>) {
-      const query = jest.fn((sql: string) => {
+      const query = jest.fn((sql: string, _params?: unknown[]) => {
         if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
         if (sql.includes('FROM orgs')) {
           return Promise.resolve({ rows: orgRows })
@@ -919,12 +871,11 @@ describe('source-ingest', () => {
     }
 
     it('derives COMPANY_NEWSROOMS_TARGETS_FILE from orgs with a domain + a hiring signal, writes the file', async () => {
-      mockGetPool.mockReturnValue(
-        mockPoolWithOrgs([
-          { id: 1, name: 'АО Ромашка', domain: 'romashka.ru', website_url: null },
-          { id: 2, name: 'ООО Вектор', domain: null, website_url: 'https://vector.ru' },
-        ]),
-      )
+      const pool = mockPoolWithOrgs([
+        { id: 1, name: 'АО Ромашка', domain: 'romashka.ru', website_url: null },
+        { id: 2, name: 'ООО Вектор', domain: null, website_url: 'https://vector.ru' },
+      ])
+      mockGetPool.mockReturnValue(pool)
 
       let capturedEnv: Record<string, string> | undefined
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
@@ -941,6 +892,13 @@ describe('source-ingest', () => {
       // Reuses buildCompanySiteTargets — same object shape as company-site.
       expect(written[0]).toEqual({ url: 'https://romashka.ru', company_name: 'АО Ромашка', company_domain: 'romashka.ru' })
       expect(written[1].url).toBe('https://vector.ru')
+      const targetQuery = pool.query.mock.calls.find((call) => call[0].includes('FROM orgs'))
+      expect(targetQuery?.[0]).toContain("signals.signal_type = 'job_posting'")
+      expect(targetQuery?.[0]).toContain('signals.source = ANY($4::text[])')
+      expect(targetQuery?.[0]).toContain('signals.updated_at >= NOW() - $3::interval')
+      expect(targetQuery?.[1]?.[2]).toBe('23 hours')
+      expect(targetQuery?.[1]?.[3]).toContain('smartrecruiters')
+      expect(targetQuery?.[1]?.[3]).not.toContain('company-newsrooms')
     })
 
     it('lets an explicit operator DB pref override the derived targets file', async () => {
@@ -967,7 +925,7 @@ describe('source-ingest', () => {
       expect(fs.existsSync(targetsFilePath)).toBe(false)
     })
 
-    it('omits COMPANY_NEWSROOMS_TARGETS_FILE when no candidate orgs exist', async () => {
+    it('writes an empty COMPANY_NEWSROOMS_TARGETS_FILE when no candidate orgs exist', async () => {
       mockGetPool.mockReturnValue(mockPoolWithOrgs([]))
 
       let capturedEnv: Record<string, string> | undefined
@@ -978,8 +936,8 @@ describe('source-ingest', () => {
 
       await ingestSource('company-newsrooms')
 
-      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBeUndefined()
-      expect(fs.existsSync(targetsFilePath)).toBe(false)
+      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBe(targetsFilePath)
+      expect(JSON.parse(fs.readFileSync(targetsFilePath, 'utf8'))).toEqual([])
     })
 
     it('omits COMPANY_NEWSROOMS_TARGETS_FILE when no pool is configured (test/dev)', async () => {
@@ -1013,8 +971,9 @@ describe('source-ingest', () => {
       })
 
       // Caller-provided COMPANY_NEWSROOMS_TARGETS_FILE is excluded (search var);
-      // with no candidate orgs nothing is derived either, so it is undefined.
-      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBeUndefined()
+      // an empty derived target set is explicit expected-zero input.
+      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBe(targetsFilePath)
+      expect(JSON.parse(fs.readFileSync(targetsFilePath, 'utf8'))).toEqual([])
       expect(capturedEnv?.NODE_OPTIONS).toBeUndefined()
     })
   })
@@ -1047,7 +1006,7 @@ describe('source-ingest', () => {
       const sources = results.map(r => r.source)
       expect(sources).toContain('hh')
       expect(sources).toContain('superjob')
-      expect(sources).toContain('habr-career')
+      expect(sources).not.toContain('habr-career')
       expect(sources).toContain('rabota-rossii')
       expect(results.every(r => r.success)).toBe(true)
       const hhResult = results.find(r => r.source === 'hh')
@@ -1100,6 +1059,87 @@ describe('source-ingest', () => {
       expect(failed?.success).toBe(false)
       // Only hh is mocked to fail; every other primary source succeeds.
       expect(results.filter(r => r.success).length).toBe(primaryCount - 1)
+    })
+  })
+
+  describe('ingestDailyRadarSources', () => {
+    const path = require('node:path')
+    const fs = require('node:fs')
+    const cacheDir = path.resolve(process.cwd(), '../../packages/db/scripts/.cache')
+    const derivedFiles = [
+      path.join(cacheDir, 'company-site-derived-targets.json'),
+      path.join(cacheDir, 'company-newsrooms-derived-targets.json'),
+    ]
+
+    afterEach(() => {
+      for (const file of derivedFiles) {
+        try { fs.unlinkSync(file) } catch { /* already absent */ }
+      }
+    })
+
+    it('declares company-owned and identity-bound free context plus CBR lookup as supporting', () => {
+      expect(getDailySupportingSourceIds()).toEqual(['company-site', 'company-newsrooms', 'funding-business-signals', 'industry-media', 'github-company-org', 'youtube-company-channels', 'telegram-company-channels', 'cbr-registry'])
+      expect(getHiringEvidenceSourceIds()).toEqual(expect.arrayContaining([
+        'career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters',
+      ]))
+    })
+
+    it('enables active snapshot sources through one persistent snapshot root', () => {
+      const previousRoot = process.env.SOURCE_SNAPSHOT_ROOT
+      process.env.SOURCE_SNAPSHOT_ROOT = 'C:\\ProgramData\\recruiter-radar\\source-snapshots'
+      try {
+        expect(getDailySupportingSourceIds()).toEqual(expect.arrayContaining([
+          'fns-open-data', 'government-procurement', 'rosstat-open-data', 'rospatent-open-data',
+        ]))
+      } finally {
+        if (previousRoot === undefined) delete process.env.SOURCE_SNAPSHOT_ROOT
+        else process.env.SOURCE_SNAPSHOT_ROOT = previousRoot
+      }
+    })
+
+    it('starts supporting sources only after every primary source completes', async () => {
+      const events: string[] = []
+      mockGetPool.mockReturnValue({
+        query: jest.fn((sql: string) => {
+          if (sql.includes('COUNT(*)')) return Promise.resolve({ rows: [{ count: '1' }] })
+          if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
+          if (sql.includes('FROM orgs')) return Promise.resolve({ rows: [] })
+          return Promise.resolve({ rows: [] })
+        }),
+      })
+      mockExecFile.mockImplementation((_cmd, args: any, _opts: any, callback: any) => {
+        const script = String(args[0])
+        const stage = script.includes('source-company-site') || script.includes('source-company-newsrooms') || script.includes('source-funding-business-signals') || script.includes('source-industry-media') || script.includes('source-github-company-org') || script.includes('source-youtube-company-channels') || script.includes('source-telegram-company-channels') || script.includes('source-cbr-registry')
+          ? 'supporting'
+          : 'primary'
+        events.push(stage)
+        callback(null, JSON.stringify({ source: stage, recordsReceived: 0, signalUpsertsCompleted: 0, zeroReason: 'smoke-zero' }), '')
+      })
+
+      const result = await ingestDailyRadarSources({
+        YOUTUBE_API_KEY: 'test-key',
+        TELEGRAM_API_ID: 'test-id',
+        TELEGRAM_API_HASH: 'test-hash',
+        TELEGRAM_SESSION: 'test-session',
+      })
+      if (isNoActiveProfiles(result)) throw new Error('unexpected no_active_profiles')
+
+      const primaryCount = getPrimarySourceIds().length
+      const supportingCount = getDailySupportingSourceIds().length
+      expect(result).toHaveLength(primaryCount + supportingCount)
+      expect(events.slice(0, primaryCount)).toEqual(Array(primaryCount).fill('primary'))
+      expect(events.slice(primaryCount)).toEqual(Array(supportingCount).fill('supporting'))
+    })
+
+    it('does not start supporting sources when there are no active profiles', async () => {
+      mockGetPool.mockReturnValue({
+        query: jest.fn().mockResolvedValue({ rows: [{ count: '0' }] }),
+      })
+
+      const result = await ingestDailyRadarSources()
+
+      expect(isNoActiveProfiles(result)).toBe(true)
+      expect(mockExecFile).not.toHaveBeenCalled()
     })
   })
 })

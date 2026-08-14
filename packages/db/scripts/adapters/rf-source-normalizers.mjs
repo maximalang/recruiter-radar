@@ -29,6 +29,14 @@ export function normalizeJobPostingRecord(record, { fetchedAt, lineNumber, sourc
   const salary = toNonEmptyText(record.salary ?? record.compensation);
   const employmentType = toNonEmptyText(record.employment_type ?? record.type_of_work?.title);
   const board = toNonEmptyText(record.board ?? record.source_board) ?? options.defaultBoard ?? sourceId;
+  const publisherType = toNonEmptyText(record.publisher_type);
+  const publisherTypeId = Number.isInteger(Number(record.publisher_type_id))
+    ? Number(record.publisher_type_id)
+    : null;
+  const publisherTypeLabel = toNonEmptyText(record.publisher_type_label);
+  const candidateEligible = typeof record.candidate_eligible === 'boolean'
+    ? record.candidate_eligible
+    : null;
   const tags = Array.isArray(record.tags) ? record.tags.map((tag) => String(tag).trim()).filter(Boolean) : [];
   const rfQuality = buildRfJobQuality({
     companyName,
@@ -39,6 +47,7 @@ export function normalizeJobPostingRecord(record, { fetchedAt, lineNumber, sourc
     occurredAt,
     fetchedAt,
     board,
+    publisherType,
     tags,
   });
 
@@ -87,6 +96,12 @@ export function normalizeJobPostingRecord(record, { fetchedAt, lineNumber, sourc
       salary,
       employment_type: employmentType,
       tags,
+      ...(publisherType ? {
+        publisher_type: publisherType,
+        publisher_type_id: publisherTypeId,
+        publisher_type_label: publisherTypeLabel,
+        candidate_eligible: candidateEligible === true,
+      } : {}),
       ...rfQuality.payload,
     },
   };
@@ -101,6 +116,7 @@ export function buildRfJobQuality({
   occurredAt,
   fetchedAt,
   board,
+  publisherType,
   tags = [],
 }) {
   const regionCanonical = canonicalizeRfRegion(location);
@@ -112,6 +128,7 @@ export function buildRfJobQuality({
     jobTitle,
     location,
     board,
+    publisherType,
     freshness,
   });
 
@@ -250,6 +267,7 @@ export function normalizeContextEventRecord(record, { fetchedAt, lineNumber, sou
     signalType: options.signalType ?? 'other',
     evidenceRole: contextOnly ? 'context' : 'enrichment',
     sourceRecordType: options.sourceRecordType ?? 'context_event',
+    extractionMethod: toNonEmptyText(record.extraction_method),
     headline,
     recordTitle: headline,
     sourceUrl,
@@ -342,12 +360,16 @@ function classifyVacancyFreshness(occurredAt, fetchedAt) {
   return 'stale-30d-plus';
 }
 
-function buildQualityPenalties({ companyName, jobTitle, location, board, freshness }) {
+function buildQualityPenalties({ companyName, jobTitle, location, board, publisherType, freshness }) {
   const normalized = normalizeLooseText([companyName, jobTitle, location, board].filter(Boolean).join(' ')) ?? '';
   const penalties = [];
 
   if (includesAny(normalized, ['agency', 'recruitment agency', 'kadrov', '\u043a\u0430\u0434\u0440\u043e\u0432', '\u0430\u0433\u0435\u043d\u0442\u0441\u0442\u0432'])) {
     penalties.push('agency_or_staffing_noise');
+  }
+
+  if (publisherType && publisherType !== 'direct-employer') {
+    penalties.push('non_direct_employer_posting');
   }
 
   if (includesAny(normalized, ['repost', 'duplicate', '\u043f\u043e\u0432\u0442\u043e\u0440'])) {

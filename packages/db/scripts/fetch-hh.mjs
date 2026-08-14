@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  describeHhFailure,
   fetchHhVacancyPages,
   resolveHhVacancySearchConfig,
 } from './adapters/hh.mjs';
@@ -55,6 +56,7 @@ try {
   const causeMessage =
     error instanceof Error && error.cause instanceof Error ? error.cause.message : '';
   console.error(`HH fetch failed: ${message}`);
+  console.error(`HH diagnostic: ${JSON.stringify(describeHhFailure(error))}`);
   if (causeMessage) {
     console.error(`cause: ${causeMessage}`);
   }

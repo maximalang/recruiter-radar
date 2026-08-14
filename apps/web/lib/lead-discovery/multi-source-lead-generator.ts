@@ -145,6 +145,12 @@ function recalculateConfidence(lead: MultiSourceLead): void {
  */
 const SOURCE_ID_TO_EVIDENCE_TYPE: Record<string, EvidenceSource['evidenceType']> = {
   'career-pages': 'career-page',
+  'greenhouse': 'career-page',
+  'lever': 'career-page',
+  'ashby': 'career-page',
+  'recruitee': 'career-page',
+  'workable': 'career-page',
+  'smartrecruiters': 'career-page',
   // Supporting company surfaces may enrich an existing lead but must not
   // independently promote its confidence gate.
   'company-site': 'news',
@@ -470,6 +476,12 @@ export class MultiSourceLeadGenerator {
       'hh': 'HeadHunter',
       'rabota-rossii': 'Rabota Rossii',
       'career-pages': 'Career Pages',
+      'greenhouse': 'Greenhouse',
+      'lever': 'Lever',
+      'ashby': 'Ashby',
+      'recruitee': 'Recruitee',
+      'workable': 'Workable',
+      'smartrecruiters': 'SmartRecruiters',
       'superjob': 'SuperJob',
       'habr-career': 'Habr Career',
       'tech-job-boards': 'Tech Job Boards',

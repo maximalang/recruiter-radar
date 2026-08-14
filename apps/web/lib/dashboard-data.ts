@@ -9,6 +9,7 @@ import { getPool } from "./db";
 import { getPool as getSharedPool } from "./db-pool";
 import { getEffectiveEntitlement, type EffectiveEntitlement } from "./entitlements";
 import { getSourceRegistry, type SourceId } from "./sources/source-registry";
+import { getSourceSchedule } from "./sources/source-schedules";
 import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem } from "./leads-data";
 import { listClientProfiles, resolveHiringMode } from "./clientProfiles";
 
@@ -49,8 +50,21 @@ export interface SourceHealth {
   overall: number;
   lastRun: string;
   recordsProcessed: number;
+  recordsProcessed1h?: number;
+  recordsProcessed24h?: number;
+  recordsProcessed7d?: number;
   errors: number;
-  status: "excellent" | "good" | "warning" | "critical";
+  status: "excellent" | "good" | "warning" | "critical" | "inactive";
+  expectedRefreshIntervalSeconds?: number;
+  lastSuccessfulFetch?: string;
+  lastSuccessfulNormalization?: string;
+  duplicates?: number;
+  organizationResolutionRejects?: number;
+  blocked?: number;
+  rateLimited?: number;
+  extractionMethods?: Record<string, number>;
+  latencyMs?: number;
+  consecutiveFailures?: number;
 }
 
 // ─── Data Fetching ──────────────────────────────────────────────
@@ -210,44 +224,85 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
     // Get the canonical source list from the registry
     const registry = getSourceRegistry();
 
-    // Query signal stats per source in the last 24h
+    // Operational source-run projection; unlike signals, this also records
+    // expected-zero runs, blocks, throttling and normalization failures.
     const statsResult = await pool.query<{
-      source: string;
-      records_24h: string;
-      latest_at: string | null;
+      source_id: string; last_attempt_at: string; last_successful_fetch_at: string | null;
+      last_successful_normalization_at: string | null; records_fetched: string; records_accepted: string;
+      records_accepted_1h: string; records_accepted_24h: string; records_accepted_7d: string;
+      duplicate_records: string; organization_resolution_rejects: string; blocked_count: string;
+      rate_limited_count: string; extraction_methods: Record<string, number>; last_latency_ms: number; consecutive_failures: number;
+      scheduler_outcome: string | null;
     }>(`
-      SELECT
-        source,
-        COUNT(*)::TEXT AS records_24h,
-        MAX(occurred_at)::TEXT AS latest_at
-      FROM signals
-      WHERE occurred_at >= NOW() - INTERVAL '24 hours'
-      GROUP BY source
+      WITH observation_windows AS (
+        SELECT source_id,
+          COALESCE(SUM(records_accepted) FILTER (
+            WHERE completed_at >= NOW() - INTERVAL '1 hour'
+          ), 0)::TEXT AS records_accepted_1h,
+          COALESCE(SUM(records_accepted) FILTER (
+            WHERE completed_at >= NOW() - INTERVAL '24 hours'
+          ), 0)::TEXT AS records_accepted_24h,
+          COALESCE(SUM(records_accepted) FILTER (
+            WHERE completed_at >= NOW() - INTERVAL '7 days'
+          ), 0)::TEXT AS records_accepted_7d
+        FROM source_run_observations
+        WHERE completed_at >= NOW() - INTERVAL '7 days'
+        GROUP BY source_id
+      )
+      SELECT COALESCE(health.source_id, scheduler.source_id) AS source_id,
+        health.last_attempt_at::TEXT,
+        health.last_successful_fetch_at::TEXT,
+        health.last_successful_normalization_at::TEXT,
+        health.records_fetched::TEXT, health.records_accepted::TEXT,
+        COALESCE(windows.records_accepted_1h, '0') AS records_accepted_1h,
+        COALESCE(windows.records_accepted_24h, '0') AS records_accepted_24h,
+        COALESCE(windows.records_accepted_7d, '0') AS records_accepted_7d,
+        health.duplicate_records::TEXT,
+        health.organization_resolution_rejects::TEXT,
+        health.blocked_count::TEXT, health.rate_limited_count::TEXT,
+        health.extraction_methods, health.last_latency_ms,
+        health.consecutive_failures,
+        scheduler.last_scheduler_outcome AS scheduler_outcome
+      FROM source_health_state health
+      FULL OUTER JOIN source_scheduler_state scheduler USING (source_id)
+      LEFT JOIN observation_windows windows
+        ON windows.source_id = COALESCE(health.source_id, scheduler.source_id)
     `);
 
     // Build a lookup from the query result
     const statsBySource = new Map(
-      statsResult.rows.map((r) => [r.source, r]),
+      statsResult.rows.map((r) => [r.source_id, r]),
     );
 
     return registry.map((src) => {
-      const stats = statsBySource.get(src.id);
-      const records = parseInt(stats?.records_24h ?? "0", 10);
-      const lastRun = stats?.latest_at ?? "";
-      const syncAgeMs = stats?.latest_at
-        ? Date.now() - new Date(stats.latest_at).getTime()
+      const schedule = getSourceSchedule(src.id as SourceId);
+      const stats = statsBySource.get(schedule.healthSourceId ?? src.id);
+      const schedulerStats = statsBySource.get(src.id);
+      const records = parseInt(stats?.records_accepted ?? "0", 10);
+      const successfulTimestamps = [
+        stats?.last_successful_fetch_at,
+        stats?.last_successful_normalization_at,
+      ].filter((value): value is string => Boolean(value));
+      const lastRun = successfulTimestamps.sort((a, b) =>
+        new Date(b).getTime() - new Date(a).getTime())[0] ?? "";
+      const syncAgeMs = lastRun
+        ? Math.max(0, Date.now() - new Date(lastRun).getTime())
         : Infinity;
+      const cadenceRatio = syncAgeMs / schedule.expectedRefreshIntervalMs;
+      const credentialGated = schedulerStats?.scheduler_outcome === "credential_gated";
 
-      // Compute overall health for this source (0-100)
-      let overall = 100;
-      // Penalty for stale sync: <1h → 100, 1-6h → 80, 6-24h → 50, 24h+ → 20
-      if (syncAgeMs > 24 * 60 * 60 * 1000) overall = 20;
-      else if (syncAgeMs > 6 * 60 * 60 * 1000) overall = 50;
-      else if (syncAgeMs > 60 * 60 * 1000) overall = 80;
-      // Penalty for no records
-      if (records === 0 && syncAgeMs > 60 * 60 * 1000) overall -= 20;
+      // Freshness is relative to the declared cadence; a successful
+      // expected-zero run remains healthy because volume is not availability.
+      let overall = credentialGated ? 0
+        : cadenceRatio <= 1 ? 100
+        : cadenceRatio <= 1.5 ? 80
+        : cadenceRatio <= 2.5 ? 50
+        : 20;
+      overall -= Math.min(60, Number(stats?.consecutive_failures ?? 0) * 20);
+      overall = Math.max(0, overall);
 
       const status: SourceHealth["status"] =
+        credentialGated ? "inactive" :
         overall >= 80 ? "excellent" :
         overall >= 60 ? "good" :
         overall >= 40 ? "warning" :
@@ -259,8 +314,21 @@ export async function getDashboardSourceHealth(): Promise<SourceHealth[]> {
         overall,
         lastRun,
         recordsProcessed: records,
-        errors: 0, // No error tracking in current schema
+        recordsProcessed1h: parseInt(stats?.records_accepted_1h ?? "0", 10),
+        recordsProcessed24h: parseInt(stats?.records_accepted_24h ?? "0", 10),
+        recordsProcessed7d: parseInt(stats?.records_accepted_7d ?? "0", 10),
+        errors: Number(stats?.consecutive_failures ?? 0),
         status,
+        lastSuccessfulFetch: stats?.last_successful_fetch_at ?? undefined,
+        lastSuccessfulNormalization: stats?.last_successful_normalization_at ?? undefined,
+        duplicates: parseInt(stats?.duplicate_records ?? "0", 10),
+        organizationResolutionRejects: parseInt(stats?.organization_resolution_rejects ?? "0", 10),
+        blocked: parseInt(stats?.blocked_count ?? "0", 10),
+        rateLimited: parseInt(stats?.rate_limited_count ?? "0", 10),
+        extractionMethods: stats?.extraction_methods ?? {},
+        latencyMs: Number(stats?.last_latency_ms ?? 0),
+        consecutiveFailures: Number(stats?.consecutive_failures ?? 0),
+        expectedRefreshIntervalSeconds: Math.round(schedule.expectedRefreshIntervalMs / 1000),
       };
     });
   } catch {
@@ -422,7 +490,7 @@ export async function getDashboardSourcePerformance(): Promise<SourcePerformance
 // also surfaces the average recency (days since latest_published_at) so
 // staleness is visible per source. This is the analytics layer that makes the
 // RF evidence layer inspectable: the HTML-card fallback's contribution shows
-// up as more direct_hiring_proof leads under `career-pages`.
+// up as more direct_hiring_proof leads under their real career/ATS source ids.
 
 export interface SourceEvidenceQualityItem {
   source: string;
@@ -435,7 +503,8 @@ export interface SourceEvidenceQualityItem {
   gateC: number;
   gateD: number;
   /** Evidence-quality distribution counts. direct_hiring_proof = company-owned
-   * surface (career-pages); platform_aggregation = platform/registry match;
+   * surface (same-domain career page or enrolled hosted ATS);
+   * platform_aggregation = platform/registry match;
    * enrichment_context = background only. */
   directHiringProof: number;
   platformAggregation: number;
@@ -457,7 +526,8 @@ export async function getDashboardSourceEvidenceQuality(): Promise<SourceEvidenc
     // both spellings so this stays correct regardless of which writer produced
     // the row. evidence_quality is NOT persisted to payload today, so derive it
     // from source_families with the SAME classification source-digest-evidence.sql
-    // uses (career-pages present → direct_hiring_proof; else platform_aggregation;
+    // uses (company career/hosted ATS present → direct_hiring_proof;
+    // else platform_aggregation;
     // a lead that reached digest_candidates is never enrichment_context because
     // the SQL scorer filters that out). This keeps the analytics view truthful
     // without a payload-shape change. unnest source_families so a lead backed by
@@ -482,8 +552,8 @@ export async function getDashboardSourceEvidenceQuality(): Promise<SourceEvidenc
         COUNT(*) FILTER (WHERE COALESCE(dc.payload->>'confidence_gate', dc.payload->>'confidenceGate') = 'B')::TEXT AS gate_b,
         COUNT(*) FILTER (WHERE COALESCE(dc.payload->>'confidence_gate', dc.payload->>'confidenceGate') = 'C')::TEXT AS gate_c,
         COUNT(*) FILTER (WHERE COALESCE(dc.payload->>'confidence_gate', dc.payload->>'confidenceGate') = 'D')::TEXT AS gate_d,
-        COUNT(*) FILTER (WHERE 'career-pages' = ANY(dc.source_families))::TEXT AS direct,
-        COUNT(*) FILTER (WHERE 'career-pages' <> ALL(dc.source_families))::TEXT AS platform,
+        COUNT(*) FILTER (WHERE dc.source_families && ARRAY['career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters']::TEXT[])::TEXT AS direct,
+        COUNT(*) FILTER (WHERE NOT (dc.source_families && ARRAY['career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters']::TEXT[]))::TEXT AS platform,
         COUNT(*) FILTER (WHERE array_length(dc.source_families, 1) IS NULL)::TEXT AS context,
         ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - dc.latest_published_at)) / 86400.0), 1) AS avg_age_days
       FROM digest_candidates dc

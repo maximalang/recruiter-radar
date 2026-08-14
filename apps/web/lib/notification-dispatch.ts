@@ -24,7 +24,6 @@ type RouteRow = {
   secretCiphertext: string;
   endpointId: string;
   destinationId: string;
-  destinationLabel: string | null;
   routeId: string;
   minScore: number | null;
   confidencePolicy: "A_ONLY" | "A_OR_B";
@@ -164,7 +163,12 @@ export function notificationRetryDelaySeconds(
   attemptNo: number,
   classified: Pick<NotificationErrorClassification, "kind" | "retryAfterSeconds">,
 ): number | null {
-  if (classified.kind === "permanent" || classified.kind === "auth" || attemptNo >= MAX_ATTEMPTS) {
+  if (
+    classified.kind === "permanent"
+    || classified.kind === "auth"
+    || classified.kind === "ambiguous"
+    || attemptNo >= MAX_ATTEMPTS
+  ) {
     return null;
   }
   if (classified.kind === "rate_limited") {
@@ -182,6 +186,19 @@ async function claimDeliveryJob(
     route: RouteRow;
   },
 ): Promise<ClaimedJob | null> {
+  const idempotencyKey = buildIdempotencyKey(input.runId, input.route);
+  await pool.query(
+    `UPDATE notification_delivery_jobs
+     SET status = 'dead_letter',
+         failed_at = NOW(),
+         last_error_code = 'ambiguous_stale_sending',
+         last_error_message = 'Delivery ownership expired before a durable provider outcome was recorded.',
+         updated_at = NOW()
+     WHERE idempotency_key = $1
+       AND status = 'sending'
+       AND updated_at < NOW() - ($2::int * INTERVAL '1 second')`,
+    [idempotencyKey, STALE_JOB_SECONDS],
+  );
   const result = await pool.query<ClaimedJob>(
     `
       INSERT INTO notification_delivery_jobs (
@@ -193,9 +210,6 @@ async function claimDeliveryJob(
       WHERE (
           notification_delivery_jobs.status IN ('failed', 'queued')
           AND notification_delivery_jobs.not_before <= NOW()
-        ) OR (
-          notification_delivery_jobs.status = 'sending'
-          AND notification_delivery_jobs.updated_at < NOW() - ($7::int * INTERVAL '1 second')
         )
       RETURNING id::text AS id, attempt_count AS "attemptCount"
     `,
@@ -205,11 +219,25 @@ async function claimDeliveryJob(
       input.route.endpointId,
       input.route.accountId,
       input.runId,
-      buildIdempotencyKey(input.runId, input.route),
-      STALE_JOB_SECONDS,
+      idempotencyKey,
     ],
   );
   return result.rowCount === 1 ? result.rows[0] : null;
+}
+
+async function readDeliveryJobState(
+  pool: Pool,
+  runId: string,
+  route: RouteRow,
+): Promise<{ status: string; attemptCount: number } | null> {
+  const result = await pool.query<{ status: string; attemptCount: number }>(
+    `SELECT status, attempt_count AS "attemptCount"
+     FROM notification_delivery_jobs
+     WHERE idempotency_key = $1
+     LIMIT 1`,
+    [buildIdempotencyKey(runId, route)],
+  );
+  return result.rows[0] ?? null;
 }
 
 async function recordDeliverySuccess(
@@ -226,7 +254,7 @@ async function recordDeliverySuccess(
   const attemptNo = input.job.attemptCount + 1;
   try {
     await client.query("BEGIN");
-    await client.query(
+    const finalized = await client.query(
       `
         UPDATE notification_delivery_jobs
         SET status = 'sent', attempt_count = $2, sent_at = NOW(), failed_at = NULL,
@@ -236,6 +264,9 @@ async function recordDeliverySuccess(
       `,
       [input.job.id, attemptNo],
     );
+    if (finalized.rowCount !== 1) {
+      throw new Error("Notification success lost delivery ownership before finalization.");
+    }
     await client.query(
       `
         INSERT INTO notification_delivery_attempts (
@@ -286,15 +317,17 @@ async function recordDeliveryFailure(
       ? "rate_limited"
       : input.classified.kind === "auth"
         ? "auth_error"
-        : input.classified.kind === "permanent"
+      : input.classified.kind === "permanent"
           ? "permanent_error"
+          : input.classified.kind === "ambiguous"
+            ? "permanent_error"
           : "retryable_error";
   const retryDelaySeconds = notificationRetryDelaySeconds(attemptNo, input.classified);
   const jobStatus = retryDelaySeconds == null ? "dead_letter" : "failed";
 
   try {
     await client.query("BEGIN");
-    await client.query(
+    const finalized = await client.query(
       `
         UPDATE notification_delivery_jobs
         SET status = $2, attempt_count = $3, failed_at = NOW(),
@@ -314,6 +347,9 @@ async function recordDeliveryFailure(
         retryDelaySeconds,
       ],
     );
+    if (finalized.rowCount !== 1) {
+      throw new Error("Notification failure lost delivery ownership before finalization.");
+    }
     await client.query(
       `
         INSERT INTO notification_delivery_attempts (
@@ -335,7 +371,7 @@ async function recordDeliveryFailure(
       `
         UPDATE notification_endpoints
         SET last_error_at = NOW(), last_error_code = $2, updated_at = NOW(),
-            status = CASE WHEN $3 IN ('auth', 'permanent') THEN 'error' ELSE status END
+            status = CASE WHEN $3 IN ('auth', 'permanent', 'ambiguous') THEN 'error' ELSE status END
         WHERE id = $1
       `,
       [
@@ -384,6 +420,9 @@ export type NotificationDispatchResult = {
   failed: number;
   skipped: number;
   errors: string[];
+  terminalFailed?: number;
+  retryableFailed?: number;
+  processing?: number;
 };
 
 export async function dispatchDigestNotifications(input: {
@@ -393,7 +432,15 @@ export async function dispatchDigestNotifications(input: {
 }): Promise<NotificationDispatchResult> {
   const pool = getPool();
   if (!pool) {
-    return { sent: 0, failed: 0, skipped: 0, errors: ["DATABASE_URL is not set."] };
+    return {
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+      errors: ["notification persistence unavailable"],
+      terminalFailed: 1,
+      retryableFailed: 0,
+      processing: 0,
+    };
   }
 
   const providers = input.providers?.length
@@ -408,7 +455,6 @@ export async function dispatchDigestNotifications(input: {
         a.secret_ciphertext AS "secretCiphertext",
         e.id::text AS "endpointId",
         e.destination_id AS "destinationId",
-        e.destination_label AS "destinationLabel",
         r.id::text AS "routeId",
         r.min_score::float8 AS "minScore",
         r.confidence_policy AS "confidencePolicy",
@@ -449,7 +495,15 @@ export async function dispatchDigestNotifications(input: {
     [input.runId, input.clientProfileId],
   );
 
-  const result: NotificationDispatchResult = { sent: 0, failed: 0, skipped: 0, errors: [] };
+  const result: NotificationDispatchResult = {
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    errors: [],
+    terminalFailed: 0,
+    retryableFailed: 0,
+    processing: 0,
+  };
   for (const route of routes.rows) {
     const leads = filterLeadsForRoute(route, candidateResult.rows);
     if (leads.length === 0) {
@@ -463,7 +517,22 @@ export async function dispatchDigestNotifications(input: {
       route,
     });
     if (!job) {
-      result.skipped += 1;
+      const existing = await readDeliveryJobState(pool, input.runId, route);
+      if (existing?.status === 'sent') {
+        result.skipped += 1;
+      } else if (existing?.status === 'failed' || existing?.status === 'queued') {
+        result.failed += 1;
+        result.retryableFailed = (result.retryableFailed ?? 0) + 1;
+        result.errors.push(`${route.provider}: failed_retryable`);
+      } else if (existing?.status === 'sending') {
+        result.failed += 1;
+        result.processing = (result.processing ?? 0) + 1;
+        result.errors.push(`${route.provider}: processing`);
+      } else {
+        result.failed += 1;
+        result.terminalFailed = (result.terminalFailed ?? 0) + 1;
+        result.errors.push(`${route.provider}: failed_terminal`);
+      }
       continue;
     }
 
@@ -547,14 +616,18 @@ export async function dispatchDigestNotifications(input: {
           safeMessage,
         });
       } catch (recordError) {
-        result.errors.push(
-          `${route.provider}:${route.destinationLabel ?? route.destinationId}: failed to persist delivery error`,
-        );
-        console.error("Failed to persist notification delivery failure", recordError);
+        void recordError;
+        result.errors.push(`${route.provider}: failed to persist delivery error`);
+        console.error("Failed to persist notification delivery failure");
       }
       result.failed += 1;
+      if (notificationRetryDelaySeconds(job.attemptCount + 1, classified) == null) {
+        result.terminalFailed = (result.terminalFailed ?? 0) + 1;
+      } else {
+        result.retryableFailed = (result.retryableFailed ?? 0) + 1;
+      }
       result.errors.push(
-        `${route.provider}:${route.destinationLabel ?? route.destinationId}: ${safeMessage}`,
+        `${route.provider}: ${safeMessage}`,
       );
     }
   }
@@ -580,6 +653,17 @@ export async function retryDueNotificationDeliveries(input?: {
     };
   }
   const limit = Math.min(Math.max(input?.limit ?? 50, 1), 200);
+  await pool.query(
+    `UPDATE notification_delivery_jobs
+     SET status = 'dead_letter',
+         failed_at = NOW(),
+         last_error_code = 'ambiguous_stale_sending',
+         last_error_message = 'Delivery ownership expired before a durable provider outcome was recorded.',
+         updated_at = NOW()
+     WHERE status = 'sending'
+       AND updated_at < NOW() - ($1::int * INTERVAL '1 second')`,
+    [STALE_JOB_SECONDS],
+  );
   const due = await pool.query<RetryBatchRow>(
     `
       SELECT
@@ -588,14 +672,13 @@ export async function retryDueNotificationDeliveries(input?: {
       FROM notification_delivery_jobs
       WHERE digest_run_id IS NOT NULL
         AND (
-          (status = 'failed' AND not_before <= NOW())
-          OR (status = 'sending' AND updated_at < NOW() - ($2::int * INTERVAL '1 second'))
+          status = 'failed' AND not_before <= NOW()
         )
       GROUP BY digest_run_id, client_profile_id
       ORDER BY MIN(not_before) ASC
       LIMIT $1
     `,
-    [limit, STALE_JOB_SECONDS],
+    [limit],
   );
 
   const result: NotificationRetryResult = {

@@ -57,11 +57,14 @@ describe("landing runtime truth contract", () => {
     const policy = JSON.parse(repoSource("packages/db/source-policy.json"));
     const readiness = JSON.parse(repoSource("packages/db/source-readiness.json"));
 
-    for (const sourceId of ["hh", "rabota-rossii", "career-pages"]) {
+    for (const sourceId of ["hh", "rabota-rossii", "career-pages", "superjob"]) {
       expect(policy[sourceId].promotionStatus).toBe("digest-allowed");
       expect(readiness.sources[sourceId].eligibility).toBe("digest-eligible");
-      expect(readiness.sources[sourceId].live.state).not.toBe("verified");
     }
+    expect(readiness.sources.hh.live.state).toBe("blocked");
+    expect(readiness.sources["career-pages"].live.state).toBe("verified");
+    expect(readiness.sources["rabota-rossii"].live.state).toBe("verified");
+    expect(readiness.sources.superjob.live.state).toBe("verified");
     expect(Object.values(policy).map((source: any) => source.promotionStatus)).toEqual(
       expect.arrayContaining([
         "blocked-from-digest-pending-confidence-tests",

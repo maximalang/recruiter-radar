@@ -725,7 +725,10 @@ for (const fileName of await readdir(screenshotDirectory)) {
     await unlink(path.join(screenshotDirectory, fileName));
   }
 }
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
+});
 
 try {
   for (const viewport of viewportMatrix) await assertResponsiveSurface(browser, viewport);

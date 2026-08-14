@@ -50,8 +50,6 @@
 - [ ] **HH.ru пагинация: pages 0..4** — код уже есть (`adapters/hh.mjs`, цикл `for page=0..pages`,
       авто-стоп на пустой странице / `payload.pages`). Дефолт `HH_PAGES=1` → тянет только page=0.
       **Фикс: `HH_PAGES=5` в `.env`** (адаптер поддерживает до `MAX_PAGES=20`). Опционально `HH_PER_PAGE=50`.
-- [ ] **Habr keywords расширить: HR, рекрутер, talent, HRBP** — код уже есть
-      (`adapters/habr-career.mjs` читает `HABR_CAREER_KEYWORDS`, comma/newline-separated, дефолт только «рекрутер»).
-      **Фикс: `HABR_CAREER_KEYWORDS=HR,рекрутер,talent,HRBP,recruiter` в `.env`.**
+- [x] **Habr direct HTML отключён** — текущие условия ограничивают коммерческое копирование без разрешения. Источник принимает только проверенный законный снапшот или явно разрешённого провайдера и не запускается автоматически.
 - [ ] **Добавить источник: hh.ru company pages** (не только вакансии) — это НОВЫЙ код,
       требует `/incremental-implementation`. Тянуть профили работодателей, не только vacancy feed.

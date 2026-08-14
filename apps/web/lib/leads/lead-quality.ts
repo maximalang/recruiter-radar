@@ -1,3 +1,5 @@
+import { hasCompanyHiringSource } from '../sources/company-hiring-sources'
+
 /**
  * Lead-quality derivations for narrow-ICP agencies (Block 3).
  *
@@ -194,7 +196,7 @@ function ageInDays(publishedAt: string | null | undefined, now: number): number 
  * excluded / heavily penalised) only when ALL of these hold:
  *   - no roles detected (vacanciesCount = 0 OR every role name is empty/noise)
  *   - AND no AI hint
- *   - AND no direct corporate surface (career-pages source / A-B gate)
+ *   - AND no direct corporate surface (company career/hosted ATS / A-B gate)
  *
  * The three conditions are ANDed on purpose: any single real signal (a role, an
  * AI hint, or a corporate surface) is enough to keep the lead. This is the
@@ -213,7 +215,7 @@ export function passesMinimumSignalGate(input: {
   if (input.hasAiHint) return true
 
   const hasDirectSurface =
-    input.sourceFamilies.includes('career-pages') ||
+    hasCompanyHiringSource(input.sourceFamilies) ||
     input.confidenceGate === 'A' ||
     input.confidenceGate === 'B'
   if (hasDirectSurface) return true

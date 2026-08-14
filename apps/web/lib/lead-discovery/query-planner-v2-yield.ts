@@ -36,7 +36,6 @@ export type QueryPlanSupplyDiagnosticCode =
 const PAGE_ENV_KEY: Readonly<Record<QueryPlannerV2Source, string>> = {
   hh: 'HH_PAGES',
   superjob: 'SUPERJOB_PAGES',
-  'habr-career': 'HABR_CAREER_PAGES',
   'rabota-rossii': 'RABOTA_ROSSII_PAGES',
 }
 

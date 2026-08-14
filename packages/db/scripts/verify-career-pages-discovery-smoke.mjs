@@ -43,6 +43,16 @@ const leverHtml = `
     </body>
   </html>
 `;
+const publicAtsHtml = `
+  <html>
+    <body>
+      <a href="https://jobs.ashbyhq.com/Ashby">Ashby jobs</a>
+      <a href="https://framestore.recruitee.com/o/animator-2033">Framestore jobs</a>
+      <a href="https://apply.workable.com/blue-altair/">Blue Altair jobs</a>
+      <a href="https://careers.smartrecruiters.com/smartrecruiters">SmartRecruiters jobs</a>
+    </body>
+  </html>
+`;
 const sameDomainHtml = `
   <html>
     <body>
@@ -86,6 +96,115 @@ assert.deepEqual(leverDetection.targets[0], {
   source_url: 'https://api.lever.co/v0/postings/zenhire?mode=json',
 });
 
+const publicAtsDetection = detectCareerPageTargetFromHtml(publicAtsHtml, {
+  baseUrl: 'https://example.org/',
+  orgName: 'Example Org',
+  domain: 'example.org',
+  websiteUrl: 'https://example.org/',
+});
+assert.deepEqual(publicAtsDetection.targets, [
+  {
+    id: 'example.org-ashby-job-board',
+    adapter: 'ashby-job-board',
+    company_name: 'Example Org',
+    company_domain: 'example.org',
+    company_website_url: 'https://example.org/',
+    career_page_url: 'https://jobs.ashbyhq.com/Ashby',
+    source_url: 'https://api.ashbyhq.com/posting-api/job-board/Ashby?includeCompensation=true',
+  },
+  {
+    id: 'example.org-recruitee-careers',
+    adapter: 'recruitee-careers',
+    company_name: 'Example Org',
+    company_domain: 'example.org',
+    company_website_url: 'https://example.org/',
+    career_page_url: 'https://framestore.recruitee.com',
+    source_url: 'https://framestore.recruitee.com/api/offers/',
+  },
+  {
+    id: 'example.org-workable-public-jobs',
+    adapter: 'workable-public-jobs',
+    company_name: 'Example Org',
+    company_domain: 'example.org',
+    company_website_url: 'https://example.org/',
+    career_page_url: 'https://apply.workable.com/blue-altair/',
+    source_url: 'https://www.workable.com/api/accounts/blue-altair?details=true',
+  },
+  {
+    id: 'example.org-smartrecruiters-postings',
+    adapter: 'smartrecruiters-postings',
+    company_name: 'Example Org',
+    company_domain: 'example.org',
+    company_website_url: 'https://example.org/',
+    career_page_url: 'https://careers.smartrecruiters.com/smartrecruiters',
+    source_url: 'https://api.smartrecruiters.com/v1/companies/smartrecruiters/postings?limit=100&offset=0',
+  },
+]);
+
+const redirectedAtsDetection = detectCareerPageTargetFromHtml('', {
+  baseUrl: 'https://jobs.ashbyhq.com/Ashby',
+  orgName: 'Ashby',
+  domain: 'ashbyhq.com',
+  websiteUrl: 'https://www.ashbyhq.com/',
+});
+assert.equal(redirectedAtsDetection.targets.length, 1, 'a direct redirect to an ATS board must be discoverable');
+assert.equal(redirectedAtsDetection.targets[0].adapter, 'ashby-job-board');
+
+const firstClassFeedCases = [
+  ['teamtailor-rss', 'https://acme.teamtailor.com/jobs', 'https://acme.teamtailor.com/jobs.rss?per_page=200'],
+  ['personio-xml', 'https://acme.jobs.personio.de/?language=en', 'https://acme.jobs.personio.de/xml?language=en'],
+];
+for (const [adapter, url, expectedSourceUrl] of firstClassFeedCases) {
+  const detection = detectCareerPageTargetFromHtml(`<a href="${url}">Jobs</a>`, {
+    baseUrl: 'https://acme.example/',
+    orgName: 'Acme',
+    domain: 'acme.example',
+    websiteUrl: 'https://acme.example/',
+  });
+  assert.equal(detection.targets.length, 1, `${adapter} public feed surface must be detected`);
+  assert.equal(detection.targets[0].adapter, adapter);
+  assert.equal(detection.targets[0].source_url, expectedSourceUrl);
+}
+
+const hostedAtsCases = [
+  ['workday', 'https://acme.wd3.myworkdayjobs.com/en-US/External'],
+  ['bamboohr', 'https://acme.bamboohr.com/careers'],
+  ['pinpoint', 'https://acme.pinpointhq.com/'],
+  ['breezy', 'https://acme.breezy.hr/'],
+  ['comeet', 'https://www.comeet.com/jobs/acme/123'],
+  ['jazzhr', 'https://acme.applytojob.com/apply'],
+  ['icims', 'https://careers-acme.icims.com/jobs/intro'],
+  ['oracle-taleo', 'https://acme.taleo.net/careersection/external/jobsearch.ftl'],
+  ['oracle-cloud', 'https://acme.fa.eu2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1'],
+  ['sap-successfactors', 'https://career5.successfactors.eu/career?company=acme'],
+  ['potok', 'https://b1.potok.io/open/jobs/1580767'],
+  ['huntflow', 'https://hatehr.huntflow.io/'],
+  ['skillaz', 'https://employer.skillaz.ru/vacancies/123'],
+  ['friendwork', 'https://jobs.friend.work/ggsel/108822'],
+  ['talantix', 'https://talantix.ru/form/SS9Tl8CCK8DP103jQxQpSg'],
+];
+for (const [family, url] of hostedAtsCases) {
+  const detection = detectCareerPageTargetFromHtml(`<a href="${url}">Jobs</a>`, {
+    baseUrl: 'https://acme.example/',
+    orgName: 'Acme',
+    domain: 'acme.example',
+    websiteUrl: 'https://acme.example/',
+  });
+  assert.equal(detection.targets.length, 1, `${family} public page must be detected`);
+  assert.equal(detection.targets[0].adapter, 'hosted-career-page');
+  assert.equal(detection.targets[0].hosted_ats_family, family);
+  const expectedUrl = family === 'icims'
+    ? 'https://careers-acme.icims.com/jobs/search?in_iframe=1&ss=1'
+    : new URL(url).pathname === '/' ? new URL(url).toString() : url.replace(/\/$/, '');
+  assert.equal(detection.targets[0].source_url, expectedUrl);
+}
+
+const privateHostedApi = detectCareerPageTargetFromHtml(
+  '<a href="https://acme.teamtailor.com/api/jobs">private endpoint</a>',
+  { baseUrl: 'https://acme.example/', orgName: 'Acme', domain: 'acme.example', websiteUrl: 'https://acme.example/' },
+);
+assert.deepEqual(privateHostedApi.targets, [], 'private hosted ATS API paths must not be adopted');
+
 const sameDomainDetection = detectCareerPageTargetFromHtml(sameDomainHtml, {
   baseUrl: 'https://same.example/',
   orgName: 'Same',
@@ -106,6 +225,19 @@ assert.deepEqual(sameDomainDetection.targets[0], {
 });
 assert.equal(sameDomainDetection.sameDomainCareerPageUrl, 'https://same.example/careers');
 assert.deepEqual(sameDomainDetection.notes, ['same-domain-careers:https://same.example/careers']);
+
+const assetOnlyDetection = detectCareerPageTargetFromHtml(`
+  <html><body>
+    <img src="https://careers.example/assets/careers-social-image.jpg" />
+    <a href="https://careers.example/assets/jobs-banner.png">About us</a>
+  </body></html>
+`, {
+  baseUrl: 'https://careers.example/',
+  orgName: 'Asset Only',
+  domain: 'example',
+  websiteUrl: 'https://example/',
+});
+assert.deepEqual(assetOnlyDetection.targets, [], 'career-named image assets must not become vacancy targets');
 
 // JSON-LD JobPosting extraction: RU career pages emit schema.org markup for
 // Яндекс.Работа / Google Jobs. Verify we walk @graph + arrays and map only
@@ -134,6 +266,14 @@ const jsonLdHtml = `
 `;
 const postings = extractJobPostingsFromHtml(jsonLdHtml);
 assert.equal(postings.length, 1, 'must extract exactly one JobPosting from @graph');
+
+const embeddedPostings = extractJobPostingsFromHtml(`
+  <script id="__NEXT_DATA__" type="application/json">
+    {"props":{"pageProps":{"jobs":[{"@type":"JobPosting","title":"Data Engineer","url":"https://same.example/careers/data"}]}}}
+  </script>
+`);
+assert.equal(embeddedPostings.length, 1, 'must discover JobPosting in bounded non-executable embedded JSON');
+assert.equal(embeddedPostings[0].title, 'Data Engineer');
 
 const mapped = mapJsonLdJobPostings(postings, {
   companyName: 'Same',

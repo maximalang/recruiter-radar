@@ -12,17 +12,18 @@ const rootEnvPath = resolve(scriptDir, '../../../.env');
 loadEnvFile(rootEnvPath);
 
 const alwaysScripts = [
+  './verify-site-discovery-primitives-smoke.mjs',
   './verify-career-pages-smoke.mjs',
   './verify-career-pages-providers-smoke.mjs',
   './verify-career-pages-discovery-smoke.mjs',
   './verify-rabota-rossii-smoke.mjs',
   './verify-company-site-smoke.mjs',
   './verify-linkedin-company-pages-smoke.mjs',
-  './verify-tech-job-boards-smoke.mjs',
-  './verify-habr-career-scrape-smoke.mjs',
   './verify-egrul-fns-smoke.mjs',
   './verify-funding-business-signals-smoke.mjs',
   './verify-rf-source-expansion-smoke.mjs',
+  './verify-government-open-data-smoke.mjs',
+  './verify-fns-open-data-sync-smoke.mjs',
   './adapters/verify-adapters-smoke.mjs',
   './verify-source-readiness.mjs',
 ];

@@ -1,0 +1,125 @@
+{
+  "fns": [
+    {
+      "dataset": "headcount",
+      "inn": "7707083893",
+      "company_name": "ПАО Сбербанк",
+      "period": "2024",
+      "employee_count": 293800,
+      "source_url": "https://file.nalog.ru/opendata/7707329152-sshr2019/data-20260625-structure-20200408.zip"
+    },
+    {
+      "dataset": "headcount",
+      "inn": "7707083893",
+      "company_name": "ПАО Сбербанк",
+      "period": "2025",
+      "employee_count": 300000,
+      "source_url": "https://file.nalog.ru/opendata/7707329152-sshr2019/data-20260625-structure-20200408.zip"
+    },
+    {
+      "dataset": "financials",
+      "inn": "7707083893",
+      "company_name": "ПАО Сбербанк",
+      "period": "2024",
+      "revenue": 1000000000,
+      "expenses": 800000000,
+      "source_url": "https://file.nalog.ru/opendata/7707329152-revexp/data-20260501-structure-20180110.zip"
+    },
+    {
+      "dataset": "financials",
+      "inn": "7707083893",
+      "company_name": "ПАО Сбербанк",
+      "period": "2025",
+      "revenue": 1300000000,
+      "expenses": 920000000,
+      "source_url": "https://file.nalog.ru/opendata/7707329152-revexp/data-20260501-structure-20180110.zip"
+    },
+    {
+      "dataset": "sme-support",
+      "inn": "7707083893",
+      "company_name": "ПАО Сбербанк",
+      "period": "2025",
+      "support_amount": 5000000,
+      "support_type": "subsidy",
+      "source_url": "https://file.nalog.ru/opendata/7707329152-rsmppp/data-20260715-structure-20230615.zip"
+    },
+    {
+      "dataset": "headcount",
+      "inn": "123456789012",
+      "company_name": "ИП Person",
+      "period": "2025",
+      "employee_count": 1,
+      "source_url": "https://file.nalog.ru/opendata/7707329152-sshr2019/data.zip"
+    }
+  ],
+  "procurement": [
+    {
+      "contract_number": "0173100004526000001",
+      "supplier_inn": "7707083893",
+      "supplier_name": "ПАО Сбербанк",
+      "customer_inn": "7710168360",
+      "customer_name": "Федеральное казначейство",
+      "contract_date": "2025-04-01",
+      "contract_value": 120000000,
+      "subject": "Информационные услуги",
+      "customer_region": "Москва",
+      "source_url": "https://zakupki.gov.ru/epz/contract/contractCard/common-info.html?reestrNumber=0173100004526000001"
+    },
+    {
+      "contract_number": "0173100004526000002",
+      "supplier_inn": "7707083893",
+      "supplier_name": "ПАО Сбербанк",
+      "customer_inn": "7810912000",
+      "customer_name": "Государственный заказчик Санкт-Петербурга",
+      "contract_date": "2026-04-01",
+      "contract_value": 180000000,
+      "subject": "Платёжная инфраструктура",
+      "customer_region": "Санкт-Петербург",
+      "source_url": "https://zakupki.gov.ru/epz/contract/contractCard/common-info.html?reestrNumber=0173100004526000002"
+    }
+  ],
+  "cbr": [
+    {
+      "inn": "7707083893",
+      "ogrn": "1027700132195",
+      "company_name": "ПАО Сбербанк",
+      "status": "Active",
+      "participant_types": ["BNK", "OPS"],
+      "licenses": [{"number": "1481", "name": "Банковские операции", "active": true}],
+      "source_url": "https://www.cbr.ru/FO_ZoomWS/FinOrg.asmx"
+    }
+  ],
+  "rosstat": [
+    {
+      "dataset_id": "7708234640-unemployment-region",
+      "record_id": "2026-q1:77",
+      "title": "Уровень безработицы — Москва",
+      "period": "2026-Q1",
+      "region": "Москва",
+      "indicator": "unemployment_rate",
+      "value": 1.2,
+      "unit": "percent",
+      "source_url": "https://rosstat.gov.ru/opendata/"
+    }
+  ],
+  "rospatent": [
+    {
+      "record_id": "RU-1234567",
+      "record_type": "trademark",
+      "applicant_inn": "7707083893",
+      "applicant_name": "ПАО Сбербанк",
+      "application_date": "2026-05-01",
+      "registration_date": "2026-08-01",
+      "title": "SBER BUSINESS",
+      "source_url": "https://rospatent.gov.ru/opendata/7730176088-tz/data-20260701-structure-20180828.csv"
+    },
+    {
+      "record_id": "RU-person",
+      "record_type": "patent",
+      "applicant_inn": "123456789012",
+      "applicant_name": "Иванов Иван",
+      "application_date": "2026-05-01",
+      "source_url": "https://rospatent.gov.ru/opendata/7730176088-iz/data.csv"
+    }
+  ]
+}

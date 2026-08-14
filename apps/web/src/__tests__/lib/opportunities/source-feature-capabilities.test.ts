@@ -17,6 +17,10 @@ describe('source feature capability registry', () => {
       .toBe('conditional')
     expect(getSourceFeatureCapability('career-pages', 'requirements_snapshot').status)
       .toBe('unsupported')
+    expect(getSourceFeatureCapability('ashby', 'vacancy').status)
+      .toBe('supported')
+    expect(getSourceFeatureCapability('ashby', 'salary_snapshot').status)
+      .toBe('unsupported')
     expect(getSourceFeatureCapability('egrul-fns', 'vacancy').status)
       .toBe('unsupported')
   })
@@ -27,5 +31,13 @@ describe('source feature capability registry', () => {
         status: 'unsupported',
         reason: 'SOURCE_NOT_REGISTERED',
       })
+  })
+
+  it('keeps retired tech-job-boards evidence readable without registering it', () => {
+    expect(getAllSourceIds()).not.toContain('tech-job-boards')
+    expect(getSourceFeatureCapability('tech-job-boards', 'vacancy').status)
+      .toBe('supported')
+    expect(getSourceFeatureCapability('tech-job-boards', 'salary_snapshot').status)
+      .toBe('conditional')
   })
 })

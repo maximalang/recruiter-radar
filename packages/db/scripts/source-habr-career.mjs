@@ -1,24 +1,18 @@
 /**
  * Habr Career source script.
  *
- * Fetch modes:
- *   1. File mode: HABR_CAREER_INPUT_FILE → read records from JSON/CSV file
- *   2. Provider mode: HABR_CAREER_PROVIDER_API_URL + token → fetch from partner API
- *   3. Live scraping mode: HABR_CAREER_KEYWORD → scrape career.habr.com search results
+ * Compliant fetch modes:
+ *   1. File mode: a reviewed, lawfully obtained snapshot.
+ *   2. Provider mode: an explicitly permitted partner API.
  *
- * Habr Career does not have a documented public REST API for vacancy search.
- * Live scraping mode uses HTML parsing of career.habr.com/vacancies search pages.
- * This is slower but works without a partner API token.
- *
- * Scraped fields:
- *   - vacancy ID (from href), title, company name, salary, location, skills/tags
- *   - Each card → normalized record via normalizeJobPostingRecord
+ * Direct commercial HTML collection is intentionally disabled. Habr Career's
+ * current agreement restricts copying and commercial use without permission;
+ * robots.txt path access is not an independent commercial-use grant.
  */
 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { fetchHabrCareerPages, resolveHabrCareerSearchConfig } from './adapters/habr-career.mjs';
 import { normalizeJobPostingRecord } from './adapters/rf-source-normalizers.mjs';
 import {
   createStandardSourceRuntime,
@@ -38,22 +32,13 @@ const runtime = createStandardSourceRuntime({
   evidenceRole: 'primary_platform',
   sourceRecordType: 'job_posting',
   inputFileEnvName: 'HABR_CAREER_INPUT_FILE',
-  usageText: 'Input: set HABR_CAREER_INPUT_FILE, HABR_CAREER_PROVIDER_API_URL + token, or HABR_CAREER_KEYWORD for live scraping mode.',
+  usageText: 'Input: set HABR_CAREER_INPUT_FILE for a reviewed snapshot, or HABR_CAREER_PROVIDER_API_URL + token for an explicitly permitted provider.',
   extractProviderRecords: extractHabrCareerRecords,
-  normalizeRecord: (record, context) => normalizeJobPostingRecord(record, context, { defaultBoard: 'habr-career' }),
-  buildSummaryExtras: (input) => input.inputMode === 'live-scrape'
-    ? {
-      liveProvider: 'habr-career-scrape',
-      keyword: input.keyword,
-      keywords: input.keywords,
-      pagesFetched: input.pagesFetched,
-    }
-    : {},
+  normalizeRecord: (record, context) => normalizeJobPostingRecord(record, context, { defaultBoard: SOURCE_ID }),
 });
 
 /**
- * Resolve input from env vars. Returns sync input (file/provider)
- * or a pending live-input descriptor for async resolution.
+ * Resolve a reviewed snapshot or explicitly permitted provider input.
  */
 export function resolveHabrCareerInput() {
   const inputFilePath = process.env.HABR_CAREER_INPUT_FILE?.trim();
@@ -65,50 +50,11 @@ export function resolveHabrCareerInput() {
     return runtime.resolveProviderInput({ providerUrl, providerToken, providerLabel: `${SOURCE_ID} provider` });
   }
 
-  // Live scraping mode — needs async resolution
-  const keyword = process.env.HABR_CAREER_KEYWORD?.trim();
-  if (keyword) {
-    return {
-      inputMode: 'public-pending',
-      config: resolveHabrCareerSearchConfig(),
-    };
-  }
-
-  throw new Error('No input configured for habr-career. Set HABR_CAREER_INPUT_FILE, HABR_CAREER_PROVIDER_API_URL + token, or HABR_CAREER_KEYWORD for live scraping mode.');
+  throw new Error('No compliant input configured for habr-career. Set HABR_CAREER_INPUT_FILE for a reviewed snapshot, or HABR_CAREER_PROVIDER_API_URL + HABR_CAREER_PROVIDER_API_TOKEN for an explicitly permitted provider. Direct commercial HTML collection is disabled.');
 }
 
-/**
- * Async: resolve live Habr Career scraping input.
- */
-export async function resolveHabrCareerLiveInput({ config }) {
-  const fetchResult = await fetchHabrCareerPages({ config });
-  const records = fetchResult.items;
-
-  return runtime.buildInputFromRecords({
-    inputMode: 'live-scrape',
-    inputFilePath: null,
-    records,
-    rejectAllSkipped: true,
-    extra: {
-      liveProvider: 'habr-career-scrape',
-      keyword: config.keyword,
-      keywords: config.keywords,
-      pagesFetched: fetchResult.pagesFetched,
-    },
-  });
-}
-
-/**
- * Async: resolve whatever input mode was configured.
- */
 export async function resolveHabrCareerConfiguredInput() {
-  const input = resolveHabrCareerInput();
-
-  if (input.inputMode === 'public-pending') {
-    return resolveHabrCareerLiveInput(input);
-  }
-
-  return input;
+  return resolveHabrCareerInput();
 }
 
 export const buildFetchSummary = runtime.buildFetchSummary;
@@ -119,9 +65,7 @@ export async function runHabrCareerCli(argv = process.argv.slice(2)) {
   });
 }
 
-/**
- * Extract records from provider response (generic wrapper).
- */
+/** Extract records from a generic permitted-provider response wrapper. */
 function extractHabrCareerRecords(body) {
   if (Array.isArray(body)) return body;
   if (Array.isArray(body?.records)) return body.records;

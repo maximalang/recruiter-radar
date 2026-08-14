@@ -2,11 +2,17 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
   P1: Object.freeze({
     description: 'Core production-ready sources for MVP',
     required: true,
-    sources: ['hh', 'rabota-rossii', 'career-pages', 'egrul-fns', 'transparent-business-fns', 'fedresurs'],
+    sources: ['hh', 'rabota-rossii', 'career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters', 'egrul-fns', 'transparent-business-fns', 'fedresurs'],
     leadEligibilityRequirements: {
       hh: 'digest-lead-originating',
       'rabota-rossii': 'confidence-gated-evidence',
       'career-pages': 'digest-lead-originating',
+      'greenhouse': 'digest-lead-originating',
+      'lever': 'digest-lead-originating',
+      'ashby': 'digest-lead-originating',
+      'recruitee': 'digest-lead-originating',
+      'workable': 'digest-lead-originating',
+      'smartrecruiters': 'digest-lead-originating',
       'egrul-fns': 'enrichment-only',
       'transparent-business-fns': 'enrichment-only',
       'fedresurs': 'context-only'
@@ -15,12 +21,11 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
   P2: Object.freeze({
     description: 'Secondary sources with confidence gates',
     required: true,
-    sources: ['company-site', 'funding-business-signals', 'linkedin-company-pages', 'tech-job-boards', 'superjob', 'habr-career'],
+    sources: ['company-site', 'funding-business-signals', 'linkedin-company-pages', 'superjob', 'habr-career'],
     leadEligibilityRequirements: {
       'company-site': 'enrichment-only',
       'funding-business-signals': 'context-only',
       'linkedin-company-pages': 'confidence-gated-evidence',
-      'tech-job-boards': 'confidence-gated-evidence',
       'superjob': 'confidence-gated-evidence',
       'habr-career': 'confidence-gated-evidence'
     }
@@ -28,16 +33,23 @@ export const SOURCE_COVERAGE_TIERS = Object.freeze({
   P3: Object.freeze({
     description: 'Context sources with supporting role',
     required: true,
-    sources: ['company-newsrooms', 'industry-media', 'regional-job-boards'],
+    sources: ['company-newsrooms', 'industry-media', 'github-company-org', 'youtube-company-channels', 'telegram-company-channels', 'fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data'],
     leadEligibilityRequirements: {
       'company-newsrooms': 'context-only',
       'industry-media': 'context-only',
-      'regional-job-boards': 'confidence-gated-evidence'
+      'github-company-org': 'context-only',
+      'youtube-company-channels': 'context-only',
+      'telegram-company-channels': 'context-only',
+      'fns-open-data': 'context-only',
+      'government-procurement': 'context-only',
+      'cbr-registry': 'context-only',
+      'rosstat-open-data': 'context-only',
+      'rospatent-open-data': 'context-only'
     }
   })
 });
 
-export const DIGEST_SOURCES = Object.freeze(['hh', 'career-pages', 'rabota-rossii']);
+export const DIGEST_SOURCES = Object.freeze(['hh', 'career-pages', 'greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'rabota-rossii', 'superjob']);
 
 export const PROMOTION_STATUSES = Object.freeze({
   'digest-allowed': 'Allowed in digest selection',

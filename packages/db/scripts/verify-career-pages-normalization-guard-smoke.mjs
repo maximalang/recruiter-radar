@@ -16,6 +16,7 @@ import {
 } from './source-career-pages.mjs';
 
 assert.equal(resolveCareerPageTargetOutcome({ recordsFetched: 3 }), 'parsed');
+assert.equal(resolveCareerPageTargetOutcome({ recordsFetched: 0, notModified: true }), 'not-modified');
 assert.equal(resolveCareerPageTargetOutcome({
   adapter: 'same-domain-jsonld',
   recordsFetched: 0,

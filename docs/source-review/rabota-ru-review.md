@@ -1,39 +1,35 @@
-# Source Review: rabota-ru (rabota.ru)
+# Source Review: rabota.ru
 
-**Date:** 2026-06-21
-**Status:** ❌ BLOCKED — WAF denies all bot access, including robots.txt
-**Decision:** Do not implement. No compliant public path.
+**Initially reviewed:** 2026-06-21
+**Re-reviewed:** 2026-08-13
+**Classification:** C — licensed database / partner path
+**Decision:** Do not implement automatic collection.
 
-## What was proposed
+## Current official surfaces
 
-Source key `rabota-ru`. Try public API first, fall back to scraping `https://www.rabota.ru/vacancy/?query=`:
+- `https://www.rabota.ru/robots.txt` now returns HTTP 200. The June BI.ZONE
+  interstitial is therefore no longer the controlling blocker.
+- `https://www.rabota.ru/vacancy/` redirects to `/vacancy` and returns public
+  HTML. Robots disallows arbitrary query-string crawling except its explicit
+  paged allowance and blocks resume/contact/application operations.
+- The previously guessed endpoint
+  `https://api.rabota.ru/vacancy/search?query=test&region=1` returns an official
+  JSON `ENDPOINT_NOT_FOUND` response (HTTP 404), not a public vacancy API.
+- `https://www.rabota.ru/info/` describes vacancies and resumes as the protected
+  Rabota.ru database and states that database access is supplied under a paid
+  non-exclusive licence or separate agreements. It also distinguishes direct
+  employers from recruitment agencies.
 
-```
-curl "https://api.rabota.ru/vacancy/search?query=разработчик&region=1" -H "User-Agent: Mozilla/5.0"
-```
+## Why no HTML adapter
 
-## Live findings (2026-06-21)
+The site is technically reachable again, but reachability and robots allowance
+do not replace the database licence. No reviewed official public API, RSS, or
+free reuse contract grants Recruiter Radar commercial background ingestion.
+Scraping the public UI would substitute for the licensed database product and
+is therefore not adopted.
 
-Every probe — even `robots.txt` — is intercepted by a **BI.ZONE WAF** that returns an
-HTML "Access denied" interstitial:
-
-```
-$ curl -sA "Mozilla/5.0" https://www.rabota.ru/robots.txt
-<title>Access denied</title> ... Request ID: 46f8f781-... (waf.support@bi.zone)
-
-$ curl -sA "Mozilla/5.0" "https://api.rabota.ru/vacancy/search?query=разработчик&region=1"
-<title>Access denied</title> ... (same WAF interstitial)
-```
-
-- No public API response — `api.rabota.ru` is WAF-gated.
-- `robots.txt` itself is unreachable, so we cannot even establish a crawl contract.
-- A scraper fallback would mean defeating an explicit anti-bot WAF — disallowed by
-  `source-priority-policy.md` ("sources that require scraping public pages where robots/legal/
-  provider terms are unclear" are rejected by default), and an active-evasion posture the
-  project's security rules forbid.
-
-## Conclusion
-
-No compliant ingestion path. **Blocked.** Revisit only via an official partner/provider API
-with documented terms (provider-token contract like `superjob`/`tech-job-boards`), never via
-scraping past the WAF.
+Re-open only through a documented official licence/partner feed. A future
+permitted integration must preserve the portal's direct-employer versus agency
+status, assign secondary-platform weight, and provenance-dedupe reposts against
+company-owned/HH/SuperJob/Работа России vacancies. No resume or applicant
+personal data may be collected.

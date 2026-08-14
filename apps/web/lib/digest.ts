@@ -10,6 +10,7 @@ import { toSignalStrength } from "./scoring/score-display";
 import { detectForeignEmployer, applyForeignEmployerPenalty } from "./scoring/foreign-employer";
 import { deriveRoleNames, passesMinimumSignalGate } from "./leads/lead-quality";
 import { hasSeniorRole } from "./scoring/role-category";
+import { hasCompanyHiringSource } from "./sources/company-hiring-sources";
 import type {
   DigestItem,
   DigestRun,
@@ -641,7 +642,7 @@ export function matchesClientProfile(item: DigestItemInput, clientProfile: Clien
 
   // Contact policy (corporate_only): the agency only works leads with a safe,
   // non-personal corporate surface. We drop ONLY when the absence of a corporate
-  // surface is EXPLICIT — i.e. no career-pages source AND the confidence gate is
+  // surface is EXPLICIT — i.e. no company hiring source AND the confidence gate is
   // C/D (platform-only aggregation / context-only). Gate A/B already implies a
   // direct company surface (see CLAUDE.md confidence gates), so those pass.
   // A NULL/unknown domain is NOT treated as "no corporate surface" — this
@@ -687,7 +688,7 @@ export function matchesClientProfile(item: DigestItemInput, clientProfile: Clien
   // Minimum signal-quality gate (Block 3): drop an empty-shell lead — no real
   // roles, no direct corporate surface. (AI hint is not known at generation time,
   // so it's treated as absent here; the gate only fires when roles AND surface
-  // are both missing, so a career-pages / A-B lead still passes.) This filters the
+  // are both missing, so a company hiring source / A-B lead still passes.) This filters the
   // vacuous leads that erode trust without regressing registry leads that carry
   // actual role titles.
   const roleNames = deriveRoleNames({ evidenceTitles: item.evidence_titles });
@@ -708,12 +709,12 @@ export function matchesClientProfile(item: DigestItemInput, clientProfile: Clien
 
 /**
  * Whether the candidate has an evident safe corporate surface. True when a
- * career-pages source is present (direct company surface) OR the confidence gate
+ * company-owned career/hosted-ATS source is present OR the confidence gate
  * is A/B (auto-deliverable, which requires a direct company surface). Only an
  * explicit platform-only + C/D candidate is considered surface-less.
  */
 function candidateHasCorporateSurface(item: DigestItemInput): boolean {
-  const hasCareerSource = item.source_families.includes("career-pages");
+  const hasCareerSource = hasCompanyHiringSource(item.source_families);
   const gate = item.confidence_gate;
   const strongGate = gate === "A" || gate === "B";
   return hasCareerSource || strongGate;

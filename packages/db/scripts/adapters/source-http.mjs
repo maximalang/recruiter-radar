@@ -7,12 +7,13 @@ const DEFAULT_RETRY_DELAY_MS = 250;
 const DEFAULT_RETRY_STATUSES = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 
 export class SourceHttpError extends Error {
-  constructor(message, { url, status, statusText, attempt, cause } = {}) {
+  constructor(message, { url, status, statusText, retryAfter, attempt, cause } = {}) {
     super(message, { cause });
     this.name = 'SourceHttpError';
     this.url = url;
     this.status = status;
     this.statusText = statusText;
+    this.retryAfter = retryAfter ?? null;
     this.attempt = attempt;
   }
 }
@@ -169,6 +170,7 @@ async function buildStatusError(response, sourceName = 'source', attempt) {
       url: safeUrl,
       status: response.status,
       statusText: response.statusText,
+      retryAfter: response.headers.get('retry-after'),
       attempt,
     },
   );
@@ -235,7 +237,14 @@ function fetchJsonOnceWithNodeHttpFallback(url, options, originalError, attempt)
           rejectPromise(new SourceHttpError(
             `${sourceName} returned HTTP ${response.statusCode} for ${safeUrl}`
               + (body.trim() ? `: ${redactText(body.trim()).slice(0, 500)}` : ''),
-            { url: safeUrl, status: response.statusCode, statusText: response.statusMessage, attempt, cause: originalError },
+            {
+              url: safeUrl,
+              status: response.statusCode,
+              statusText: response.statusMessage,
+              retryAfter: response.headers['retry-after'],
+              attempt,
+              cause: originalError,
+            },
           ));
           return;
         }

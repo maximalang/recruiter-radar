@@ -1,12 +1,12 @@
 /**
  * Browser-backed crawler engines.
  *
- * The historical export names are retained for API compatibility, but the
- * implementation deliberately avoids the Crawlee fingerprint dependency
- * chain. Static pages use the existing hardened HTTP engine; SPA pages use
- * Playwright directly with one isolated browser context per request.
+ * The historical export names are retained for API compatibility. The actual
+ * bounded Playwright worker pool lives in the canonical packages/db source
+ * runtime so CLI sources and the web runtime share one browser lifecycle.
  */
 
+import { createPlaywrightBrowserPool } from '@/../../packages/db/scripts/adapters/playwright-browser-pool.mjs'
 import type {
   CrawlerEngine,
   CrawlerFetchInput,
@@ -15,79 +15,97 @@ import type {
 import { createStaticEngine } from './crawler-static'
 
 export interface CrawleeEngineOptions {
-  /** Proxy URLs; the first configured proxy is used for an isolated request. */
+  /** Proxy URLs assigned deterministically across persistent browser workers. */
   proxyUrls?: string[]
   /** Max navigation timeout in ms. Default 30_000. */
   navigationTimeoutMs?: number
   /** Extra headers merged on every request. */
   defaultHeaders?: Record<string, string>
+  /** Maximum number of concurrent rendered pages. Default 2; hard-capped at 8. */
+  concurrency?: number
+  /** Recycle each Chromium worker after this many page requests. Default 100. */
+  maxRequestsPerBrowser?: number
+  /** Recycle each Chromium worker after this lifetime. Default 15 minutes. */
+  maxBrowserAgeMs?: number
+  /** Close idle Chromium workers after this delay. Default 60 seconds. */
+  idleBrowserTimeoutMs?: number
+  /** Minimum delay between rendered requests to the same host. Default 250ms. */
+  perHostMinIntervalMs?: number
+  /** Maximum rendered pages in flight for one host. Default 1. */
+  perHostConcurrency?: number
+  /** Maximum requests waiting behind active workers. Default 100. */
+  maxQueueSize?: number
+  /** Host-specific rate/concurrency overrides; supports exact and `*.suffix` keys. */
+  hostProfiles?: Record<string, { maxConcurrency?: number; minIntervalMs?: number }>
+  /** Recycle a worker before reuse when the process RSS reaches this threshold. */
+  maxProcessRssBytes?: number
+  /** Test seam for deterministic memory-threshold verification. */
+  memoryUsage?: () => { rss: number }
+  /** Hard deadline for a rendered-page operation. Default navigation timeout plus 5s. */
+  stuckPageTimeoutMs?: number
+  /** Time to let active pages drain during close before forcing recycle. Default 10s. */
+  gracefulCloseTimeoutMs?: number
+  /** Consecutive host failures before opening the circuit. Default 3. */
+  circuitFailureThreshold?: number
+  /** Host circuit cool-down period. Default 60 seconds. */
+  circuitResetMs?: number
+  /** Cool-down after repeated 401/403/407/451 responses. Default 15 minutes. */
+  accessFailureCooldownMs?: number
+  /** Minimum cool-down after repeated 429 responses. Default 5 minutes. */
+  throttlingCooldownMs?: number
+  /** Test seam for deterministic DNS security checks; production uses node:dns. */
+  dnsLookup?: (hostname: string, options: { all: true; verbatim: true }) => Promise<Array<{
+    address: string
+    family: number
+  }>>
 }
 
-function resolveProxyUrls(explicit?: string[]): string[] {
-  if (explicit && explicit.length > 0) return explicit
-  const envValue = process.env.CRAWLEE_PROXY_URLS?.trim()
-  if (!envValue) return []
-  return envValue.split(',').map((value) => value.trim()).filter(Boolean)
+export interface ManagedCrawlerEngine extends CrawlerEngine {
+  close(): Promise<void>
 }
 
-async function fetchWithPlaywright(
-  url: string,
-  options: CrawleeEngineOptions,
-  fetchOptions?: CrawlerFetchInput['options'],
-): Promise<CrawlerResult> {
-  const { chromium } = await import('playwright')
-  const proxyUrl = resolveProxyUrls(options.proxyUrls)[0]
-  const timeout = fetchOptions?.timeoutMs ?? options.navigationTimeoutMs ?? 30_000
-  const headers = {
-    'accept-language': 'ru,en;q=0.9',
-    ...options.defaultHeaders,
-    ...(fetchOptions?.headers ?? {}),
-  }
-  const browser = await chromium.launch({
-    headless: true,
-    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
-      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
-      : {}),
-    ...(proxyUrl ? { proxy: { server: proxyUrl } } : {}),
-  })
-
-  try {
-    const context = await browser.newContext({ extraHTTPHeaders: headers })
-    const page = await context.newPage()
-    const response = await page.goto(url, {
-      waitUntil: 'domcontentloaded',
-      timeout,
-    })
-
-    return {
-      url,
-      status: response?.status() ?? 200,
-      html: await page.content(),
-      rawHeaders: response ? await response.allHeaders() : {},
-      fetchedAt: new Date().toISOString(),
-      engine: 'spa',
-      warnings: response ? [] : ['Playwright navigation returned no HTTP response'],
-    }
-  } finally {
-    await browser.close()
-  }
+interface SharedPlaywrightPool {
+  fetchPage(input: {
+    url: string
+    timeoutMs?: number
+    headers?: Record<string, string>
+    previous?: { etag?: string; lastModified?: string }
+    settleMs?: number
+  }): Promise<{
+    url: string
+    status: number
+    html: string | null
+    rawHeaders: Record<string, string>
+    fetchedAt: string
+    warnings: string[]
+  }>
+  close(): Promise<void>
 }
 
 /** @deprecated Name retained for compatibility; implemented with Playwright directly. */
 export function createCrawleeSpaEngine(
   options: CrawleeEngineOptions = {},
-): CrawlerEngine {
+): ManagedCrawlerEngine {
+  const pool = createPlaywrightBrowserPool(options) as SharedPlaywrightPool
   return {
     id: 'spa',
     capabilities: {
       rendersJs: true,
-      bypassesCloudflare: false,
       returnsMarkdown: false,
       supportsPdf: false,
       selfHosted: false,
     },
-    fetch(input: CrawlerFetchInput): Promise<CrawlerResult> {
-      return fetchWithPlaywright(input.url, options, input.options)
+    async fetch(input: CrawlerFetchInput): Promise<CrawlerResult> {
+      const result = await pool.fetchPage({
+        url: input.url,
+        timeoutMs: input.options?.timeoutMs ?? options.navigationTimeoutMs ?? 30_000,
+        headers: input.options?.headers,
+        previous: input.options?.previousValidators,
+      })
+      return { ...result, html: result.html ?? undefined, engine: 'spa' }
+    },
+    close(): Promise<void> {
+      return pool.close()
     },
   }
 }

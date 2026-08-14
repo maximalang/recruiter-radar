@@ -83,7 +83,6 @@ export function createFirecrawlEngine(
     id: 'llm-markdown',
     capabilities: {
       rendersJs: true, // Firecrawl renders JS server-side
-      bypassesCloudflare: true,
       returnsMarkdown: true,
       supportsPdf: true,
       selfHosted: apiUrl !== 'https://api.firecrawl.dev/v1',

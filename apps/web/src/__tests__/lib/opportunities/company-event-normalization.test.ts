@@ -66,14 +66,14 @@ describe('Company Events v1 normalization', () => {
       sourceRecord('hh-101', {
         source: 'hh',
         externalVacancyId: '101',
-        sourceUrl: 'https://hh.test/vacancy/101',
+        sourceUrl: 'https://jobs.company.test/java?utm_source=hh',
         title: ' Senior Java Developer ',
         evidenceIds: ['evidence-hh'],
       }),
       sourceRecord('career-77', {
         source: 'career-pages',
         externalVacancyId: 'career-77',
-        sourceUrl: 'https://company.test/career/java?ref=jobs',
+        sourceUrl: 'https://jobs.company.test/java?ref=career',
         title: 'senior java developer',
         evidenceIds: ['evidence-career'],
         firstSeenAt: '2026-08-02T09:10:00.000Z',

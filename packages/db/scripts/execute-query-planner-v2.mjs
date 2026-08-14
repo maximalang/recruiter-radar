@@ -18,15 +18,11 @@ const SEARCH_ENV_KEYS = Object.freeze({
     'HH_SEARCH_TEXT', 'HH_PAGES', 'HH_AREA', 'HH_EMPLOYMENT', 'HH_SCHEDULE',
     'HH_EXPERIENCE', 'HH_PROFESSIONAL_ROLE', 'HH_INDUSTRY', 'HH_DATE_FROM',
     'HH_DATE_TO', 'HH_ORDER_BY', 'HH_SEARCH_FIELD', 'HH_PER_PAGE',
-    'HH_SEARCH_PARAMS_JSON',
+    'HH_LABEL', 'HH_SEARCH_PARAMS_JSON',
   ],
   superjob: [
     'SUPERJOB_KEYWORD', 'SUPERJOB_PAGES', 'SUPERJOB_TOWN',
     'SUPERJOB_COUNT', 'SUPERJOB_PAGE',
-  ],
-  'habr-career': [
-    'HABR_CAREER_KEYWORD', 'HABR_CAREER_KEYWORDS', 'HABR_CAREER_PAGES',
-    'HABR_CAREER_CITY', 'HABR_CAREER_REMOTE',
   ],
   'rabota-rossii': [
     'RABOTA_ROSSII_SEARCH_TEXT', 'RABOTA_ROSSII_REGION_CODE',
@@ -87,11 +83,6 @@ export function queryPlannerSourceProductionStatus(source, env = process.env) {
       return { allowed: false, reasonCode: 'SUPERJOB_API_CREDENTIAL_REQUIRED' };
     }
     return { allowed: true, reasonCode: 'SUPERJOB_API_EXPLICITLY_APPROVED' };
-  }
-  if (source === 'habr-career') {
-    // The repository's live Habr adapter is HTML scraping, not a documented
-    // vacancy-search API. A Query Planner request cannot silently activate it.
-    return { allowed: false, reasonCode: 'HABR_LIVE_SCRAPE_NOT_PRODUCTION_APPROVED' };
   }
   return { allowed: false, reasonCode: 'SOURCE_UNSUPPORTED' };
 }
@@ -369,9 +360,6 @@ async function resolveSourceInput(source, env) {
   if (source === 'superjob') return resolveSuperjobConfiguredInput();
   if (source === 'rabota-rossii') return resolveRabotaRossiiConfiguredInput();
   if (source === 'hh') return resolveHhInput(env);
-  if (source === 'habr-career') {
-    throw new Error('HABR_LIVE_SCRAPE_NOT_PRODUCTION_APPROVED');
-  }
   throw new Error('SOURCE_UNSUPPORTED');
 }
 

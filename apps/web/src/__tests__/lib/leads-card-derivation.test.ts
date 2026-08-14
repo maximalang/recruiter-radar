@@ -146,6 +146,19 @@ describe('deriveNegativeSignals', () => {
     expect(result).toEqual([])
   })
 
+  it('does NOT flag a single enrolled hosted ATS as uncorroborated platform evidence', () => {
+    const result = deriveNegativeSignals({
+      reasons: [],
+      vacanciesCount: 2,
+      distinctVacancyNamesCount: 2,
+      sourceFamilies: ['recruitee'],
+      confidenceGate: 'C',
+    })
+    // Gate C contributes one low-confidence warning. A platform-only source
+    // would add a second single-source warning, which a hosted ATS must not do.
+    expect(result).toHaveLength(1)
+  })
+
   it('flags repost pattern: high vacancies count but low distinct', () => {
     const result = deriveNegativeSignals({
       reasons: [],

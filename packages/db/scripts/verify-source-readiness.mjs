@@ -16,8 +16,13 @@ const expectedSources = [
   'hh',
   'rabota-rossii',
   'career-pages',
+  'greenhouse',
+  'lever',
+  'ashby',
+  'recruitee',
+  'workable',
+  'smartrecruiters',
   'linkedin-company-pages',
-  'tech-job-boards',
   'egrul-fns',
   'company-site',
   'funding-business-signals',
@@ -27,7 +32,14 @@ const expectedSources = [
   'habr-career',
   'company-newsrooms',
   'industry-media',
-  'regional-job-boards',
+  'github-company-org',
+  'youtube-company-channels',
+  'telegram-company-channels',
+  'fns-open-data',
+  'government-procurement',
+  'cbr-registry',
+  'rosstat-open-data',
+  'rospatent-open-data',
 ];
 // Sources whose signals are eligible to ORIGINATE a digest lead. The digest SQL
 // (source-digest-evidence.sql) admits only signal_type = 'job_posting', so this set
@@ -38,12 +50,16 @@ const expectedSources = [
 const digestLeadSources = [
   'hh',
   'career-pages',
+  'greenhouse',
+  'lever',
+  'ashby',
+  'recruitee',
+  'workable',
+  'smartrecruiters',
   'rabota-rossii',
   'superjob',
   'habr-career',
-  'tech-job-boards',
   'linkedin-company-pages',
-  'regional-job-boards',
 ];
 const digestContextSources = [
   'funding-business-signals',
@@ -53,11 +69,17 @@ const digestContextSources = [
   'company-site',
   'company-newsrooms',
   'industry-media',
+  'github-company-org',
+  'youtube-company-channels',
+  'telegram-company-channels',
+  'fns-open-data',
+  'government-procurement',
+  'cbr-registry',
+  'rosstat-open-data',
+  'rospatent-open-data',
 ];
 const providerTokenSources = [
   'linkedin-company-pages',
-  'tech-job-boards',
-  'egrul-fns',
   'funding-business-signals',
   'transparent-business-fns',
   'fedresurs',
@@ -65,7 +87,6 @@ const providerTokenSources = [
   'habr-career',
   'company-newsrooms',
   'industry-media',
-  'regional-job-boards',
 ];
 const requireLiveConfig = process.argv.includes('--require-live-config')
   || process.env.SOURCE_READINESS_REQUIRE_LIVE_CONFIG === '1';
@@ -143,10 +164,11 @@ assert.ok(
 const digestSources = [...digestSourceMatch[1].matchAll(/'([^']+)'/g)]
   .map((match) => match[1])
   .sort();
+const legacyDigestCompatibilitySources = ['tech-job-boards'];
 assert.deepEqual(
   digestSources,
-  [...digestLeadSources].sort(),
-  'digest lead selection must stay limited to lead-originating sources',
+  [...digestLeadSources, ...legacyDigestCompatibilitySources].sort(),
+  'digest lead selection must stay limited to runnable lead sources plus explicit historical compatibility ids',
 );
 
 const digestContextMatch = digestSql.match(
@@ -180,17 +202,21 @@ const liveConfigSummary = evaluatedReadiness.map((readiness) => ({
   sourceId: readiness.id,
   status: readiness.configured
     ? 'configured'
-    : readiness.providerRequired ? 'provider-required' : 'missing',
+    : readiness.registrationRequired
+      ? 'registration-required'
+      : readiness.providerRequired ? 'provider-required' : 'missing',
   configured: readiness.configured,
   launchRequired: readiness.configurationMode === 'launch-required',
   providerRequired: readiness.providerRequired,
+  registrationRequired: readiness.registrationRequired,
   providerConfigured: readiness.providerRequired && readiness.configured,
   acceptedEnvSets: readiness.acceptedEnvSets.map((envSet) => envSet.join(' + ')),
 }));
 const missingLiveConfig = liveConfigSummary.filter((item) => item.status === 'missing');
 const providerRequiredLiveConfig = liveConfigSummary.filter((item) => item.status === 'provider-required');
+const registrationRequiredLiveConfig = liveConfigSummary.filter((item) => item.status === 'registration-required');
 const blockingLiveConfig = includeProviderRequired
-  ? [...missingLiveConfig, ...providerRequiredLiveConfig]
+  ? [...missingLiveConfig, ...registrationRequiredLiveConfig, ...providerRequiredLiveConfig]
   : missingLiveConfig;
 
 if (requireLiveConfig && blockingLiveConfig.length > 0) {
@@ -221,6 +247,12 @@ console.log(JSON.stringify({
       acceptedEnvSets: item.acceptedEnvSets,
     })),
   liveConfigProviderRequired: providerRequiredLiveConfig
+    .map((item) => ({
+      sourceId: item.sourceId,
+      status: item.status,
+      acceptedEnvSets: item.acceptedEnvSets,
+    })),
+  liveConfigRegistrationRequired: registrationRequiredLiveConfig
     .map((item) => ({
       sourceId: item.sourceId,
       status: item.status,

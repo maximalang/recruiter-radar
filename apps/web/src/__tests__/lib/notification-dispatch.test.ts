@@ -1,4 +1,5 @@
 import { notificationRetryDelaySeconds } from '../../../lib/notification-dispatch';
+import { classifyNotificationProviderError } from '../../../lib/notification-providers';
 
 describe('notification retry policy', () => {
   it.each([
@@ -42,5 +43,20 @@ describe('notification retry policy', () => {
 
   it('moves the fifth failed attempt to dead-letter', () => {
     expect(notificationRetryDelaySeconds(5, { kind: 'retryable' })).toBeNull();
+  });
+
+  it('treats a transport error without an HTTP response as ambiguous and terminal', () => {
+    const classified = classifyNotificationProviderError(new Error('socket closed'));
+
+    expect(classified.kind).toBe('ambiguous');
+    expect(notificationRetryDelaySeconds(1, classified)).toBeNull();
+  });
+
+  it('treats HTTP 5xx as ambiguous because the provider may have committed', () => {
+    const error = Object.assign(new Error('upstream failed after request'), { status: 503 });
+    const classified = classifyNotificationProviderError(error);
+
+    expect(classified.kind).toBe('ambiguous');
+    expect(notificationRetryDelaySeconds(1, classified)).toBeNull();
   });
 });

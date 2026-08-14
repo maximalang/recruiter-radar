@@ -11,7 +11,7 @@ Recruiter Radar каждый день находит компании с док�
 ## Architecture principles
 
 - **Next.js + PostgreSQL** — product core и единственный владелец бизнес-решений.
-- **VPS cron + product APIs** — production orchestration.
+- **GitHub Actions clocks + product APIs** — production orchestration; PostgreSQL owns eligibility, leases and backoff.
 - **n8n** — не обязательная часть production. Клиент может подключить собственный n8n через signed webhook.
 - **AI** — узкий слой поверх evidence/scoring, не источник истины.
 - **Notification providers** — delivery и feedback transport, не отдельный источник бизнес-логики.
@@ -38,7 +38,9 @@ Source registry разделяет несколько независимых с�
 - `hh`;
 - `rabota-rossii`;
 - `career-pages`;
-- provider-gated secondary sources: `superjob`, `habr-career`, `linkedin-company-pages`, `tech-job-boards`, `regional-job-boards`.
+- provider/gate-controlled secondary sources: `habr-career` and `linkedin-company-pages`; hosted ATS vacancies use concrete reviewed source IDs discovered through `career-pages`.
+
+Historical compatibility provenance is readable but is not a runnable source family and is omitted from current inventories.
 
 ### Enrichment и context
 

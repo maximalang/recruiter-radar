@@ -23,6 +23,7 @@ const report = {
     configured: sources.filter((source) => source.configured).length,
     liveReachable: sources.filter((source) => source.liveReachable).length,
     liveVerified: sources.filter((source) => source.liveVerified).length,
+    registrationRequired: sources.filter((source) => source.finalState === 'registration-required').length,
     providerRequired: sources.filter((source) => source.finalState === 'provider-required').length,
     legalReviewRequired: sources.filter((source) => source.finalState === 'legal-review-required').length,
     blocked: sources.filter((source) => source.finalState === 'blocked').length,
@@ -63,6 +64,7 @@ function printHumanReport(value) {
   console.log(`Configured: ${value.summary.configured}`);
   console.log(`Live reachable: ${value.summary.liveReachable}`);
   console.log(`Live verified: ${value.summary.liveVerified}`);
+  console.log(`Registration required: ${value.summary.registrationRequired}`);
   console.log(`Provider required: ${value.summary.providerRequired}`);
   console.log(`Legal review required: ${value.summary.legalReviewRequired}`);
   console.log(`Blocked: ${value.summary.blocked}`);

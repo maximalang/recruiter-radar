@@ -12,6 +12,7 @@ import { hashCanonicalJson } from './canonical-hash'
 import {
   isCommercialSignalAuthoritativeForWorkspace,
 } from './commercial-signal-rollout'
+import { summarizeOpportunityTemporalContext } from './temporal-context'
 
 export type CommercialSignalWriterDb = Pick<Pool, 'query' | 'connect'> |
   Pick<PoolClient, 'query' | 'release'>
@@ -86,6 +87,7 @@ type CandidateRow = {
   gateVersion: string
   calibrationStatus: string
   validUntil: string
+  temporalEvents?: unknown
 }
 
 type QueryPlanLink = {
@@ -234,13 +236,29 @@ async function loadCandidates(
        candidate.feature_schema_version AS "featureSchemaVersion",
        candidate.gate_version AS "gateVersion",
        candidate.calibration_status AS "calibrationStatus",
-       candidate.valid_until::TEXT AS "validUntil"
+       candidate.valid_until::TEXT AS "validUntil",
+       COALESCE(temporal_data.events, '[]'::JSONB) AS "temporalEvents"
      FROM opportunity_candidates candidate
      JOIN signal_episodes episode
        ON episode.id = candidate.signal_episode_id
       AND episode.organization_id = candidate.organization_id
       AND episode.episode_generation = candidate.signal_episode_generation
      JOIN orgs org ON org.id = candidate.organization_id
+     LEFT JOIN LATERAL (
+       SELECT JSONB_AGG(JSONB_BUILD_OBJECT(
+         'id', event.id::TEXT,
+         'subjectType', event.subject_type,
+         'eventType', event.event_type,
+         'occurredAt', event.occurred_at::TEXT,
+         'windowDays', event.window_days,
+         'delta', event.delta,
+         'evidenceIds', event.evidence_ids::TEXT[]
+       ) ORDER BY event.occurred_at DESC, event.id DESC) AS events
+       FROM source_temporal_derived_events event
+       WHERE event.organization_id = candidate.organization_id
+         AND event.occurred_at >= episode.started_at - INTERVAL '30 days'
+         AND event.occurred_at <= $4::TIMESTAMPTZ
+     ) temporal_data ON TRUE
      WHERE candidate.workspace_id = $1
        AND ($2::BIGINT IS NULL OR candidate.client_profile_id = $2)
        AND ($3::BIGINT IS NULL OR candidate.organization_id = $3)
@@ -912,6 +930,7 @@ export function buildCommercialSignalCard(
     | 'qualityScore'
     | 'actionabilityScore'
     | 'qualityComponents'
+    | 'temporalEvents'
   >,
   evidenceIds: readonly string[],
 ): CommercialSignalCard {
@@ -925,6 +944,9 @@ export function buildCommercialSignalCard(
     candidate.qualityComponents,
     'externalAgencyPropensity',
   )
+  const acceleration = summarizeOpportunityTemporalContext(
+    candidate.temporalEvents,
+  ).strongestAcceleration
   const whatChanged: CommercialSignalCardConclusion = {
     text: whatChangedText(
       candidate.signalEpisodeType,
@@ -954,7 +976,9 @@ export function buildCommercialSignalCard(
       evidenceIds: [],
     },
     whyNow: {
-      text: `Подтверждённый Signal Episode остаётся активным до ${isoDate(candidate.episodeValidUntil)}.`,
+      text: acceleration && acceleration.change > 0
+        ? `Подтверждённый Signal Episode остаётся активным до ${isoDate(candidate.episodeValidUntil)}. Активные вакансии выросли с ${acceleration.previous} до ${acceleration.current} за ${acceleration.windowDays} дней.`
+        : `Подтверждённый Signal Episode остаётся активным до ${isoDate(candidate.episodeValidUntil)}.`,
       basis: 'evidence',
       evidenceIds: directEvidenceIds,
     },
@@ -1200,6 +1224,7 @@ function candidateFromRow(row: Record<string, unknown>): CandidateRow {
     gateVersion: String(row.gateVersion),
     calibrationStatus: String(row.calibrationStatus),
     validUntil: timestamp(row.validUntil, 'candidate valid until'),
+    temporalEvents: row.temporalEvents,
   }
 }
 

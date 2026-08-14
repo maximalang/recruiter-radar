@@ -22,6 +22,15 @@ describe('digest evidence query mirror', () => {
     expect(DIGEST_EVIDENCE_QUERY).toContain('AS source_record_urls')
   })
 
+  it('does not originate candidates from postings explicitly attributed to a non-direct publisher', () => {
+    expect(DIGEST_EVIDENCE_QUERY).toContain(
+      "COALESCE(signal.payload ->> 'candidate_eligible', 'true') = 'true'",
+    )
+    expect(DIGEST_EVIDENCE_QUERY).toContain(
+      "signal.source <> 'superjob' OR signal.payload ->> 'candidate_eligible' = 'true'",
+    )
+  })
+
   it('canonicalizes already-prefixed legal identity keys without duplicating the namespace', () => {
     expect(DIGEST_EVIDENCE_QUERY).toContain("'inn:' || LOWER(REPLACE(ref.source_key, 'inn:', ''))")
     expect(DIGEST_EVIDENCE_QUERY).toContain("'ogrn:' || LOWER(REPLACE(ref.source_key, 'ogrn:', ''))")

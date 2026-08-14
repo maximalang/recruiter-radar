@@ -1,18 +1,19 @@
 /**
  * Cron: Daily Radar Pipeline
  *
- * Triggered by the production cron (cron/trigger-daily-radar.mjs) to run
- * the legacy daily cycle for non-canary workspaces:
- *   1. Ingest all primary sources
- *   2. Generate digest for each active non-canary client profile
- *   3. Deliver the digest to every enabled channel
+ * The daily clock is delivery-oriented. Source refresh has its own persisted
+ * cadence scheduler and hourly clock; this route only asks that scheduler to
+ * run anything currently due before deriving temporal context and delivering.
+ * A fenced day-level lease prevents duplicate delivery when multiple external
+ * clocks race, while per-profile state reuses the original digest run on retry.
  *
  * A Commercial Signal canary is executed by its separate exact-lineage cron
  * stage and is deliberately excluded from legacy digest delivery here.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { ingestAllPrimarySources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
+import { isNoActiveProfiles, runSourceTemporalIntelligence } from '@/lib/lead-discovery/source-ingest'
+import { runScheduledSourceRefresh } from '@/lib/lead-discovery/scheduled-source-refresh'
 import { runDigestForClientProfile } from '@/lib/digest'
 import { deliverCandidatesForRun } from '@/lib/digest/deliver-candidates'
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
@@ -22,10 +23,36 @@ import {
   getCommercialSignalCanaryWorkspaceId,
   resolveCommercialSignalRollout,
 } from '@/lib/opportunities/commercial-signal-rollout'
-import { logEvent, logError, logWarn } from '@/lib/runtime'
+import {
+  attachDailyRadarProfileDigestRun,
+  claimDailyRadarProfile,
+  claimDailyRadarRun,
+  dailyRadarNextRetryAt,
+  finishDailyRadarProfile,
+  finishDailyRadarRun,
+  heartbeatDailyRadarRun,
+  recordDailyRadarSourceRefreshResult,
+  recordDailyRadarTemporalResult,
+  type DailyRadarLease,
+} from '@/lib/daily-radar-run-state'
+import { logEvent, logWarn } from '@/lib/runtime'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+export function resolveDailyRadarFinalStatus(input: {
+  allOk: boolean
+  attemptCount: number
+  terminalProfiles: number
+  retryableFailedProfiles: number
+}): 'completed' | 'partial' | 'terminal' {
+  if (input.allOk) return 'completed'
+  if (
+    input.attemptCount >= 3
+    || (input.terminalProfiles > 0 && input.retryableFailedProfiles === 0)
+  ) return 'terminal'
+  return 'partial'
+}
 
 /** GET — health-check for monitors (no pipeline run, no auth required) */
 export async function GET() {
@@ -51,11 +78,26 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const lease = await claimDailyRadarRun()
+  if (!lease.acquired) {
+    const terminal = lease.reason === 'attempt-limit' || lease.reason === 'terminal'
+    return NextResponse.json({
+      success: !terminal,
+      skipped: true,
+      terminal,
+      reason: lease.reason ?? 'daily-radar-already-claimed',
+      runDate: lease.runDate,
+      attemptCount: lease.attemptCount,
+      nextRetryAt: lease.nextRetryAt ?? null,
+    }, { status: terminal ? 409 : 200 })
+  }
+
   const startMs = Date.now()
 
   try {
-    const ingestResults = await ingestAllPrimarySources()
+    const ingestResults = await runScheduledSourceRefresh()
     if (isNoActiveProfiles(ingestResults)) {
+      await finishDailyRadarRun(lease, 'completed')
       return NextResponse.json(
         { success: false, error: 'No active client profiles; pipeline skipped.', hint: ingestResults.hint },
         { status: 422 }
@@ -76,9 +118,9 @@ export async function POST(request: NextRequest) {
         signals: result.upsertedCount ?? null,
       }
       if (result.success) {
-        logEvent('daily_radar.source_ingest_completed', sourcePayload)
+        logEvent('daily_radar.source_refresh_completed', sourcePayload)
       } else {
-        logWarn('daily_radar.source_ingest_failed', sourcePayload)
+        logWarn('daily_radar.source_refresh_failed', sourcePayload)
       }
     }
     const ingestSummary = {
@@ -92,27 +134,93 @@ export async function POST(request: NextRequest) {
         return counts
       }, {}),
     }
+    if (!await recordDailyRadarSourceRefreshResult(lease, { ok: ingestOk, ...ingestSummary })) {
+      throw new Error('Daily radar lease ownership was lost after source refresh.')
+    }
+    if (!await heartbeatDailyRadarRun(lease)) {
+      throw new Error('Daily radar lease ownership was lost before temporal intelligence.')
+    }
 
-    const digestResults = await generateAndDeliverDigests()
+    const temporalResult = await runSourceTemporalIntelligence()
+    const temporalPayload = {
+      success: temporalResult.success,
+      observations: temporalResult.observations,
+      derivedEvents: temporalResult.derivedEvents,
+      error: temporalResult.error ?? null,
+    }
+    if (temporalResult.success) {
+      logEvent('daily_radar.temporal_intelligence_completed', temporalPayload)
+    } else {
+      logWarn('daily_radar.temporal_intelligence_failed', temporalPayload)
+    }
+    if (!await recordDailyRadarTemporalResult(lease, temporalPayload)) {
+      throw new Error('Daily radar lease ownership was lost after temporal intelligence.')
+    }
+
+    const digestResults = await generateAndDeliverDigests(lease)
     const digestOk = digestResults.every(r => r.ok)
     const digestSummary = {
       total: digestResults.length,
       succeeded: digestResults.filter(r => r.ok).length,
       failed: digestResults.filter(r => !r.ok).length,
+      retryableFailed: digestResults.filter(r => !r.ok && r.terminal !== true).length,
       totalSent: digestResults.reduce((sum, r) => sum + r.sent, 0),
       totalSkipped: digestResults.reduce((sum, r) => sum + r.skipped, 0),
+      terminal: digestResults.filter(r => r.terminal === true).length,
+      profilesCompleted: digestResults.filter(r => r.ok && r.sent > 0).length,
+      profilesSkipped: digestResults.filter(r => r.ok && r.sent === 0).length,
     }
 
-    const allOk = ingestOk && digestOk
+    const allOk = ingestOk && temporalResult.success && digestOk
     const durationMs = Date.now() - startMs
 
+    const finalStatus = resolveDailyRadarFinalStatus({
+      allOk,
+      attemptCount: lease.attemptCount,
+      terminalProfiles: digestSummary.terminal,
+      retryableFailedProfiles: digestSummary.retryableFailed,
+    })
+    const terminalReason = finalStatus === 'terminal'
+      ? digestSummary.terminal > 0 ? 'terminal_profile_delivery' : 'daily_attempt_limit_reached'
+      : null
+
+    const finishedAt = new Date()
+    const nextRetryAt = dailyRadarNextRetryAt(lease, finalStatus, finishedAt)
+
+    const finalized = await finishDailyRadarRun(
+      lease,
+      finalStatus,
+      finishedAt,
+      {
+        profilesTotal: digestSummary.total,
+        profilesCompleted: digestSummary.profilesCompleted,
+        profilesFailed: digestSummary.failed,
+        profilesSkipped: digestSummary.profilesSkipped,
+        terminalReason,
+      },
+    )
+    if (!finalized) {
+      throw new Error('Daily radar lease ownership was lost before finalization.')
+    }
     logEvent('daily_radar.run', {
-      status: allOk ? 'ok' : 'partial',
+      runDate: lease.runDate,
+      leaseId: lease.leaseId,
+      attempt: lease.attemptCount,
+      status: finalStatus,
       ingestOk: ingestSummary.succeeded,
       ingestTotal: ingestSummary.total,
+      temporalOk: temporalResult.success,
+      temporalObservations: temporalResult.observations,
+      temporalEvents: temporalResult.derivedEvents,
       digestOk: digestSummary.succeeded,
       digestTotal: digestSummary.total,
+      profilesTotal: digestSummary.total,
+      profilesCompleted: digestSummary.profilesCompleted,
+      profilesFailed: digestSummary.failed,
+      profilesSkipped: digestSummary.profilesSkipped,
       sent: digestSummary.totalSent,
+      nextRetryAt,
+      terminalReason,
       durationMs,
     })
     if (
@@ -122,39 +230,68 @@ export async function POST(request: NextRequest) {
     ) {
       logWarn('daily_radar.zero_opportunity_anomaly', {
         profileCount: digestSummary.total,
-        completedCount: digestSummary.succeeded,
+        completedCount: digestSummary.profilesCompleted,
       })
     }
-
     return NextResponse.json({
       success: allOk,
+      terminal: finalStatus === 'terminal',
+      reason: finalStatus === 'terminal' ? 'terminal' : finalStatus,
+      nextRetryAt,
       data: {
         startedAt: new Date(startMs).toISOString(),
         completedAt: new Date().toISOString(),
         durationMs,
+        attemptCount: lease.attemptCount,
         ingest: { ok: ingestOk, ...ingestSummary, details: ingestResults },
+        temporal: { ok: temporalResult.success, ...temporalResult },
         digest: { ok: digestOk, ...digestSummary, details: digestResults },
       },
-    }, { status: allOk ? 200 : 207 })
-  } catch (error) {
-    logError('daily_radar.pipeline_failed', error)
+    }, { status: allOk ? 200 : finalStatus === 'terminal' ? 409 : 207 })
+  } catch {
+    const terminal = lease.attemptCount >= 3
+    await finishDailyRadarRun(
+      lease,
+      terminal ? 'terminal' : 'failed',
+      new Date(),
+      { profilesTotal: 0, profilesCompleted: 0, profilesFailed: 0, profilesSkipped: 0,
+        terminalReason: terminal ? 'daily_attempt_limit_reached' : null },
+    ).catch(() => undefined)
+    logWarn('daily_radar.pipeline_failed', {
+      runDate: lease.runDate,
+      leaseId: lease.leaseId,
+      attempt: lease.attemptCount,
+      state: terminal ? 'terminal' : 'failed',
+      retryable: !terminal,
+      reasonCode: terminal ? 'daily_attempt_limit_reached' : 'pipeline_execution_failed',
+    })
     return NextResponse.json(
-      { success: false, error: 'Daily radar pipeline failed' },
-      { status: 500 }
+      {
+        success: false,
+        terminal,
+        reason: terminal ? 'terminal' : 'failed',
+        error: 'Daily radar pipeline failed',
+      },
+      { status: terminal ? 409 : 500 }
     )
   }
 }
 
-interface DigestDeliveryResult {
+export interface DigestDeliveryResult {
   clientProfileId: string
   ok: boolean
   sent: number
   failed: number
   skipped: number
+  digestRunId?: string
+  retried?: boolean
+  terminal?: boolean
   error?: string
 }
 
-async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
+export async function generateAndDeliverDigests(
+  lease: DailyRadarLease,
+): Promise<DigestDeliveryResult[]> {
   const pool = getPool()
   if (!pool) {
     return [{ clientProfileId: 'none', ok: false, sent: 0, failed: 0, skipped: 0, error: 'DATABASE_URL not set' }]
@@ -209,7 +346,7 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
 
   for (const profile of profiles.rows) {
     if (!shouldDeliverOnRun(
-      profile.delivery_frequency === "weekly" ? "weekly" : "daily",
+      profile.delivery_frequency === 'weekly' ? 'weekly' : 'daily',
       runUtc,
     )) {
       results.push({
@@ -222,17 +359,73 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
       continue
     }
 
+    if (!await heartbeatDailyRadarRun(lease)) {
+      throw new Error('Daily radar lease ownership was lost during profile delivery.')
+    }
+
+    const profileLease = await claimDailyRadarProfile(lease, profile.id)
+    if (!profileLease.acquired) {
+      if (profileLease.status === 'completed' || profileLease.status === 'skipped') {
+        results.push({
+          clientProfileId: profile.id,
+          ok: true,
+          sent: 0,
+          failed: 0,
+          skipped: 1,
+          digestRunId: profileLease.digestRunId ?? undefined,
+          retried: true,
+        })
+      } else {
+        results.push({
+          clientProfileId: profile.id,
+          ok: false,
+          sent: 0,
+          failed: 0,
+          skipped: 0,
+          digestRunId: profileLease.digestRunId ?? undefined,
+          retried: true,
+          terminal: profileLease.status === 'failed_terminal',
+          error: `Profile delivery is not claimable (status=${profileLease.status}, attempts=${profileLease.attemptCount}).`,
+        })
+      }
+      continue
+    }
+
     try {
-      const { run } = await runDigestForClientProfile({ clientProfileId: profile.id })
-      const runId = run.id
+      let runId = profileLease.digestRunId
+      const retried = Boolean(runId)
+      if (!runId) {
+        const { run } = await runDigestForClientProfile({ clientProfileId: profile.id })
+        runId = run.id
+        if (!await attachDailyRadarProfileDigestRun(profileLease, runId)) {
+          throw new Error('Daily radar profile lease ownership was lost before digest run persistence.')
+        }
+      }
 
       try {
         await enrichRunCandidates(runId)
-      } catch (error) {
-        logError('daily_radar.enrichment_failed', error, { runId: String(runId) })
+      } catch {
+        logWarn('daily_radar.enrichment_failed', {
+          runId: String(runId),
+          reasonCode: 'enrichment_failed',
+        })
       }
 
       const delivery = await deliverCandidatesForRun(runId)
+      const deliveryError = delivery.ok
+        ? null
+        : delivery.failures.map((failure) => failure.error).join('; ') || 'Digest delivery failed.'
+      const terminal = profileLease.attemptCount >= 3
+        || delivery.failures.some((failure) => (
+          failure.state === 'failed_terminal' || failure.state === 'processing'
+        ))
+      if (!await finishDailyRadarProfile(
+        profileLease,
+        delivery.ok ? 'completed' : terminal ? 'failed_terminal' : 'failed_retryable',
+        deliveryError,
+      )) {
+        throw new Error('Daily radar profile lease ownership was lost before delivery finalization.')
+      }
 
       results.push({
         clientProfileId: profile.id,
@@ -240,16 +433,38 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
         sent: delivery.sent,
         failed: delivery.failed,
         skipped: delivery.skipped,
+        digestRunId: runId,
+        retried,
+        terminal,
+        ...(deliveryError ? { error: deliveryError } : {}),
       })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
+    } catch {
+      const terminal = profileLease.attemptCount >= 3
+      await finishDailyRadarProfile(
+        profileLease,
+        terminal ? 'failed_terminal' : 'failed_retryable',
+        terminal ? 'profile_attempt_limit_reached' : 'profile_execution_failed',
+      ).catch(() => undefined)
+      logWarn('daily_radar.profile_failed', {
+        runDate: lease.runDate,
+        leaseId: lease.leaseId,
+        profile: profile.id,
+        digestRunId: profileLease.digestRunId,
+        state: terminal ? 'failed_terminal' : 'failed_retryable',
+        retryable: !terminal,
+        attempt: profileLease.attemptCount,
+        reasonCode: 'profile_execution_failed',
+      })
       results.push({
         clientProfileId: profile.id,
         ok: false,
         sent: 0,
         failed: 0,
         skipped: 0,
-        error: message,
+        digestRunId: profileLease.digestRunId ?? undefined,
+        retried: Boolean(profileLease.digestRunId),
+        terminal,
+        error: terminal ? 'Profile attempt limit reached.' : 'Profile execution failed.',
       })
     }
   }

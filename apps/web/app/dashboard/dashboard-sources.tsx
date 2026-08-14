@@ -12,7 +12,7 @@ interface SourceHealth {
   lastRun: string;
   recordsProcessed: number;
   errors: number;
-  status: 'excellent' | 'good' | 'warning' | 'critical';
+  status: 'excellent' | 'good' | 'warning' | 'critical' | 'inactive';
 }
 
 const STATUS_CONFIG: Record<SourceHealth['status'], { label: string; icon: (p: SVGProps<SVGSVGElement>) => ReactElement; colorClass: string }> = {
@@ -20,9 +20,11 @@ const STATUS_CONFIG: Record<SourceHealth['status'], { label: string; icon: (p: S
   good:      { label: 'хорошо',   icon: AlertIcon, colorClass: styles.sourceItemScoreYellow },
   warning:   { label: 'внимание', icon: AlertIcon, colorClass: styles.sourceItemScoreYellow },
   critical:  { label: 'критично', icon: XIcon,     colorClass: styles.sourceItemScoreRed },
+  inactive:  { label: 'неактивен', icon: AlertIcon, colorClass: styles.sourceItemScoreYellow },
 };
 
-const getBarColor = (overall: number) =>
+const getBarColor = (overall: number, status: SourceHealth['status']) =>
+  status === 'inactive' ? styles.sourceItemScoreYellow :
   overall >= 80 ? styles.sourceItemScoreGreen :
   overall >= 60 ? styles.sourceItemScoreYellow :
   styles.sourceItemScoreRed;
@@ -207,7 +209,7 @@ const DashboardSources: React.FC<DashboardSourcesProps> = ({
                       aria-label={`${source.name}: ${source.overall}%`}
                     >
                       <div
-                        className={`${styles.sourceItemProgressBar} ${getBarColor(source.overall)}`}
+                        className={`${styles.sourceItemProgressBar} ${getBarColor(source.overall, source.status)}`}
                         style={{ width: `${source.overall}%` }}
                       />
                     </div>

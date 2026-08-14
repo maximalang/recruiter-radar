@@ -131,6 +131,7 @@ async function runLiveCrawlSmoke() {
     const baseUrl = `http://127.0.0.1:${address.port}`;
     const targetsPath = join(tempDir, 'targets.json');
     const failedTargetsPath = join(tempDir, 'failed-targets.json');
+    const emptyTargetsPath = join(tempDir, 'empty-targets.json');
 
     writeFileSync(
       targetsPath,
@@ -147,8 +148,13 @@ async function runLiveCrawlSmoke() {
       failedTargetsPath,
       JSON.stringify([{ url: `${baseUrl}/missing` }], null, 2),
     );
+    writeFileSync(emptyTargetsPath, '[]');
 
-    const liveInput = await resolveCompanySiteLiveInput({ targetsFilePath: targetsPath });
+    const testDependencies = { allowPrivateForTests: true, rendered: false };
+    const liveInput = await resolveCompanySiteLiveInput(
+      { targetsFilePath: targetsPath },
+      { dependencies: testDependencies },
+    );
     const liveSummary = buildFetchSummary(liveInput);
 
     assert.equal(liveInput.inputMode, 'live-public');
@@ -185,9 +191,20 @@ async function runLiveCrawlSmoke() {
     ]);
 
     await assert.rejects(
-      () => resolveCompanySiteLiveInput({ targetsFilePath: failedTargetsPath }),
+      () => resolveCompanySiteLiveInput(
+        { targetsFilePath: failedTargetsPath },
+        { dependencies: testDependencies },
+      ),
       /0 usable pages/,
     );
+
+    const emptyInput = await resolveCompanySiteLiveInput(
+      { targetsFilePath: emptyTargetsPath },
+      { dependencies: testDependencies },
+    );
+    const emptySummary = buildFetchSummary(emptyInput);
+    assert.equal(emptySummary.zeroReason, 'no-eligible-company-targets');
+    assert.equal(emptySummary.normalizedRecords, 0);
 
     return {
       targetsVerified: liveSummary.recordsReceived,
@@ -195,6 +212,7 @@ async function runLiveCrawlSmoke() {
       crawlErrors: liveSummary.crawlErrors,
       normalizedRecords: liveSummary.normalizedRecords,
       allFailedCrawlRejected: true,
+      emptyTargetsOutcome: emptySummary.zeroReason,
     };
   } finally {
     await close(server);

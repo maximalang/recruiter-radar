@@ -99,6 +99,31 @@ describe('OpportunityBriefBuilder', () => {
     expect(copy).not.toMatch(/\+7\d/)
   })
 
+  it('adds an exact temporal delta to why-now when hiring evidence already exists', () => {
+    const brief = new OpportunityBriefBuilder().build({
+      organizationName: 'Пример',
+      episode: {
+        ...EPISODE,
+        metadata: {
+          ...EPISODE.metadata,
+          temporalContext: {
+            events: [], activeVacancyCount: 27, vacancyDeltas: { '14': 15 },
+            strongestAcceleration: {
+              windowDays: 14, previous: 12, current: 27, change: 15,
+            },
+            newlyOpenedRoles: [], closedRoles: [], reopenedRoles: [],
+            evidenceIds: ['e-1'],
+          },
+        },
+      },
+      score: SCORE,
+      agency: AGENCY,
+    })
+
+    expect(brief.whyNow).toContain('с 12 до 27')
+    expect(brief.whyNow).toContain('+15')
+  })
+
   it('uses an evidence-safe fallback when an optional metric is absent', () => {
     const brief = new OpportunityBriefBuilder().build({
       organizationName: 'Пример',
