@@ -61,6 +61,9 @@ describe('production scheduler authority', () => {
   })
 
   it('fails Source Refresh on a real partial failure and logs only safe counters', () => {
+    expect(sourceRefreshWorkflow).toContain("await import('node:http')")
+    expect(sourceRefreshWorkflow).toContain('SOURCE_REFRESH_CLIENT_TIMEOUT_MS = 15 * 60 * 1000')
+    expect(sourceRefreshWorkflow).toContain('request.setTimeout(SOURCE_REFRESH_CLIENT_TIMEOUT_MS')
     expect(sourceRefreshWorkflow).toContain('succeeded: body?.data?.succeeded ?? 0')
     expect(sourceRefreshWorkflow).toContain('credentialGated: body?.data?.credentialGated ?? 0')
     expect(sourceRefreshWorkflow).toContain('rateLimited: body?.data?.rateLimited ?? 0')

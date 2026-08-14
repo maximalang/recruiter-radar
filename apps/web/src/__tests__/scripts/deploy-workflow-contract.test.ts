@@ -228,6 +228,8 @@ describe('production deploy workflow contract', () => {
     expect(runtimeConfigurator).toContain(
       'LANDING_ANALYTICS_RATE_LIMIT_SALT: ${LANDING_ANALYTICS_RATE_LIMIT_SALT:?',
     )
+    expect(runtimeConfigurator).toContain('Preserve the caller stdin so an SSH deployment heredoc continues')
+    expect(runtimeConfigurator).toContain("  ' </dev/null")
   })
 
   it('runs landing events through a real Caddy container', () => {
