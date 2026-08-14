@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { getTimewebMcpProtectedResourceMetadata } from '../../../../../lib/timeweb-mcp-auth'
+import { getTimewebMcpProtectedResourceMetadata } from '../../../../../../lib/timeweb-mcp-auth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
