@@ -43,7 +43,9 @@ resolve_compose_args() {
   if [ -z "$configured" ]; then configured="$(read_env_value COMPOSE_FILE "$ENV_FILE")"; fi
   if [ -n "$configured" ]; then
     IFS=':' read -r -a files <<< "$configured"
-    for file in "${files[@]}"; do [ -n "$file" ] && compose_args+=(-f "$file"); done
+    for file in "${files[@]}"; do
+      if [ -n "$file" ]; then compose_args+=(-f "$file"); fi
+    done
   else
     local base="" candidate override=""
     for candidate in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
@@ -57,10 +59,14 @@ resolve_compose_args() {
       docker-compose.yaml) override="docker-compose.override.yaml" ;;
       docker-compose.yml) override="docker-compose.override.yml" ;;
     esac
-    [ -n "$override" ] && [ -f "$override" ] && compose_args+=(-f "$override")
+    if [ -n "$override" ] && [ -f "$override" ]; then compose_args+=(-f "$override"); fi
   fi
-  [ -f "$APP_DIR/.rr-notification-key.compose.yml" ] && compose_args+=(-f "$APP_DIR/.rr-notification-key.compose.yml")
-  [ -f "$APP_DIR/.rr-timeweb-mcp.compose.yml" ] && compose_args+=(-f "$APP_DIR/.rr-timeweb-mcp.compose.yml")
+  if [ -f "$APP_DIR/.rr-notification-key.compose.yml" ]; then
+    compose_args+=(-f "$APP_DIR/.rr-notification-key.compose.yml")
+  fi
+  if [ -f "$APP_DIR/.rr-timeweb-mcp.compose.yml" ]; then
+    compose_args+=(-f "$APP_DIR/.rr-timeweb-mcp.compose.yml")
+  fi
 }
 resolve_compose_args
 
