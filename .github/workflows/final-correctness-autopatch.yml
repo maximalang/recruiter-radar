@@ -18,116 +18,64 @@ jobs:
           ref: codex/free-source-expansion
           fetch-depth: 0
 
-      - name: Apply exact matcher replacements
+      - name: Apply conservative matcher and HH activation patches
         run: |
           node <<'NODE'
           const fs = require('node:fs')
 
-          function replaceExact(path, before, after) {
+          function replaceRegex(path, regex, replacer, label) {
             const content = fs.readFileSync(path, 'utf8')
-            if (!content.includes(before)) {
-              throw new Error(`Exact patch anchor not found in ${path}`)
-            }
-            const updated = content.replace(before, after)
-            if (updated === content) throw new Error(`Patch produced no change in ${path}`)
+            if (!regex.test(content)) throw new Error(`Patch anchor not found: ${label}`)
+            const updated = content.replace(regex, replacer)
+            if (updated === content) throw new Error(`Patch produced no change: ${label}`)
             fs.writeFileSync(path, updated)
           }
 
           const detection = 'apps/web/lib/opportunities/hiring-episode-detection.ts'
-          replaceExact(
+          replaceRegex(
             detection,
-            `    if (conflictProvider) {
-              logEvent('canonical_vacancy.merge_rejected', {
-                organizationId: signals[left].organizationId,
-                provider: conflictProvider,
-                reasonCode: 'conflicting_provider_external_ids',
-              })
-              return
-            }
-            if (enforcePublicationWindow) {`,
-            `    if (conflictProvider) {
-              logEvent('canonical_vacancy.merge_rejected', {
-                organizationId: signals[left].organizationId,
-                provider: conflictProvider,
-                reasonCode: 'conflicting_provider_external_ids',
-              })
-              return
-            }
-            if (
-              enforcePublicationWindow &&
-              explicitIdsByProvider[leftRoot].size > 0 &&
-              explicitIdsByProvider[rightRoot].size > 0
-            ) {
-              logEvent('canonical_vacancy.merge_rejected', {
-                organizationId: signals[left].organizationId,
-                reasonCode: 'ambiguous_cross_source_strong_ids',
-              })
-              return
-            }
-            if (enforcePublicationWindow) {`,
+            /(    if \(conflictProvider\) \{[\s\S]*?      return\n    \}\n)(    if \(enforcePublicationWindow\) \{)/,
+            `$1    if (\n      enforcePublicationWindow &&\n      explicitIdsByProvider[leftRoot].size > 0 &&\n      explicitIdsByProvider[rightRoot].size > 0\n    ) {\n      logEvent('canonical_vacancy.merge_rejected', {\n        organizationId: signals[left].organizationId,\n        reasonCode: 'ambiguous_cross_source_strong_ids',\n      })\n      return\n    }\n$2`,
+            'union strong-id fence',
           )
-
-          replaceExact(
+          replaceRegex(
             detection,
-            `  const conflictingSameSourceIds =
-            normalizeText(left.source) === normalizeText(right.source) &&
-            Boolean(left.externalVacancyId) &&
-            Boolean(right.externalVacancyId) &&
-            normalizeExternalVacancyId(left.externalVacancyId ?? '') !==
-              normalizeExternalVacancyId(right.externalVacancyId ?? '')
-          return conflictingSameSourceIds ? null : 'fallback'`,
-            `  const leftProvider = normalizeText(left.source)
-          const rightProvider = normalizeText(right.source)
-          const conflictingSameSourceIds =
-            leftProvider === rightProvider &&
-            Boolean(left.externalVacancyId) &&
-            Boolean(right.externalVacancyId) &&
-            normalizeExternalVacancyId(left.externalVacancyId ?? '') !==
-              normalizeExternalVacancyId(right.externalVacancyId ?? '')
-          const ambiguousCrossSourceStrongIds =
-            leftProvider !== rightProvider &&
-            Boolean(left.externalVacancyId) &&
-            Boolean(right.externalVacancyId)
-          return conflictingSameSourceIds || ambiguousCrossSourceStrongIds ? null : 'fallback'`,
+            /  const conflictingSameSourceIds =\n    normalizeText\(left\.source\) === normalizeText\(right\.source\) &&\n    Boolean\(left\.externalVacancyId\) &&\n    Boolean\(right\.externalVacancyId\) &&\n    normalizeExternalVacancyId\(left\.externalVacancyId \?\? ''\) !==\n      normalizeExternalVacancyId\(right\.externalVacancyId \?\? ''\)\n  return conflictingSameSourceIds \? null : 'fallback'/,
+            `  const leftProvider = normalizeText(left.source)\n  const rightProvider = normalizeText(right.source)\n  const conflictingSameSourceIds =\n    leftProvider === rightProvider &&\n    Boolean(left.externalVacancyId) &&\n    Boolean(right.externalVacancyId) &&\n    normalizeExternalVacancyId(left.externalVacancyId ?? '') !==\n      normalizeExternalVacancyId(right.externalVacancyId ?? '')\n  const ambiguousCrossSourceStrongIds =\n    leftProvider !== rightProvider &&\n    Boolean(left.externalVacancyId) &&\n    Boolean(right.externalVacancyId)\n  return conflictingSameSourceIds || ambiguousCrossSourceStrongIds ? null : 'fallback'`,
+            'pairwise strong-id fence',
           )
 
           const lifecycle = 'apps/web/lib/opportunities/canonical-vacancy-lifecycle-repository.ts'
-          replaceExact(
+          replaceRegex(
             lifecycle,
-            `    Math.abs(Date.parse(row.firstSeenAt) - incomingFirstSeenAt) <= CANONICAL_MATCH_WINDOW_MS &&
-            !hasConflictingProviderId(row, vacancy))`,
-            `    Math.abs(Date.parse(row.firstSeenAt) - incomingFirstSeenAt) <= CANONICAL_MATCH_WINDOW_MS &&
-            !hasConflictingProviderId(row, vacancy) &&
-            !hasAmbiguousCrossSourceStrongIdentity(row, vacancy))`,
+            /(    Math\.abs\(Date\.parse\(row\.firstSeenAt\) - incomingFirstSeenAt\) <= CANONICAL_MATCH_WINDOW_MS &&\n    !hasConflictingProviderId\(row, vacancy\))\)/,
+            `$1 &&\n    !hasAmbiguousCrossSourceStrongIdentity(row, vacancy))`,
+            'repository fallback strong-id fence',
+          )
+          replaceRegex(
+            lifecycle,
+            /function normalizeMatchText\(value: string\): string \{/,
+            `function hasAmbiguousCrossSourceStrongIdentity(\n  row: LifecycleRow,\n  vacancy: CanonicalVacancy,\n): boolean {\n  const existingStrongSources = Object.entries(row.sourceExternalIds ?? {})\n    .filter(([, ids]) => ids.length > 0)\n    .map(([source]) => source)\n  if (existingStrongSources.length === 0) return false\n  return vacancy.publications.some((publication) =>\n    Boolean(publication.externalVacancyId) &&\n    existingStrongSources.some((source) => source !== publication.source))\n}\n\nfunction normalizeMatchText(value: string): string {`,
+            'repository ambiguity helper',
           )
 
-          replaceExact(
-            lifecycle,
-            `function normalizeMatchText(value: string): string {`,
-            `function hasAmbiguousCrossSourceStrongIdentity(
-            row: LifecycleRow,
-            vacancy: CanonicalVacancy,
-          ): boolean {
-            const existingStrongSources = Object.entries(row.sourceExternalIds ?? {})
-              .filter(([, ids]) => ids.length > 0)
-              .map(([source]) => source)
-            if (existingStrongSources.length === 0) return false
-            return vacancy.publications.some((publication) =>
-              Boolean(publication.externalVacancyId) &&
-              existingStrongSources.some((source) => source !== publication.source))
-          }
-
-          function normalizeMatchText(value: string): string {`,
+          const registry = 'apps/web/lib/sources/source-registry.ts'
+          replaceRegex(
+            registry,
+            /(id: 'hh',[\s\S]*?requiredEnvVars:) \['HH_USER_AGENT'\]/,
+            `$1 ['HH_USER_AGENT', 'HH_CLIENT_ID', 'HH_CLIENT_SECRET']`,
+            'HH registry credential contract',
           )
           NODE
 
-      - name: Commit matcher hardening
+      - name: Commit correctness hardening
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add apps/web/lib/opportunities/hiring-episode-detection.ts \
-                  apps/web/lib/opportunities/canonical-vacancy-lifecycle-repository.ts
+                  apps/web/lib/opportunities/canonical-vacancy-lifecycle-repository.ts \
+                  apps/web/lib/sources/source-registry.ts
           git diff --cached --check
-          git commit -m 'fix: reject ambiguous cross-source vacancy collisions'
+          git commit -m 'fix: close canonical collision and HH activation gaps'
           git push origin HEAD:codex/free-source-expansion
