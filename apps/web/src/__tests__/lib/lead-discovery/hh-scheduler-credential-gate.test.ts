@@ -5,7 +5,7 @@ describe('HH scheduler credential gate', () => {
     const run = jest.fn(async () => ({
       source: 'hh' as const,
       success: true,
-      outcome: 'fetched' as const,
+      outcome: 'ingested' as const,
       fetchedCount: 1,
       upsertedCount: 1,
     }))
@@ -35,7 +35,7 @@ describe('HH scheduler credential gate', () => {
     const run = jest.fn(async () => ({
       source: 'hh' as const,
       success: true,
-      outcome: 'fetched' as const,
+      outcome: 'ingested' as const,
       fetchedCount: 1,
       upsertedCount: 1,
     }))
@@ -54,6 +54,6 @@ describe('HH scheduler credential gate', () => {
     })
 
     expect(run).toHaveBeenCalledTimes(1)
-    expect(results[0]).toMatchObject({ source: 'hh', outcome: 'fetched' })
+    expect(results[0]).toMatchObject({ source: 'hh', outcome: 'ingested' })
   })
 })
