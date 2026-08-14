@@ -3,6 +3,7 @@
 import { NextRequest } from 'next/server'
 
 import { DELETE, GET, OPTIONS, POST } from '@/app/api/internal/mcp/route'
+import { GET as GET_ROOT_PROTECTED_RESOURCE } from '@/app/.well-known/oauth-protected-resource/route'
 import { GET as GET_PATH_PROTECTED_RESOURCE } from '@/app/.well-known/oauth-protected-resource/api/internal/mcp/route'
 
 const MCP_URL = 'https://recruiter-radar.ru/api/internal/mcp'
@@ -54,12 +55,13 @@ describe('retired Recruiter Radar operator MCP public boundary', () => {
     }
   })
 
-  it('does not publish protected-resource metadata for the retired legacy resource', async () => {
+  it('does not publish protected-resource metadata through either retired legacy alias', async () => {
     process.env.RR_MCP_ENABLED = 'true'
-    const response = await GET_PATH_PROTECTED_RESOURCE()
-    expect(response.status).toBe(404)
-    expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(await response.json()).toEqual({ error: 'not_found' })
+    for (const response of [await GET_ROOT_PROTECTED_RESOURCE(), await GET_PATH_PROTECTED_RESOURCE()]) {
+      expect(response.status).toBe(404)
+      expect(response.headers.get('cache-control')).toBe('no-store')
+      expect(await response.json()).toEqual({ error: 'not_found' })
+    }
   })
 })
 
