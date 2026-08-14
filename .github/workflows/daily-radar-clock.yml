@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Trigger once-per-day radar delivery
+      - name: Trigger fenced once-per-day radar delivery
         run: |
           set -euo pipefail
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
@@ -35,21 +35,51 @@ jobs:
           docker compose exec -T web node --input-type=module - <<'NODE'
           const key = process.env.CRON_API_KEY?.trim()
           if (!key) throw new Error('CRON_API_KEY is not configured in the web runtime.')
-          const response = await fetch('http://127.0.0.1:3000/api/cron/daily-radar', {
-            method: 'POST',
-            headers: { 'x-api-key': key, 'content-type': 'application/json' },
-            body: '{}',
-          })
-          const body = await response.json().catch(() => ({}))
-          if (![200, 207, 422].includes(response.status)) {
+
+          const maxAttempts = 3
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+          let completed = false
+
+          for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+            const response = await fetch('http://127.0.0.1:3000/api/cron/daily-radar', {
+              method: 'POST',
+              headers: { 'x-api-key': key, 'content-type': 'application/json' },
+              body: '{}',
+            })
+            const body = await response.json().catch(() => ({}))
+            console.log(JSON.stringify({
+              attempt,
+              status: response.status,
+              success: body?.success ?? false,
+              skipped: body?.skipped ?? false,
+              reason: body?.reason ?? null,
+              runAttemptCount: body?.data?.attemptCount ?? body?.attemptCount ?? null,
+              durationMs: body?.data?.durationMs ?? null,
+              sent: body?.data?.digest?.totalSent ?? 0,
+            }))
+
+            if (response.status === 200 || response.status === 422) {
+              if (body?.reason === 'retry-backoff' && attempt < maxAttempts) {
+                await sleep(attempt * 60_000)
+                continue
+              }
+              completed = true
+              break
+            }
+
+            if (response.status === 207 || response.status >= 500) {
+              if (attempt < maxAttempts) {
+                await sleep(attempt * 60_000)
+                continue
+              }
+              throw new Error(`daily-radar remained incomplete after ${maxAttempts} bounded attempts (HTTP ${response.status})`)
+            }
+
             throw new Error(`daily-radar returned HTTP ${response.status}`)
           }
-          console.log(JSON.stringify({
-            status: response.status,
-            success: body?.success ?? false,
-            skipped: body?.skipped ?? false,
-            durationMs: body?.data?.durationMs ?? null,
-            sent: body?.data?.digest?.totalSent ?? 0,
-          }))
+
+          if (!completed) {
+            throw new Error('daily-radar did not reach a completed or terminal no-op state')
+          }
           NODE
           SSH_EOF
