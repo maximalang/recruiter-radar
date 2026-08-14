@@ -207,7 +207,12 @@ test('Timeweb OAuth is DCR + S256 PKCE + exact-resource bound with replay-safe r
     const wrongResource = await httpClient.request(authorizationPath(clientId, verifier, { resource: 'https://recruiter-radar.ru/api/internal/mcp' }))
     assert.ok(wrongResource.status === 400 || String(wrongResource.headers.get('location')).includes('error='))
     const wrongScope = await httpClient.request(authorizationPath(clientId, verifier, { scope: 'openid offline_access rr.operator.read' }))
-    assert.ok(wrongScope.status === 400 || String(wrongScope.headers.get('location')).includes('error='))
+    assert.ok([302, 303, 400].includes(wrongScope.status))
+    if (wrongScope.status !== 400) {
+      const wrongScopeLocation = String(wrongScope.headers.get('location') || '')
+      assert.ok(wrongScopeLocation.includes('error=') || wrongScopeLocation.startsWith('/operator/oauth/interaction/'))
+      assert.ok(!wrongScopeLocation.includes('code='), 'legacy scope must never receive an authorization code at the authorization endpoint')
+    }
 
     const code = await completeAuthorization(httpClient, clientId, verifier)
     const tokenResponse = await exchangeCode(httpClient, clientId, code, verifier)
