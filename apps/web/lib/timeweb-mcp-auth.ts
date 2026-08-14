@@ -28,7 +28,7 @@ export function isTimewebMcpConfigured(
   return env.RR_TIMEWEB_MCP_ENABLED === 'true'
     && Boolean(env.RR_TIMEWEB_MCP_TOKEN?.trim())
     && env.RR_MCP_OAUTH_ISSUER?.trim() === TIMEWEB_MCP_OAUTH_ISSUER
-    && env.RR_MCP_ALLOWED_SUBJECTS?.trim() === TIMEWEB_MCP_OWNER_SUBJECT
+    && env.RR_MCP_OAUTH_ALLOWED_SUBJECTS?.trim() === TIMEWEB_MCP_OWNER_SUBJECT
 }
 
 export function getTimewebMcpProtectedResourceMetadata() {
@@ -83,7 +83,7 @@ export async function verifyTimewebMcpAccessToken(
   if (env.RR_MCP_OAUTH_ISSUER?.trim() !== TIMEWEB_MCP_OAUTH_ISSUER) {
     return { ok: false, reason: 'oauth_not_configured' }
   }
-  if (env.RR_MCP_ALLOWED_SUBJECTS?.trim() !== TIMEWEB_MCP_OWNER_SUBJECT) {
+  if (env.RR_MCP_OAUTH_ALLOWED_SUBJECTS?.trim() !== TIMEWEB_MCP_OWNER_SUBJECT) {
     return { ok: false, reason: 'oauth_not_configured' }
   }
   if (!authorization?.startsWith('Bearer ')) return { ok: false, reason: 'missing_bearer_token' }
