@@ -1,0 +1,80 @@
+name: Government Source Clocks
+
+on:
+  schedule:
+    - cron: '5 0 * * *'
+    - cron: '15 1 * * 0'
+    - cron: '15 2 * * 0'
+    - cron: '15 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Government snapshot source to sync
+        required: true
+        type: choice
+        options:
+          - government-procurement
+          - rosstat-open-data
+          - fns-open-data
+          - rospatent-open-data
+
+permissions:
+  contents: read
+
+concurrency:
+  group: government-source-sync-prod
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Resolve scheduled source
+        id: source
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          MANUAL_SOURCE: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = 'workflow_dispatch' ]; then
+            source_id="$MANUAL_SOURCE"
+          else
+            case "$EVENT_SCHEDULE" in
+              '5 0 * * *') source_id='government-procurement' ;;
+              '15 1 * * 0') source_id='rosstat-open-data' ;;
+              '15 2 * * 0') source_id='fns-open-data' ;;
+              '15 3 * * 0') source_id='rospatent-open-data' ;;
+              *) echo "Unknown schedule: $EVENT_SCHEDULE" >&2; exit 64 ;;
+            esac
+          fi
+          echo "source=$source_id" >> "$GITHUB_OUTPUT"
+
+      - name: Setup SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Sync official snapshot
+        env:
+          SOURCE_ID: ${{ steps.source.outputs.source }}
+        run: |
+          set -euo pipefail
+          case "$SOURCE_ID" in
+            fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data) ;;
+            *) echo 'Resolved source is not allowlisted.' >&2; exit 64 ;;
+          esac
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "SOURCE_ID='$SOURCE_ID' bash -s" <<'SSH_EOF'
+          set -euo pipefail
+          case "$SOURCE_ID" in
+            fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data) ;;
+            *) exit 64 ;;
+          esac
+          /opt/recruiter-radar/scripts/deploy/run-government-source-sync.sh "$SOURCE_ID"
+          SSH_EOF
