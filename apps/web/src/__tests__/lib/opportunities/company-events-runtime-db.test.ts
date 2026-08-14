@@ -260,7 +260,7 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
     }, database)
     expect(secondCrossSourceApply).toMatchObject({
       persisted: 0,
-      publicationsAttached: 1,
+      publicationsAttached: 2,
       failed: 0,
     })
 
