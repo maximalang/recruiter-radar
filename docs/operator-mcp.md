@@ -1,214 +1,155 @@
-# Recruiter Radar private Operator MCP
+# Recruiter Radar → Timeweb Cloud MCP bridge
 
-This is the production runbook for the single-owner Recruiter Radar Operator MCP. It is a separate security domain from customer authentication, Better Auth, billing, workspaces and normal Recruiter Radar users.
+This runbook describes the production MCP exposed to ChatGPT after the legacy Recruiter Radar Operator MCP retirement.
 
-## Canonical endpoints
+## Canonical contract
 
-- MCP resource: `https://recruiter-radar.ru/api/internal/mcp`
+- MCP resource: `https://recruiter-radar.ru/api/internal/timeweb-mcp`
 - OAuth issuer: `https://recruiter-radar.ru/operator/oauth`
+- OAuth resource / JWT audience: `https://recruiter-radar.ru/api/internal/timeweb-mcp`
+- OAuth scope: `rr.timeweb.manage`
 - owner subject: `rr_owner`
-- first-rollout scope: `rr.operator.read`
-- RFC 9728 metadata: `https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/internal/mcp`
+- RFC 9728 metadata: `https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/internal/timeweb-mcp`
+- fixed upstream: `https://timeweb.cloud/api/v1/mcp`
+
+The legacy Recruiter Radar MCP resource `https://recruiter-radar.ru/api/internal/mcp` and its protected-resource metadata are intentionally fail-closed with HTTP 404. `RR_MCP_ENABLED=false` and `RR_MCP_MUTATIONS_ENABLED=false` remain production invariants.
 
 ## Architecture
 
 ```text
-ChatGPT
-  -> Caddy TLS boundary
-       -> exact OAuth routes -> 127.0.0.1:3002 -> operator-auth
-       -> MCP + RFC9728     -> 127.0.0.1:3001 -> operator resource server
-                                                   -> rr_operator_ro PostgreSQL
-                                                   -> bounded Unix host-agent
+ChatGPT Web
+  -> recruiter-radar.ru Caddy/TLS
+       -> /operator/oauth/* -> 127.0.0.1:3002 -> isolated operator-auth
+       -> /api/internal/timeweb-mcp -> normal hardened web runtime
+             -> verify Recruiter Radar OAuth JWT
+             -> inject server-only Timeweb Bearer token
+             -> https://timeweb.cloud/api/v1/mcp
 ```
 
-`operator-auth` uses `oidc-provider@9.11.1` and a PostgreSQL adapter. OAuth state is stored only in schema `operator_auth` through login `rr_operator_auth`. That role has no product-table grants and no CREATE privilege on `public`.
+The bridge does not implement or copy Timeweb tools. JSON-RPC/MCP requests are forwarded to the one fixed upstream with only the protocol headers required by MCP. User-supplied upstream URLs, bearer credentials and arbitrary headers are not supported.
 
-The MCP resource server remains a separate Next.js runtime with `rr_operator_ro`. It does not receive OAuth write credentials. The customer-facing web runtime does not receive the host-agent socket or operator DB credentials.
+## OAuth security profile
 
-## OAuth profile
-
-The production profile intentionally keeps the attack surface small:
+The isolated auth service keeps the existing hardened owner model while binding it to the Timeweb resource:
 
 - Authorization Code only;
 - PKCE required, S256 only;
-- `offline_access` + rotating refresh tokens;
-- refresh-token reuse revokes the associated grant family;
-- RFC 8707 resource indicator bound to the exact MCP resource;
-- JWT access tokens signed with persistent ES256 P-256 key(s);
-- `iss`, exact single `aud`, `exp`, `nbf`, sane `iat`, `sub` and scopes validated by the resource server;
-- RFC 9207 authorization-response issuer supported by the provider;
-- revocation endpoint enabled;
-- DCR enabled only as a compatibility fallback for public clients; no client secret, wildcard redirect URI or non-HTTPS redirect is accepted;
-- CIMD disabled for the first rollout because the provider implementation is experimental and therefore not a stable production dependency for this private MCP.
+- DCR for public OAuth clients only;
+- exact HTTPS redirect URIs only;
+- `offline_access` with rotating refresh tokens;
+- refresh/code replay protection through persistent `operator_auth` storage;
+- RFC 8707 exact resource indicator;
+- ES256 / P-256 JWT access tokens;
+- exact `iss`, single `aud`, `sub`, `scope`, expiry and timing validation;
+- persistent signing/cookie keys mounted read-only into auth;
+- public JWKS strips private `d`;
+- Argon2id owner-password verification;
+- persistent IP/account brute-force throttling;
+- CSRF protection and restrictive login/consent response headers;
+- allowlisted structured auth audit fields only.
 
-Implicit, hybrid, password, client-credentials, device flow, CIBA and generic admin scopes are not part of this profile.
+The private signing key exists only in the isolated auth service. The web bridge receives public JWKS through OAuth discovery, never the private signing material.
 
-## Owner model
+## Timeweb API credential
 
-There is exactly one principal: `rr_owner`.
+The deployment source of truth is the GitHub Actions secret:
 
-There is no signup, registration UI, password reset, organization, invitation, social login or linkage to normal Recruiter Radar users. The subject is immutable and is not a secret.
+`RR_TIMEWEB_MCP_TOKEN`
 
-The owner password is never stored. `operator-auth` requires an Argon2id encoded hash supplied through the GitHub Actions secret `RR_MCP_OWNER_PASSWORD_HASH`. The hash is staged as a root-only file during bootstrap and is never printed by the workflow.
+Do not place the token in source control, a `NEXT_PUBLIC_*` variable, ChatGPT, tickets, logs or product tables.
 
-### Initial owner password bootstrap
+`Timeweb MCP Bootstrap` stages the secret through a mode-0600 file, installs it under `/var/lib/recruiter-radar-timeweb/token`, and configures only the server-side web runtime. The bridge replaces any client `Authorization` header with `Bearer <server credential>` when calling the fixed Timeweb MCP upstream.
 
-Run this on a trusted local machine from the exact repository revision you are about to deploy:
+The existing owner-login secret remains:
 
-```bash
-cd operator-auth
-npm ci --no-audit --no-fund
-read -rsp 'Owner password: ' RR_OWNER_PASSWORD; printf '\n'
-printf '%s' "$RR_OWNER_PASSWORD" | node --input-type=module -e '
-  import argon2 from "argon2";
-  let input="";
-  for await (const chunk of process.stdin) input += chunk;
-  process.stdout.write(await argon2.hash(input, {
-    type: argon2.argon2id,
-    memoryCost: 19456,
-    timeCost: 2,
-    parallelism: 1,
-  }));
-' > /tmp/rr-owner-password.hash
-unset RR_OWNER_PASSWORD
-cat /tmp/rr-owner-password.hash | gh secret set RR_MCP_OWNER_PASSWORD_HASH --repo maximalang/recruiter-radar
-rm -f /tmp/rr-owner-password.hash
-```
+`RR_MCP_OWNER_PASSWORD_HASH`
 
-Do not paste the plaintext password into GitHub, a shell command argument, a ticket, ChatGPT, logs or this repository.
+It must contain an Argon2id encoded hash, never the plaintext owner password.
 
-When the secret is absent, `Operator MCP Bootstrap` leaves the MCP fail-dark rather than inventing a credential or falling back to unauthenticated access.
+## Bridge boundary
 
-## Persistent signing and session secrets
+The resource server enforces:
 
-Bootstrap creates these only on the production host when missing:
+- `RR_TIMEWEB_MCP_ENABLED=true` before the route becomes active;
+- fixed upstream `https://timeweb.cloud/api/v1/mcp`;
+- separate Timeweb credential from Recruiter Radar mutation gates;
+- 1 MiB bounded request body;
+- pre-auth and per-subject rate limits;
+- OAuth audience/scope/subject validation;
+- 30 second upstream timeout through `AbortSignal`;
+- `redirect: manual` and rejection of upstream redirects;
+- MCP protocol/session/method/name headers only;
+- upstream HTTP status and response-body passthrough;
+- no arbitrary URL/fetch/command/filesystem/Docker-socket capability;
+- safe audit metadata without request bodies, OAuth tokens or Timeweb credentials.
 
-- `/var/lib/recruiter-radar-operator/auth-secrets/jwks.json`
-- `/var/lib/recruiter-radar-operator/auth-secrets/cookie-keys.json`
+Unauthenticated requests return HTTP 401 with `WWW-Authenticate` pointing to the Timeweb RFC 9728 protected-resource document. A valid token with the wrong scope is rejected separately.
 
-They are root/service-group readable only and mounted read-only into `operator-auth`. They are not regenerated on container restart.
+## Production deployment
 
-### Signing-key rotation
-
-1. Generate a new ES256 P-256 private JWK with a unique `kid` on the host without logging it.
-2. Add it to the private JWK set while retaining the previous active key.
-3. Restart only `operator-auth` through the normal controlled operator bootstrap/deploy path.
-4. Verify JWKS exposes both public keys and new tokens use the new `kid`.
-5. Keep the previous public key until every access token signed with it has exceeded the maximum access-token lifetime plus clock skew.
-6. Remove the old private/public JWK and verify discovery/JWKS again.
-
-Never rotate by deleting the only key before old access tokens expire.
-
-### Cookie-key rotation
-
-Prepend a new high-entropy key to `cookie-keys.json`, retain at least the immediately previous key during the session transition, then recreate `operator-auth`. Do not rotate keys on every deploy.
-
-## Password rotation
-
-Create a new Argon2id hash using the local procedure above, replace `RR_MCP_OWNER_PASSWORD_HASH`, and rerun `Operator MCP Bootstrap` for the current production SHA. Existing OAuth grants should be revoked after a password rotation if credential compromise is suspected.
-
-## Refresh-token revocation
-
-The authorization server exposes its revocation endpoint and persists grants/refresh tokens in `operator_auth`. Rotation is enabled. Reuse of a consumed refresh token causes the provider to revoke the grant family. For an emergency global owner reset, clear the owner’s OAuth grants from the isolated `operator_auth` store through a controlled server administration procedure; do not mutate product tables.
-
-## Login security
-
-The owner login interaction is server-side and uses:
-
-- Argon2id verification;
-- a `Secure`, `HttpOnly`, `SameSite=Strict` CSRF cookie;
-- per-interaction CSRF token;
-- generic invalid-credential response;
-- IP + account failure counters in persistent `operator_auth.login_throttle`;
-- bounded exponential lockout;
-- `Cache-Control: no-store`, frame denial and restrictive CSP;
-- structured audit events with an allowlist of fields.
-
-Passwords, password hashes, authorization codes, JWTs, refresh tokens, private JWKs, cookies and full Authorization headers are not audit fields.
-
-## Resource server and read tools
-
-Unauthenticated MCP requests return HTTP `401` with `WWW-Authenticate` pointing at the path-specific RFC 9728 metadata document. Missing/invalid read scope returns `403`.
-
-With `RR_MCP_MUTATIONS_ENABLED=false`, `tools/list` exposes only:
-
-1. `get_production_state`
-2. `get_system_health`
-3. `get_service_state`
-4. `get_recent_logs`
-5. `get_resource_usage`
-6. `get_reverse_proxy_state`
-7. `get_database_state`
-8. `get_quality_validation_state`
-9. `list_quality_review_targets`
-
-No read tool exposes arbitrary shell, SQL, filesystem, HTTP fetch, environment dump, Docker API or secrets. Database diagnostics execute in explicit read-only transactions.
-
-## Mutation rollout
-
-Keep `RR_MCP_MUTATIONS_ENABLED=false` until real ChatGPT read-only E2E has succeeded.
-
-The only mutation capabilities already designed are:
-
-- `restart_service(web|n8n)` with `rr.operator.restart`;
-- `reload_proxy` with `rr.operator.proxy`.
-
-Before enabling them, separately verify ChatGPT confirmation behavior, scope issuance, audit, idempotency and postconditions. Do not add arbitrary shell/SQL/filesystem/fetch, `docker.sock`, DB/Redis/Firecrawl restart, migrations, deploy or rollback. Deploy/rollback remain GitHub Actions operations.
-
-## Deployment
-
-`Deploy` remains the customer-facing tested-SHA deployment. After a successful `main` Deploy, `Operator MCP Bootstrap` consumes exactly that SHA.
+The normal `Deploy` workflow remains responsible for the tested customer-facing release. After a successful deploy of `main`, `Timeweb MCP Bootstrap` consumes that exact SHA.
 
 The bootstrap:
 
-- builds the exact-SHA `operator-auth` image in GitHub Actions;
-- transfers it and audited bootstrap scripts over the existing SSH deployment channel;
-- maintains `rr_operator_ro` and `rr_operator_auth` as distinct PostgreSQL roles;
-- creates `operator_auth` persistence only;
-- recreates operator services on loopback ports only;
-- preserves the bounded host-agent;
-- installs only the exact Caddy routes needed by MCP/OAuth;
-- validates external RFC 9728, OIDC/RFC 8414/JWKS and unauthenticated MCP behavior when enabled.
+1. validates the exact deployed SHA and the Timeweb deployment scripts;
+2. refuses to continue if `RR_TIMEWEB_MCP_TOKEN` or `RR_MCP_OWNER_PASSWORD_HASH` is absent/invalid;
+3. builds the exact-SHA `operator-auth` image;
+4. transfers scripts, image and protected files over the existing SSH deployment channel;
+5. changes Caddy first so `/api/internal/mcp` is 404 before local legacy services are removed;
+6. starts only the Timeweb OAuth profile on loopback `127.0.0.1:3002`;
+7. removes the legacy operator container and disables the old host agent;
+8. configures the web runtime with `RR_MCP_ENABLED=false`, `RR_MCP_MUTATIONS_ENABLED=false` and `RR_TIMEWEB_MCP_ENABLED=true`;
+9. revalidates Caddy and local health;
+10. verifies public legacy 404, Timeweb RFC 9728 metadata, OAuth discovery, public JWKS, DCR and unauthenticated 401 challenge.
 
-A bootstrap failure does not roll back or patch the already-verified public product release.
+A Timeweb bootstrap failure does not rewrite application code or introduce an unauthenticated fallback.
 
-## ChatGPT setup and acceptance
+## Required production acceptance
 
-In ChatGPT Developer mode, create a custom MCP/app with:
+Before treating the integration as fully accepted, verify:
+
+- legacy `/api/internal/mcp` = 404;
+- legacy protected-resource metadata = 404;
+- Timeweb protected-resource metadata = 200 and exact;
+- OIDC / RFC 8414 discovery = 200;
+- DCR accepts the ChatGPT public client contract;
+- JWKS has ES256 P-256 public keys and no `d`;
+- unauthenticated Timeweb MCP = 401 with the correct `resource_metadata` challenge;
+- owner login + consent issue a JWT for audience `.../timeweb-mcp` and scope `rr.timeweb.manage`;
+- `tools/list` comes from the official Timeweb MCP;
+- at least one clearly read-only Timeweb tool returns real infrastructure data;
+- no Timeweb token appears in response bodies, browser-visible configuration or audit logs.
+
+Do not run destructive Timeweb tools as a smoke test.
+
+## ChatGPT Web setup
+
+Create the custom MCP/app as:
 
 ```text
-https://recruiter-radar.ru/api/internal/mcp
+Name: Timeweb Cloud
+URL: https://recruiter-radar.ru/api/internal/timeweb-mcp
+Authentication: OAuth
 ```
 
-Then complete OAuth owner login and authorization and run Scan Tools.
+Expected flow:
 
-Do not call the system production-ready until the real account/UI has proven:
+```text
+ChatGPT
+  -> protected-resource discovery
+  -> OAuth discovery
+  -> DCR
+  -> owner login
+  -> consent
+  -> resource-bound access token
+  -> Scan Tools
+  -> official Timeweb MCP tools
+```
 
-- Scan Tools succeeds;
-- `tools/list` contains only the nine read tools above;
-- `get_production_state` reports the expected production SHA;
-- `get_system_health`, service status and resource usage return bounded diagnostics;
-- bounded logs remain sanitized/untrusted content;
-- `get_database_state` proves the read-only DB transaction/role;
-- refresh/reconnect works after initial authorization;
-- secrets do not appear in tool output or audit.
+If ChatGPT fails, capture the exact OAuth/MCP contract failure and fix the contract. Do not weaken audience validation, PKCE, DCR redirect validation or the fixed-upstream boundary as a workaround.
 
-If the actual ChatGPT plan/UI cannot complete a supported mode, record that exact product limitation. Do not loosen OAuth or MCP security to work around it.
+## Rollback / emergency disable
 
-## Fail-dark / rollback
+The legacy Recruiter Radar operational MCP must remain disabled during rollback unless a separate security review explicitly reintroduces it.
 
-MCP is visible only when the isolated operator runtime has both `RR_OPERATOR_MODE=true` and a complete valid OAuth configuration. Missing owner hash, signing state, auth persistence or invalid issuer/resource/sub configuration must not result in anonymous MCP access.
-
-To disable the subsystem, remove/rotate the owner hash secret and rerun the normal bootstrap/deploy path so the operator MCP is configured dark. Do not introduce a temporary no-auth path.
-
-## Troubleshooting
-
-- **MCP `404`:** verify bootstrap intentionally enabled the MCP; absence of the owner hash leaves it dark.
-- **MCP `401`:** inspect RFC 9728 metadata, issuer discovery and JWT `iss/aud/sub/scope` without logging the token.
-- **OAuth discovery wrong host/scheme:** verify Caddy `Host`, `X-Forwarded-Host` and `X-Forwarded-Proto=https`; the provider trusts only the loopback proxy boundary.
-- **DCR rejected:** client must be public and use exact HTTPS redirect URIs with Authorization Code.
-- **PKCE rejected:** only S256 is supported.
-- **Refresh rejected after reuse:** expected; refresh-token reuse revokes the grant family and requires fresh authorization.
-- **OAuth state lost after restart:** treat as a persistence incident; `MemoryAdapter` is not a production fallback. Verify `operator_auth` connectivity/role and do not enable anonymous access.
-- **JWT key not found:** verify persistent JWKS and safe overlapping key rotation; do not regenerate keys automatically.
-- **mutations missing:** expected in the read-only rollout.
+For an emergency Timeweb bridge disable, set `RR_TIMEWEB_MCP_ENABLED=false` in the controlled server runtime and recreate the web service; keep the Caddy legacy 404 rule in place. Rotate/revoke the Timeweb API token at Timeweb if compromise is suspected, then replace the GitHub Actions secret before re-enabling.
