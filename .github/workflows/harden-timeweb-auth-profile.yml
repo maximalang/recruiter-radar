@@ -1,21 +1,22 @@
 name: Harden Timeweb auth profile
 
 on:
-  pull_request:
-    types: [synchronize, opened, reopened]
+  push:
+    branches:
+      - feat/timeweb-mcp-oauth-bridge
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.event.pull_request.number == 206 && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: feat/timeweb-mcp-oauth-bridge
           fetch-depth: 0
       - name: Enforce exact authorization resource and scope before provider interaction
         run: |
@@ -23,7 +24,7 @@ jobs:
           from pathlib import Path
           path = Path('operator-auth/src/timeweb-server.js')
           source = path.read_text()
-          needle = "      const interactionMatch = url.pathname.match(/^\\/operator\\/oauth\\/interaction\\/([^/]+)$/)\n"
+          marker = "      const interactionMatch = url.pathname.match("
           block = """      if (req.method === 'GET' && url.pathname === `${OIDC_PREFIX}/auth`) {
             const requestedScopes = new Set(String(url.searchParams.get('scope') ?? '').split(/\\s+/).filter(Boolean))
             const resources = url.searchParams.getAll('resource')
@@ -39,13 +40,12 @@ jobs:
             }
           }
 """
-          if block in source:
-              pass
-          elif needle in source:
-              source = source.replace(needle, block + needle, 1)
+          if block not in source:
+              index = source.find(marker)
+              if index < 0:
+                  raise SystemExit('authorization insertion point not found')
+              source = source[:index] + block + source[index:]
               path.write_text(source)
-          else:
-              raise SystemExit('authorization insertion point not found')
           PY
           node --check operator-auth/src/timeweb-server.js
       - name: Commit hardening and remove this one-shot workflow
@@ -56,4 +56,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "fix(timeweb-mcp): reject wrong OAuth resource and scope early"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          git push origin HEAD:feat/timeweb-mcp-oauth-bridge
