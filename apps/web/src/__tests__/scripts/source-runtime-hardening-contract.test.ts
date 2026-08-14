@@ -79,7 +79,7 @@ describe('source runtime hardening contract', () => {
 
   it('makes daily delivery idempotent and keeps schedule verification honest before merge', () => {
     expect(dailyLeaseMigration).toContain('CREATE TABLE daily_radar_run_state')
-    expect(dailyLeaseMigration).toContain("status IN ('running', 'completed', 'failed')")
+    expect(dailyLeaseMigration).toContain("status IN ('running', 'completed', 'partial', 'failed')")
     expect(dailyLeaseDown).toContain('DROP TABLE IF EXISTS daily_radar_run_state')
     expect(productionPreflight).toContain('"productionScheduled":false')
     expect(productionPreflight).toContain('"scheduleAuthority":"github-actions"')
