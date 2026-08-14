@@ -29,6 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} <<'SSH_EOF'
           set -euo pipefail
           cd /opt/recruiter-radar
@@ -41,15 +42,18 @@ jobs:
             body: '{}',
           })
           const body = await response.json().catch(() => ({}))
-          if (![200, 207, 422].includes(response.status)) {
-            throw new Error(`source-refresh returned HTTP ${response.status}`)
-          }
           console.log(JSON.stringify({
             status: response.status,
             success: body?.success ?? false,
             total: body?.data?.total ?? 0,
+            succeeded: body?.data?.succeeded ?? 0,
             failed: body?.data?.failed ?? 0,
             deferred: body?.data?.deferred ?? 0,
+            credentialGated: body?.data?.credentialGated ?? 0,
+            rateLimited: body?.data?.rateLimited ?? 0,
           }))
+          if (response.status === 200) process.exit(0)
+          if (response.status === 422) process.exit(0)
+          throw new Error(`source-refresh returned HTTP ${response.status}`)
           NODE
           SSH_EOF

@@ -16,6 +16,7 @@ const sourceSchedules = read('apps/web/lib/sources/source-schedules.ts')
 const scheduledRefresh = read('apps/web/lib/lead-discovery/scheduled-source-refresh.ts')
 const sourceClock = read('.github/workflows/source-refresh-clock.yml')
 const dailyClock = read('.github/workflows/daily-radar-clock.yml')
+const dailyRadarRoute = read('apps/web/app/api/cron/daily-radar/route.ts')
 const governmentClocks = read('.github/workflows/government-source-clocks.yml')
 const productionPreflight = read('scripts/deploy/verify-source-production-runtime.sh')
 
@@ -71,6 +72,7 @@ describe('source runtime hardening contract', () => {
     expect(sourceClock).toContain('/api/cron/source-refresh')
     expect(dailyClock).toContain("cron: '15 6 * * *'")
     expect(dailyClock).toContain("cron: '15 9 * * *'")
+    expect(dailyClock).toContain("cron: '15 12 * * *'")
     expect(dailyClock).toContain('/api/cron/daily-radar')
     for (const source of [
       'government-procurement',
@@ -92,5 +94,12 @@ describe('source runtime hardening contract', () => {
     expect(productionPreflight).toContain('"productionScheduled":false')
     expect(productionPreflight).toContain('"scheduleAuthority":"github-actions"')
     expect(productionPreflight).toContain('"scheduleVerification":"external-after-merge"')
+  })
+
+  it('finalizes the day from cumulative profile state instead of the latest invocation', () => {
+    expect(dailyRadarRoute).toContain('summarizeDailyRadarProfiles(lease)')
+    expect(dailyRadarRoute).toContain('profilesRetryable')
+    expect(dailyRadarRoute).toContain('profilesTerminal')
+    expect(dailyRadarRoute).toContain('profilesRunning')
   })
 })

@@ -15,6 +15,7 @@ import {
   claimDailyRadarRun,
   dailyRadarNextRetryAt,
   finishDailyRadarRun,
+  summarizeDailyRadarProfiles,
 } from '@/lib/daily-radar-run-state'
 
 describe('daily radar fenced lease', () => {
@@ -112,5 +113,39 @@ describe('daily radar fenced lease', () => {
       .toBe('2026-08-14T06:16:00.000Z')
     expect(dailyRadarNextRetryAt({ attemptCount: 3 }, 'partial', now)).toBeNull()
     expect(dailyRadarNextRetryAt({ attemptCount: 1 }, 'terminal', now)).toBeNull()
+  })
+
+  test('builds the final day summary from cumulative profile state', async () => {
+    query.mockImplementation(async (sql: string, params: readonly unknown[]) => {
+      expect(sql).toContain('FROM daily_radar_profile_run_state')
+      expect(sql).toContain("status = 'failed_retryable'")
+      expect(sql).toContain("status = 'failed_terminal'")
+      expect(sql).toContain("status = 'running'")
+      expect(params).toEqual(['2026-08-14'])
+      return {
+        rowCount: 1,
+        rows: [{
+          profilesTotal: 2,
+          profilesCompleted: 2,
+          profilesRetryable: 0,
+          profilesTerminal: 0,
+          profilesSkipped: 0,
+          profilesRunning: 0,
+        }],
+      }
+    })
+
+    await expect(summarizeDailyRadarProfiles({
+      runDate: '2026-08-14',
+      persisted: true,
+    })).resolves.toEqual({
+      profilesTotal: 2,
+      profilesCompleted: 2,
+      profilesFailed: 0,
+      profilesRetryable: 0,
+      profilesTerminal: 0,
+      profilesSkipped: 0,
+      profilesRunning: 0,
+    })
   })
 })

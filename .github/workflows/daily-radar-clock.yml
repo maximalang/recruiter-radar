@@ -4,7 +4,22 @@ on:
   schedule:
     - cron: '15 6 * * *'
     - cron: '15 9 * * *'
+    - cron: '15 12 * * *'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Safe readiness verification or explicit real delivery
+        required: true
+        default: verify
+        type: choice
+        options:
+          - verify
+          - deliver
+      confirm:
+        description: Type DELIVER to permit manual delivery
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -30,44 +45,88 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_SCHEDULE: ${{ github.event.schedule }}
+          MANUAL_MODE: ${{ inputs.mode }}
+          MANUAL_CONFIRM: ${{ inputs.confirm }}
         run: |
           set -euo pipefail
           if [ "$EVENT_NAME" = 'workflow_dispatch' ]; then
-            trigger='workflow_dispatch'
+            case "$MANUAL_MODE" in
+              verify)
+                trigger='manual-verify'
+                request_mode='verify'
+                ;;
+              deliver)
+                [ "$MANUAL_CONFIRM" = 'DELIVER' ] || {
+                  echo 'Manual delivery requires confirm=DELIVER.' >&2
+                  exit 64
+                }
+                trigger='manual-deliver'
+                request_mode='deliver'
+                ;;
+              *) echo "Unsupported manual mode: $MANUAL_MODE" >&2; exit 64 ;;
+            esac
           else
             case "$EVENT_SCHEDULE" in
               '15 6 * * *') trigger='primary' ;;
-              '15 9 * * *') trigger='recovery' ;;
+              '15 9 * * *') trigger='recovery-1' ;;
+              '15 12 * * *') trigger='recovery-2' ;;
               *) echo "Unknown schedule: $EVENT_SCHEDULE" >&2; exit 64 ;;
             esac
+            request_mode='scheduled'
           fi
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
-            "DAILY_RADAR_TRIGGER='$trigger' bash -s" <<'SSH_EOF'
+            "DAILY_RADAR_TRIGGER='$trigger' DAILY_RADAR_REQUEST_MODE='$request_mode' bash -s" <<'SSH_EOF'
           set -euo pipefail
           cd /opt/recruiter-radar
-          docker compose exec -T -e DAILY_RADAR_TRIGGER="$DAILY_RADAR_TRIGGER" web node --input-type=module - <<'NODE'
+          docker compose exec -T \
+            -e DAILY_RADAR_TRIGGER="$DAILY_RADAR_TRIGGER" \
+            -e DAILY_RADAR_REQUEST_MODE="$DAILY_RADAR_REQUEST_MODE" \
+            web node --input-type=module - <<'NODE'
           const key = process.env.CRON_API_KEY?.trim()
           if (!key) throw new Error('CRON_API_KEY is not configured in the web runtime.')
+
+          const requestMode = process.env.DAILY_RADAR_REQUEST_MODE
+          const requestBody = requestMode === 'verify'
+            ? { mode: 'verify' }
+            : requestMode === 'deliver'
+              ? { mode: 'deliver', confirm: 'DELIVER' }
+              : {}
 
           const response = await fetch('http://127.0.0.1:3000/api/cron/daily-radar', {
             method: 'POST',
             headers: { 'x-api-key': key, 'content-type': 'application/json' },
-            body: '{}',
+            body: JSON.stringify(requestBody),
           })
           const body = await response.json().catch(() => ({}))
           console.log(JSON.stringify({
             trigger: process.env.DAILY_RADAR_TRIGGER || 'unknown',
-            status: response.status,
+            runDate: body?.runDate ?? null,
+            attempt: body?.data?.attemptCount ?? body?.attemptCount ?? null,
+            status: body?.reason ?? (body?.success === true ? 'completed' : 'failed'),
+            httpStatus: response.status,
             success: body?.success ?? false,
             skipped: body?.skipped ?? false,
             terminal: body?.terminal ?? false,
             reason: body?.reason ?? null,
-            runAttemptCount: body?.data?.attemptCount ?? body?.attemptCount ?? null,
             nextRetryAt: body?.nextRetryAt ?? null,
             durationMs: body?.data?.durationMs ?? null,
+            sourceFailedCount: body?.data?.ingest?.failed ?? 0,
+            credentialGatedCount: body?.data?.ingest?.credentialGated ?? 0,
+            profilesTotal: body?.data?.digest?.profilesTotal ?? 0,
+            profilesCompleted: body?.data?.digest?.profilesCompleted ?? 0,
+            profilesRetryable: body?.data?.digest?.profilesRetryable ?? 0,
+            profilesTerminal: body?.data?.digest?.profilesTerminal ?? 0,
+            profilesSkipped: body?.data?.digest?.profilesSkipped ?? 0,
+            profilesRunning: body?.data?.digest?.profilesRunning ?? 0,
             sent: body?.data?.digest?.totalSent ?? 0,
           }))
+
+          if (requestMode === 'verify') {
+            if (response.status === 200 && body?.success === true && body?.mode === 'verify') process.exit(0)
+            throw new Error(`daily-radar verification failed (HTTP ${response.status})`)
+          }
 
           const cleanNoop = body?.reason === 'retry-backoff'
             || body?.reason === 'already-running'
