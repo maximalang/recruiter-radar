@@ -112,6 +112,15 @@ geography/function expansion, FNS trajectories, procurement acceleration and
 Rospatent changes are derived events, not new raw source IDs. The first observation
 is a baseline and emits no transition.
 
+Supporting sources use persisted `source_scheduler_state` with source-specific cadence,
+global/per-host concurrency, `next_eligible_run_at`, cooldown and credential-gated outcomes.
+Source health compares successful fetch/normalization against that source cadence; expected-zero
+success is healthy and an attempted-but-failed run is never presented as fresh.
+
+Vacancies use canonical identity, publication, observation and lifecycle tables under the
+`canonical_*_v1` contract. Closed/reopened/changed events and 7/14/30-day derived deltas feed
+why-now, scoring, Commercial Signal and Evidence Radar with typed temporal evidence.
+
 `status: active` означает runnable contract, а не одновременно live-configured, legally approved и digest-allowed. Machine-readable source of truth для priority, confidence, lead eligibility и promotion status — `packages/db/source-policy.json`; `packages/db/scripts/source-registry.mjs` проецирует эту policy в runtime readiness и coverage report.
 
 Operational readiness отдельно зафиксирован в `packages/db/source-readiness.json`, а классы

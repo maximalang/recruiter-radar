@@ -25,6 +25,12 @@ The daily dependency order is:
 3. temporal observation and derived-event refresh;
 4. digest generation and entitlement-gated delivery.
 
+The supporting stage is cadence-aware rather than a single unbounded fan-out. It persists
+`next_eligible_run_at`, cooldown and outcome state in `source_scheduler_state`, enforces a
+global concurrency bound plus per-host limits, and treats missing registration credentials
+as inactive/credential-gated rather than a daily-radar failure. HTTP 429 outcomes persist a
+cooldown instead of retrying inside the same run.
+
 Every accepted source record resolves to a company-level organization, then persists signal,
 evidence, and append-only lineage with source ownership, URL/external ID, timestamps,
 extraction method, confidence snapshot, and organization-resolution reason. Personal profiles,
@@ -57,6 +63,12 @@ The daily pipeline also stores `source_temporal_observations` and deterministic
 `source_temporal_derived_events`. Vacancy deltas/reopenings/expansion, FNS trajectories,
 procurement changes, and Rospatent changes are derived events, not new source IDs. A first
 observation is a baseline and produces no false transition.
+
+Vacancy identity and lifecycle are canonicalized separately in `canonical_vacancies_v1`,
+`canonical_vacancy_publications_v1`, `canonical_vacancy_observations_v1`, and
+`canonical_vacancy_events_v1`. Source URLs/publications may differ while one vacancy identity
+remains stable; closed, reopened and changed states feed temporal why-now consumers instead of
+being inferred from a single static snapshot.
 
 ## Verification
 

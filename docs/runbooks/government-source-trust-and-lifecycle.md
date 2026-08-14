@@ -105,6 +105,26 @@ An overlap fails closed instead of running concurrent activation. Cron
 installation and the persistent volume are deployment operations; repository
 delivery alone does not prove that production scheduling is enabled.
 
+The web image stores mutable ETag, cooldown and incremental-crawl state under
+`SOURCE_RUNTIME_STATE_ROOT=/var/lib/recruiter-radar/source-state`. Mount the parent
+`/var/lib/recruiter-radar` as a persistent read-write volume. Do not set a default
+`SOURCE_SNAPSHOT_ROOT` in the image: an explicit, read-write persistent mount is the
+activation boundary for government snapshots.
+
+After installing the two cron entries, run the fail-closed production preflight:
+
+```bash
+/opt/recruiter-radar/scripts/deploy/verify-source-production-runtime.sh
+```
+
+It verifies that both state roots are covered by read-write Docker mounts, the exact
+government cron cadences are installed, all 27 dynamically launched source entrypoints
+and dependencies exist, Chromium and the CA bundles work, the latest source migrations
+and health/lifecycle tables exist, and the authenticated Source Status API returns the
+canonical registry. The deployment workflow runs the same preflight before disarming its
+rollback guard. Repository CI runs an isolated final-image equivalent, but that is not
+evidence that production cron or mounts are currently active.
+
 The 2026-08-13 controlled live proof activated 50 EIS contract records and 96
 Rosstat aggregates in a disposable snapshot root. A fresh isolated
 production-schema database then persisted 25 derived EIS signals/lineage rows

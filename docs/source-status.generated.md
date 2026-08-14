@@ -17,7 +17,7 @@ Canonical sources: 27. Live-verified: 18. Runtime configured or credential-free:
 | lever | P1 | digest-lead-originating | digest-allowed | implemented | not-required | verified | none |
 | rabota-rossii | P1 | confidence-gated-evidence | digest-allowed | implemented | not-required | verified | none |
 | recruitee | P1 | digest-lead-originating | digest-allowed | implemented | not-required | verified | none |
-| smartrecruiters | P1 | digest-lead-originating | blocked-from-digest-pending-confidence-tests | implemented | not-required | verified | none |
+| smartrecruiters | P1 | digest-lead-originating | digest-allowed | implemented | not-required | verified | none |
 | transparent-business-fns | P1 | enrichment-only | never-lead-originating | implemented | provider-required | blocked | No approved stable public API exists; direct pb.nalog.ru scraping is prohibited. |
 | workable | P1 | digest-lead-originating | digest-allowed | implemented | not-required | verified | none |
 | company-site | P2 | enrichment-only | supporting-evidence-only | implemented | launch-required | verified | none |
