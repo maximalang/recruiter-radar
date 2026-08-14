@@ -232,14 +232,24 @@ trap - EXIT
 runtime_args=("${compose_args[@]}" -f "$AUTH_OVERRIDE")
 docker compose --env-file "$ENV_FILE" "${runtime_args[@]}" up -d --force-recreate operator-auth
 
-# Remove the legacy operational MCP runtime and host agent. The source remains in
-# git for rollback/history, but there is no running tool surface on port 3001.
-docker rm -f recruiter-radar-operator-1 >/dev/null 2>&1 || true
-if systemctl list-unit-files rr-operator-agent.service >/dev/null 2>&1; then
-  systemctl disable --now rr-operator-agent.service >/dev/null 2>&1 || true
-fi
+wait_for_auth_health() {
+  local attempt state
+  for attempt in $(seq 1 45); do
+    if curl -fsS --max-time 2 http://127.0.0.1:3002/healthz >/dev/null 2>&1; then
+      return 0
+    fi
+    state="$(docker inspect -f '{{.State.Status}}' "$AUTH_CONTAINER" 2>/dev/null || true)"
+    if [ "$state" = "exited" ] || [ "$state" = "dead" ]; then
+      break
+    fi
+    sleep 1
+  done
+  echo "Timeweb OAuth service did not become ready" >&2
+  docker inspect -f 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$AUTH_CONTAINER" >&2 2>/dev/null || true
+  return 1
+}
+wait_for_auth_health
 
-curl -fsS http://127.0.0.1:3002/healthz >/dev/null
 docker exec "$AUTH_CONTAINER" node -e '
   if (process.env.RR_OPERATOR_AUTH_PROVIDER !== "local_oidc") process.exit(1);
   if (process.env.RR_MCP_OAUTH_ISSUER !== "https://recruiter-radar.ru/operator/oauth") process.exit(1);
@@ -247,6 +257,14 @@ docker exec "$AUTH_CONTAINER" node -e '
   if (process.env.RR_MCP_ALLOWED_SUBJECTS !== "rr_owner") process.exit(1);
   if ((process.env.RR_MCP_OWNER_PASSWORD_HASH || "").startsWith("$argon2id$") !== true) process.exit(1);
 '
+
+# Remove the legacy operational MCP runtime and host agent only after the new
+# OAuth service has passed readiness and its runtime contract is verified.
+docker rm -f recruiter-radar-operator-1 >/dev/null 2>&1 || true
+if systemctl list-unit-files rr-operator-agent.service >/dev/null 2>&1; then
+  systemctl disable --now rr-operator-agent.service >/dev/null 2>&1 || true
+fi
+
 unset owner_hash auth_db_password
 
 echo "Timeweb OAuth service is active; legacy operator runtime is stopped."

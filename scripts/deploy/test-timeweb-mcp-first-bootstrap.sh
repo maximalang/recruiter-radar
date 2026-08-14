@@ -73,4 +73,12 @@ RR_TIMEWEB_MCP_TOKEN_FILE="$TOKEN_FILE" \
 test ! -e "$APP_DIR/.rr-timeweb-mcp.compose.yml"
 grep -Fxq 'COMPOSE_FILE=compose.yml' "$APP_DIR/.env"
 
-echo "Timeweb clean first-bootstrap preflight passed."
+# The real apply path must tolerate the OAuth container's startup window and
+# must not remove the legacy runtime until OAuth readiness is established.
+grep -Fq 'for attempt in $(seq 1 45); do' "$AUTH_SCRIPT"
+grep -Fq 'curl -fsS --max-time 2 http://127.0.0.1:3002/healthz' "$AUTH_SCRIPT"
+wait_line="$(grep -n '^wait_for_auth_health$' "$AUTH_SCRIPT" | cut -d: -f1)"
+legacy_line="$(grep -n '^docker rm -f recruiter-radar-operator-1' "$AUTH_SCRIPT" | cut -d: -f1)"
+[ -n "$wait_line" ] && [ -n "$legacy_line" ] && [ "$wait_line" -lt "$legacy_line" ]
+
+echo "Timeweb clean first-bootstrap preflight and readiness guards passed."
