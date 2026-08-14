@@ -77,6 +77,11 @@ async function proxyTimewebMcp(request: Request): Promise<Response> {
     })
   }
 
+  const contentLength = Number(request.headers.get('content-length') ?? 0)
+  if (Number.isFinite(contentLength) && contentLength > TIMEWEB_MCP_MAX_BODY_BYTES) {
+    return NextResponse.json({ error: 'request_too_large' }, { status: 413, headers: baseHeaders })
+  }
+
   const auth = await verifyTimewebMcpAccessToken(request.headers.get('authorization'))
   if (!auth.ok) {
     const insufficientScope = auth.reason === 'insufficient_scope'
@@ -97,11 +102,6 @@ async function proxyTimewebMcp(request: Request): Promise<Response> {
       status: 429,
       headers: { ...baseHeaders, 'Retry-After': String(subjectLimit.retryAfterSeconds) },
     })
-  }
-
-  const contentLength = Number(request.headers.get('content-length') ?? 0)
-  if (Number.isFinite(contentLength) && contentLength > TIMEWEB_MCP_MAX_BODY_BYTES) {
-    return NextResponse.json({ error: 'request_too_large' }, { status: 413, headers: baseHeaders })
   }
 
   let body: ArrayBuffer | undefined
