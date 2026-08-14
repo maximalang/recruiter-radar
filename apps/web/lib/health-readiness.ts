@@ -1,5 +1,5 @@
 export const EXPECTED_LATEST_MIGRATION =
-  '20260814050000_add_source_scheduler_state'
+  '20260814070000_add_daily_radar_run_lease'
 
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/
 
