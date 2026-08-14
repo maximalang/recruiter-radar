@@ -41,7 +41,9 @@ if [ -z "$configured_compose_files" ]; then
 fi
 if [ -n "$configured_compose_files" ]; then
   IFS=':' read -r -a compose_files <<< "$configured_compose_files"
-  for compose_file in "${compose_files[@]}"; do [ -n "$compose_file" ] && compose_args+=(-f "$compose_file"); done
+  for compose_file in "${compose_files[@]}"; do
+    if [ -n "$compose_file" ]; then compose_args+=(-f "$compose_file"); fi
+  done
 else
   base_compose=""
   for candidate in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
