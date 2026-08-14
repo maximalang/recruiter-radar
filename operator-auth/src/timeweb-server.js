@@ -171,7 +171,18 @@ export async function createTimewebAuthServer() {
     findAccount(_ctx, id) { if (id !== OWNER_SUB) return undefined; return { accountId: OWNER_SUB, async claims() { return { sub: OWNER_SUB } } } },
     idTokenSigningAlgValues: ['ES256'],
     interactions: { url(_ctx, interaction) { return `${OIDC_PREFIX}/interaction/${interaction.uid}` } },
-    issueRefreshToken(_ctx, client, code) { return client.grantTypeAllowed('refresh_token') && code.scopes.has('offline_access') },
+    // ChatGPT caches OAuth discovery/client metadata for an existing Dev App. A reconnect
+    // can therefore repeat an authorization request created before offline_access was seen.
+    // This provider is isolated to the single Timeweb MCP resource and DCR always grants
+    // refresh_token, so issue a renewable session after successful Timeweb authorization
+    // even when that cached request omitted the OIDC offline_access hint.
+    issueRefreshToken(_ctx, client, code) {
+      const renewable = client.grantTypeAllowed('refresh_token')
+      if (renewable && !code.scopes.has('offline_access')) {
+        safeAudit('refresh_compatibility_path', { client_id: client.clientId ?? '', reason: 'offline_access_not_requested' })
+      }
+      return renewable
+    },
     jwks,
     pkce: { required() { return true } },
     routes: { authorization: `${OIDC_PREFIX}/auth`, jwks: `${OIDC_PREFIX}/jwks`, registration: `${OIDC_PREFIX}/reg`, revocation: `${OIDC_PREFIX}/token/revocation`, token: `${OIDC_PREFIX}/token` },
@@ -182,6 +193,20 @@ export async function createTimewebAuthServer() {
   provider.proxy = true
   provider.on('authorization.success', (ctx) => safeAudit('authorization_granted', { client_id: ctx.oidc?.client?.clientId ?? '', subject: OWNER_SUB }))
   provider.on('grant.success', (ctx) => { if (ctx.oidc?.params?.grant_type === 'refresh_token') safeAudit('token_refresh', { client_id: ctx.oidc?.client?.clientId ?? '', grant_type: 'refresh_token' }) })
+  provider.on('grant.error', (ctx, error) => {
+    if (ctx.oidc?.params?.grant_type === 'refresh_token') {
+      safeAudit('token_refresh_failed', {
+        client_id: ctx.oidc?.client?.clientId ?? '',
+        grant_type: 'refresh_token',
+        reason: error?.error || error?.message || 'unknown_refresh_error',
+      })
+    }
+  })
+  provider.on('refresh_token.consumed', (token) => safeAudit('refresh_token_rotated', { client_id: token?.clientId ?? '' }))
+  provider.on('grant.revoked', (ctx) => safeAudit('grant_revoked', {
+    client_id: ctx.oidc?.client?.clientId ?? '',
+    reason: ctx.oidc?.params?.grant_type === 'refresh_token' ? 'refresh_token_reuse_or_revocation' : 'revoked',
+  }))
   provider.on('revocation.success', (ctx) => safeAudit('token_revoked', { client_id: ctx.oidc?.client?.clientId ?? '' }))
   provider.on('client.created', (client) => safeAudit('client_registered', { client_id: client.clientId ?? '' }))
   const providerCallback = provider.callback()
