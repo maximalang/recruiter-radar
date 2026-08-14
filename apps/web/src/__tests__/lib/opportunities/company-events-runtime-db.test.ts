@@ -31,6 +31,7 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
     organizationId = organization.rows[0].id
 
     const canonicalVacancyUrl = `https://company.example.invalid/${token}/career/java`
+    const hhVacancyUrl = `${canonicalVacancyUrl}?utm_source=hh`
     const signals = await database.query<{
       id: string
       source: string
@@ -52,7 +53,7 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
          external_id AS "externalId", payload`,
       [
         organizationId,
-        canonicalVacancyUrl,
+        hhVacancyUrl,
         canonicalVacancyUrl,
       ],
     )
@@ -66,7 +67,7 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
        RETURNING id::TEXT AS id, source`,
       [
         organizationId,
-        canonicalVacancyUrl,
+        hhVacancyUrl,
         canonicalVacancyUrl,
         'a'.repeat(63) + '1',
         'b'.repeat(63) + '2',
@@ -232,7 +233,7 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
       failed: 0,
     })
 
-    const secondCrossSourceUrl = secondUrl
+    const secondCrossSourceUrl = `${secondUrl}?utm_source=hh`
     await database.query(
       `INSERT INTO signals (
          org_id, signal_type, source, external_id, headline, source_url,
@@ -260,7 +261,7 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
     }, database)
     expect(secondCrossSourceApply).toMatchObject({
       persisted: 0,
-      publicationsAttached: 2,
+      publicationsAttached: 1,
       failed: 0,
     })
 
