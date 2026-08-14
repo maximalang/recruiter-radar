@@ -145,7 +145,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     id: 'career-pages',
     name: 'Career Pages',
     description: 'Company career page crawl and enrichment',
-    script: 'source-career-pages.mjs',
+    script: 'source-career-pages-runtime.mjs',
     requiredEnvVars: [],
     envPrefixes: ['CRAWLER_', 'FIRECRAWL_', 'CAREER_PAGES_'],
     searchEnvVars: [],
@@ -282,7 +282,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     requiredEnvVars: [],
     envPrefixes: ['COMPANY_NEWSROOMS_'],
     // COMPANY_NEWSROOMS_TARGETS_FILE is a searchEnvVar so it is EXCLUDED from
-    // the caller env whitelist and instead derived from the DB (same contract
+    // caller env whitelist and instead derived from the DB (same contract
     // as company-site): source-ingest selects orgs the radar is already
     // tracking (domain/website_url + a hiring signal), writes them to a temp
     // .cache/ file as the JSON array the script `existsSync`s, and injects the
