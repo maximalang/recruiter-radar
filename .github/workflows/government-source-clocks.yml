@@ -69,6 +69,7 @@ jobs:
             *) echo 'Resolved source is not allowlisted.' >&2; exit 64 ;;
           esac
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
             "SOURCE_ID='$SOURCE_ID' bash -s" <<'SSH_EOF'
           set -euo pipefail

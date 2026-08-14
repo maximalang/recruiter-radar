@@ -33,6 +33,7 @@ import {
   heartbeatDailyRadarRun,
   recordDailyRadarSourceRefreshResult,
   recordDailyRadarTemporalResult,
+  summarizeDailyRadarProfiles,
   type DailyRadarLease,
 } from '@/lib/daily-radar-run-state'
 import { logEvent, logWarn } from '@/lib/runtime'
@@ -75,6 +76,74 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { success: false, error: 'Invalid or missing x-api-key header.' },
       { status: 401 }
+    )
+  }
+
+  let payload: Record<string, unknown>
+  try {
+    const parsed = await request.json()
+    payload = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {}
+  } catch {
+    return NextResponse.json(
+      { success: false, error: 'Request body must be valid JSON.' },
+      { status: 400 },
+    )
+  }
+
+  if (payload.mode === 'verify') {
+    const pool = getPool()
+    if (!pool) {
+      return NextResponse.json(
+        { success: false, mode: 'verify', error: 'Database runtime is not configured.' },
+        { status: 503 },
+      )
+    }
+    let readiness
+    try {
+      readiness = await pool.query<{
+        runStateReady: boolean
+        profileStateReady: boolean
+      }>(
+        `SELECT
+           to_regclass('daily_radar_run_state') IS NOT NULL AS "runStateReady",
+           to_regclass('daily_radar_profile_run_state') IS NOT NULL AS "profileStateReady"`,
+      )
+    } catch {
+      logWarn('daily_radar.verify_failed', { reason: 'database_unavailable' })
+      return NextResponse.json(
+        { success: false, mode: 'verify', error: 'Database readiness check failed.' },
+        { status: 503 },
+      )
+    }
+    const schedulerStateReady = readiness.rows[0]?.runStateReady === true
+      && readiness.rows[0]?.profileStateReady === true
+    if (!schedulerStateReady) {
+      return NextResponse.json(
+        { success: false, mode: 'verify', error: 'Daily Radar scheduler state is not ready.' },
+        { status: 503 },
+      )
+    }
+    const result = {
+      success: true,
+      mode: 'verify',
+      data: { runtime: 'ready', database: 'ready', schedulerState: 'ready' },
+    }
+    logEvent('daily_radar.verify', result.data)
+    return NextResponse.json(result, { status: 200 })
+  }
+
+  if (payload.mode === 'deliver' && payload.confirm !== 'DELIVER') {
+    return NextResponse.json(
+      { success: false, error: 'Manual delivery requires confirm=DELIVER.' },
+      { status: 400 },
+    )
+  }
+  if (payload.mode !== undefined && payload.mode !== 'deliver') {
+    return NextResponse.json(
+      { success: false, error: 'Unsupported Daily Radar mode.' },
+      { status: 400 },
     )
   }
 
@@ -127,6 +196,9 @@ export async function POST(request: NextRequest) {
       total: ingestResults.length,
       succeeded: ingestResults.filter(r => r.success).length,
       failed: ingestResults.filter(r => !r.success).length,
+      deferred: ingestResults.filter(r => r.outcome === 'deferred').length,
+      credentialGated: ingestResults.filter(r => r.outcome === 'credential-gated').length,
+      rateLimited: ingestResults.filter(r => r.outcome === 'rate-limited').length,
       fetchedTotal: ingestResults.reduce((sum, r) => sum + (r.fetchedCount ?? 0), 0),
       upsertedTotal: ingestResults.reduce((sum, r) => sum + (r.upsertedCount ?? 0), 0),
       outcomes: ingestResults.reduce<Record<string, number>>((counts, result) => {
@@ -158,7 +230,7 @@ export async function POST(request: NextRequest) {
     }
 
     const digestResults = await generateAndDeliverDigests(lease)
-    const digestOk = digestResults.every(r => r.ok)
+    const invocationDigestOk = digestResults.every(r => r.ok)
     const digestSummary = {
       total: digestResults.length,
       succeeded: digestResults.filter(r => r.ok).length,
@@ -171,17 +243,31 @@ export async function POST(request: NextRequest) {
       profilesSkipped: digestResults.filter(r => r.ok && r.sent === 0).length,
     }
 
-    const allOk = ingestOk && temporalResult.success && digestOk
+    const profileSummary = lease.persisted
+      ? await summarizeDailyRadarProfiles(lease)
+      : {
+          profilesTotal: digestSummary.total,
+          profilesCompleted: digestSummary.profilesCompleted,
+          profilesFailed: digestSummary.failed,
+          profilesRetryable: digestSummary.retryableFailed,
+          profilesTerminal: digestSummary.terminal,
+          profilesSkipped: digestSummary.profilesSkipped,
+          profilesRunning: 0,
+        }
+    const cumulativeDigestOk = profileSummary.profilesRetryable === 0
+      && profileSummary.profilesTerminal === 0
+      && profileSummary.profilesRunning === 0
+    const allOk = ingestOk && temporalResult.success && cumulativeDigestOk
     const durationMs = Date.now() - startMs
 
     const finalStatus = resolveDailyRadarFinalStatus({
       allOk,
       attemptCount: lease.attemptCount,
-      terminalProfiles: digestSummary.terminal,
-      retryableFailedProfiles: digestSummary.retryableFailed,
+      terminalProfiles: profileSummary.profilesTerminal,
+      retryableFailedProfiles: profileSummary.profilesRetryable + profileSummary.profilesRunning,
     })
     const terminalReason = finalStatus === 'terminal'
-      ? digestSummary.terminal > 0 ? 'terminal_profile_delivery' : 'daily_attempt_limit_reached'
+      ? profileSummary.profilesTerminal > 0 ? 'terminal_profile_delivery' : 'daily_attempt_limit_reached'
       : null
 
     const finishedAt = new Date()
@@ -192,10 +278,10 @@ export async function POST(request: NextRequest) {
       finalStatus,
       finishedAt,
       {
-        profilesTotal: digestSummary.total,
-        profilesCompleted: digestSummary.profilesCompleted,
-        profilesFailed: digestSummary.failed,
-        profilesSkipped: digestSummary.profilesSkipped,
+        profilesTotal: profileSummary.profilesTotal,
+        profilesCompleted: profileSummary.profilesCompleted,
+        profilesFailed: profileSummary.profilesFailed,
+        profilesSkipped: profileSummary.profilesSkipped,
         terminalReason,
       },
     )
@@ -212,12 +298,14 @@ export async function POST(request: NextRequest) {
       temporalOk: temporalResult.success,
       temporalObservations: temporalResult.observations,
       temporalEvents: temporalResult.derivedEvents,
-      digestOk: digestSummary.succeeded,
+      digestOk: invocationDigestOk,
       digestTotal: digestSummary.total,
-      profilesTotal: digestSummary.total,
-      profilesCompleted: digestSummary.profilesCompleted,
-      profilesFailed: digestSummary.failed,
-      profilesSkipped: digestSummary.profilesSkipped,
+      profilesTotal: profileSummary.profilesTotal,
+      profilesCompleted: profileSummary.profilesCompleted,
+      profilesRetryable: profileSummary.profilesRetryable,
+      profilesTerminal: profileSummary.profilesTerminal,
+      profilesSkipped: profileSummary.profilesSkipped,
+      profilesRunning: profileSummary.profilesRunning,
       sent: digestSummary.totalSent,
       nextRetryAt,
       terminalReason,
@@ -237,6 +325,7 @@ export async function POST(request: NextRequest) {
       success: allOk,
       terminal: finalStatus === 'terminal',
       reason: finalStatus === 'terminal' ? 'terminal' : finalStatus,
+      runDate: lease.runDate,
       nextRetryAt,
       data: {
         startedAt: new Date(startMs).toISOString(),
@@ -245,16 +334,22 @@ export async function POST(request: NextRequest) {
         attemptCount: lease.attemptCount,
         ingest: { ok: ingestOk, ...ingestSummary, details: ingestResults },
         temporal: { ok: temporalResult.success, ...temporalResult },
-        digest: { ok: digestOk, ...digestSummary, details: digestResults },
+        digest: { ok: cumulativeDigestOk, ...digestSummary, ...profileSummary, details: digestResults },
       },
     }, { status: allOk ? 200 : finalStatus === 'terminal' ? 409 : 207 })
   } catch {
     const terminal = lease.attemptCount >= 3
+    const failureSummary = lease.persisted
+      ? await summarizeDailyRadarProfiles(lease).catch(() => null)
+      : null
     await finishDailyRadarRun(
       lease,
       terminal ? 'terminal' : 'failed',
       new Date(),
-      { profilesTotal: 0, profilesCompleted: 0, profilesFailed: 0, profilesSkipped: 0,
+      { profilesTotal: failureSummary?.profilesTotal ?? 0,
+        profilesCompleted: failureSummary?.profilesCompleted ?? 0,
+        profilesFailed: failureSummary?.profilesFailed ?? 0,
+        profilesSkipped: failureSummary?.profilesSkipped ?? 0,
         terminalReason: terminal ? 'daily_attempt_limit_reached' : null },
     ).catch(() => undefined)
     logWarn('daily_radar.pipeline_failed', {
@@ -270,6 +365,8 @@ export async function POST(request: NextRequest) {
         success: false,
         terminal,
         reason: terminal ? 'terminal' : 'failed',
+        runDate: lease.runDate,
+        attemptCount: lease.attemptCount,
         error: 'Daily radar pipeline failed',
       },
       { status: terminal ? 409 : 500 }
@@ -345,20 +442,6 @@ export async function generateAndDeliverDigests(
   const results: DigestDeliveryResult[] = []
 
   for (const profile of profiles.rows) {
-    if (!shouldDeliverOnRun(
-      profile.delivery_frequency === 'weekly' ? 'weekly' : 'daily',
-      runUtc,
-    )) {
-      results.push({
-        clientProfileId: profile.id,
-        ok: true,
-        sent: 0,
-        failed: 0,
-        skipped: 1,
-      })
-      continue
-    }
-
     if (!await heartbeatDailyRadarRun(lease)) {
       throw new Error('Daily radar lease ownership was lost during profile delivery.')
     }
@@ -388,6 +471,23 @@ export async function generateAndDeliverDigests(
           error: `Profile delivery is not claimable (status=${profileLease.status}, attempts=${profileLease.attemptCount}).`,
         })
       }
+      continue
+    }
+
+    if (!shouldDeliverOnRun(
+      profile.delivery_frequency === 'weekly' ? 'weekly' : 'daily',
+      runUtc,
+    )) {
+      if (!await finishDailyRadarProfile(profileLease, 'skipped')) {
+        throw new Error('Daily radar profile lease ownership was lost before skip finalization.')
+      }
+      results.push({
+        clientProfileId: profile.id,
+        ok: true,
+        sent: 0,
+        failed: 0,
+        skipped: 1,
+      })
       continue
     }
 

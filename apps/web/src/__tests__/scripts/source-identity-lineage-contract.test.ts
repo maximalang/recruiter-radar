@@ -69,6 +69,8 @@ describe('source identity and evidence lineage contract', () => {
     const runtime = readFileSync(runtimePath, 'utf8')
 
     expect(runtime).toContain('resolveOrganizationOwner')
+    expect(runtime).toContain('isOrganizationIdentityConflict')
+    expect(runtime).toContain('organizationResolutionRejects')
     expect(runtime).toContain('assertOrgSourceRefOwner')
     expect(runtime).toContain('upsertSignalEvidenceLineage')
     expect(runtime).toContain("evidenceRole === 'primary_platform' ? 'corroboration' : 'context'")

@@ -59,6 +59,7 @@ async function verifyFilesystem() {
     ...runtimeSupportScripts.map((name) => `packages/db/scripts/${name}`),
     ...governmentSyncScripts.map((name) => `packages/db/scripts/${name}`),
     ...requiredMigrationFiles.map((name) => `packages/db/migrations/${name}`),
+    'packages/db/industry-media-feed-registry.json',
     '/etc/ssl/certs/ca-certificates.crt',
     '/etc/ssl/certs/russian-trusted-ca-bundle.pem',
   ];

@@ -23,6 +23,22 @@ test('tracks fetch and normalization success from the requested action', () => {
   assert.equal(pipeline.normalizationSucceeded, true);
 });
 
+test('excludes fail-closed organization identity rejects from accepted records', () => {
+  const metrics = buildSourceRunMetrics({
+    sourceId: 'company-newsrooms',
+    action: 'pipeline',
+    startedAt: 100,
+    completedAt: 200,
+    input: {
+      recordsReceived: 3,
+      normalizedRecords: [{}, {}, {}],
+      organizationResolutionRejects: 1,
+    },
+  });
+  assert.equal(metrics.recordsAccepted, 2);
+  assert.equal(metrics.organizationResolutionRejects, 1);
+});
+
 test('persists append-only run and updates consecutive-failure projection', async () => {
   const queries = [];
   await recordSourceRunObservation({ query: async (sql, values) => { queries.push({ sql, values }); } }, buildSourceRunMetrics({ sourceId: 'hh', action: 'fetch', startedAt: 100, completedAt: 200, error: new Error('HTTP 429 rate limited') }));

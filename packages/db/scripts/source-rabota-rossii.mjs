@@ -73,6 +73,7 @@ const runtime = createStandardSourceRuntime({
       pagesFetched: input.pagesFetched,
       regionsFetched: input.regionsFetched,
       apiTotal: input.apiTotal,
+      zeroReason: input.zeroReason ?? undefined,
     }
     : {},
 });
@@ -218,6 +219,7 @@ export async function resolveRabotaRossiiLiveInput({ searchText, regionCode, reg
       pagesFetched,
       regionsFetched: regions.length,
       apiTotal,
+      zeroReason: records.length === 0 ? 'no-vacancies-for-query' : null,
     },
   });
 }

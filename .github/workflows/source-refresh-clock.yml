@@ -29,27 +29,57 @@ jobs:
         run: |
           set -euo pipefail
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} <<'SSH_EOF'
           set -euo pipefail
           cd /opt/recruiter-radar
           docker compose exec -T web node --input-type=module - <<'NODE'
+          const http = await import('node:http')
+          const SOURCE_REFRESH_CLIENT_TIMEOUT_MS = 15 * 60 * 1000
           const key = process.env.CRON_API_KEY?.trim()
           if (!key) throw new Error('CRON_API_KEY is not configured in the web runtime.')
-          const response = await fetch('http://127.0.0.1:3000/api/cron/source-refresh', {
-            method: 'POST',
-            headers: { 'x-api-key': key, 'content-type': 'application/json' },
-            body: '{}',
+          const payload = '{}'
+          const response = await new Promise((resolve, reject) => {
+            const request = http.request({
+              hostname: '127.0.0.1',
+              port: 3000,
+              path: '/api/cron/source-refresh',
+              method: 'POST',
+              headers: {
+                'x-api-key': key,
+                'content-type': 'application/json',
+                'content-length': Buffer.byteLength(payload),
+              },
+            }, (incoming) => {
+              let rawBody = ''
+              incoming.setEncoding('utf8')
+              incoming.on('data', (chunk) => { rawBody += chunk })
+              incoming.on('error', reject)
+              incoming.on('end', () => {
+                let body = {}
+                try { body = JSON.parse(rawBody) } catch {}
+                resolve({ status: incoming.statusCode ?? 0, body })
+              })
+            })
+            request.setTimeout(SOURCE_REFRESH_CLIENT_TIMEOUT_MS, () => {
+              request.destroy(new Error('source-refresh client timeout'))
+            })
+            request.on('error', reject)
+            request.end(payload)
           })
-          const body = await response.json().catch(() => ({}))
-          if (![200, 207, 422].includes(response.status)) {
-            throw new Error(`source-refresh returned HTTP ${response.status}`)
-          }
+          const body = response.body
           console.log(JSON.stringify({
             status: response.status,
             success: body?.success ?? false,
             total: body?.data?.total ?? 0,
+            succeeded: body?.data?.succeeded ?? 0,
             failed: body?.data?.failed ?? 0,
             deferred: body?.data?.deferred ?? 0,
+            credentialGated: body?.data?.credentialGated ?? 0,
+            rateLimited: body?.data?.rateLimited ?? 0,
           }))
+          if (response.status === 200) process.exit(0)
+          if (response.status === 422) process.exit(0)
+          throw new Error(`source-refresh returned HTTP ${response.status}`)
           NODE
           SSH_EOF

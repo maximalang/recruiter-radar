@@ -66,6 +66,11 @@ try {
 
 async function persistTargetRunObservations({ summary, startedAt, completedAt }) {
   const targetResults = Array.isArray(summary.targetResults) ? summary.targetResults : [];
+  const identityRejectedTargetKeys = new Set(
+    Array.isArray(summary.organizationResolutionRejectedTargetKeys)
+      ? summary.organizationResolutionRejectedTargetKeys.map(nonEmptyText).filter(Boolean)
+      : [],
+  );
   if (targetResults.length === 0) return;
 
   const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -116,12 +121,15 @@ async function persistTargetRunObservations({ summary, startedAt, completedAt })
         continue;
       }
       const provenanceSource = resolveTargetProvenanceSource(result, target);
-      const targetOutcome = nonEmptyText(result?.outcome) ?? 'unknown';
-      const outcome = classifyTargetOutcome(result, targetOutcome);
+      const identityRejected = identityRejectedTargetKeys.has(targetKey);
+      const targetOutcome = identityRejected
+        ? 'organization-identity-conflict'
+        : nonEmptyText(result?.outcome) ?? 'unknown';
+      const outcome = identityRejected ? 'failure' : classifyTargetOutcome(result, targetOutcome);
       const recordsFetched = nonNegativeInteger(result?.recordsFetched);
       const latencyMs = nonNegativeInteger(result?.durationMs);
       const extractionMethod = nonEmptyText(result?.extractionMethod) ?? 'unknown';
-      const errorCode = nonEmptyText(result?.errorCategory)
+      const errorCode = identityRejected ? 'organization-identity-conflict' : nonEmptyText(result?.errorCategory)
         ?? (outcome === 'success' ? null : targetOutcome);
 
       await client.query(

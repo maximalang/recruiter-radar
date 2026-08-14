@@ -96,6 +96,7 @@ COPY --from=builder /app/packages/db/scripts/sync-rosstat-open-data-snapshot.mjs
 COPY --from=builder /app/packages/db/scripts/sync-rospatent-open-data-snapshot.mjs ./packages/db/scripts/sync-rospatent-open-data-snapshot.mjs
 COPY --from=builder /app/packages/db/scripts/adapters/government-ca-runtime.mjs ./packages/db/scripts/adapters/government-ca-runtime.mjs
 COPY --from=builder /app/packages/db/source-policy.json ./packages/db/source-policy.json
+COPY --from=builder /app/packages/db/industry-media-feed-registry.json ./packages/db/industry-media-feed-registry.json
 
 # The daily radar launches temporal derivation as a child process after source
 # ingestion. Keep the entrypoint and pure derivation dependency explicit because

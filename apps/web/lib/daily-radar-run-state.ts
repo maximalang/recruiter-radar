@@ -12,6 +12,12 @@ export interface DailyRadarRunSummary {
   terminalReason?: string | null
 }
 
+export interface DailyRadarProfileSummary extends DailyRadarRunSummary {
+  profilesRetryable: number
+  profilesTerminal: number
+  profilesRunning: number
+}
+
 export interface DailyRadarLease {
   acquired: boolean
   runDate: string
@@ -406,4 +412,46 @@ export async function finishDailyRadarProfile(
     ],
   )
   return result.rowCount === 1
+}
+
+export async function summarizeDailyRadarProfiles(
+  lease: Pick<DailyRadarLease, 'runDate' | 'persisted'>,
+): Promise<DailyRadarProfileSummary> {
+  if (!lease.persisted) {
+    throw new Error('Cumulative Daily Radar summary requires persisted scheduler state.')
+  }
+  const pool = getPool()
+  if (!pool) throw new Error('DATABASE_URL is not set.')
+  const result = await pool.query<{
+    profilesTotal: number
+    profilesCompleted: number
+    profilesRetryable: number
+    profilesTerminal: number
+    profilesSkipped: number
+    profilesRunning: number
+  }>(
+    `SELECT
+       COUNT(*)::INT AS "profilesTotal",
+       (COUNT(*) FILTER (WHERE status = 'completed'))::INT AS "profilesCompleted",
+       (COUNT(*) FILTER (WHERE status = 'failed_retryable'))::INT AS "profilesRetryable",
+       (COUNT(*) FILTER (WHERE status = 'failed_terminal'))::INT AS "profilesTerminal",
+       (COUNT(*) FILTER (WHERE status = 'skipped'))::INT AS "profilesSkipped",
+       (COUNT(*) FILTER (WHERE status = 'running'))::INT AS "profilesRunning"
+     FROM daily_radar_profile_run_state
+     WHERE run_date = $1::DATE`,
+    [lease.runDate],
+  )
+  const row = result.rows[0]
+  const profilesRetryable = Number(row?.profilesRetryable ?? 0)
+  const profilesTerminal = Number(row?.profilesTerminal ?? 0)
+  const profilesRunning = Number(row?.profilesRunning ?? 0)
+  return {
+    profilesTotal: Number(row?.profilesTotal ?? 0),
+    profilesCompleted: Number(row?.profilesCompleted ?? 0),
+    profilesFailed: profilesRetryable + profilesTerminal + profilesRunning,
+    profilesRetryable,
+    profilesTerminal,
+    profilesSkipped: Number(row?.profilesSkipped ?? 0),
+    profilesRunning,
+  }
 }

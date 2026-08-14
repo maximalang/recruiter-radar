@@ -10,6 +10,7 @@ import {
   heartbeatDailyRadarRun,
   recordDailyRadarSourceRefreshResult,
   recordDailyRadarTemporalResult,
+  summarizeDailyRadarProfiles,
 } from '@/lib/daily-radar-run-state'
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
@@ -19,6 +20,7 @@ const describeIfDatabase = databaseUrl && isolated ? describe : describe.skip
 describeIfDatabase('daily radar real PostgreSQL fencing', () => {
   const client = new Pool({ connectionString: databaseUrl })
   let profileId = ''
+  let secondProfileId = ''
   let digestRunId = ''
 
   beforeAll(async () => {
@@ -40,6 +42,17 @@ describeIfDatabase('daily radar real PostgreSQL fencing', () => {
        VALUES ($1::BIGINT, $2::BIGINT, 'owner', 'active')`,
       [workspace.rows[0].id, user.rows[0].id],
     )
+    const secondUser = await client.query<{ id: string }>(
+      `INSERT INTO users (email, full_name)
+       VALUES ($1, 'Daily Radar DB B')
+       RETURNING id::TEXT AS id`,
+      [`daily-radar-db-b-${fixtureSuffix}@example.invalid`],
+    )
+    await client.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+       VALUES ($1::BIGINT, $2::BIGINT, 'recruiter', 'active')`,
+      [workspace.rows[0].id, secondUser.rows[0].id],
+    )
     await client.query('ALTER TABLE client_profiles DISABLE TRIGGER USER')
     try {
       const profile = await client.query<{ id: string }>(
@@ -49,6 +62,13 @@ describeIfDatabase('daily radar real PostgreSQL fencing', () => {
         [user.rows[0].id, workspace.rows[0].id],
       )
       profileId = profile.rows[0].id
+      const secondProfile = await client.query<{ id: string }>(
+        `INSERT INTO client_profiles (agency_name, owner_id, workspace_id)
+         VALUES ('Daily Radar DB B', $1::BIGINT, $2::BIGINT)
+         RETURNING id::TEXT AS id`,
+        [secondUser.rows[0].id, workspace.rows[0].id],
+      )
+      secondProfileId = secondProfile.rows[0].id
     } finally {
       await client.query('ALTER TABLE client_profiles ENABLE TRIGGER USER')
     }
@@ -136,5 +156,80 @@ describeIfDatabase('daily radar real PostgreSQL fencing', () => {
     })
     const afterLimit = await claimDailyRadarRun(new Date('2026-08-15T04:00:00.000Z'))
     expect(afterLimit).toMatchObject({ acquired: false, reason: 'terminal', attemptCount: 3 })
+  })
+
+  it('admits all three scheduled attempts and can complete on attempt three', async () => {
+    const first = await claimDailyRadarRun(new Date('2026-08-16T06:15:00.000Z'))
+    expect(await finishDailyRadarRun(first, 'partial', new Date('2026-08-16T06:15:01.000Z'))).toBe(true)
+
+    const second = await claimDailyRadarRun(new Date('2026-08-16T09:15:00.000Z'))
+    expect(second).toMatchObject({ acquired: true, attemptCount: 2 })
+    expect(await finishDailyRadarRun(second, 'partial', new Date('2026-08-16T09:15:01.000Z'))).toBe(true)
+
+    const third = await claimDailyRadarRun(new Date('2026-08-16T12:15:00.000Z'))
+    expect(third).toMatchObject({ acquired: true, attemptCount: 3 })
+    expect(await finishDailyRadarRun(third, 'completed', new Date('2026-08-16T12:15:01.000Z'))).toBe(true)
+  })
+
+  it('no-ops both scheduled recoveries after attempt one completed', async () => {
+    const first = await claimDailyRadarRun(new Date('2026-08-18T06:15:00.000Z'))
+    expect(await finishDailyRadarRun(first, 'completed', new Date('2026-08-18T06:15:01.000Z'))).toBe(true)
+
+    const recoveryOne = await claimDailyRadarRun(new Date('2026-08-18T09:15:00.000Z'))
+    const recoveryTwo = await claimDailyRadarRun(new Date('2026-08-18T12:15:00.000Z'))
+    expect(recoveryOne).toMatchObject({ acquired: false, reason: 'already-completed', attemptCount: 1 })
+    expect(recoveryTwo).toMatchObject({ acquired: false, reason: 'already-completed', attemptCount: 1 })
+  })
+
+  it('persists the cumulative day summary after only the failed profile is retried', async () => {
+    const first = await claimDailyRadarRun(new Date('2026-08-17T06:15:00.000Z'))
+    const profileA = await claimDailyRadarProfile(first, profileId)
+    const profileB = await claimDailyRadarProfile(first, secondProfileId)
+    expect(await finishDailyRadarProfile(profileA, 'completed')).toBe(true)
+    expect(await finishDailyRadarProfile(profileB, 'failed_retryable', 'safe_retry')).toBe(true)
+
+    const firstSummary = await summarizeDailyRadarProfiles(first)
+    expect(firstSummary).toMatchObject({
+      profilesTotal: 2,
+      profilesCompleted: 1,
+      profilesFailed: 1,
+      profilesRetryable: 1,
+      profilesTerminal: 0,
+      profilesSkipped: 0,
+      profilesRunning: 0,
+    })
+    expect(await finishDailyRadarRun(first, 'partial', new Date('2026-08-17T06:15:01.000Z'), firstSummary)).toBe(true)
+
+    const second = await claimDailyRadarRun(new Date('2026-08-17T09:15:00.000Z'))
+    const completedA = await claimDailyRadarProfile(second, profileId)
+    const retriedB = await claimDailyRadarProfile(second, secondProfileId)
+    expect(completedA).toMatchObject({ acquired: false, status: 'completed', attemptCount: 1 })
+    expect(retriedB).toMatchObject({ acquired: true, status: 'running', attemptCount: 2 })
+    expect(await finishDailyRadarProfile(retriedB, 'completed')).toBe(true)
+
+    const finalSummary = await summarizeDailyRadarProfiles(second)
+    expect(finalSummary).toEqual({
+      profilesTotal: 2,
+      profilesCompleted: 2,
+      profilesFailed: 0,
+      profilesRetryable: 0,
+      profilesTerminal: 0,
+      profilesSkipped: 0,
+      profilesRunning: 0,
+    })
+    expect(await finishDailyRadarRun(second, 'completed', new Date('2026-08-17T09:15:01.000Z'), finalSummary)).toBe(true)
+
+    const persisted = await client.query(
+      `SELECT status, profiles_total, profiles_completed, profiles_failed, profiles_skipped
+       FROM daily_radar_run_state
+       WHERE run_date = '2026-08-17'::DATE`,
+    )
+    expect(persisted.rows[0]).toEqual({
+      status: 'completed',
+      profiles_total: 2,
+      profiles_completed: 2,
+      profiles_failed: 0,
+      profiles_skipped: 0,
+    })
   })
 })

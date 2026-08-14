@@ -308,6 +308,7 @@ if [ "$published_web_port" != "127.0.0.1:3000" ]; then
   exit 1
 fi
 
+# Preserve the caller stdin so an SSH deployment heredoc continues after validation.
 docker compose "${compose_args[@]}" exec -T web \
   node -e '
     const raw = process.env.NOTIFICATION_ENCRYPTION_KEY?.trim() || "";
@@ -320,4 +321,4 @@ docker compose "${compose_args[@]}" exec -T web \
     const subjects = process.env.RR_MCP_OAUTH_ALLOWED_SUBJECTS?.trim() || "";
     if (mcpEnabled && (!issuer.startsWith("https://") || !subjects)) process.exit(1);
     console.log("Notification encryption key and optional OAuth MCP configuration are valid");
-  '
+  ' </dev/null

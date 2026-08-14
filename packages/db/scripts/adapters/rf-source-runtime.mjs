@@ -19,6 +19,7 @@ import { upsertSignalEvidenceLineage } from '../lib/source-lineage-writer.mjs';
 import { fetchJson } from './source-http.mjs';
 import {
   assertOrgSourceRefOwner,
+  isOrganizationIdentityConflict,
   resolveOrganizationOwner,
 } from './organization-resolution.mjs';
 import { buildSourceRunMetrics, recordSourceRunObservation } from '../lib/source-health-recorder.mjs';
@@ -139,6 +140,7 @@ export function createStandardSourceRuntime(config) {
     let evidenceUpsertCount = 0;
     let evidenceCreatedCount = 0;
     let lineageCreatedCount = 0;
+    let organizationResolutionRejects = 0;
 
     await client.connect();
 
@@ -146,7 +148,14 @@ export function createStandardSourceRuntime(config) {
       await client.query('BEGIN');
 
       for (const record of input.normalizedRecords) {
-        const orgResult = await upsertOrgSourceRef(client, sourceId, record);
+        let orgResult;
+        try {
+          orgResult = await upsertOrgSourceRef(client, sourceId, record);
+        } catch (error) {
+          if (!isOrganizationIdentityConflict(error)) throw error;
+          organizationResolutionRejects += 1;
+          continue;
+        }
         orgUpsertCount += orgResult.insertedOrg ? 1 : 0;
 
         const signalPayload = buildSignalPayload(sourceId, config, record);
@@ -176,6 +185,12 @@ export function createStandardSourceRuntime(config) {
         lineageCreatedCount += lineage.lineageCreatedCount;
       }
 
+      input.organizationResolutionRejects = organizationResolutionRejects;
+      if (input.normalizedRecords.length > 0
+        && organizationResolutionRejects === input.normalizedRecords.length) {
+        throw new Error(`organization identity conflict: ${sourceId} rejected every normalized record at the identity gate.`);
+      }
+
       await client.query('COMMIT');
 
       return {
@@ -184,6 +199,7 @@ export function createStandardSourceRuntime(config) {
         evidenceUpsertCount,
         evidenceCreatedCount,
         lineageCreatedCount,
+        organizationResolutionRejects,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -279,6 +295,7 @@ export function createStandardSourceRuntime(config) {
       evidenceUpsertsCompleted: stats.evidenceUpsertCount,
       evidenceCreated: stats.evidenceCreatedCount,
       lineageCreated: stats.lineageCreatedCount,
+      organizationResolutionRejects: stats.organizationResolutionRejects,
       zeroReason: input.zeroReason ?? undefined,
     };
   }
@@ -302,6 +319,7 @@ export function createStandardSourceRuntime(config) {
       evidenceUpsertsCompleted: stats.evidenceUpsertCount,
       evidenceCreated: stats.evidenceCreatedCount,
       lineageCreated: stats.lineageCreatedCount,
+      organizationResolutionRejects: stats.organizationResolutionRejects,
       zeroReason: input.zeroReason ?? undefined,
     };
   }

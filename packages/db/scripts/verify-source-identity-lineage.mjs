@@ -80,6 +80,45 @@ function weakNameRuntime(sourceId, externalId, sourceUrl) {
   });
 }
 
+function partialConflictRuntime(sourceId) {
+  return createStandardSourceRuntime({
+    sourceId,
+    signalType: 'job_posting',
+    evidenceRole: 'primary_platform',
+    sourceRecordType: 'vacancy',
+    normalizeRecord: (raw, { fetchedAt }) => {
+      const conflict = raw.kind === 'conflict';
+      const domain = conflict ? 'lineage-verifier.example' : 'lineage-safe.example';
+      const inn = conflict ? '7707083893' : null;
+      return {
+        orgName: conflict ? 'Conflict candidate' : 'Safe candidate',
+        orgDisplayName: conflict ? 'Conflict candidate' : 'Safe candidate',
+        companyName: conflict ? 'Conflict candidate' : 'Safe candidate',
+        companyDomain: domain,
+        companyWebsiteUrl: `https://${domain}`,
+        inn,
+        ogrn: null,
+        primarySourceKey: inn ? `inn:${inn}` : `domain:${domain}`,
+        innSourceKey: inn ? `inn:${inn}` : null,
+        ogrnSourceKey: null,
+        domainSourceKey: `domain:${domain}`,
+        companyNameSourceKey: null,
+        orgSourceKeys: inn ? [`inn:${inn}`, `domain:${domain}`] : [`domain:${domain}`],
+        orgSourceAliasKeys: [],
+        orgExternalId: raw.id,
+        signalExternalId: raw.id,
+        headline: raw.id,
+        summary: 'partial conflict isolation verification',
+        sourceUrl: `https://${domain}/${raw.id}`,
+        occurredAt: '2026-08-12T09:00:00.000Z',
+        fetchedAt,
+        evidenceRole: 'primary_platform',
+        extractionMethod: 'isolated-db-verifier',
+      };
+    },
+  });
+}
+
 async function ingest(sourceId, externalId, sourceUrl) {
   const adapter = runtime(sourceId, externalId, sourceUrl);
   const input = adapter.buildInputFromRecords({
@@ -176,12 +215,29 @@ try {
     /organization identity conflict/,
   );
 
+  const partialAdapter = partialConflictRuntime(`${PREFIX}-partial`);
+  const partialInput = partialAdapter.buildInputFromRecords({
+    inputMode: 'isolated-db-verifier',
+    inputFilePath: null,
+    records: [
+      { id: 'partial-conflict', kind: 'conflict' },
+      { id: 'partial-safe', kind: 'safe' },
+    ],
+  });
+  const partial = await partialAdapter.ingest({
+    connectionString: process.env.DATABASE_URL,
+    input: partialInput,
+  });
+  assert.equal(partial.organizationResolutionRejects, 1);
+  assert.equal(partial.signalUpsertCount, 1);
+
   console.log(JSON.stringify({
     event: 'source_identity_lineage.verified',
     ...counts.rows[0],
     replayEvidenceCreated: replay.evidenceCreatedCount,
     replayLineageCreated: replay.lineageCreatedCount,
     weakNameOwners: weakOwners.rows[0].count,
+    partialConflictRejects: partial.organizationResolutionRejects,
     conflictMode: 'fail-closed',
   }));
 } finally {

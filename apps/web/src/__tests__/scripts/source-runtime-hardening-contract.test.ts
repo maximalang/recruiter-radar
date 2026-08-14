@@ -11,11 +11,13 @@ const dailyLeaseDown = read('packages/db/migrations/20260814070000_add_daily_rad
 const dailyRecoveryMigration = read('packages/db/migrations/20260814090000_harden_daily_radar_recovery.sql')
 const dailyRecoveryDown = read('packages/db/migrations/20260814090000_harden_daily_radar_recovery.down.sql')
 const careerRuntime = read('packages/db/scripts/source-career-pages-runtime.mjs')
+const careerSource = read('packages/db/scripts/source-career-pages.mjs')
 const lifecycle = read('apps/web/lib/opportunities/canonical-vacancy-lifecycle-repository.ts')
 const sourceSchedules = read('apps/web/lib/sources/source-schedules.ts')
 const scheduledRefresh = read('apps/web/lib/lead-discovery/scheduled-source-refresh.ts')
 const sourceClock = read('.github/workflows/source-refresh-clock.yml')
 const dailyClock = read('.github/workflows/daily-radar-clock.yml')
+const dailyRadarRoute = read('apps/web/app/api/cron/daily-radar/route.ts')
 const governmentClocks = read('.github/workflows/government-source-clocks.yml')
 const productionPreflight = read('scripts/deploy/verify-source-production-runtime.sh')
 
@@ -56,6 +58,9 @@ describe('source runtime hardening contract', () => {
     expect(lifecycle).toContain('resolveSuccessfulAbsenceRunIds')
     expect(lifecycle).toContain('sourceTargetKeys')
     expect(lifecycle).not.toMatch(/target_outcome IN \([^)]*not-modified/i)
+    expect(careerSource).toContain('organizationResolutionRejectedTargetKeys')
+    expect(careerRuntime).toContain("'organization-identity-conflict'")
+    expect(careerRuntime).toContain("const outcome = identityRejected ? 'failure'")
   })
 
   it('serializes scheduler processes while retaining persisted cadence state', () => {
@@ -63,7 +68,12 @@ describe('source runtime hardening contract', () => {
     expect(scheduledRefresh).toContain('pg_advisory_unlock')
     expect(scheduledRefresh).toContain('runSupportingSourceScheduler')
     expect(scheduledRefresh).toContain('getPrimarySourceIds')
-    expect(scheduledRefresh).toContain('getDailySupportingSourceIds')
+    expect(scheduledRefresh).toContain('getRunnableDailySupportingSourceIds')
+    expect(scheduledRefresh).toContain('primaryResults')
+    expect(scheduledRefresh).toContain('supportingResults')
+    expect(scheduledRefresh.indexOf('primaryResults')).toBeLessThan(
+      scheduledRefresh.indexOf('supportingResults'),
+    )
   })
 
   it('has separate real clocks for source refresh, daily delivery, and official snapshots', () => {
@@ -71,6 +81,7 @@ describe('source runtime hardening contract', () => {
     expect(sourceClock).toContain('/api/cron/source-refresh')
     expect(dailyClock).toContain("cron: '15 6 * * *'")
     expect(dailyClock).toContain("cron: '15 9 * * *'")
+    expect(dailyClock).toContain("cron: '15 12 * * *'")
     expect(dailyClock).toContain('/api/cron/daily-radar')
     for (const source of [
       'government-procurement',
@@ -92,5 +103,12 @@ describe('source runtime hardening contract', () => {
     expect(productionPreflight).toContain('"productionScheduled":false')
     expect(productionPreflight).toContain('"scheduleAuthority":"github-actions"')
     expect(productionPreflight).toContain('"scheduleVerification":"external-after-merge"')
+  })
+
+  it('finalizes the day from cumulative profile state instead of the latest invocation', () => {
+    expect(dailyRadarRoute).toContain('summarizeDailyRadarProfiles(lease)')
+    expect(dailyRadarRoute).toContain('profilesRetryable')
+    expect(dailyRadarRoute).toContain('profilesTerminal')
+    expect(dailyRadarRoute).toContain('profilesRunning')
   })
 })

@@ -1,4 +1,4 @@
-import { ingestSource, ingestAllPrimarySources, ingestDailyRadarSources, isNoActiveProfiles, runSourceTemporalIntelligence } from '@/lib/lead-discovery/source-ingest'
+import { getRunnableDailySupportingSourceIds, ingestSource, ingestAllPrimarySources, ingestDailyRadarSources, isNoActiveProfiles, runSourceTemporalIntelligence } from '@/lib/lead-discovery/source-ingest'
 import { getDailySupportingSourceIds, getHiringEvidenceSourceIds, getPrimarySourceIds, getSourceConfig } from '@/lib/sources/source-registry'
 
 // Mock the execFile accessor (production resolves execFile via
@@ -1094,6 +1094,28 @@ describe('source-ingest', () => {
       } finally {
         if (previousRoot === undefined) delete process.env.SOURCE_SNAPSHOT_ROOT
         else process.env.SOURCE_SNAPSHOT_ROOT = previousRoot
+      }
+    })
+
+    it('runs only snapshot sources with an explicit override or active manifest', () => {
+      const os = require('node:os')
+      const path = require('node:path')
+      const fs = require('node:fs')
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rr-snapshots-'))
+      fs.mkdirSync(path.join(root, 'rosstat-open-data'), { recursive: true })
+      fs.writeFileSync(path.join(root, 'rosstat-open-data', 'active.json'), '{}')
+      try {
+        const sources = getRunnableDailySupportingSourceIds({
+          SOURCE_SNAPSHOT_ROOT: root,
+          FNS_OPEN_DATA_INPUT_FILE: 'C:\\reviewed\\fns.json',
+        })
+        expect(sources).toEqual(expect.arrayContaining(['rosstat-open-data', 'fns-open-data']))
+        expect(sources).not.toEqual(expect.arrayContaining([
+          'government-procurement',
+          'rospatent-open-data',
+        ]))
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true })
       }
     })
 
