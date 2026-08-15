@@ -598,22 +598,38 @@ async function resolveCompanyPageTargetsEnv(
       orgs.website_url
     FROM orgs
     WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
-      AND (
-        NULLIF(BTRIM(orgs.domain), '') IS NULL
-        OR NOT EXISTS (
-          SELECT 1
-          FROM orgs AS domain_peer
-          WHERE domain_peer.id <> orgs.id
-            AND REGEXP_REPLACE(
-              LOWER(BTRIM(domain_peer.domain)),
-              '^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.',
-              ''
-            ) = REGEXP_REPLACE(
-              LOWER(BTRIM(orgs.domain)),
-              '^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.',
-              ''
-            )
-        )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM orgs AS domain_peer
+        WHERE domain_peer.id <> orgs.id
+          AND REGEXP_REPLACE(
+            LOWER(SPLIT_PART(SPLIT_PART(REGEXP_REPLACE(
+              COALESCE(NULLIF(BTRIM(domain_peer.domain), ''), NULLIF(BTRIM(domain_peer.website_url), '')),
+              '^https?://', '', 'i'
+            ), '/', 1), ':', 1)),
+            '^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.',
+            ''
+          ) = REGEXP_REPLACE(
+            LOWER(SPLIT_PART(SPLIT_PART(REGEXP_REPLACE(
+              COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')),
+              '^https?://', '', 'i'
+            ), '/', 1), ':', 1)),
+            '^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.',
+            ''
+          )
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM org_source_refs AS domain_ref_owner
+        WHERE domain_ref_owner.org_id <> orgs.id
+          AND domain_ref_owner.source_key = 'domain:' || REGEXP_REPLACE(
+            LOWER(SPLIT_PART(SPLIT_PART(REGEXP_REPLACE(
+              COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')),
+              '^https?://', '', 'i'
+            ), '/', 1), ':', 1)),
+            '^(www|career|careers|job|jobs|hr|vacancy|vacancies)\\.',
+            ''
+          )
       )
       AND EXISTS (
         SELECT 1

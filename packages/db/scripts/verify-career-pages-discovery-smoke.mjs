@@ -33,6 +33,16 @@ assert.ok(
     && /REGEXP_REPLACE\([\s\S]*domain_peer\.domain[\s\S]*REGEXP_REPLACE\([\s\S]*orgs\.domain/i.test(seedsQuery),
   'auto-discovery must exclude domains with multiple organization owners',
 );
+assert.ok(
+  /FROM\s+org_source_refs\s+AS\s+domain_ref_owner/i.test(seedsQuery)
+    && /domain_ref_owner\.org_id\s*<>\s*orgs\.id/i.test(seedsQuery)
+    && /domain_ref_owner\.source_key\s*=\s*'domain:'\s*\|\|/i.test(seedsQuery),
+  'auto-discovery must exclude canonical domain refs owned by another organization',
+);
+assert.ok(
+  /FROM\s+org_source_refs\s+AS\s+domain_ref_owner[\s\S]*COALESCE\(NULLIF\(BTRIM\(orgs\.domain\),\s*''\),\s*NULLIF\(BTRIM\(orgs\.website_url\),\s*''\)\)/i.test(seedsQuery),
+  'auto-discovery must apply the ownership guard to website-only organizations too',
+);
 
 const greenhouseHtml = `
   <html>
