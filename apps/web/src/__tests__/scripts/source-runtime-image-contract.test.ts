@@ -54,6 +54,9 @@ describe('source runtime final image', () => {
 
   it('runs filesystem, browser, migration and health-table checks against the final image', () => {
     expect(workflow).toContain('Verify source runtime final image')
+    expect(workflow).toContain('PostgreSQL init process complete; ready for start up.')
+    expect(workflow).toContain('database_ready=1')
+    expect(workflow).toContain('if [ "$database_ready" -ne 1 ]; then')
     expect(workflow).toContain('verify-source-runtime-image.mjs --filesystem --browser')
     expect(workflow).toContain('packages/db/scripts/migrate.mjs')
     expect(workflow).toContain('verify-source-runtime-image.mjs --database')
