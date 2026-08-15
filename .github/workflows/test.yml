@@ -493,12 +493,20 @@ jobs:
           docker run -d --name "$database" --network "$network" \
             -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=source_runtime \
             postgres:16-alpine >/dev/null
+          database_ready=0
           for _ in $(seq 1 30); do
-            if docker exec "$database" pg_isready -U postgres -d source_runtime >/dev/null 2>&1; then
+            if docker logs "$database" 2>&1 \
+                | grep -F 'PostgreSQL init process complete; ready for start up.' >/dev/null \
+              && docker exec "$database" pg_isready -U postgres -d source_runtime >/dev/null 2>&1; then
+              database_ready=1
               break
             fi
             sleep 1
           done
+          if [ "$database_ready" -ne 1 ]; then
+            docker logs "$database"
+            exit 1
+          fi
           docker exec "$database" pg_isready -U postgres -d source_runtime
           docker run --rm --network "$network" "$image" \
             node packages/db/scripts/verify-source-runtime-image.mjs --filesystem --browser
