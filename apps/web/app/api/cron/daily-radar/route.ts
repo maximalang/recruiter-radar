@@ -234,6 +234,9 @@ export async function POST(request: NextRequest) {
     const sourceRefreshNoActiveProfiles = isNoActiveProfiles(scheduledIngestResults)
     const ingestResults = sourceRefreshNoActiveProfiles ? [] : scheduledIngestResults
     const ingestOk = ingestResults.every(r => r.success)
+    const failedSources = ingestResults
+      .filter(result => !result.success)
+      .map(result => ({ source: result.source, outcome: result.outcome }))
     for (const result of ingestResults) {
       const sourcePayload = {
         source: result.source,
@@ -329,7 +332,11 @@ export async function POST(request: NextRequest) {
     const cumulativeDigestOk = profileSummary.profilesRetryable === 0
       && profileSummary.profilesTerminal === 0
       && profileSummary.profilesRunning === 0
-    const allOk = ingestOk && temporalResult.success && cumulativeDigestOk
+    const noEligibleProfiles = profileEligibility.summary.eligible === 0
+    const allOk = temporalResult.success
+      && cumulativeDigestOk
+      && (noEligibleProfiles || ingestOk)
+    const healthyNoop = noEligibleProfiles && allOk
     const durationMs = Date.now() - startMs
 
     const finalStatus = resolveDailyRadarFinalStatus({
@@ -341,6 +348,9 @@ export async function POST(request: NextRequest) {
     const terminalReason = finalStatus === 'terminal'
       ? profileSummary.profilesTerminal > 0 ? 'terminal_profile_delivery' : 'daily_attempt_limit_reached'
       : null
+    const responseReason = finalStatus === 'terminal'
+      ? 'terminal'
+      : healthyNoop ? 'no-eligible-profiles' : finalStatus
 
     const finishedAt = new Date()
     const nextRetryAt = dailyRadarNextRetryAt(lease, finalStatus, finishedAt)
@@ -365,9 +375,11 @@ export async function POST(request: NextRequest) {
       leaseId: lease.leaseId,
       attempt: lease.attemptCount,
       status: finalStatus,
+      reason: responseReason,
       ingestOk,
       ingestSucceeded: ingestSummary.succeeded,
       ingestTotal: ingestSummary.total,
+      failedSources,
       temporalOk: temporalResult.success,
       temporalReasonCode: temporalResult.reason,
       temporalObservations: temporalResult.observations,
@@ -401,7 +413,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: allOk,
       terminal: finalStatus === 'terminal',
-      reason: finalStatus === 'terminal' ? 'terminal' : finalStatus,
+      reason: responseReason,
       runDate: lease.runDate,
       nextRetryAt,
       data: {
@@ -409,7 +421,7 @@ export async function POST(request: NextRequest) {
         completedAt: new Date().toISOString(),
         durationMs,
         attemptCount: lease.attemptCount,
-        ingest: { ok: ingestOk, ...ingestSummary, details: ingestResults },
+        ingest: { ok: ingestOk, ...ingestSummary, failedSources, details: ingestResults },
         temporal: { ok: temporalResult.success, ...temporalResult },
         digest: {
           ok: cumulativeDigestOk,
