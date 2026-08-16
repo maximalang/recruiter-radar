@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 
 const runScheduledSourceRefresh = jest.fn()
-const isNoActiveProfiles = jest.fn(() => false)
+const isNoActiveProfiles = jest.fn((_results: unknown) => false)
 
 jest.mock('@/lib/lead-discovery/source-ingest', () => ({
   isNoActiveProfiles: (results: unknown) => isNoActiveProfiles(results),
