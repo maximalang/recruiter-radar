@@ -4,9 +4,7 @@ import Link from "next/link";
 import {
   BriefcaseIcon,
   LayersIcon,
-  MotionIcon,
   SearchIcon,
-  ShieldIcon,
   TargetIcon,
   TrendIcon,
 } from "./icons";
@@ -16,29 +14,27 @@ import styles from "./product-workspace.module.css";
 
 type WorkspaceIcon = (props: SVGProps<SVGSVGElement>) => ReactElement;
 
-const NAV_ICONS: Record<string, WorkspaceIcon> = {
-  "/dashboard": TrendIcon,
-  "/leads": SearchIcon,
-  "/opportunities": BriefcaseIcon,
-  "/review": ShieldIcon,
-  "/profile": TargetIcon,
-  "/settings/radar": TargetIcon,
-  "/settings": LayersIcon,
+type CoreDestination = {
+  href: string;
+  label: string;
+  icon: WorkspaceIcon;
 };
 
-const ACCOUNT_SECONDARY_LINKS = [
-  { href: "/settings/team", label: "Команда" },
-  { href: "/settings/security", label: "Безопасность" },
+const CORE_DESTINATIONS: readonly CoreDestination[] = [
+  { href: "/dashboard", label: "Сегодня", icon: TrendIcon },
+  { href: "/leads", label: "Компании", icon: SearchIcon },
+  { href: "/opportunities", label: "Ситуации", icon: BriefcaseIcon },
+  { href: "/opportunities/radar", label: "Радар", icon: TargetIcon },
 ] as const;
 
-const STANDARD_ACCOUNT_HREFS = new Set([
-  "/dashboard",
-  "/leads",
-  "/opportunities",
-  "/review",
-  "/profile",
-  "/settings",
-]);
+const ACCOUNT_SECONDARY_LINKS = [
+  { href: "/settings", label: "Настройки" },
+  { href: "/settings/team", label: "Команда" },
+  { href: "/settings/security", label: "Безопасность" },
+  { href: "/settings/access", label: "Доступ и оплата" },
+] as const;
+
+const CORE_HREFS = new Set(CORE_DESTINATIONS.map((item) => item.href));
 
 function uniqueNavItems(items: Array<NavItem | undefined>): NavItem[] {
   const seen = new Set<string>();
@@ -51,77 +47,70 @@ function uniqueNavItems(items: Array<NavItem | undefined>): NavItem[] {
   return result;
 }
 
-function isAccountSecondaryRoute(href: string): boolean {
-  return href === "/profile" || href === "/settings" || href.startsWith("/settings/");
+function destinationIsActive(destination: CoreDestination, items: NavItem[]) {
+  const explicit = items.find((item) => item.href === destination.href);
+  if (explicit?.active) return true;
+  if (destination.href === "/opportunities") {
+    return items.some((item) => item.active && item.href.startsWith("/opportunities") && item.href !== "/opportunities/radar");
+  }
+  return false;
 }
 
-function buildMobileNavigation(items: NavItem[]) {
-  const activeItem = items.find((item) => item.active);
-  const activeOpportunity = activeItem?.href.startsWith("/opportunities") ? activeItem : undefined;
-  const activeCustom = activeItem &&
-    !STANDARD_ACCOUNT_HREFS.has(activeItem.href) &&
-    !activeItem.href.startsWith("/opportunities") &&
-    !isAccountSecondaryRoute(activeItem.href)
-    ? activeItem
-    : undefined;
+function buildCoreNavigation(items: NavItem[]) {
+  return CORE_DESTINATIONS.map((destination) => ({
+    ...destination,
+    active: destinationIsActive(destination, items),
+  }));
+}
 
-  const dashboard = items.find((item) => item.href === "/dashboard");
-  const leads = items.find((item) => item.href === "/leads");
-  const opportunities = items.find((item) => item.href === "/opportunities");
-  const review = items.find((item) => item.href === "/review");
-
-  const preferredPrimary = activeOpportunity
-    ? [activeOpportunity, leads, review, dashboard]
-    : activeCustom
-      ? [activeCustom, dashboard, leads, review]
-      : [dashboard, leads, opportunities, review];
-
-  const primaryItems = uniqueNavItems([
-    ...preferredPrimary,
-    ...items.filter((item) => !isAccountSecondaryRoute(item.href)),
-  ]).slice(0, 3);
-  const primaryHrefs = new Set(primaryItems.map((item) => item.href));
-  const hasAccountSettings = items.some((item) => item.href === "/settings");
-  const secondaryLinks = hasAccountSettings ? ACCOUNT_SECONDARY_LINKS.map((item) => ({ ...item })) : [];
-  const moreLinks = uniqueNavItems([
-    ...items.filter((item) => !primaryHrefs.has(item.href)),
-    ...secondaryLinks,
+function buildMoreNavigation(items: NavItem[]) {
+  const settings = items.find((item) => item.href === "/settings");
+  const custom = items.filter((item) => !CORE_HREFS.has(item.href) && item.href !== "/settings");
+  return uniqueNavItems([
+    settings ?? { href: "/settings", label: "Настройки", active: false },
+    ...custom,
+    ...ACCOUNT_SECONDARY_LINKS.slice(1).map((item) => ({ ...item, active: false })),
   ]);
-
-  return { primaryItems, moreLinks, moreActive: moreLinks.some((item) => item.active) };
 }
 
 export function ProductWorkspaceFrame(props: { navItems: NavItem[]; children: ReactNode }) {
+  const coreItems = buildCoreNavigation(props.navItems);
+  const settingsActive = props.navItems.some((item) => item.active && (item.href === "/settings" || item.href.startsWith("/settings/")));
+
   return (
     <div className={styles.workspace} data-product-workspace="true" data-ui-system="recruiter-radar">
       <a href="#main-content" className={styles.skipLink}>К содержанию</a>
 
-      <aside className={styles.sidebar} data-theme="inverse" aria-label="Рабочее пространство Recruiter Radar">
-        <div className={styles.sidebarBrand}>
-          <Link href="/" aria-label="Recruiter Radar — на главную">
-            <BrandLogo tone="dark" joined />
-          </Link>
-        </div>
-        <nav className={styles.sidebarNav} aria-label="Разделы кабинета">
-          {props.navItems.map((item) => {
-            const Icon = NAV_ICONS[item.href] ?? BriefcaseIcon;
-            return (
-              <Link key={item.href} href={item.href} className={styles.navItem}
-                data-active={item.active ? "true" : undefined} data-motion-interactive
-                aria-current={item.active ? "page" : undefined}>
-                <MotionIcon className={styles.navIcon} kind="navigation" state={item.active ? "active" : "idle"}>
-                  <Icon />
-                </MotionIcon>
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+      <header className={styles.topbar}>
+        <Link href="/" className={styles.topbarBrand} aria-label="Recruiter Radar — на главную">
+          <BrandLogo size="small" joined />
+        </Link>
+        <nav className={styles.primaryNav} aria-label="Основные разделы">
+          {coreItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={styles.primaryNavItem}
+              data-active={item.active ? "true" : undefined}
+              aria-current={item.active ? "page" : undefined}
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
-      </aside>
+        <Link
+          href="/settings"
+          className={styles.accountLink}
+          data-active={settingsActive ? "true" : undefined}
+          aria-current={settingsActive ? "page" : undefined}
+        >
+          Аккаунт
+        </Link>
+      </header>
 
       <div className={styles.workspaceBody}>
         <div className={styles.mobileTopbar}>
-          <Link href="/" aria-label="Recruiter Radar — на главную"><BrandLogo joined /></Link>
+          <Link href="/" aria-label="Recruiter Radar — на главную"><BrandLogo size="small" joined /></Link>
         </div>
         <main id="main-content" className={styles.content} tabIndex={-1}>{props.children}</main>
         <ProductFooter />
@@ -154,33 +143,38 @@ export function ProductWorkspaceHeader(props: {
 }
 
 function MobileNavigation(props: { items: NavItem[] }) {
-  const { primaryItems, moreLinks, moreActive } = buildMobileNavigation(props.items);
+  const coreItems = buildCoreNavigation(props.items);
+  const moreLinks = buildMoreNavigation(props.items);
+  const moreActive = moreLinks.some((item) => item.active) || props.items.some((item) => item.active && !CORE_HREFS.has(item.href));
+
   return (
-    <nav className={styles.mobileNav} data-theme="inverse" aria-label="Мобильная навигация">
-      {primaryItems.map((item) => {
-        const Icon = NAV_ICONS[item.href] ?? BriefcaseIcon;
+    <nav className={styles.mobileNav} aria-label="Мобильная навигация">
+      {coreItems.map((item) => {
+        const Icon = item.icon;
         return (
-          <Link key={item.href} href={item.href} className={styles.mobileNavItem}
-            data-active={item.active ? "true" : undefined} data-motion-interactive
-            aria-current={item.active ? "page" : undefined}>
-            <MotionIcon className={styles.mobileNavIcon} kind="navigation" state={item.active ? "active" : "idle"}><Icon /></MotionIcon>
-            <span>{item.href === "/review" ? "Проверка" : item.label}</span>
+          <Link
+            key={item.href}
+            href={item.href}
+            className={styles.mobileNavItem}
+            data-active={item.active ? "true" : undefined}
+            aria-current={item.active ? "page" : undefined}
+          >
+            <Icon className={styles.mobileNavIcon} aria-hidden="true" />
+            <span>{item.label}</span>
           </Link>
         );
       })}
-      {moreLinks.length > 0 ? (
-        <details className={styles.mobileMore} data-active={moreActive ? "true" : undefined} data-motion-disclosure>
-          <summary data-motion-interactive>
-            <MotionIcon className={styles.mobileNavIcon} kind="disclosure"><LayersIcon /></MotionIcon>
-            <span>Ещё</span>
-          </summary>
-          <div className={styles.mobileMoreMenu}>
-            {moreLinks.map((item) => (
-              <Link key={item.href} href={item.href} data-motion-interactive aria-current={item.active ? "page" : undefined}>{item.label}</Link>
-            ))}
-          </div>
-        </details>
-      ) : null}
+      <details className={styles.mobileMore} data-active={moreActive ? "true" : undefined}>
+        <summary>
+          <LayersIcon className={styles.mobileNavIcon} aria-hidden="true" />
+          <span>Ещё</span>
+        </summary>
+        <div className={styles.mobileMoreMenu}>
+          {moreLinks.map((item) => (
+            <Link key={item.href} href={item.href} aria-current={item.active ? "page" : undefined}>{item.label}</Link>
+          ))}
+        </div>
+      </details>
     </nav>
   );
 }
