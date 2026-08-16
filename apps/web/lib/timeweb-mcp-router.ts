@@ -108,6 +108,6 @@ function rpcError(id: JsonRpcId, code: number, message: string, data?: unknown):
   return { jsonrpc: '2.0', id, error: { code, message, ...(data === undefined ? {} : { data }) } }
 }
 
-function isRecord(value: unknown): value is Record<string, any> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
