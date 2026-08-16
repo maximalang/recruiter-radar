@@ -9,12 +9,12 @@ const runScheduledSourceRefresh = jest.fn()
 const runSourceTemporalIntelligence = jest.fn()
 const runDigestForClientProfile = jest.fn()
 const deliverCandidatesForRun = jest.fn()
-const loadDailyRadarProfileEligibility = jest.fn()
-const isNoActiveProfiles = jest.fn(() => false)
-const finishDailyRadarRun = jest.fn(async () => true)
-const recordDailyRadarSourceRefreshResult = jest.fn(async () => true)
-const recordDailyRadarTemporalResult = jest.fn(async () => true)
-const heartbeatDailyRadarRun = jest.fn(async () => true)
+const loadDailyRadarProfileEligibility = jest.fn() as jest.Mock
+const isNoActiveProfiles = jest.fn(() => false) as jest.Mock
+const finishDailyRadarRun = jest.fn(async () => true) as jest.Mock
+const recordDailyRadarSourceRefreshResult = jest.fn(async () => true) as jest.Mock
+const recordDailyRadarTemporalResult = jest.fn(async () => true) as jest.Mock
+const heartbeatDailyRadarRun = jest.fn(async () => true) as jest.Mock
 
 jest.mock('@/lib/db', () => ({
   getPool: () => ({ query: dbQuery }),
@@ -33,10 +33,13 @@ jest.mock('@/lib/opportunities/commercial-signal-rollout', () => ({
 }))
 jest.mock('@/lib/daily-radar-run-state', () => ({
   claimDailyRadarRun: () => claimDailyRadarRun(),
-  finishDailyRadarRun: (...args: unknown[]) => finishDailyRadarRun(...args),
-  recordDailyRadarSourceRefreshResult: (...args: unknown[]) => recordDailyRadarSourceRefreshResult(...args),
-  recordDailyRadarTemporalResult: (...args: unknown[]) => recordDailyRadarTemporalResult(...args),
-  heartbeatDailyRadarRun: (...args: unknown[]) => heartbeatDailyRadarRun(...args),
+  finishDailyRadarRun: (lease: unknown, status: unknown, now?: unknown, summary?: unknown) =>
+    finishDailyRadarRun(lease, status, now, summary),
+  recordDailyRadarSourceRefreshResult: (lease: unknown, value: unknown) =>
+    recordDailyRadarSourceRefreshResult(lease, value),
+  recordDailyRadarTemporalResult: (lease: unknown, value: unknown) =>
+    recordDailyRadarTemporalResult(lease, value),
+  heartbeatDailyRadarRun: (lease: unknown, now?: unknown) => heartbeatDailyRadarRun(lease, now),
   summarizeDailyRadarProfiles: jest.fn(async () => ({ profilesTotal: 0, profilesCompleted: 0, profilesFailed: 0, profilesRetryable: 0, profilesTerminal: 0, profilesSkipped: 0, profilesRunning: 0 })),
   claimDailyRadarProfile: jest.fn(),
   attachDailyRadarProfileDigestRun: jest.fn(),
@@ -44,10 +47,10 @@ jest.mock('@/lib/daily-radar-run-state', () => ({
   dailyRadarNextRetryAt: jest.fn(),
 }))
 jest.mock('@/lib/daily-radar-profile-eligibility', () => ({
-  loadDailyRadarProfileEligibility: (...args: unknown[]) => loadDailyRadarProfileEligibility(...args),
+  loadDailyRadarProfileEligibility: (options: unknown) => loadDailyRadarProfileEligibility(options),
 }))
 jest.mock('@/lib/lead-discovery/source-ingest', () => ({
-  isNoActiveProfiles: (...args: unknown[]) => isNoActiveProfiles(...args),
+  isNoActiveProfiles: (result: unknown) => isNoActiveProfiles(result),
   runSourceTemporalIntelligence: () => runSourceTemporalIntelligence(),
 }))
 jest.mock('@/lib/lead-discovery/scheduled-source-refresh', () => ({

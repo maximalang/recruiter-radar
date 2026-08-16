@@ -292,35 +292,41 @@ try {
   assert.equal(partial.signalUpsertCount, 1);
 
   const canonicalConflict = canonicalConflictRuntime(`${PREFIX}-canonical-conflict`);
-  const canonicalConflictResult = await canonicalConflict.ingest({
-    connectionString: process.env.DATABASE_URL,
-    input: canonicalConflict.buildInputFromRecords({
-      inputMode: 'isolated-db-verifier',
-      inputFilePath: null,
-      records: [{ id: 'canonical-conflict' }],
+  await assert.rejects(
+    canonicalConflict.ingest({
+      connectionString: process.env.DATABASE_URL,
+      input: canonicalConflict.buildInputFromRecords({
+        inputMode: 'isolated-db-verifier',
+        inputFilePath: null,
+        records: [{ id: 'canonical-conflict' }],
+      }),
     }),
-  });
-  assert.equal(canonicalConflictResult.organizationResolutionRejects, 1);
+    /rejected every normalized record at the identity gate/,
+  );
   const keyOnlyCanonicalConflict = canonicalConflictRuntime(`${PREFIX}-canonical-key-only-conflict`);
-  const keyOnlyCanonicalConflictResult = await keyOnlyCanonicalConflict.ingest({
-    connectionString: process.env.DATABASE_URL,
-    input: keyOnlyCanonicalConflict.buildInputFromRecords({
-      inputMode: 'isolated-db-verifier',
-      inputFilePath: null,
-      records: [{ id: 'canonical-key-only-conflict', omitInn: true }],
+  await assert.rejects(
+    keyOnlyCanonicalConflict.ingest({
+      connectionString: process.env.DATABASE_URL,
+      input: keyOnlyCanonicalConflict.buildInputFromRecords({
+        inputMode: 'isolated-db-verifier',
+        inputFilePath: null,
+        records: [{ id: 'canonical-key-only-conflict', omitInn: true }],
+      }),
     }),
-  });
-  assert.equal(keyOnlyCanonicalConflictResult.organizationResolutionRejects, 1);
+    /rejected every normalized record at the identity gate/,
+  );
   const invalidKeyConflict = canonicalConflictRuntime(`${PREFIX}-invalid-legal-key`);
-  const invalidKeyConflictResult = await invalidKeyConflict.ingest({
-    connectionString: process.env.DATABASE_URL,
-    input: invalidKeyConflict.buildInputFromRecords({
-      inputMode: 'isolated-db-verifier',
-      inputFilePath: null,
-      records: [{ id: 'invalid-legal-key', invalidKey: true }],
+  await assert.rejects(
+    invalidKeyConflict.ingest({
+      connectionString: process.env.DATABASE_URL,
+      input: invalidKeyConflict.buildInputFromRecords({
+        inputMode: 'isolated-db-verifier',
+        inputFilePath: null,
+        records: [{ id: 'invalid-legal-key', invalidKey: true }],
+      }),
     }),
-  });
-  assert.equal(invalidKeyConflictResult.organizationResolutionRejects, 1);
+    /rejected every normalized record at the identity gate/,
+  );
   const poisonedStrongRef = await client.query(
     `SELECT COUNT(*)::int AS count
      FROM org_source_refs
