@@ -7,19 +7,16 @@ import { getEffectiveEntitlement } from "@/lib/entitlements";
 import { listCheckoutOrdersForAccess } from "@/lib/paymentsRepo";
 import { buildAccountNavigation } from "../../ui/account-navigation";
 import {
-  ContentCard,
-  ContentCardTitle,
   InternalPageFrame,
   InternalPageHeader,
-  internalPageClasses,
 } from "../../ui/internal-page";
-import ppStyles from "../../ui/page-primitives.module.css";
+import styles from "./access-ledger.module.css";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Доступ и оплата — Recruiter Radar",
-  description: "Текущий доступ к Radar и история разовых заказов.",
+  description: "Текущий доступ к Радару и история разовых заказов.",
   robots: { index: false, follow: false },
 };
 
@@ -50,52 +47,71 @@ export default async function AccessSettingsPage() {
     <InternalPageFrame navItems={buildAccountNavigation("settings")}>
       <InternalPageHeader
         title="Доступ и оплата"
-        subtitle="Один источник истины для текущего доступа и отдельная история платёжных операций."
+        subtitle="Текущий доступ, срок действия и история платёжных операций — как проверяемые факты аккаунта."
       />
-      <div className={internalPageClasses.narrowLayout}>
-        <ContentCard variant="hero">
-          <ContentCardTitle>Текущий доступ</ContentCardTitle>
+
+      <div className={styles.document}>
+        <section className={styles.section} aria-labelledby="current-access-title">
+          <div className={styles.sectionHeader}>
+            <h2 id="current-access-title">Текущий доступ</h2>
+            <p>Показываем только фактическое состояние entitlement, без предположений о подписке или будущих списаниях.</p>
+          </div>
+
           {access.status === "active" ? (
-            <dl>
+            <dl className={styles.ledger}>
               <div><dt>Статус</dt><dd>Активен</dd></div>
               <div><dt>Тариф</dt><dd>{access.plan}</dd></div>
               <div><dt>Источник</dt><dd>{accessSourceLabel(access.source)}</dd></div>
               <div><dt>Начало</dt><dd>{formatDate(access.startsAt)}</dd></div>
               <div><dt>Доступ до</dt><dd>{access.expiresAt ? formatDate(access.expiresAt) : "Без даты окончания"}</dd></div>
               {remainingDays !== null ? <div><dt>Осталось</dt><dd>{remainingDays} дн.</dd></div> : null}
-              <div><dt>Возможности</dt><dd>{access.features.map(featureLabel).join(", ")}</dd></div>
+              <div><dt>Доступно</dt><dd>{access.features.map(featureLabel).join(", ")}</dd></div>
             </dl>
           ) : (
-            <p className={internalPageClasses.bodyTextMutedBlock}>
+            <p className={styles.notice}>
               Активного доступа нет. Профиль и история аккаунта сохраняются.
             </p>
           )}
-          <Link className={ppStyles.primaryAction} href="/checkout">Выбрать период доступа</Link>
-        </ContentCard>
 
-        <ContentCard>
-          <ContentCardTitle>История заказов</ContentCardTitle>
+          <div className={styles.actions}>
+            <Link className={styles.primaryAction} href="/checkout">
+              {access.status === "active" ? "Продлить доступ" : "Выбрать период доступа"}
+            </Link>
+          </div>
+        </section>
+
+        <section className={styles.section} aria-labelledby="orders-title">
+          <div className={styles.sectionHeader}>
+            <h2 id="orders-title">История заказов</h2>
+            <p>Отдельный журнал платёжных операций. Он не подменяет текущее состояние доступа.</p>
+          </div>
+
           {orders === null ? (
-            <p className={internalPageClasses.bodyTextMutedBlock} role="status">
-              История заказов временно недоступна. Текущий доступ показан отдельно и остаётся актуальным.
+            <p className={styles.notice} role="status">
+              История заказов временно недоступна. Текущий доступ выше остаётся источником истины.
             </p>
           ) : orders.length === 0 ? (
-            <p className={internalPageClasses.bodyTextMutedBlock}>Заказов пока нет.</p>
+            <p className={styles.muted}>Заказов пока нет.</p>
           ) : (
-            <div style={{ display: "grid", gap: "10px" }}>
+            <div className={styles.orders} role="list">
               {orders.map((order) => (
-                <article key={order.id} style={{ borderBottom: "1px solid var(--c-border)", paddingBottom: "10px" }}>
-                  <strong>Заказ #{order.id} · {order.productCode}</strong>
-                  <p className={internalPageClasses.bodyText}>
-                    {(order.amountMinor / 100).toLocaleString("ru-RU")} {order.currency} · {order.status}
-                    {order.provider ? ` · ${order.provider}` : ""}
-                  </p>
-                  <small>{formatDate(order.createdAt)}</small>
+                <article key={order.id} className={styles.order} role="listitem">
+                  <div className={styles.orderIdentity}>
+                    <strong>Заказ #{order.id}</strong>
+                    <small>{order.productCode}</small>
+                  </div>
+                  <span className={styles.orderAmount}>
+                    {(order.amountMinor / 100).toLocaleString("ru-RU")} {order.currency}
+                  </span>
+                  <span className={styles.orderStatus}>{order.status}</span>
+                  <span className={styles.orderMeta}>
+                    {order.provider ? `${order.provider} · ` : ""}{formatDate(order.createdAt)}
+                  </span>
                 </article>
               ))}
             </div>
           )}
-        </ContentCard>
+        </section>
       </div>
     </InternalPageFrame>
   );
