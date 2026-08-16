@@ -37,6 +37,8 @@ function runtime(sourceId, externalId, sourceUrl) {
       signalExternalId: externalId,
       headline: raw.headline,
       summary: 'isolated source lineage verification',
+      payload: { inn: '1234567890', ogrn: '1234567890123' },
+      orgMetadata: { inn: '1234567890', ogrn: '1234567890123' },
       sourceUrl,
       occurredAt: '2026-08-12T09:00:00.000Z',
       fetchedAt,
@@ -119,6 +121,43 @@ function partialConflictRuntime(sourceId) {
   });
 }
 
+function canonicalConflictRuntime(sourceId) {
+  return createStandardSourceRuntime({
+    sourceId,
+    signalType: 'job_posting',
+    evidenceRole: 'primary_platform',
+    sourceRecordType: 'vacancy',
+    normalizeRecord: (raw, { fetchedAt }) => {
+      const strongInn = raw.invalidKey ? '1234567890' : '9102013580';
+      return {
+        orgName: 'Canonical conflict candidate',
+        orgDisplayName: 'Canonical conflict candidate',
+        companyName: 'Canonical conflict candidate',
+        companyDomain: 'lineage-verifier.example',
+        companyWebsiteUrl: 'https://lineage-verifier.example',
+        inn: raw.omitInn || raw.invalidKey ? null : strongInn,
+        ogrn: null,
+        primarySourceKey: `inn:${strongInn}`,
+        innSourceKey: `inn:${strongInn}`,
+        ogrnSourceKey: null,
+        domainSourceKey: 'domain:lineage-verifier.example',
+        companyNameSourceKey: null,
+        orgSourceKeys: [`inn:${strongInn}`, 'domain:lineage-verifier.example'],
+        orgSourceAliasKeys: [],
+        orgExternalId: raw.id,
+        signalExternalId: raw.id,
+        headline: raw.id,
+        summary: 'canonical conflict isolation verification',
+        sourceUrl: `https://lineage-verifier.example/${raw.id}`,
+        occurredAt: '2026-08-12T09:00:00.000Z',
+        fetchedAt,
+        evidenceRole: 'primary_platform',
+        extractionMethod: 'isolated-db-verifier',
+      };
+    },
+  });
+}
+
 async function ingest(sourceId, externalId, sourceUrl) {
   const adapter = runtime(sourceId, externalId, sourceUrl);
   const input = adapter.buildInputFromRecords({
@@ -149,6 +188,27 @@ try {
   assert.equal(second.orgUpsertCount, 0, 'validated INN/domain must reuse the cross-source organization');
   assert.equal(replay.evidenceCreatedCount, 0, 'replay must not duplicate evidence');
   assert.equal(replay.lineageCreatedCount, 0, 'replay must not duplicate lineage');
+
+  const persistedLegalIdentity = await client.query(
+    `SELECT orgs.inn, orgs.ogrn, org_source_refs.metadata
+     FROM orgs
+     JOIN org_source_refs ON org_source_refs.org_id = orgs.id
+     WHERE org_source_refs.source = $1
+     LIMIT 1`,
+    [`${PREFIX}-one`],
+  );
+  assert.equal(persistedLegalIdentity.rows[0].inn, '7707083893', 'validated INN must cross the canonical org persistence boundary');
+  assert.equal(persistedLegalIdentity.rows[0].metadata.inn, '7707083893', 'custom metadata must not override canonical INN');
+  assert.equal(persistedLegalIdentity.rows[0].metadata.ogrn, null, 'custom metadata must not inject OGRN');
+  const persistedSignalIdentity = await client.query(
+    `SELECT payload->>'inn' AS inn, payload->>'ogrn' AS ogrn
+     FROM signals
+     WHERE source = $1
+     LIMIT 1`,
+    [`${PREFIX}-one`],
+  );
+  assert.equal(persistedSignalIdentity.rows[0].inn, '7707083893', 'custom payload must not override canonical INN');
+  assert.equal(persistedSignalIdentity.rows[0].ogrn, null, 'custom payload must not inject OGRN');
 
   const counts = await client.query(
     `SELECT
@@ -231,12 +291,52 @@ try {
   assert.equal(partial.organizationResolutionRejects, 1);
   assert.equal(partial.signalUpsertCount, 1);
 
+  const canonicalConflict = canonicalConflictRuntime(`${PREFIX}-canonical-conflict`);
+  const canonicalConflictResult = await canonicalConflict.ingest({
+    connectionString: process.env.DATABASE_URL,
+    input: canonicalConflict.buildInputFromRecords({
+      inputMode: 'isolated-db-verifier',
+      inputFilePath: null,
+      records: [{ id: 'canonical-conflict' }],
+    }),
+  });
+  assert.equal(canonicalConflictResult.organizationResolutionRejects, 1);
+  const keyOnlyCanonicalConflict = canonicalConflictRuntime(`${PREFIX}-canonical-key-only-conflict`);
+  const keyOnlyCanonicalConflictResult = await keyOnlyCanonicalConflict.ingest({
+    connectionString: process.env.DATABASE_URL,
+    input: keyOnlyCanonicalConflict.buildInputFromRecords({
+      inputMode: 'isolated-db-verifier',
+      inputFilePath: null,
+      records: [{ id: 'canonical-key-only-conflict', omitInn: true }],
+    }),
+  });
+  assert.equal(keyOnlyCanonicalConflictResult.organizationResolutionRejects, 1);
+  const invalidKeyConflict = canonicalConflictRuntime(`${PREFIX}-invalid-legal-key`);
+  const invalidKeyConflictResult = await invalidKeyConflict.ingest({
+    connectionString: process.env.DATABASE_URL,
+    input: invalidKeyConflict.buildInputFromRecords({
+      inputMode: 'isolated-db-verifier',
+      inputFilePath: null,
+      records: [{ id: 'invalid-legal-key', invalidKey: true }],
+    }),
+  });
+  assert.equal(invalidKeyConflictResult.organizationResolutionRejects, 1);
+  const poisonedStrongRef = await client.query(
+    `SELECT COUNT(*)::int AS count
+     FROM org_source_refs
+     WHERE source = ANY($1::text[])`,
+    [[`${PREFIX}-canonical-conflict`, `${PREFIX}-canonical-key-only-conflict`, `${PREFIX}-invalid-legal-key`]],
+  );
+  assert.equal(poisonedStrongRef.rows[0].count, 0, 'rejected canonical identifiers must not persist source refs');
+
   console.log(JSON.stringify({
     event: 'source_identity_lineage.verified',
     ...counts.rows[0],
     replayEvidenceCreated: replay.evidenceCreatedCount,
     replayLineageCreated: replay.lineageCreatedCount,
     weakNameOwners: weakOwners.rows[0].count,
+    legalIdentityPersisted: persistedLegalIdentity.rows[0].inn === '7707083893',
+    rejectedCanonicalRefs: poisonedStrongRef.rows[0].count,
     partialConflictRejects: partial.organizationResolutionRejects,
     conflictMode: 'fail-closed',
   }));

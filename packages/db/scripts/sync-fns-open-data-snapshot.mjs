@@ -12,7 +12,7 @@ import { SaxesParser } from 'saxes';
 
 import { normalizeLegalInn, parseCommaSeparated, toNonEmptyText } from './adapters/rf-source-runtime.mjs';
 import { fetchWithSourcePolicy } from './adapters/source-http.mjs';
-import { resolveTrackedCompanyInns } from './adapters/tracked-company-inns.mjs';
+import { buildNoEligibleLegalEntitiesSummary, resolveTrackedCompanyInns } from './adapters/tracked-company-inns.mjs';
 
 const FNS_DATASETS = Object.freeze({
   headcount: Object.freeze({
@@ -517,6 +517,10 @@ function parseCli(argv) {
 async function main() {
   const options = parseCli(process.argv.slice(2));
   options.trackedInns = await resolveTrackedCompanyInns({ explicitInns: options.trackedInns });
+  if (options.trackedInns.length === 0) {
+    console.log(JSON.stringify(buildNoEligibleLegalEntitiesSummary('fns-open-data'), null, 2));
+    return;
+  }
   const result = await syncFnsOpenDataSnapshot(options);
   console.log(JSON.stringify({
     ok: true,

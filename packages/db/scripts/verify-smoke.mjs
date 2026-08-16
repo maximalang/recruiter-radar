@@ -33,6 +33,7 @@ const dbBackedScripts = [
   './verify-digest-feedback-smoke.mjs',
   './verify-rf-context-corroboration-smoke.mjs',
   './verify-career-pages-ingest.mjs',
+  './verify-source-identity-lineage.mjs',
 ];
 
 for (const scriptPath of alwaysScripts) {

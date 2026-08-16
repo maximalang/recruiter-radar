@@ -19,7 +19,9 @@ import { upsertSignalEvidenceLineage } from '../lib/source-lineage-writer.mjs';
 import { fetchJson } from './source-http.mjs';
 import {
   assertOrgSourceRefOwner,
+  classifyStrongIdentityKey,
   isOrganizationIdentityConflict,
+  OrganizationIdentityConflictError,
   resolveOrganizationOwner,
 } from './organization-resolution.mjs';
 import { buildSourceRunMetrics, recordSourceRunObservation } from '../lib/source-health-recorder.mjs';
@@ -361,21 +363,54 @@ async function persistRunHealth(connectionString, metrics) {
 
 async function upsertOrgSourceRef(client, sourceId, record) {
   const resolution = await resolveOrganizationOwner(client, sourceId, record);
+  const canonicalInn = canonicalLegalIdentifier(record, 'inn');
+  const canonicalOgrn = canonicalLegalIdentifier(record, 'ogrn');
   let orgId = resolution.orgId;
   let insertedOrg = false;
 
   if (!orgId) {
     const insertedOrgResult = await client.query(
       `
-        INSERT INTO orgs (name, domain, website_url)
-        VALUES ($1, $2, $3)
+        INSERT INTO orgs (name, domain, website_url, inn, ogrn)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING id
       `,
-      [record.orgName, record.companyDomain, record.companyWebsiteUrl],
+      [record.orgName, record.companyDomain, record.companyWebsiteUrl, canonicalInn, canonicalOgrn],
     );
 
     orgId = insertedOrgResult.rows[0].id;
     insertedOrg = true;
+  }
+
+  const canonicalUpdate = await client.query(
+    `
+      UPDATE orgs
+      SET
+        name = CASE
+          WHEN $2::text IS NULL OR BTRIM($2::text) = '' THEN name
+          WHEN name IS NULL OR BTRIM(name) = '' THEN $2::text
+          ELSE name
+        END,
+        domain = CASE
+          WHEN $3::text IS NULL OR BTRIM($3::text) = '' THEN domain
+          WHEN domain IS NULL OR BTRIM(domain) = '' THEN $3::text
+          ELSE domain
+        END,
+        website_url = CASE
+          WHEN $4::text IS NULL OR BTRIM($4::text) = '' THEN website_url
+          WHEN website_url IS NULL OR BTRIM(website_url) = '' THEN $4::text
+          ELSE website_url
+        END,
+        inn = COALESCE(inn, $5::text),
+        ogrn = COALESCE(ogrn, $6::text)
+      WHERE id = $1::bigint
+        AND (inn IS NULL OR $5::text IS NULL OR inn = $5::text)
+        AND (ogrn IS NULL OR $6::text IS NULL OR ogrn = $6::text)
+    `,
+    [orgId, record.orgDisplayName, record.companyDomain, record.companyWebsiteUrl, canonicalInn, canonicalOgrn],
+  );
+  if (canonicalUpdate.rowCount !== 1) {
+    throw new OrganizationIdentityConflictError(`canonical legal identity conflict for organization ${orgId}`);
   }
 
   for (const sourceKey of record.orgSourceKeys) {
@@ -412,35 +447,54 @@ async function upsertOrgSourceRef(client, sourceId, record) {
     await assertOrgSourceRefOwner(client, sourceId, sourceKey, orgId);
   }
 
-  await client.query(
-    `
-      UPDATE orgs
-      SET
-        name = CASE
-          WHEN $2::text IS NULL OR BTRIM($2::text) = '' THEN name
-          WHEN name IS NULL OR BTRIM(name) = '' THEN $2::text
-          ELSE name
-        END,
-        domain = CASE
-          WHEN $3::text IS NULL OR BTRIM($3::text) = '' THEN domain
-          WHEN domain IS NULL OR BTRIM(domain) = '' THEN $3::text
-          ELSE domain
-        END,
-        website_url = CASE
-          WHEN $4::text IS NULL OR BTRIM($4::text) = '' THEN website_url
-          WHEN website_url IS NULL OR BTRIM(website_url) = '' THEN $4::text
-          ELSE website_url
-        END
-      WHERE id = $1::bigint
-    `,
-    [orgId, record.orgDisplayName, record.companyDomain, record.companyWebsiteUrl],
-  );
-
   return { orgId, insertedOrg, resolutionReason: resolution.resolutionReason };
+}
+
+function canonicalLegalIdentifier(record, type) {
+  const typedSourceKey = type === 'inn' ? record.innSourceKey : record.ogrnSourceKey;
+  if (typedSourceKey != null && classifyStrongIdentityKey(typedSourceKey)?.type !== type) {
+    throw new OrganizationIdentityConflictError(`${type}SourceKey is not a checksum-valid ${type.toUpperCase()} identity`);
+  }
+  const declaredKeys = [
+    ...(record.orgSourceKeys ?? []),
+    ...(record.orgSourceAliasKeys ?? []),
+    record.primarySourceKey,
+    record.innSourceKey,
+    record.ogrnSourceKey,
+  ].filter((value) => typeof value === 'string');
+  const legalKeys = declaredKeys.filter((sourceKey) => sourceKey.startsWith(`${type}:`));
+  const strongValues = [...new Set(legalKeys.map((sourceKey) => {
+    const identity = classifyStrongIdentityKey(sourceKey);
+    if (identity?.type !== type) {
+      throw new OrganizationIdentityConflictError(`invalid ${type.toUpperCase()} identity key in source record`);
+    }
+    return identity.key.slice(type.length + 1);
+  }))];
+  if (strongValues.length > 1) {
+    throw new OrganizationIdentityConflictError(`multiple checksum-valid ${type.toUpperCase()} identities in one source record`);
+  }
+
+  const claimedValue = type === 'inn'
+    ? normalizeLegalInn(record.inn)
+    : normalizeLegalOgrn(record.ogrn);
+  if (record[type] != null) {
+    const claimedIdentity = claimedValue
+      ? classifyStrongIdentityKey(`${type}:${claimedValue}`)
+      : null;
+    if (claimedIdentity?.type !== type) {
+      throw new OrganizationIdentityConflictError(`invalid ${type.toUpperCase()} field in source record`);
+    }
+  }
+  if (strongValues.length === 0) return null;
+  if (claimedValue != null && claimedValue !== strongValues[0]) {
+    throw new OrganizationIdentityConflictError(`source ${type.toUpperCase()} field conflicts with its strong identity key`);
+  }
+  return strongValues[0];
 }
 
 function buildSignalPayload(sourceId, config, record) {
   return {
+    ...(record.payload ?? {}),
     source: sourceId,
     evidence_role: record.evidenceRole ?? config.evidenceRole,
     source_entity_type: record.sourceEntityType ?? 'company',
@@ -458,15 +512,15 @@ function buildSignalPayload(sourceId, config, record) {
     company_name: record.companyName,
     company_domain: record.companyDomain,
     company_website_url: record.companyWebsiteUrl,
-    inn: record.inn,
-    ogrn: record.ogrn,
+    inn: canonicalLegalIdentifier(record, 'inn'),
+    ogrn: canonicalLegalIdentifier(record, 'ogrn'),
     fetched_at: record.fetchedAt,
-    ...(record.payload ?? {}),
   };
 }
 
 function buildOrgSourceMetadata(sourceId, record, sourceKey) {
   return {
+    ...(record.orgMetadata ?? {}),
     source: sourceId,
     source_key: sourceKey,
     source_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, sourceKey),
@@ -475,9 +529,8 @@ function buildOrgSourceMetadata(sourceId, record, sourceKey) {
     company_name: record.companyName,
     company_domain: record.companyDomain,
     company_website_url: record.companyWebsiteUrl,
-    inn: record.inn,
-    ogrn: record.ogrn,
-    ...(record.orgMetadata ?? {}),
+    inn: canonicalLegalIdentifier(record, 'inn'),
+    ogrn: canonicalLegalIdentifier(record, 'ogrn'),
   };
 }
 

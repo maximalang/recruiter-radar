@@ -2,6 +2,7 @@ import pg from 'pg';
 import sourcePolicy from '../../source-policy.json' with { type: 'json' };
 
 import { normalizeLegalInn, parseCommaSeparated } from './rf-source-runtime.mjs';
+import { classifyStrongIdentityKey } from './organization-resolution.mjs';
 
 const { Client } = pg;
 const DEFAULT_LIMIT = 50;
@@ -37,7 +38,21 @@ export async function resolveTrackedCompanyInns({
       `SELECT orgs.inn
        FROM orgs
        JOIN signals ON signals.org_id = orgs.id
-       WHERE orgs.inn ~ '^\\d{10}$'
+       WHERE CASE WHEN orgs.inn ~ '^\\d{10}$' THEN
+         MOD(MOD(
+             2 * SUBSTRING(orgs.inn, 1, 1)::int
+             + 4 * SUBSTRING(orgs.inn, 2, 1)::int
+             + 10 * SUBSTRING(orgs.inn, 3, 1)::int
+             + 3 * SUBSTRING(orgs.inn, 4, 1)::int
+             + 5 * SUBSTRING(orgs.inn, 5, 1)::int
+             + 9 * SUBSTRING(orgs.inn, 6, 1)::int
+             + 4 * SUBSTRING(orgs.inn, 7, 1)::int
+             + 6 * SUBSTRING(orgs.inn, 8, 1)::int
+             + 8 * SUBSTRING(orgs.inn, 9, 1)::int,
+             11
+           ), 10) = SUBSTRING(orgs.inn, 10, 1)::int
+         ELSE FALSE
+       END
          AND signals.signal_type = 'job_posting'
          AND signals.source = ANY($2::text[])
        GROUP BY orgs.inn
@@ -46,17 +61,29 @@ export async function resolveTrackedCompanyInns({
       [boundedLimit, HIRING_EVIDENCE_SOURCE_IDS],
     );
     const trackedInns = uniqueLegalEntityInns(result.rows.map((row) => row.inn));
-    if (trackedInns.length === 0) {
-      throw new Error('Canonical database contains no tracked legal-entity INNs with hiring evidence.');
-    }
     return trackedInns;
   } finally {
     await client.end();
   }
 }
 
+export function buildNoEligibleLegalEntitiesSummary(source) {
+  return {
+    ok: true,
+    source,
+    outcome: 'expected-zero',
+    reason: 'deferred:no-eligible-legal-entities',
+    eligibleLegalEntities: 0,
+    activated: false,
+  };
+}
+
 function uniqueLegalEntityInns(values) {
-  return [...new Set(values.map(normalizeLegalInn).filter(Boolean))];
+  return [...new Set(values.map((value) => {
+    const normalized = normalizeLegalInn(value);
+    if (!normalized) return null;
+    return classifyStrongIdentityKey(`inn:${normalized}`)?.type === 'inn' ? normalized : null;
+  }).filter(Boolean))];
 }
 
 function validateLimit(value) {

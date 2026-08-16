@@ -11,7 +11,7 @@ import { installGovernmentCaRuntime } from './adapters/government-ca-runtime.mjs
 import { activateValidatedSnapshot, resolveVersionedSnapshotOutput } from './adapters/snapshot-activation.mjs';
 import { normalizeLegalInn, parseCommaSeparated, toNonEmptyText } from './adapters/rf-source-runtime.mjs';
 import { fetchWithSourcePolicy } from './adapters/source-http.mjs';
-import { resolveTrackedCompanyInns } from './adapters/tracked-company-inns.mjs';
+import { buildNoEligibleLegalEntitiesSummary, resolveTrackedCompanyInns } from './adapters/tracked-company-inns.mjs';
 
 const SOURCE_ID = 'government-procurement';
 const EIS_ORIGIN = 'https://zakupki.gov.ru';
@@ -332,6 +332,10 @@ function parseCli(argv) {
 async function main() {
   const options = parseCli(process.argv.slice(2));
   options.trackedInns = await resolveTrackedCompanyInns({ explicitInns: options.trackedInns });
+  if (options.trackedInns.length === 0) {
+    console.log(JSON.stringify(buildNoEligibleLegalEntitiesSummary(SOURCE_ID), null, 2));
+    return;
+  }
   const result = await syncGovernmentProcurementSnapshot(options);
   console.log(JSON.stringify({
     ok: true, source: SOURCE_ID, outputFile: result.outputFile,
