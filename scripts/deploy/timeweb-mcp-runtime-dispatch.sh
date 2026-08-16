@@ -51,6 +51,11 @@ case "$ACTION" in
     uname -a
     printf '%s\n' '--- /etc/os-release ---'
     cat /etc/os-release
+    printf '%s\n' '--- cpu ---'
+    logical_cpus="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || printf unknown)"
+    printf 'logical_cpus=%s\n' "$logical_cpus"
+    cpu_model="$(awk -F: '/^[[:space:]]*model name[[:space:]]*:/{ sub(/^[[:space:]]+/, "", $2); print $2; exit }' /proc/cpuinfo 2>/dev/null || true)"
+    if [ -n "$cpu_model" ]; then printf 'model=%s\n' "$cpu_model"; fi
     ;;
   disk_usage)
     exec df -h
