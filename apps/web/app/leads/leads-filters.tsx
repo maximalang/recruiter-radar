@@ -87,14 +87,14 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
           disabled={isPending}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Компания, роль или сигнал"
-          aria-label="Поиск по текущему списку возможностей"
+          aria-label="Поиск по текущему списку компаний"
         />
       </form>
 
       {profiles.length > 1 ? (
         <select value={currentProfile} disabled={isPending}
           onChange={(event) => updateFilter('profile', event.target.value)}
-          className={s.filterSelect} aria-label="Профиль Radar">
+          className={s.filterSelect} aria-label="Профиль радара">
           <option value="">Все практики</option>
           {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
         </select>
@@ -114,11 +114,11 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
 
       <button type="button" onClick={toggleToday} disabled={isPending}
         className={s.todayToggle} data-motion-interactive data-active={currentToday ? 'true' : undefined}
-        aria-pressed={currentToday} title="Лиды, которые вы взяли в работу или по которым уже ответили">
+        aria-pressed={currentToday} title="Компании, которые вы взяли в работу или по которым уже ответили">
         <MotionIcon kind="filter" state={isPending ? 'pending' : currentToday ? 'active' : 'idle'} className={s.icon}>
           <CheckIcon />
         </MotionIcon>
-        В работе сегодня
+        Сегодня в работе
       </button>
 
       {hasEphemeralFilters ? (
