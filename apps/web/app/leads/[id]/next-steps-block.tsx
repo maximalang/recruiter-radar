@@ -109,7 +109,7 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
 
       {copyError && <p className={s.nextStepsError}>{copyError}</p>}
 
-      <details className={s.nextStepsPreview}>
+      <details className={s.nextStepsPreview} data-motion-disclosure>
         <summary>Что попадёт в CRM</summary>
         <pre className={s.nextStepsPre}>{crmBlock}</pre>
       </details>
