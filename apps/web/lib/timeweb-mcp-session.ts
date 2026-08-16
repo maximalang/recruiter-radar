@@ -82,17 +82,17 @@ export class TimewebMcpSessionManager {
 class PostgresTimewebMcpSessionStore implements TimewebMcpSessionStore {
   async findById(id: string) {
     if (!isUuid(id)) return null
-    const { rows } = await getPool().query('SELECT * FROM timeweb_mcp_sessions WHERE session_id = $1 LIMIT 1', [id])
+    const { rows } = await requirePool().query('SELECT * FROM timeweb_mcp_sessions WHERE session_id = $1 LIMIT 1', [id])
     return rows[0] ? fromRow(rows[0]) : null
   }
 
   async findBySubject(subject: string) {
-    const { rows } = await getPool().query('SELECT * FROM timeweb_mcp_sessions WHERE subject = $1 LIMIT 1', [subject])
+    const { rows } = await requirePool().query('SELECT * FROM timeweb_mcp_sessions WHERE subject = $1 LIMIT 1', [subject])
     return rows[0] ? fromRow(rows[0]) : null
   }
 
   async save(session: TimewebMcpSession) {
-    await getPool().query(`
+    await requirePool().query(`
       INSERT INTO timeweb_mcp_sessions (
         session_id, subject, upstream_session_id, protocol_version,
         created_at, last_seen_at, expires_at, recovery_count
@@ -118,11 +118,17 @@ class PostgresTimewebMcpSessionStore implements TimewebMcpSessionStore {
 
   async delete(id: string) {
     if (!isUuid(id)) return
-    await getPool().query('DELETE FROM timeweb_mcp_sessions WHERE session_id = $1', [id])
+    await requirePool().query('DELETE FROM timeweb_mcp_sessions WHERE session_id = $1', [id])
   }
 }
 
 export const timewebMcpSessionManager = new TimewebMcpSessionManager(new PostgresTimewebMcpSessionStore())
+
+function requirePool() {
+  const pool = getPool()
+  if (!pool) throw new Error('DATABASE_URL is required for persistent Timeweb MCP sessions')
+  return pool
+}
 
 function fromRow(row: Record<string, unknown>): TimewebMcpSession {
   return {
