@@ -72,6 +72,7 @@ jobs:
           set -euo pipefail
           bash -n scripts/deploy/configure-timeweb-mcp-auth.sh
           bash -n scripts/deploy/configure-timeweb-mcp-runtime.sh
+          bash -n scripts/deploy/timeweb-mcp-runtime-dispatch.sh
           bash -n scripts/deploy/configure-timeweb-mcp-caddy.sh
           bash scripts/deploy/test-timeweb-mcp-first-bootstrap.sh
           test -f .github/workflows/timeweb-mcp-bootstrap.yml
@@ -80,6 +81,8 @@ jobs:
           grep -Fq 'secrets.RR_TIMEWEB_MCP_TOKEN' .github/workflows/timeweb-mcp-bootstrap.yml
           grep -Fq 'RR_MCP_ENABLED: "false"' scripts/deploy/configure-timeweb-mcp-runtime.sh
           grep -Fq 'RR_MCP_MUTATIONS_ENABLED: "false"' scripts/deploy/configure-timeweb-mcp-runtime.sh
+          grep -Fq 'restrict,command=' scripts/deploy/configure-timeweb-mcp-runtime.sh
+          grep -Fq 'action_not_allowed' scripts/deploy/timeweb-mcp-runtime-dispatch.sh
           grep -Fq 'respond @rr_legacy_operator_mcp 404' scripts/deploy/configure-timeweb-mcp-caddy.sh
           if grep -Fq 'https://recruiter-radar.ru/api/internal/mcp' operator-auth/src/timeweb-server.js; then
             echo 'Timeweb auth service must not authorize the legacy MCP resource' >&2
@@ -91,6 +94,10 @@ jobs:
           npm test --workspace @recruiter-radar/web -- --runInBand
           src/__tests__/app/api/timeweb-mcp-route.test.ts
           src/__tests__/lib/timeweb-mcp-auth.test.ts
+          src/__tests__/lib/timeweb-mcp-session.test.ts
+          src/__tests__/lib/timeweb-mcp-recovery.test.ts
+          src/__tests__/lib/timeweb-mcp-runtime.test.ts
+          src/__tests__/lib/timeweb-mcp-router.test.ts
 
       - name: Type and production-build checks
         run: |
