@@ -2,14 +2,16 @@
 
 import { withSingleTimewebMcpRecovery } from '@/lib/timeweb-mcp-recovery'
 
+type AttemptResult = { status: number }
+
 describe('Timeweb MCP bounded recovery', () => {
   it('reinitializes once and retries once after session expiry', async () => {
-    const attempt = jest.fn()
+    const attempt = jest.fn<Promise<AttemptResult>, []>()
       .mockResolvedValueOnce({ status: 404 })
       .mockResolvedValueOnce({ status: 200 })
     const recover = jest.fn(async () => undefined)
 
-    const outcome = await withSingleTimewebMcpRecovery(
+    const outcome = await withSingleTimewebMcpRecovery<AttemptResult>(
       attempt,
       recover,
       (result) => result.status === 404 || result.status === 410,
@@ -21,10 +23,10 @@ describe('Timeweb MCP bounded recovery', () => {
   })
 
   it('does not create a reconnect loop when the retry is still expired', async () => {
-    const attempt = jest.fn().mockResolvedValue({ status: 410 })
+    const attempt = jest.fn<Promise<AttemptResult>, []>().mockResolvedValue({ status: 410 })
     const recover = jest.fn(async () => undefined)
 
-    const outcome = await withSingleTimewebMcpRecovery(attempt, recover, (result) => result.status === 410)
+    const outcome = await withSingleTimewebMcpRecovery<AttemptResult>(attempt, recover, (result) => result.status === 410)
 
     expect(outcome.result.status).toBe(410)
     expect(recover).toHaveBeenCalledTimes(1)
@@ -32,10 +34,10 @@ describe('Timeweb MCP bounded recovery', () => {
   })
 
   it('does not reconnect a healthy session', async () => {
-    const attempt = jest.fn().mockResolvedValue({ status: 200 })
+    const attempt = jest.fn<Promise<AttemptResult>, []>().mockResolvedValue({ status: 200 })
     const recover = jest.fn(async () => undefined)
 
-    const outcome = await withSingleTimewebMcpRecovery(attempt, recover, (result) => result.status === 410)
+    const outcome = await withSingleTimewebMcpRecovery<AttemptResult>(attempt, recover, (result) => result.status === 410)
 
     expect(outcome.recovered).toBe(false)
     expect(recover).not.toHaveBeenCalled()
