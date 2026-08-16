@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { LeadItem } from "@/lib/leads-data";
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from "@/lib/leads/lead-quality";
-import { formatScorePoints } from "@/lib/scoring/score-display";
 import { formatSignalFreshness, EmptyState } from "../ui/internal-page";
 import { TargetIcon } from "../ui/icons";
 import styles from "./dashboard-workspace.module.css";
@@ -14,10 +13,10 @@ interface DashboardTodayRadarProps {
 }
 
 function confidenceLabel(gate: LeadItem["confidenceGate"]) {
-  if (gate === "A") return "высокая";
-  if (gate === "B") return "достаточная";
-  if (gate === "C") return "ограниченная";
-  return "низкая";
+  if (gate === "A") return "высокое подтверждение";
+  if (gate === "B") return "достаточное подтверждение";
+  if (gate === "C") return "требует проверки";
+  return "недостаточно подтверждений";
 }
 
 export default function DashboardTodayRadar({ topLeads, pendingReview, hiringModeByProfileId, lastRunAt }: DashboardTodayRadarProps) {
@@ -25,7 +24,7 @@ export default function DashboardTodayRadar({ topLeads, pendingReview, hiringMod
     <section className={styles.todayRadarSection} aria-labelledby="today-radar-heading">
       <div className={styles.todayRadarHeader}>
         <div>
-          <span className={styles.sectionEyebrow}>Рабочий набор</span>
+          <span className={styles.sectionEyebrow}>Приоритет</span>
           <h2 id="today-radar-heading" className={styles.analyticsHeading}>Что требует внимания</h2>
         </div>
         <Link href="/review" className={styles.reviewLink}>На проверке {pendingReview}</Link>
@@ -35,12 +34,12 @@ export default function DashboardTodayRadar({ topLeads, pendingReview, hiringMod
         <EmptyState
           icon={TargetIcon}
           title={lastRunAt ? "Подходящих компаний пока нет" : "Первое сканирование ещё не завершено"}
-          text={lastRunAt ? "Последний запуск завершён, но компании не прошли текущие условия. Можно уточнить профиль или дождаться новых сигналов." : "После первого сканирования здесь появятся компании, why now и доказательства."}
-          action={{ href: "/settings/radar", label: "Проверить настройки Radar" }}
+          text={lastRunAt ? "Последний запуск завершён, но компании не прошли текущие условия. Можно уточнить профиль или дождаться новых сигналов." : "После первого сканирования здесь появятся компании, причины приоритета и подтверждения."}
+          action={{ href: "/settings/radar", label: "Проверить профиль радара" }}
         />
       ) : (
-        <div className={styles.todayRadarList} data-motion-list>
-          {topLeads.map((lead, index) => {
+        <div className={styles.todayRadarList}>
+          {topLeads.slice(0, 5).map((lead, index) => {
             const roleNames = deriveRoleNames({ evidenceTitles: lead.evidenceTitles });
             const { shown: shownRoles, more: moreRoles } = splitRolesForDisplay(roleNames, 2);
             const hiringMode = hiringModeByProfileId?.[lead.clientProfileId] ?? "specialist";
@@ -49,7 +48,7 @@ export default function DashboardTodayRadar({ topLeads, pendingReview, hiringMod
             const roles = shownRoles.length > 0 ? `${shownRoles.join(" · ")}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ""}` : "роли уточняются";
 
             return (
-              <Link key={lead.id} href={`/leads/${lead.id}`} className={styles.todayRadarRow} data-motion-item>
+              <Link key={lead.id} href={`/leads/${lead.id}`} className={styles.todayRadarRow}>
                 <span className={styles.todayRank}>{String(index + 1).padStart(2, "0")}</span>
                 <span className={styles.todayIdentity}>
                   <strong>{lead.orgName}</strong>
@@ -60,10 +59,9 @@ export default function DashboardTodayRadar({ topLeads, pendingReview, hiringMod
                   <small>{freshness} · {roles}</small>
                 </span>
                 <span className={styles.todayEvidence}>
-                  <strong>{lead.evidenceTitles.length} доказ.</strong>
+                  <strong>{lead.evidenceTitles.length} подтверждений</strong>
                   <small>{lead.sourceFamilies.length} ист. · {lead.vacanciesCount} вакансий</small>
                 </span>
-                <span className={styles.todayScore} data-numeric="true">{formatScorePoints(lead.score)}</span>
                 <span className={styles.todayConfidence}>{confidenceLabel(lead.confidenceGate)}</span>
                 <span className={styles.todayAction}>Открыть</span>
               </Link>
