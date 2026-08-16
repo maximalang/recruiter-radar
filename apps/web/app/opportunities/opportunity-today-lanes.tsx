@@ -4,7 +4,7 @@ import type {
   OpportunityOutcomeOperationalSummary,
   OpportunityView,
 } from '@/lib/opportunities/repository'
-import styles from './opportunities.module.css'
+import styles from './situations-page.module.css'
 
 const LANES: ReadonlyArray<{
   label: string
