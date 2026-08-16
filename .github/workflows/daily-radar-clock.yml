@@ -120,6 +120,7 @@ jobs:
             ingestStatus: body?.data?.ingest?.ok === true ? 'healthy' : body?.data?.ingest ? 'failed' : 'unknown',
             ingestSucceeded: body?.data?.ingest?.succeeded ?? 0,
             ingestFailed: body?.data?.ingest?.failed ?? 0,
+            failedSources: body?.data?.ingest?.failedSources ?? [],
             credentialGated: body?.data?.ingest?.credentialGated ?? 0,
             ingestNoActiveProfiles: body?.data?.ingest?.noActiveProfiles ?? false,
             temporalStatus: body?.data?.temporal === 'ready'
