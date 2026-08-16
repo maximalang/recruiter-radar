@@ -2,10 +2,12 @@
 
 import { useMemo, useState, type CSSProperties } from 'react'
 
-import { projectRussianCoordinates } from '@/lib/intelligence/evidence-radar'
 import type { EvidenceRadarRegionBoundary } from '@/lib/intelligence/evidence-radar-boundaries'
 import type { EvidenceRadarLead } from '@/lib/intelligence/evidence-radar-repository'
 import styles from './evidence-radar-map.module.css'
+
+const RADAR_WINDOW_DAYS = 30
+const MAX_PERSISTENT_LABELS = 8
 
 export function EvidenceRadarMap(props: {
   leads: readonly EvidenceRadarLead[]
@@ -15,15 +17,19 @@ export function EvidenceRadarMap(props: {
     props.leads[0]?.cardId ?? null,
   )
   const selected = props.leads.find((lead) => lead.cardId === selectedCardId) ?? props.leads[0] ?? null
-  const regions = useMemo(() => buildRegionSummaries(props.leads), [props.leads])
+  const rankedLeads = useMemo(() => rankRadarLeads(props.leads), [props.leads])
+  const labelledIds = useMemo(
+    () => new Set(rankedLeads.slice(0, MAX_PERSISTENT_LABELS).map((lead) => lead.cardId)),
+    [rankedLeads],
+  )
 
   if (props.leads.length === 0) {
     return (
       <section className={styles.empty} data-evidence-radar-empty>
-        <strong>Нет лидов с подтверждённой географией</strong>
+        <strong>Подтверждённых сигналов пока нет</strong>
         <p>
-          Карта спроса не размещает случайные города. Маркер появляется только после
-          подтверждения организации, объекта присутствия, координат и доказательной цепочки.
+          Радар показывает только компании, для которых есть проверяемая цепочка подтверждений.
+          Слабые или неподтверждённые связи не дорисовываются.
         </p>
       </section>
     )
@@ -31,129 +37,133 @@ export function EvidenceRadarMap(props: {
 
   return (
     <div className={styles.layout}>
-      <section className={styles.radarPanel} aria-label="Карта подтверждённого кадрового спроса">
-        <div className={styles.legend} aria-label="Легенда карты">
-          <span><i className={styles.legendSource} /> независимый источник</span>
-          <span><i className={styles.legendOrganization} /> организация</span>
-          <span>яркость — свежесть</span>
-          <span>размер — интенсивность найма</span>
-          <span>прозрачность — достоверность</span>
-        </div>
-        <p className={styles.selectedStatus} role="status" aria-live="polite" data-motion-status>
+      <section className={styles.radarPanel} aria-labelledby="evidence-radar-title">
+        <header className={styles.radarHeader}>
+          <div>
+            <span className={styles.radarEyebrow}>Свежесть × уровень подтверждения</span>
+            <h2 id="evidence-radar-title">Сильные сигналы ближе к верхнему правому углу</h2>
+          </div>
+          <div className={styles.radarLegend} aria-label="Как читать Радар">
+            <span>по горизонтали — свежесть</span>
+            <span>по вертикали — подтверждение</span>
+            <span>размер — коммерческая релевантность</span>
+          </div>
+        </header>
+
+        <p className={styles.selectedStatus} role="status" aria-live="polite">
           {selected ? `Выбрано: ${selected.organizationName}, ${selected.location.city}` : ''}
         </p>
 
-        <div className={styles.map} data-evidence-radar-map>
-          {props.boundaries && props.boundaries.length > 0 ? (
-            <svg
-              className={styles.regionBoundaries}
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              aria-label="Верифицированные границы субъектов Российской Федерации"
-            >
-              {props.boundaries.flatMap((boundary) =>
-                geometryPaths(boundary.geometry).map((path, index) => (
-                  <path
-                    key={`${boundary.code}:${index}`}
-                    d={path}
-                    className={styles.boundaryPath}
-                    data-region-code={boundary.code}
-                    aria-label={boundary.name}
-                  />
-                )),
-              )}
-            </svg>
-          ) : (
-            <div className={styles.mapFrame} aria-label="Границы субъектов ещё не загружены из верифицированного источника" />
-          )}
+        <div className={styles.canvas} data-evidence-radar-map>
+          <div className={styles.axisY} aria-hidden="true">
+            <span>сильнее подтверждено</span>
+            <span>слабее подтверждено</span>
+          </div>
+          <div className={styles.axisX} aria-hidden="true">
+            <span>старее</span>
+            <span>сейчас</span>
+          </div>
+          <div className={styles.guideHorizontal} aria-hidden="true" />
+          <div className={styles.guideVertical} aria-hidden="true" />
+
           {props.leads.map((lead) => (
-            <OrganizationCluster
+            <RadarOrganization
               key={lead.cardId}
               lead={lead}
               selected={lead.cardId === selected?.cardId}
+              labelled={labelledIds.has(lead.cardId) || lead.cardId === selected?.cardId}
               onSelect={() => setSelectedCardId(lead.cardId)}
             />
           ))}
         </div>
 
-        <div className={styles.regionGrid} aria-label="Региональное покрытие">
-          {regions.map((region) => (
-            <article key={region.code} className={styles.regionCard}>
-              <div>
-                <strong>{region.name}</strong>
-                <span>{region.cities.join(' · ')}</span>
-              </div>
-              <dl>
-                <div><dt>Организации</dt><dd>{region.organizations}</dd></div>
-                <div><dt>Источники</dt><dd>{region.sources}</dd></div>
-                <div><dt>Интенсивность</dt><dd>{Math.round(region.hiringIntent * 100)}</dd></div>
-                <div><dt>Свежесть</dt><dd>{Math.round(region.freshness * 100)}</dd></div>
-              </dl>
-              <small>{region.specializations.join(', ')}</small>
-            </article>
-          ))}
+        <div className={styles.semanticListWrap}>
+          <div className={styles.semanticListHeader}>
+            <h3>Сигналы по приоритету</h3>
+            <span>{rankedLeads.length} компаний</span>
+          </div>
+          <ol className={styles.semanticList} aria-label="Компании на Радаре">
+            {rankedLeads.map((lead, index) => {
+              const confidence = radarConfidence(lead)
+              return (
+                <li key={lead.cardId} data-selected={lead.cardId === selected?.cardId ? 'true' : undefined}>
+                  <button type="button" onClick={() => setSelectedCardId(lead.cardId)}>
+                    <span className={styles.semanticRank}>{String(index + 1).padStart(2, '0')}</span>
+                    <span className={styles.semanticIdentity}>
+                      <strong>{lead.organizationName}</strong>
+                      <small>{lead.location.city} · {freshnessLabel(lead)}</small>
+                    </span>
+                    <span className={styles.semanticWhy}>{lead.whyNow}</span>
+                    <span className={styles.semanticConfidence} data-level={confidence.level}>
+                      {confidence.label}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
         </div>
       </section>
 
-      <aside className={styles.detailPanel} aria-label="Детали выбранной организации">
+      <aside className={styles.detailPanel} aria-label="Контекст выбранной компании">
         {selected ? <EvidenceLeadDetail key={selected.cardId} lead={selected} /> : null}
       </aside>
     </div>
   )
 }
 
-function OrganizationCluster(props: {
+function RadarOrganization(props: {
   lead: EvidenceRadarLead
   selected: boolean
+  labelled: boolean
   onSelect: () => void
 }) {
-  const point = projectRussianCoordinates(
-    props.lead.location.latitude,
-    props.lead.location.longitude,
-  )
-  const freshness = componentValue(props.lead.score.components, 'freshness', .5)
-  const intent = componentValue(props.lead.score.components, 'hiringIntent',
-    componentValue(props.lead.score.components, 'hiring_intent', props.lead.score.opportunityScore / 100))
+  const point = radarPoint(props.lead)
+  const relevance = clamp01(props.lead.score.opportunityScore / 100)
+  const actualEvidence = props.lead.evidence.slice(0, 3)
   const style = {
     left: `${point.x}%`,
     top: `${point.y}%`,
-    '--intent': intent,
-    '--freshness': freshness,
-    '--confidence': clamp01(props.lead.location.confidence),
-    '--risk': clamp01(props.lead.score.riskScore / 100),
+    '--relevance': relevance,
   } as CSSProperties
-  const sourceCount = Math.min(12, Math.max(1, props.lead.independentSourceCount))
 
   return (
-    <div className={styles.cluster} style={style} data-selected={props.selected ? 'true' : undefined}>
-      <div className={styles.sourceOrbit} aria-hidden="true">
-        {Array.from({ length: sourceCount }, (_, index) => {
-          const offset = deterministicOrbit(props.lead.organizationId, index, sourceCount)
-          return (
-            <i
-              key={`${props.lead.cardId}:source:${index}`}
-              className={styles.sourceDot}
-              data-evidence-source
-              style={{
-                transform: `translate(${offset.x}px, ${offset.y}px)`,
-                '--source-index': index,
-              } as CSSProperties}
-            />
-          )
-        })}
-      </div>
+    <div
+      className={styles.cluster}
+      style={style}
+      data-selected={props.selected ? 'true' : undefined}
+      data-recency={point.recency}
+      data-confidence={point.confidence}
+    >
+      {props.selected && actualEvidence.length > 0 ? (
+        <span className={styles.evidenceConstellation} aria-hidden="true">
+          {actualEvidence.map((event, index) => {
+            const offset = deterministicEvidenceOffset(props.lead.organizationId, index, actualEvidence.length)
+            return (
+              <i
+                key={event.id}
+                className={styles.evidencePoint}
+                data-evidence-source
+                style={{
+                  '--evidence-x': `${offset.x}px`,
+                  '--evidence-y': `${offset.y}px`,
+                } as CSSProperties}
+              />
+            )
+          })}
+        </span>
+      ) : null}
       <button
         type="button"
         className={styles.organizationMarker}
         onClick={props.onSelect}
-        data-motion-interactive
         aria-pressed={props.selected}
         aria-label={`${props.lead.organizationName}, ${props.lead.location.city}`}
       >
-        <span className={styles.organizationDiamond} aria-hidden="true" />
-        <span className={styles.markerLabel}>
+        <span className={styles.organizationNode} aria-hidden="true" />
+        <span className={styles.markerLabel} data-visible={props.labelled ? 'true' : undefined}>
           <strong>{props.lead.organizationName}</strong>
-          <small>{props.lead.location.city} · {Math.round(props.lead.score.leadScore)}</small>
+          <small>{freshnessLabel(props.lead)} · {radarConfidence(props.lead).label}</small>
         </span>
       </button>
     </div>
@@ -169,14 +179,19 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
   const maxHeadcount = numeric(staffing?.maxHeadcount)
   const mode = typeof staffing?.mode === 'string' ? staffing.mode : null
   const acceleration = lead.temporalContext?.strongestAcceleration ?? null
+  const confidence = radarConfidence(lead)
 
   return (
-    <article className={styles.leadCard} data-evidence-lead-card data-motion-disclosure>
+    <article className={styles.leadCard} data-evidence-lead-card>
       <header className={styles.leadHeader}>
         <div>
-          <span className={styles.eyebrow}>Подтверждённая возможность</span>
+          <span className={styles.eyebrow}>Компания с подтверждённым сигналом</span>
           <h2>{lead.organizationName}</h2>
           {lead.legalName && lead.legalName !== lead.organizationName ? <p>{lead.legalName}</p> : null}
+        </div>
+        <div className={styles.leadScore} aria-label={`Сила сигнала ${Math.round(lead.score.leadScore)} из 100`}>
+          <strong>{Math.round(lead.score.leadScore)}</strong>
+          <span>{confidence.label}</span>
         </div>
       </header>
 
@@ -190,54 +205,50 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
         <h3>Почему сейчас</h3>
         <p>{lead.whyNow}</p>
         {acceleration && acceleration.change > 0 ? (
-          <p>
+          <p className={styles.delta}>
             Активные вакансии: {acceleration.previous} → {acceleration.current} за {acceleration.windowDays} дней (+{acceleration.change}).
           </p>
         ) : null}
       </section>
 
-      <section className={styles.opportunityStrength} aria-label="Сила возможности">
-        <div>
-          <span>Сила возможности</span>
-          <strong>{Math.round(lead.score.leadScore)} из 100</strong>
-        </div>
-        <p>Приоритет для проверки и первого контакта по подтверждённым фактам.</p>
-      </section>
-
       <section className={styles.leadSection}>
         <div className={styles.sectionHeading}>
-          <h3>Доказательства</h3>
+          <h3>Подтверждения</h3>
           <span>{lead.independentSourceCount} независимых источника</span>
         </div>
-        <ol className={styles.timeline}>
-          {lead.evidence.map((event) => (
-            <li key={event.id}>
-              <span>{formatDate(event.occurredAt)}</span>
-              <div>
-                <strong>{evidenceEventLabel(event.eventType)}</strong>
-                <small>{event.sourceFamily} · достоверность {Math.round(event.confidence * 100)}%</small>
-                {event.canonicalUrl ? (
-                  <a href={event.canonicalUrl} target="_blank" rel="noreferrer">
-                    {event.primarySource ? 'Открыть первичный источник' : 'Открыть источник'}
-                  </a>
-                ) : (
-                  <em>Прямая ссылка недоступна</em>
-                )}
-              </div>
-            </li>
-          ))}
-        </ol>
+        {lead.evidence.length > 0 ? (
+          <ol className={styles.timeline}>
+            {lead.evidence.map((event) => (
+              <li key={event.id}>
+                <span>{formatDate(event.occurredAt)}</span>
+                <div>
+                  <strong>{evidenceEventLabel(event.eventType)}</strong>
+                  <small>{event.sourceFamily} · достоверность {Math.round(event.confidence * 100)}%</small>
+                  {event.canonicalUrl ? (
+                    <a href={event.canonicalUrl} target="_blank" rel="noreferrer">
+                      {event.primarySource ? 'Открыть первичный источник' : 'Открыть источник'}
+                    </a>
+                  ) : (
+                    <em>Прямая ссылка недоступна</em>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className={styles.muted}>Датированные подтверждения для этого сигнала пока недоступны.</p>
+        )}
       </section>
 
       {lead.riskReasons.length > 0 ? (
         <section className={styles.leadSection}>
-          <h3>Риски</h3>
+          <h3>Ограничения</h3>
           <ul className={styles.riskList}>{lead.riskReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
         </section>
       ) : null}
 
       <section className={styles.leadSection}>
-        <h3>Безопасный путь контакта</h3>
+        <h3>Контакт</h3>
         {lead.contactPaths.length > 0 ? (
           <div className={styles.contacts}>
             {lead.contactPaths.map((contact) => contact.href ? (
@@ -250,7 +261,7 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
       </section>
 
       <footer className={styles.nextAction}>
-        <span>Следующий шаг</span>
+        <span>Следующий ход</span>
         <strong>{lead.recommendedAction}</strong>
         {lead.recommendedContactAt ? <small>Рекомендуемое окно: {formatDate(lead.recommendedContactAt)}</small> : null}
       </footer>
@@ -259,8 +270,8 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
         <summary>Диагностика оценки</summary>
         <div className={styles.diagnosticsBody}>
           <div className={styles.scoreGrid}>
-            <Score label="Сила возможности" value={lead.score.opportunityScore} />
-            <Score label="Достоверность" value={lead.score.confidenceScore} />
+            <Score label="Коммерческая релевантность" value={lead.score.opportunityScore} />
+            <Score label="Подтверждение" value={lead.score.confidenceScore} />
             <Score label="Срочность" value={lead.score.urgencyScore} />
             <Score label="Доступность контакта" value={lead.score.contactabilityScore} />
             <Score label="Риск" value={lead.score.riskScore} risk />
@@ -294,7 +305,7 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
                   </li>
                 ))}
               </ul>
-            ) : <p className={styles.muted}>Детализация вклада отсутствует — карточка требует проверки.</p>}
+            ) : <p className={styles.muted}>Детализация вклада отсутствует — сигнал требует проверки.</p>}
           </section>
         </div>
       </details>
@@ -320,8 +331,8 @@ const EVIDENCE_EVENT_LABELS: Readonly<Record<string, string>> = {
 }
 
 const SCORE_COMPONENT_LABELS: Readonly<Record<string, string>> = {
-  opportunity: 'Сила возможности',
-  confidence: 'Достоверность',
+  opportunity: 'Коммерческая релевантность',
+  confidence: 'Подтверждение',
   urgency: 'Срочность',
   contactability: 'Доступность контакта',
   risk: 'Риск',
@@ -351,61 +362,63 @@ function staffingModeLabel(mode: string | null): string {
   return 'режим не указан'
 }
 
-function buildRegionSummaries(leads: readonly EvidenceRadarLead[]) {
-  const regions = new Map<string, {
-    code: string
-    name: string
-    cities: Set<string>
-    organizations: Set<string>
-    sources: number
-    intent: number[]
-    freshness: number[]
-    specializations: Set<string>
-  }>()
-
-  for (const lead of leads) {
-    const key = lead.location.federalSubjectCode
-    const current = regions.get(key) ?? {
-      code: key,
-      name: lead.location.federalSubjectName,
-      cities: new Set<string>(),
-      organizations: new Set<string>(),
-      sources: 0,
-      intent: [],
-      freshness: [],
-      specializations: new Set<string>(),
-    }
-    current.cities.add(lead.location.city)
-    current.organizations.add(lead.organizationId)
-    current.sources += lead.independentSourceCount
-    current.intent.push(componentValue(lead.score.components, 'hiringIntent',
-      componentValue(lead.score.components, 'hiring_intent', lead.score.opportunityScore / 100)))
-    current.freshness.push(componentValue(lead.score.components, 'freshness', .5))
-    if (lead.specialization) current.specializations.add(lead.specialization)
-    regions.set(key, current)
-  }
-
-  return [...regions.values()]
-    .map((region) => ({
-      code: region.code,
-      name: region.name,
-      cities: [...region.cities].sort(),
-      organizations: region.organizations.size,
-      sources: region.sources,
-      hiringIntent: average(region.intent),
-      freshness: average(region.freshness),
-      specializations: [...region.specializations].sort(),
-    }))
-    .sort((a, b) => b.organizations - a.organizations || a.name.localeCompare(b.name, 'ru'))
+function rankRadarLeads(leads: readonly EvidenceRadarLead[]): EvidenceRadarLead[] {
+  return [...leads].sort((left, right) => {
+    const relevance = right.score.opportunityScore - left.score.opportunityScore
+    if (relevance !== 0) return relevance
+    const confidence = right.score.confidenceScore - left.score.confidenceScore
+    if (confidence !== 0) return confidence
+    return latestEvidenceTimestamp(right) - latestEvidenceTimestamp(left)
+  })
 }
 
-function deterministicOrbit(seedValue: string, index: number, count: number) {
+function radarPoint(lead: EvidenceRadarLead) {
+  const timestamp = latestEvidenceTimestamp(lead)
+  const ageDays = timestamp > 0 ? Math.max(0, (Date.now() - timestamp) / 86_400_000) : RADAR_WINDOW_DAYS
+  const recency = clamp01(1 - ageDays / RADAR_WINDOW_DAYS)
+  const confidence = clamp01(lead.score.confidenceScore / 100)
+  return {
+    x: 8 + recency * 84,
+    y: 88 - confidence * 76,
+    recency: Math.round(recency * 100),
+    confidence: Math.round(confidence * 100),
+  }
+}
+
+function latestEvidenceTimestamp(lead: EvidenceRadarLead): number {
+  let latest = 0
+  for (const event of lead.evidence) {
+    const timestamp = Date.parse(event.occurredAt)
+    if (Number.isFinite(timestamp) && timestamp > latest) latest = timestamp
+  }
+  return latest
+}
+
+function freshnessLabel(lead: EvidenceRadarLead): string {
+  const timestamp = latestEvidenceTimestamp(lead)
+  if (!timestamp) return 'дата подтверждения не определена'
+  const ageHours = Math.max(0, (Date.now() - timestamp) / 3_600_000)
+  if (ageHours < 24) return ageHours < 1 ? 'подтверждено недавно' : `${Math.floor(ageHours)} ч назад`
+  const ageDays = Math.floor(ageHours / 24)
+  if (ageDays === 1) return 'вчера'
+  if (ageDays <= 30) return `${ageDays} дн. назад`
+  return formatDate(new Date(timestamp).toISOString())
+}
+
+function radarConfidence(lead: EvidenceRadarLead): { level: 'high' | 'medium' | 'low'; label: string } {
+  const value = lead.score.confidenceScore
+  if (value >= 75) return { level: 'high', label: 'высокое подтверждение' }
+  if (value >= 50) return { level: 'medium', label: 'достаточное подтверждение' }
+  return { level: 'low', label: 'требует проверки' }
+}
+
+function deterministicEvidenceOffset(seedValue: string, index: number, count: number) {
   const seed = [...seedValue].reduce((total, char) => (total * 31 + char.charCodeAt(0)) % 3600, 17)
-  const angle = ((seed / 10) + (360 / count) * index) * Math.PI / 180
-  const radius = 18 + ((seed + index * 7) % 11)
+  const angle = ((seed / 10) + (360 / Math.max(count, 1)) * index) * Math.PI / 180
+  const radius = 24 + ((seed + index * 7) % 8)
   return {
     x: Math.round(Math.cos(angle) * radius * 10) / 10,
-    y: Math.round(Math.sin(angle) * radius * .68 * 10) / 10,
+    y: Math.round(Math.sin(angle) * radius * .72 * 10) / 10,
   }
 }
 
@@ -417,15 +430,6 @@ function numeric(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function average(values: readonly number[]): number {
-  return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
-}
-
-function componentValue(values: Record<string, number>, key: string, fallback: number): number {
-  const value = values[key]
-  return typeof value === 'number' && Number.isFinite(value) ? clamp01(value) : clamp01(fallback)
-}
-
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0))
 }
@@ -433,34 +437,4 @@ function clamp01(value: number): number {
 function formatDate(value: string): string {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? 'дата не подтверждена' : new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
-}
-
-function geometryPaths(geometry: Readonly<Record<string, unknown>>): string[] {
-  const type = geometry.type
-  const coordinates = geometry.coordinates
-  if (!Array.isArray(coordinates)) return []
-  if (type === 'Polygon') return polygonPaths(coordinates)
-  if (type === 'MultiPolygon') {
-    return coordinates.flatMap((polygon) => Array.isArray(polygon) ? polygonPaths(polygon) : [])
-  }
-  return []
-}
-
-function polygonPaths(rings: unknown[]): string[] {
-  return rings.flatMap((ring) => {
-    if (!Array.isArray(ring)) return []
-    const points = ring.flatMap((pair) => {
-      if (!Array.isArray(pair) || pair.length < 2) return []
-      const longitude = pair[0]
-      const latitude = pair[1]
-      if (typeof longitude !== 'number' || typeof latitude !== 'number') return []
-      try {
-        return [projectRussianCoordinates(latitude, longitude)]
-      } catch {
-        return []
-      }
-    })
-    if (points.length < 3) return []
-    return [`M ${points.map((point) => `${point.x} ${point.y}`).join(' L ')} Z`]
-  })
 }
