@@ -33,7 +33,7 @@ WORKDIR /app
 # Node's documented extra-CA path; certificate verification remains enabled.
 COPY packages/db/certs/russian-trusted-root-ca.pem /usr/local/share/ca-certificates/russian-trusted-root-ca.crt
 COPY packages/db/certs/russian-trusted-sub-ca-2024.pem /usr/local/share/ca-certificates/russian-trusted-sub-ca-2024.crt
-RUN apk add --no-cache ca-certificates chromium nss-tools \
+RUN apk add --no-cache ca-certificates chromium nss-tools openssh-client \
   && update-ca-certificates \
   && cat /usr/local/share/ca-certificates/russian-trusted-root-ca.crt \
     /usr/local/share/ca-certificates/russian-trusted-sub-ca-2024.crt \
