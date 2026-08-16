@@ -19,6 +19,7 @@ type WorkspaceIcon = (props: SVGProps<SVGSVGElement>) => ReactElement;
 const NAV_ICONS: Record<string, WorkspaceIcon> = {
   "/dashboard": TrendIcon,
   "/leads": SearchIcon,
+  "/opportunities": BriefcaseIcon,
   "/review": ShieldIcon,
   "/profile": TargetIcon,
   "/settings/radar": TargetIcon,
@@ -33,6 +34,7 @@ const ACCOUNT_SECONDARY_LINKS = [
 const STANDARD_ACCOUNT_HREFS = new Set([
   "/dashboard",
   "/leads",
+  "/opportunities",
   "/review",
   "/profile",
   "/settings",
@@ -41,13 +43,11 @@ const STANDARD_ACCOUNT_HREFS = new Set([
 function uniqueNavItems(items: Array<NavItem | undefined>): NavItem[] {
   const seen = new Set<string>();
   const result: NavItem[] = [];
-
   for (const item of items) {
     if (!item || seen.has(item.href)) continue;
     seen.add(item.href);
     result.push(item);
   }
-
   return result;
 }
 
@@ -57,9 +57,7 @@ function isAccountSecondaryRoute(href: string): boolean {
 
 function buildMobileNavigation(items: NavItem[]) {
   const activeItem = items.find((item) => item.active);
-  const activeOpportunity = activeItem?.href.startsWith("/opportunities")
-    ? activeItem
-    : undefined;
+  const activeOpportunity = activeItem?.href.startsWith("/opportunities") ? activeItem : undefined;
   const activeCustom = activeItem &&
     !STANDARD_ACCOUNT_HREFS.has(activeItem.href) &&
     !activeItem.href.startsWith("/opportunities") &&
@@ -69,13 +67,14 @@ function buildMobileNavigation(items: NavItem[]) {
 
   const dashboard = items.find((item) => item.href === "/dashboard");
   const leads = items.find((item) => item.href === "/leads");
+  const opportunities = items.find((item) => item.href === "/opportunities");
   const review = items.find((item) => item.href === "/review");
 
   const preferredPrimary = activeOpportunity
     ? [activeOpportunity, leads, review, dashboard]
     : activeCustom
       ? [activeCustom, dashboard, leads, review]
-      : [dashboard, leads, review];
+      : [dashboard, leads, opportunities, review];
 
   const primaryItems = uniqueNavItems([
     ...preferredPrimary,
@@ -83,57 +82,34 @@ function buildMobileNavigation(items: NavItem[]) {
   ]).slice(0, 3);
   const primaryHrefs = new Set(primaryItems.map((item) => item.href));
   const hasAccountSettings = items.some((item) => item.href === "/settings");
-  const secondaryLinks = hasAccountSettings
-    ? ACCOUNT_SECONDARY_LINKS.map((item) => ({ ...item }))
-    : [];
+  const secondaryLinks = hasAccountSettings ? ACCOUNT_SECONDARY_LINKS.map((item) => ({ ...item })) : [];
   const moreLinks = uniqueNavItems([
     ...items.filter((item) => !primaryHrefs.has(item.href)),
     ...secondaryLinks,
   ]);
 
-  return {
-    primaryItems,
-    moreLinks,
-    moreActive: moreLinks.some((item) => item.active),
-  };
+  return { primaryItems, moreLinks, moreActive: moreLinks.some((item) => item.active) };
 }
 
-export function ProductWorkspaceFrame(props: {
-  navItems: NavItem[];
-  children: ReactNode;
-}) {
+export function ProductWorkspaceFrame(props: { navItems: NavItem[]; children: ReactNode }) {
   return (
-    <div
-      className={styles.workspace}
-      data-product-workspace="true"
-      data-ui-system="recruiter-radar-v7"
-    >
+    <div className={styles.workspace} data-product-workspace="true" data-ui-system="recruiter-radar">
       <a href="#main-content" className={styles.skipLink}>К содержанию</a>
 
-      <aside className={styles.sidebar} aria-label="Рабочее пространство Recruiter Radar">
+      <aside className={styles.sidebar} data-theme="inverse" aria-label="Рабочее пространство Recruiter Radar">
         <div className={styles.sidebarBrand}>
           <Link href="/" aria-label="Recruiter Radar — на главную">
             <BrandLogo tone="dark" joined />
           </Link>
         </div>
-
         <nav className={styles.sidebarNav} aria-label="Разделы кабинета">
           {props.navItems.map((item) => {
             const Icon = NAV_ICONS[item.href] ?? BriefcaseIcon;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={styles.navItem}
-                data-active={item.active ? "true" : undefined}
-                data-motion-interactive
-                aria-current={item.active ? "page" : undefined}
-              >
-                <MotionIcon
-                  className={styles.navIcon}
-                  kind="navigation"
-                  state={item.active ? "active" : "idle"}
-                >
+              <Link key={item.href} href={item.href} className={styles.navItem}
+                data-active={item.active ? "true" : undefined} data-motion-interactive
+                aria-current={item.active ? "page" : undefined}>
+                <MotionIcon className={styles.navIcon} kind="navigation" state={item.active ? "active" : "idle"}>
                   <Icon />
                 </MotionIcon>
                 <span>{item.label}</span>
@@ -145,15 +121,9 @@ export function ProductWorkspaceFrame(props: {
 
       <div className={styles.workspaceBody}>
         <div className={styles.mobileTopbar}>
-          <Link href="/" aria-label="Recruiter Radar — на главную">
-            <BrandLogo joined />
-          </Link>
+          <Link href="/" aria-label="Recruiter Radar — на главную"><BrandLogo joined /></Link>
         </div>
-
-        <main id="main-content" className={styles.content} tabIndex={-1}>
-          {props.children}
-        </main>
-
+        <main id="main-content" className={styles.content} tabIndex={-1}>{props.children}</main>
         <ProductFooter />
         <MobileNavigation items={props.navItems} />
       </div>
@@ -185,53 +155,28 @@ export function ProductWorkspaceHeader(props: {
 
 function MobileNavigation(props: { items: NavItem[] }) {
   const { primaryItems, moreLinks, moreActive } = buildMobileNavigation(props.items);
-
   return (
-    <nav className={styles.mobileNav} aria-label="Мобильная навигация">
+    <nav className={styles.mobileNav} data-theme="inverse" aria-label="Мобильная навигация">
       {primaryItems.map((item) => {
         const Icon = NAV_ICONS[item.href] ?? BriefcaseIcon;
         return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={styles.mobileNavItem}
-            data-active={item.active ? "true" : undefined}
-            data-motion-interactive
-            aria-current={item.active ? "page" : undefined}
-          >
-            <MotionIcon
-              className={styles.mobileNavIcon}
-              kind="navigation"
-              state={item.active ? "active" : "idle"}
-            >
-              <Icon />
-            </MotionIcon>
+          <Link key={item.href} href={item.href} className={styles.mobileNavItem}
+            data-active={item.active ? "true" : undefined} data-motion-interactive
+            aria-current={item.active ? "page" : undefined}>
+            <MotionIcon className={styles.mobileNavIcon} kind="navigation" state={item.active ? "active" : "idle"}><Icon /></MotionIcon>
             <span>{item.href === "/review" ? "Проверка" : item.label}</span>
           </Link>
         );
       })}
       {moreLinks.length > 0 ? (
-        <details
-          className={styles.mobileMore}
-          data-active={moreActive ? "true" : undefined}
-          data-motion-disclosure
-        >
+        <details className={styles.mobileMore} data-active={moreActive ? "true" : undefined} data-motion-disclosure>
           <summary data-motion-interactive>
-            <MotionIcon className={styles.mobileNavIcon} kind="disclosure">
-              <LayersIcon />
-            </MotionIcon>
+            <MotionIcon className={styles.mobileNavIcon} kind="disclosure"><LayersIcon /></MotionIcon>
             <span>Ещё</span>
           </summary>
           <div className={styles.mobileMoreMenu}>
             {moreLinks.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                data-motion-interactive
-                aria-current={item.active ? "page" : undefined}
-              >
-                {item.label}
-              </Link>
+              <Link key={item.href} href={item.href} data-motion-interactive aria-current={item.active ? "page" : undefined}>{item.label}</Link>
             ))}
           </div>
         </details>
