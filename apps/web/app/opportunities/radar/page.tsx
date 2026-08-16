@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { listEvidenceRadarRegionBoundaries } from '@/lib/intelligence/evidence-radar-boundaries'
 import { isEvidenceRadarV1EnabledForContext } from '@/lib/intelligence/evidence-radar-config'
 import { listEvidenceRadarLeads } from '@/lib/intelligence/evidence-radar-repository'
 import {
@@ -11,7 +9,6 @@ import {
 } from '@/lib/opportunities/authorization'
 import { isOpportunityEngineV1EnabledForContext } from '@/lib/opportunities/config'
 import {
-  ContentCard,
   EmptyState,
   ErrorState,
   InternalPageFrame,
@@ -23,8 +20,8 @@ import { buildOpportunityRadarNavigation } from '../navigation'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Карта спроса — Recruiter Radar',
-  description: 'Региональная карта подтверждённых кадровых возможностей.',
+  title: 'Радар — Recruiter Radar',
+  description: 'Свежие подтверждённые hiring signals в пространстве свежести и уровня подтверждения.',
 }
 
 const NAVIGATION = buildOpportunityRadarNavigation('radar')
@@ -38,16 +35,14 @@ export default async function EvidenceRadarPage() {
     return (
       <InternalPageFrame navItems={NAVIGATION}>
         <InternalPageHeader
-          title="Карта спроса"
-          subtitle="Подтверждённые организации, события и кадровый спрос по регионам."
+          title="Радар"
+          subtitle="Свежесть сигнала и уровень подтверждения в одном пространстве."
         />
-        <ContentCard variant="hero">
-          <EmptyState
-            title="Нет доступа к Evidence Radar"
-            text="Войдите в рабочее пространство с доступом к возможностям."
-            action={{ href: '/login', label: 'Войти' }}
-          />
-        </ContentCard>
+        <EmptyState
+          title="Нет доступа к Радару"
+          text="Войдите в рабочее пространство с доступом к подтверждённым сигналам."
+          action={{ href: '/login', label: 'Войти' }}
+        />
       </InternalPageFrame>
     )
   }
@@ -56,27 +51,23 @@ export default async function EvidenceRadarPage() {
   const access = getOpportunityDataAccessContext(authorization)
   if (!access?.workspaceId) notFound()
 
-  const [leads, boundaries] = await Promise.all([
-    listEvidenceRadarLeads({
-      workspaceId: access.workspaceId,
-      limit: 100,
-    }).catch(() => null),
-    listEvidenceRadarRegionBoundaries().catch(() => []),
-  ])
+  const leads = await listEvidenceRadarLeads({
+    workspaceId: access.workspaceId,
+    limit: 100,
+  }).catch(() => null)
 
   return (
     <InternalPageFrame navItems={NAVIGATION}>
       <InternalPageHeader
-        title="Карта спроса"
-        subtitle="Только подтверждённые организации и объекты присутствия. География, источники и оценки не синтезируются."
-        nav={<Link href="/opportunities/sources">Реестр источников</Link>}
+        title="Радар"
+        subtitle="По горизонтали — свежесть подтверждения, по вертикали — его сила. География остаётся контекстом и не определяет положение компании."
       />
       {leads ? (
-        <EvidenceRadarMap leads={leads} boundaries={boundaries} />
+        <EvidenceRadarMap leads={leads} />
       ) : (
         <ErrorState
-          title="Evidence Radar временно не загрузился"
-          description="Данные других рабочих пространств не показываются. Проверьте миграции и повторите запрос."
+          title="Радар временно не загрузился"
+          description="Данные других рабочих пространств не показываются. Последние неподтверждённые связи не подставляются вместо результата."
           action={{ href: '/opportunities/radar', label: 'Обновить' }}
         />
       )}
