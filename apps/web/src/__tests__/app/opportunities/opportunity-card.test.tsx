@@ -62,27 +62,30 @@ const OPPORTUNITY: OpportunityItem = {
   }],
 }
 
-describe('OpportunityCard', () => {
-  const DECISION_HEADINGS = [
-    'Что изменилось',
-    'Почему сейчас',
-    'Почему подходит агентству',
-    'Доказательства',
-    'Предполагаемая задача',
-    'Рекомендуемая персона',
-    'Рекомендуемый заход',
-    'Релевантный кейс',
-    'Ограничения',
-    'Следующее действие',
-    'Коммерческая история',
-  ]
+function openAnalysis() {
+  const cue = screen.getByText('Анализ')
+  const summary = cue.closest('summary')
+  expect(summary).not.toBeNull()
+  fireEvent.click(summary as HTMLElement)
+}
 
-  it('renders evidence-backed brief copy and the evidence timeline', () => {
+describe('Situation row', () => {
+  it('keeps episode identity, change, proof and temporal state in the scan surface', () => {
     render(<OpportunityCard opportunity={OPPORTUNITY} />)
 
-    expect(screen.getByRole('heading', { name: 'Пример' })).toBeInTheDocument()
-    expect(screen.getByText(/Пример ускорила найм/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Всплеск найма' })).toBeInTheDocument()
+    expect(screen.getByText('Пример')).toBeInTheDocument()
     expect(screen.getByText('За 14 дней открыто 8 вакансий.')).toBeInTheDocument()
+    expect(screen.getByText(/1 факт · 1 источник · высокое подтверждение/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Ситуация с/)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Оценка возможности:/)).toBeNull()
+    expect(screen.getByText('Анализ').closest('details')).not.toHaveAttribute('open')
+  })
+
+  it('reveals evidence-backed decision detail without losing the temporal list hierarchy', () => {
+    render(<OpportunityCard opportunity={OPPORTUNITY} />)
+    openAnalysis()
+
     expect(screen.getByText('Почему подходит агентству')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Доказательства' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Backend developer' })).toHaveAttribute(
@@ -94,22 +97,16 @@ describe('OpportunityCard', () => {
       'href',
       '#evidence-10',
     )
-    expect(screen.getByLabelText('Оценка возможности: 82 из 100')).toBeInTheDocument()
   })
 
-  it('keeps all eleven decision sections and marks missing strategist data honestly', () => {
+  it('marks insufficient strategist data honestly after the user opens analysis', () => {
     render(<OpportunityCard opportunity={OPPORTUNITY} />)
+    openAnalysis()
 
-    for (const heading of DECISION_HEADINGS) {
-      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
-    }
-    expect(screen.getByRole('article')).toHaveAttribute(
-      'data-content-state',
-      'insufficient',
-    )
+    expect(screen.getByRole('article')).toHaveAttribute('data-content-state', 'insufficient')
     expect(screen.getByText(
       'Для части выводов пока недостаточно подтверждённых данных.',
-    )).toBeInTheDocument()
+    )).toHaveAttribute('role', 'status')
     expect(screen.getAllByText('Недостаточно подтверждённых данных.').length)
       .toBeGreaterThan(0)
   })
@@ -121,6 +118,7 @@ describe('OpportunityCard', () => {
     }} />)
 
     expect(screen.getByRole('article')).toHaveAttribute('data-freshness', 'stale')
+    openAnalysis()
     expect(screen.getByText(/Срок актуальности закончился/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Backend developer' })).toBeInTheDocument()
   })
@@ -133,6 +131,7 @@ describe('OpportunityCard', () => {
         url: 'javascript:alert(1)',
       }],
     }} />)
+    openAnalysis()
     expect(screen.queryByRole('link', { name: 'Backend developer' })).toBeNull()
     expect(screen.getByText('Backend developer')).toBeInTheDocument()
   })
@@ -147,11 +146,11 @@ describe('OpportunityCard', () => {
       outcomesUiEnabled
     />)
 
-    expect(screen.getByText('Предложение')).toBeInTheDocument()
+    expect(screen.getByText(/Предложение/)).toBeInTheDocument()
     expect(screen.queryByText('Связались')).toBeNull()
   })
 
-  it('renders the complete strategist card with explicit evidence and heuristic labels', () => {
+  it('preserves explicit evidence and hypothesis labels in strategist detail', () => {
     render(<OpportunityCard opportunity={{
       ...OPPORTUNITY,
       strategistBrief: {
@@ -160,10 +159,7 @@ describe('OpportunityCard', () => {
         whyNow: evidenceConclusion('Сигнал появился на этой неделе.', ['1']),
         problemHypothesis: heuristicConclusion('Команде может требоваться помощь.'),
         agencyFitExplanation: heuristicConclusion('Есть профильное совпадение.'),
-        externalSupportNeedExplanation: evidenceConclusion(
-          'Темп найма вырос.',
-          ['1'],
-        ),
+        externalSupportNeedExplanation: evidenceConclusion('Темп найма вырос.', ['1']),
         recommendedPersona: heuristicConclusion('Проверить функцию HRD.'),
         recommendedAngle: heuristicConclusion('Начать со сложных ролей.'),
         recommendedCaseStudy: heuristicConclusion('Точного кейса нет.'),
@@ -172,25 +168,16 @@ describe('OpportunityCard', () => {
         limitations: [heuristicConclusion('Нужна ручная проверка.')],
       },
     }} />)
+    openAnalysis()
 
-    for (const heading of DECISION_HEADINGS) {
-      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
-    }
-    expect(screen.getByRole('article')).toHaveAttribute(
-      'data-content-state',
-      'complete',
-    )
-    expect(screen.getAllByText('Основано на доказательствах').length)
-      .toBeGreaterThan(0)
-    expect(screen.getAllByText('Гипотеза — проверьте вручную').length)
-      .toBeGreaterThan(0)
+    expect(screen.getByRole('article')).toHaveAttribute('data-content-state', 'complete')
+    expect(screen.getAllByText('Основано на доказательствах').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Гипотеза — проверьте вручную').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Подтверждения: №1').length).toBeGreaterThan(0)
-    expect(screen.getByText('Риски')).toBeInTheDocument()
-    expect(screen.getByText('Ограничения')).toBeInTheDocument()
     expect(screen.getByText('Подготовить ручной черновик.')).toBeInTheDocument()
   })
 
-  it('renders the Commercial Signal card without an opaque overall score', () => {
+  it('renders Commercial Signal detail without reintroducing an opaque overall score', () => {
     render(<OpportunityCard
       opportunity={{
         ...OPPORTUNITY,
@@ -203,34 +190,21 @@ describe('OpportunityCard', () => {
       }}
       commercialSignalUiEnabled
     />)
+    openAnalysis()
 
     for (const heading of [
       'Что изменилось',
       'Почему это важно',
-      'Почему может понадобиться агентство',
-      'Почему подходит вашему агентству',
       'Почему сейчас',
-      'Вероятность внешнего подбора',
-      'Соответствие вашему профилю',
-      'Сила возможности',
-      'Готовность к контакту',
       'Что сделать сейчас',
       'Ограничения',
     ]) {
       expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
     }
     expect(screen.queryByLabelText(/Оценка возможности:/)).toBeNull()
-    expect(screen.getAllByText('Высокая').length).toBeGreaterThan(0)
-    expect(screen.getByText('Средняя')).toBeInTheDocument()
-    expect(screen.getByText('Коммерческая возможность')).toBeInTheDocument()
-    expect(screen.queryByText('Commercial Signal v3')).toBeNull()
-    expect(screen.queryByText('qualified actionable')).toBeNull()
     expect(screen.getAllByRole('link', { name: 'Подтверждено · №101' })).toHaveLength(4)
-    expect(screen.queryByText('Основано на доказательствах')).toBeNull()
-    expect(screen.queryByText('Подтверждения: №101')).toBeNull()
     expect(screen.getByText('Как радар сделал вывод').closest('details')).not.toHaveAttribute('open')
-    expect(screen.getByText('Подготовить проверяемый черновик обращения.'))
-      .toBeInTheDocument()
+    expect(screen.getByText('Подготовить проверяемый черновик обращения.')).toBeInTheDocument()
   })
 
   it('fails closed when Commercial Signal metadata is invalid', () => {
@@ -246,27 +220,27 @@ describe('OpportunityCard', () => {
       }}
       commercialSignalUiEnabled
     />)
+    openAnalysis()
 
     expect(screen.queryByLabelText(/Оценка возможности:/)).toBeNull()
-    expect(screen.getByText(/Данных для новой оценки коммерческой возможности пока недостаточно/))
+    expect(screen.getByText(/Данных для новой оценки ситуации пока недостаточно/))
       .toHaveAttribute('role', 'status')
     expect(screen.queryByText('Opportunity Quality')).toBeNull()
     expect(screen.queryByText(/snapshot|legacy-score/i)).toBeNull()
   })
 
   it.each([
-    [1, 1, 1, '1 факт · 1 источник · 1 прямое подтверждение'],
-    [2, 2, 2, '2 факта · 2 источника · 2 прямых подтверждения'],
-    [5, 5, 5, '5 фактов · 5 источников · 5 прямых подтверждений'],
-  ])('pluralizes evidence counts for %i items', (factCount, sourceFamilyCount, directEvidenceCount, expected) => {
+    [1, 1, '1 факт · 1 источник'],
+    [2, 2, '2 факта · 2 источника'],
+    [5, 5, '5 фактов · 5 источников'],
+  ])('pluralizes proof counts for %i items without badge-cloud duplication', (factCount, sourceFamilyCount, expected) => {
     render(<OpportunityCard opportunity={{
       ...OPPORTUNITY,
       factCount,
       sourceFamilyCount,
-      directEvidenceCount,
     }} />)
 
-    expect(screen.getByText(expected)).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(expected))).toBeInTheDocument()
   })
 })
 
