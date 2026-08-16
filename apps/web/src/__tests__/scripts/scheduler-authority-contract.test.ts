@@ -58,6 +58,10 @@ describe('production scheduler authority', () => {
     expect(dailyRadarWorkflow).toContain("[ \"$MANUAL_CONFIRM\" = 'DELIVER' ]")
     expect(dailyRadarWorkflow).toContain("? { mode: 'verify' }")
     expect(dailyRadarWorkflow).toContain('body: JSON.stringify(requestBody)')
+    expect(dailyRadarWorkflow).toContain("body?.data?.migrations === 'current'")
+    expect(dailyRadarWorkflow).toContain("body?.data?.temporal === 'ready'")
+    expect(dailyRadarWorkflow).toContain("body?.data?.deliveryInfrastructure === 'ready'")
+    expect(dailyRadarWorkflow).toContain('body?.data?.profileSelection')
   })
 
   it('fails Source Refresh on a real partial failure and logs only safe counters', () => {
@@ -81,6 +85,11 @@ describe('production scheduler authority', () => {
       'runDate:',
       'attempt:',
       'finalStatus:',
+      'runtimeStatus:',
+      'databaseStatus:',
+      'migrationsStatus:',
+      'schedulerStateStatus:',
+      'deliveryInfrastructureStatus:',
       'ingestStatus:',
       'ingestSucceeded:',
       'ingestFailed:',

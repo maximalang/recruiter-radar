@@ -2,7 +2,13 @@ import { NextRequest } from 'next/server'
 
 const dbQuery = jest.fn(async () => ({
   rowCount: 1,
-  rows: [{ runStateReady: true, profileStateReady: true }],
+  rows: [{
+    runStateReady: true,
+    profileStateReady: true,
+    migrationsCurrent: true,
+    temporalStateReady: true,
+    deliveryStateReady: true,
+  }],
 }))
 const claimDailyRadarRun = jest.fn()
 const runScheduledSourceRefresh = jest.fn()
@@ -70,6 +76,15 @@ describe('manual Daily Radar dispatch safety', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     isNoActiveProfiles.mockReturnValue(false)
+    loadDailyRadarProfileEligibility.mockResolvedValue({
+      eligible: [],
+      summary: {
+        total: 1,
+        active: 1,
+        eligible: 0,
+        excluded: { entitlement_inactive: 1 },
+      },
+    })
     process.env.CRON_API_KEY = 'cron-test-key'
   })
 
@@ -84,9 +99,23 @@ describe('manual Daily Radar dispatch safety', () => {
     await expect(response.json()).resolves.toMatchObject({
       success: true,
       mode: 'verify',
-      data: { database: 'ready' },
+      data: {
+        runtime: 'ready',
+        database: 'ready',
+        migrations: 'current',
+        schedulerState: 'ready',
+        temporal: 'ready',
+        deliveryInfrastructure: 'ready',
+        profileSelection: {
+          total: 1,
+          active: 1,
+          eligible: 0,
+          excluded: { entitlement_inactive: 1 },
+        },
+      },
     })
     expect(dbQuery).toHaveBeenCalledTimes(1)
+    expect(loadDailyRadarProfileEligibility).toHaveBeenCalledTimes(1)
     expect(claimDailyRadarRun).not.toHaveBeenCalled()
     expect(runScheduledSourceRefresh).not.toHaveBeenCalled()
     expect(runSourceTemporalIntelligence).not.toHaveBeenCalled()
@@ -116,6 +145,30 @@ describe('manual Daily Radar dispatch safety', () => {
       mode: 'verify',
       error: 'Database readiness check failed.',
     })
+    expect(claimDailyRadarRun).not.toHaveBeenCalled()
+  })
+
+  test('verify mode fails closed when temporal readiness is missing', async () => {
+    dbQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{
+        runStateReady: true,
+        profileStateReady: true,
+        migrationsCurrent: true,
+        temporalStateReady: false,
+        deliveryStateReady: true,
+      }],
+    })
+
+    const response = await POST(request({ mode: 'verify' }))
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      mode: 'verify',
+      error: 'Daily Radar temporal state is not ready.',
+    })
+    expect(loadDailyRadarProfileEligibility).not.toHaveBeenCalled()
     expect(claimDailyRadarRun).not.toHaveBeenCalled()
   })
 

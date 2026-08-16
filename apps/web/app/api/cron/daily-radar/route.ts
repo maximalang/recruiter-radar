@@ -22,6 +22,7 @@ import {
   type DailyRadarProfileCandidate,
 } from '@/lib/daily-radar-profile-eligibility'
 import { getPool } from '@/lib/db'
+import { EXPECTED_LATEST_MIGRATION } from '@/lib/health-readiness'
 import {
   getCommercialSignalCanaryWorkspaceId,
   resolveCommercialSignalRollout,
@@ -108,10 +109,27 @@ export async function POST(request: NextRequest) {
       readiness = await pool.query<{
         runStateReady: boolean
         profileStateReady: boolean
+        migrationsCurrent: boolean
+        temporalStateReady: boolean
+        deliveryStateReady: boolean
       }>(
         `SELECT
-           to_regclass('daily_radar_run_state') IS NOT NULL AS "runStateReady",
-           to_regclass('daily_radar_profile_run_state') IS NOT NULL AS "profileStateReady"`,
+           to_regclass('public.daily_radar_run_state') IS NOT NULL AS "runStateReady",
+           to_regclass('public.daily_radar_profile_run_state') IS NOT NULL AS "profileStateReady",
+           EXISTS (
+             SELECT 1 FROM schema_migrations WHERE version = $1
+           ) AS "migrationsCurrent",
+           (
+             to_regclass('public.source_temporal_observations') IS NOT NULL
+             AND to_regclass('public.source_temporal_derived_events') IS NOT NULL
+           ) AS "temporalStateReady",
+           (
+             to_regclass('public.web_push_subscriptions') IS NOT NULL
+             AND to_regclass('public.notification_provider_accounts') IS NOT NULL
+             AND to_regclass('public.notification_endpoints') IS NOT NULL
+             AND to_regclass('public.notification_routes') IS NOT NULL
+           ) AS "deliveryStateReady"`,
+        [EXPECTED_LATEST_MIGRATION],
       )
     } catch {
       logWarn('daily_radar.verify_failed', { reason: 'database_unavailable' })
@@ -128,10 +146,55 @@ export async function POST(request: NextRequest) {
         { status: 503 },
       )
     }
+    if (readiness.rows[0]?.migrationsCurrent !== true) {
+      return NextResponse.json(
+        { success: false, mode: 'verify', error: 'Database migrations are not current.' },
+        { status: 503 },
+      )
+    }
+    if (readiness.rows[0]?.temporalStateReady !== true) {
+      return NextResponse.json(
+        { success: false, mode: 'verify', error: 'Daily Radar temporal state is not ready.' },
+        { status: 503 },
+      )
+    }
+    if (readiness.rows[0]?.deliveryStateReady !== true) {
+      return NextResponse.json(
+        { success: false, mode: 'verify', error: 'Delivery infrastructure is not ready.' },
+        { status: 503 },
+      )
+    }
+
+    const configuredCanaryWorkspaceId = getCommercialSignalCanaryWorkspaceId()
+    const excludedWorkspaceId = configuredCanaryWorkspaceId
+      && resolveCommercialSignalRollout(configuredCanaryWorkspaceId).effectiveMode === 'canary'
+      ? configuredCanaryWorkspaceId
+      : null
+    let profileSelection
+    try {
+      profileSelection = await loadDailyRadarProfileEligibility({
+        now: new Date(),
+        excludedWorkspaceId,
+      })
+    } catch {
+      logWarn('daily_radar.verify_failed', { reason: 'profile_selection_unavailable' })
+      return NextResponse.json(
+        { success: false, mode: 'verify', error: 'Daily Radar profile selection is not ready.' },
+        { status: 503 },
+      )
+    }
     const result = {
       success: true,
       mode: 'verify',
-      data: { runtime: 'ready', database: 'ready', schedulerState: 'ready' },
+      data: {
+        runtime: 'ready',
+        database: 'ready',
+        migrations: 'current',
+        schedulerState: 'ready',
+        temporal: 'ready',
+        deliveryInfrastructure: 'ready',
+        profileSelection: profileSelection.summary,
+      },
     }
     logEvent('daily_radar.verify', result.data)
     return NextResponse.json(result, { status: 200 })
