@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import pg from 'pg';
 import { deriveTemporalEvents } from './lib/source-temporal-intelligence.mjs';
 
@@ -39,4 +41,6 @@ function buildMetrics(type, rows) { if (type === 'vacancies') { const active=row
 function latest(rows, mapping) { const row=[...rows].sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0]??{}; return Object.fromEntries(Object.entries(mapping).map(([out,keys])=>[out,num(keys.map((k)=>row.payload?.[k]).find((v)=>v!=null))])); }
 function unique(v){return [...new Set(v.map((x)=>String(x??'').trim()).filter(Boolean))]}; function num(v){const n=Number(v);return Number.isFinite(n)?n:0}; function hash(v){return crypto.createHash('sha256').update(JSON.stringify(v)).digest('hex')}
 
-if (import.meta.url === `file:///${process.argv[1]?.replaceAll('\\','/')}`) console.log(JSON.stringify(await deriveSourceTemporalIntelligence(), null, 2));
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  console.log(JSON.stringify(await deriveSourceTemporalIntelligence(), null, 2));
+}

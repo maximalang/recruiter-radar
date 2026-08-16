@@ -1,6 +1,6 @@
 const profileRows = [
-  { id: '101', delivery_frequency: 'daily' },
-  { id: '202', delivery_frequency: 'daily' },
+  { id: '101', deliveryFrequency: 'daily' },
+  { id: '202', deliveryFrequency: 'daily' },
 ]
 const runDigestForClientProfile = jest.fn(async (_arg: unknown) => ({ run: { id: 'unused' } }))
 const deliverCandidatesForRun = jest.fn(async (_runId: unknown) => ({
@@ -118,13 +118,13 @@ describe('daily radar partial retry', () => {
       .mockResolvedValueOnce({ acquired: false, persisted: true, runDate: '2026-08-14', clientProfileId: '101', leaseId: 'lease-2', attemptCount: 1, digestRunId: 'run-a', status: 'completed' })
       .mockResolvedValueOnce({ acquired: true, persisted: true, runDate: '2026-08-14', clientProfileId: '202', leaseId: 'lease-2', attemptCount: 2, digestRunId: 'run-b', status: 'running' })
 
-    const first = await generateAndDeliverDigests(dailyLease(1))
+    const first = await generateAndDeliverDigests(dailyLease(1), profileRows as any)
     expect(first.map((result) => result.ok)).toEqual([true, false])
     expect(runDigestForClientProfile).toHaveBeenCalledTimes(2)
     expect(deliverCandidatesForRun).toHaveBeenNthCalledWith(1, 'run-a')
     expect(deliverCandidatesForRun).toHaveBeenNthCalledWith(2, 'run-b')
 
-    const second = await generateAndDeliverDigests(dailyLease(2))
+    const second = await generateAndDeliverDigests(dailyLease(2), profileRows as any)
     expect(second.map((result) => result.ok)).toEqual([true, true])
     expect(second[0]).toMatchObject({ clientProfileId: '101', skipped: 1, retried: true })
     expect(second[1]).toMatchObject({ clientProfileId: '202', digestRunId: 'run-b', retried: true })

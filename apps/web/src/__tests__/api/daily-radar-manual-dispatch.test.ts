@@ -9,6 +9,12 @@ const runScheduledSourceRefresh = jest.fn()
 const runSourceTemporalIntelligence = jest.fn()
 const runDigestForClientProfile = jest.fn()
 const deliverCandidatesForRun = jest.fn()
+const loadDailyRadarProfileEligibility = jest.fn() as jest.Mock
+const isNoActiveProfiles = jest.fn(() => false) as jest.Mock
+const finishDailyRadarRun = jest.fn(async () => true) as jest.Mock
+const recordDailyRadarSourceRefreshResult = jest.fn(async () => true) as jest.Mock
+const recordDailyRadarTemporalResult = jest.fn(async () => true) as jest.Mock
+const heartbeatDailyRadarRun = jest.fn(async () => true) as jest.Mock
 
 jest.mock('@/lib/db', () => ({
   getPool: () => ({ query: dbQuery }),
@@ -27,17 +33,24 @@ jest.mock('@/lib/opportunities/commercial-signal-rollout', () => ({
 }))
 jest.mock('@/lib/daily-radar-run-state', () => ({
   claimDailyRadarRun: () => claimDailyRadarRun(),
-  finishDailyRadarRun: jest.fn(),
-  recordDailyRadarSourceRefreshResult: jest.fn(),
-  recordDailyRadarTemporalResult: jest.fn(),
-  heartbeatDailyRadarRun: jest.fn(),
+  finishDailyRadarRun: (lease: unknown, status: unknown, now?: unknown, summary?: unknown) =>
+    finishDailyRadarRun(lease, status, now, summary),
+  recordDailyRadarSourceRefreshResult: (lease: unknown, value: unknown) =>
+    recordDailyRadarSourceRefreshResult(lease, value),
+  recordDailyRadarTemporalResult: (lease: unknown, value: unknown) =>
+    recordDailyRadarTemporalResult(lease, value),
+  heartbeatDailyRadarRun: (lease: unknown, now?: unknown) => heartbeatDailyRadarRun(lease, now),
+  summarizeDailyRadarProfiles: jest.fn(async () => ({ profilesTotal: 0, profilesCompleted: 0, profilesFailed: 0, profilesRetryable: 0, profilesTerminal: 0, profilesSkipped: 0, profilesRunning: 0 })),
   claimDailyRadarProfile: jest.fn(),
   attachDailyRadarProfileDigestRun: jest.fn(),
   finishDailyRadarProfile: jest.fn(),
   dailyRadarNextRetryAt: jest.fn(),
 }))
+jest.mock('@/lib/daily-radar-profile-eligibility', () => ({
+  loadDailyRadarProfileEligibility: (options: unknown) => loadDailyRadarProfileEligibility(options),
+}))
 jest.mock('@/lib/lead-discovery/source-ingest', () => ({
-  isNoActiveProfiles: () => false,
+  isNoActiveProfiles: (result: unknown) => isNoActiveProfiles(result),
   runSourceTemporalIntelligence: () => runSourceTemporalIntelligence(),
 }))
 jest.mock('@/lib/lead-discovery/scheduled-source-refresh', () => ({
@@ -56,6 +69,7 @@ const request = (payload: unknown) => new NextRequest('http://localhost/api/cron
 describe('manual Daily Radar dispatch safety', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    isNoActiveProfiles.mockReturnValue(false)
     process.env.CRON_API_KEY = 'cron-test-key'
   })
 
@@ -103,5 +117,65 @@ describe('manual Daily Radar dispatch safety', () => {
       error: 'Database readiness check failed.',
     })
     expect(claimDailyRadarRun).not.toHaveBeenCalled()
+  })
+
+  test('scheduled mode treats zero eligible profiles as a healthy no-op when other stages are healthy', async () => {
+    claimDailyRadarRun.mockResolvedValueOnce({ acquired: true, persisted: true, runDate: '2026-08-16', leaseId: '00000000-0000-4000-8000-000000000001', attemptCount: 1 })
+    runScheduledSourceRefresh.mockResolvedValueOnce([])
+    runSourceTemporalIntelligence.mockResolvedValueOnce({ success: true, reason: 'expected-zero', observations: 0, derivedEvents: 0 })
+    loadDailyRadarProfileEligibility.mockResolvedValueOnce({
+      eligible: [],
+      summary: {
+        total: 1,
+        active: 1,
+        eligible: 0,
+        excluded: { no_configured_channel: 1 },
+      },
+    })
+
+    const response = await POST(request({}))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      reason: 'completed',
+      data: {
+        temporal: { reason: 'expected-zero' },
+        digest: {
+          eligibility: {
+            active: 1,
+            eligible: 0,
+            excluded: { no_configured_channel: 1 },
+          },
+        },
+      },
+    })
+    expect(runDigestForClientProfile).not.toHaveBeenCalled()
+    expect(deliverCandidatesForRun).not.toHaveBeenCalled()
+  })
+
+  test('scheduled mode reports no active profiles as a healthy classified no-op', async () => {
+    claimDailyRadarRun.mockResolvedValueOnce({ acquired: true, persisted: true, runDate: '2026-08-16', leaseId: '00000000-0000-4000-8000-000000000001', attemptCount: 1 })
+    runScheduledSourceRefresh.mockResolvedValueOnce({ error: 'no_active_profiles', hint: 'not logged' })
+    isNoActiveProfiles.mockReturnValueOnce(true)
+    runSourceTemporalIntelligence.mockResolvedValueOnce({ success: true, reason: 'expected-zero', observations: 0, derivedEvents: 0 })
+    loadDailyRadarProfileEligibility.mockResolvedValueOnce({
+      eligible: [],
+      summary: { total: 1, active: 0, eligible: 0, excluded: { profile_paused: 1 } },
+    })
+
+    const response = await POST(request({}))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      reason: 'completed',
+      data: {
+        ingest: { ok: true, noActiveProfiles: true, total: 0 },
+        digest: { eligibility: { active: 0, eligible: 0, excluded: { profile_paused: 1 } } },
+      },
+    })
+    expect(runSourceTemporalIntelligence).toHaveBeenCalledTimes(1)
+    expect(runDigestForClientProfile).not.toHaveBeenCalled()
   })
 })

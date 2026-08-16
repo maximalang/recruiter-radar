@@ -13,6 +13,10 @@ const hardeningSmokeWorkflow = readFileSync(
   resolve(process.cwd(), '..', '..', '.github', 'workflows', 'hardening-smoke.yml'),
   'utf8',
 )
+const smokeVerifier = readFileSync(
+  resolve(process.cwd(), '..', '..', 'packages', 'db', 'scripts', 'verify-smoke.mjs'),
+  'utf8',
+)
 const browserRunners = [
   resolve(process.cwd(), 'scripts', 'verify-landing-production.mjs'),
   resolve(process.cwd(), '..', '..', 'scripts', 'verify-responsive-surfaces.mjs'),
@@ -76,6 +80,9 @@ describe('pull request CI workflow contract', () => {
     )
     expect(hardeningSmokeWorkflow).toContain(
       'SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK: isolated',
+    )
+    expect(smokeVerifier).toContain(
+      "'./verify-source-identity-lineage.mjs'",
     )
   })
 

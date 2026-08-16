@@ -36,6 +36,20 @@ describe('source-ingest', () => {
         success: true,
         observations: 4,
         derivedEvents: 2,
+        reason: 'derived-events',
+      })
+    })
+
+    it('classifies zero observations and zero derived events as an expected healthy result', async () => {
+      mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+        callback(null, JSON.stringify({ observations: 0, derivedEvents: 0 }), '')
+      })
+
+      await expect(runSourceTemporalIntelligence()).resolves.toEqual({
+        success: true,
+        observations: 0,
+        derivedEvents: 0,
+        reason: 'expected-zero',
       })
     })
 
@@ -48,7 +62,57 @@ describe('source-ingest', () => {
         success: false,
         observations: 0,
         derivedEvents: 0,
+        reason: 'process-failed',
         error: 'source_temporal_observations is missing',
+      })
+    })
+
+    it('fails closed when stdout is empty or malformed', async () => {
+      mockExecFile
+        .mockImplementationOnce((_cmd, _args, _opts, callback) => callback(null, '', ''))
+        .mockImplementationOnce((_cmd, _args, _opts, callback) => callback(null, 'diagnostic\n{bad-json}', ''))
+
+      await expect(runSourceTemporalIntelligence()).resolves.toEqual({
+        success: false,
+        observations: 0,
+        derivedEvents: 0,
+        reason: 'malformed-output',
+        error: 'Temporal intelligence summary is empty.',
+      })
+      await expect(runSourceTemporalIntelligence()).resolves.toEqual(expect.objectContaining({
+        success: false,
+        observations: 0,
+        derivedEvents: 0,
+        reason: 'malformed-output',
+      }))
+    })
+
+    it('rejects negative counts as malformed output', async () => {
+      mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+        callback(null, JSON.stringify({ observations: -1, derivedEvents: 0 }), '')
+      })
+
+      await expect(runSourceTemporalIntelligence()).resolves.toEqual({
+        success: false,
+        observations: 0,
+        derivedEvents: 0,
+        reason: 'malformed-output',
+        error: 'Temporal intelligence summary is missing non-negative integer counts.',
+      })
+    })
+
+    it('classifies a killed subprocess as a timeout without masking the failure', async () => {
+      mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+        const error = Object.assign(new Error('Command failed'), { killed: true, signal: 'SIGTERM' })
+        callback(error, '', '')
+      })
+
+      await expect(runSourceTemporalIntelligence()).resolves.toEqual({
+        success: false,
+        observations: 0,
+        derivedEvents: 0,
+        reason: 'timeout',
+        error: 'Temporal intelligence timed out.',
       })
     })
   })

@@ -17,7 +17,10 @@ import { runScheduledSourceRefresh } from '@/lib/lead-discovery/scheduled-source
 import { runDigestForClientProfile } from '@/lib/digest'
 import { deliverCandidatesForRun } from '@/lib/digest/deliver-candidates'
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
-import { shouldDeliverOnRun } from '@/lib/delivery/nextDeliveryHint'
+import {
+  loadDailyRadarProfileEligibility,
+  type DailyRadarProfileCandidate,
+} from '@/lib/daily-radar-profile-eligibility'
 import { getPool } from '@/lib/db'
 import {
   getCommercialSignalCanaryWorkspaceId,
@@ -164,14 +167,9 @@ export async function POST(request: NextRequest) {
   const startMs = Date.now()
 
   try {
-    const ingestResults = await runScheduledSourceRefresh()
-    if (isNoActiveProfiles(ingestResults)) {
-      await finishDailyRadarRun(lease, 'completed')
-      return NextResponse.json(
-        { success: false, error: 'No active client profiles; pipeline skipped.', hint: ingestResults.hint },
-        { status: 422 }
-      )
-    }
+    const scheduledIngestResults = await runScheduledSourceRefresh()
+    const sourceRefreshNoActiveProfiles = isNoActiveProfiles(scheduledIngestResults)
+    const ingestResults = sourceRefreshNoActiveProfiles ? [] : scheduledIngestResults
     const ingestOk = ingestResults.every(r => r.success)
     for (const result of ingestResults) {
       const sourcePayload = {
@@ -199,6 +197,7 @@ export async function POST(request: NextRequest) {
       deferred: ingestResults.filter(r => r.outcome === 'deferred').length,
       credentialGated: ingestResults.filter(r => r.outcome === 'credential-gated').length,
       rateLimited: ingestResults.filter(r => r.outcome === 'rate-limited').length,
+      noActiveProfiles: sourceRefreshNoActiveProfiles,
       fetchedTotal: ingestResults.reduce((sum, r) => sum + (r.fetchedCount ?? 0), 0),
       upsertedTotal: ingestResults.reduce((sum, r) => sum + (r.upsertedCount ?? 0), 0),
       outcomes: ingestResults.reduce<Record<string, number>>((counts, result) => {
@@ -216,6 +215,7 @@ export async function POST(request: NextRequest) {
     const temporalResult = await runSourceTemporalIntelligence()
     const temporalPayload = {
       success: temporalResult.success,
+      reason: temporalResult.reason,
       observations: temporalResult.observations,
       derivedEvents: temporalResult.derivedEvents,
       error: temporalResult.error ?? null,
@@ -229,7 +229,16 @@ export async function POST(request: NextRequest) {
       throw new Error('Daily radar lease ownership was lost after temporal intelligence.')
     }
 
-    const digestResults = await generateAndDeliverDigests(lease)
+    const configuredCanaryWorkspaceId = getCommercialSignalCanaryWorkspaceId()
+    const canaryWorkspaceId = configuredCanaryWorkspaceId
+      && resolveCommercialSignalRollout(configuredCanaryWorkspaceId).effectiveMode === 'canary'
+      ? configuredCanaryWorkspaceId
+      : null
+    const profileEligibility = await loadDailyRadarProfileEligibility({
+      now: new Date(),
+      excludedWorkspaceId: canaryWorkspaceId,
+    })
+    const digestResults = await generateAndDeliverDigests(lease, profileEligibility.eligible)
     const invocationDigestOk = digestResults.every(r => r.ok)
     const digestSummary = {
       total: digestResults.length,
@@ -293,13 +302,18 @@ export async function POST(request: NextRequest) {
       leaseId: lease.leaseId,
       attempt: lease.attemptCount,
       status: finalStatus,
-      ingestOk: ingestSummary.succeeded,
+      ingestOk,
+      ingestSucceeded: ingestSummary.succeeded,
       ingestTotal: ingestSummary.total,
       temporalOk: temporalResult.success,
+      temporalReasonCode: temporalResult.reason,
       temporalObservations: temporalResult.observations,
       temporalEvents: temporalResult.derivedEvents,
       digestOk: invocationDigestOk,
       digestTotal: digestSummary.total,
+      profilesActive: profileEligibility.summary.active,
+      profilesEligible: profileEligibility.summary.eligible,
+      profileExclusions: profileEligibility.summary.excluded,
       profilesTotal: profileSummary.profilesTotal,
       profilesCompleted: profileSummary.profilesCompleted,
       profilesRetryable: profileSummary.profilesRetryable,
@@ -334,7 +348,13 @@ export async function POST(request: NextRequest) {
         attemptCount: lease.attemptCount,
         ingest: { ok: ingestOk, ...ingestSummary, details: ingestResults },
         temporal: { ok: temporalResult.success, ...temporalResult },
-        digest: { ok: cumulativeDigestOk, ...digestSummary, ...profileSummary, details: digestResults },
+        digest: {
+          ok: cumulativeDigestOk,
+          ...digestSummary,
+          ...profileSummary,
+          eligibility: profileEligibility.summary,
+          details: digestResults,
+        },
       },
     }, { status: allOk ? 200 : finalStatus === 'terminal' ? 409 : 207 })
   } catch {
@@ -388,60 +408,19 @@ export interface DigestDeliveryResult {
 
 export async function generateAndDeliverDigests(
   lease: DailyRadarLease,
+  profiles: readonly DailyRadarProfileCandidate[],
 ): Promise<DigestDeliveryResult[]> {
   const pool = getPool()
   if (!pool) {
     return [{ clientProfileId: 'none', ok: false, sent: 0, failed: 0, skipped: 0, error: 'DATABASE_URL not set' }]
   }
 
-  const configuredCanaryWorkspaceId = getCommercialSignalCanaryWorkspaceId()
-  const canaryWorkspaceId = configuredCanaryWorkspaceId &&
-    resolveCommercialSignalRollout(configuredCanaryWorkspaceId).effectiveMode === 'canary'
-    ? configuredCanaryWorkspaceId
-    : null
-
-  const profiles = await pool.query<{ id: string; delivery_frequency: string }>(`
-    SELECT id::TEXT AS id, delivery_frequency
-    FROM client_profiles
-    WHERE is_active = true
-      AND delivery_enabled = true
-      AND ($1::BIGINT IS NULL OR workspace_id IS DISTINCT FROM $1::BIGINT)
-      AND (
-        telegram_chat_id IS NOT NULL
-        OR (email_digest_enabled = true AND digest_email IS NOT NULL)
-        OR (
-          web_push_enabled = true
-          AND EXISTS (
-            SELECT 1
-            FROM web_push_subscriptions wps
-            WHERE wps.client_profile_id = client_profiles.id
-              AND wps.revoked_at IS NULL
-          )
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM notification_routes nr
-          INNER JOIN notification_endpoints ne ON ne.id = nr.endpoint_id
-          INNER JOIN notification_provider_accounts npa ON npa.id = ne.provider_account_id
-          WHERE nr.client_profile_id = client_profiles.id
-            AND nr.event_kind = 'daily_digest'
-            AND nr.status = 'active'
-            AND ne.status = 'active'
-            AND ne.destination_id IS NOT NULL
-            AND npa.status IN ('active', 'degraded')
-        )
-      )
-    ORDER BY id
-  `, [canaryWorkspaceId])
-
-  if (profiles.rows.length === 0) {
+  if (profiles.length === 0) {
     return []
   }
-
-  const runUtc = new Date()
   const results: DigestDeliveryResult[] = []
 
-  for (const profile of profiles.rows) {
+  for (const profile of profiles) {
     if (!await heartbeatDailyRadarRun(lease)) {
       throw new Error('Daily radar lease ownership was lost during profile delivery.')
     }
@@ -471,23 +450,6 @@ export async function generateAndDeliverDigests(
           error: `Profile delivery is not claimable (status=${profileLease.status}, attempts=${profileLease.attemptCount}).`,
         })
       }
-      continue
-    }
-
-    if (!shouldDeliverOnRun(
-      profile.delivery_frequency === 'weekly' ? 'weekly' : 'daily',
-      runUtc,
-    )) {
-      if (!await finishDailyRadarProfile(profileLease, 'skipped')) {
-        throw new Error('Daily radar profile lease ownership was lost before skip finalization.')
-      }
-      results.push({
-        clientProfileId: profile.id,
-        ok: true,
-        sent: 0,
-        failed: 0,
-        skipped: 1,
-      })
       continue
     }
 

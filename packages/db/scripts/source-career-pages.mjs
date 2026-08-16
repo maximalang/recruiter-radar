@@ -338,7 +338,9 @@ function loadCareerPagesTargetsConfig(targetsFilePath) {
 
 async function discoverCareerPagesTargets({ connectionString, persistSnapshot }) {
   const seeds = await loadCareerPagesDiscoverySeeds(connectionString);
-  const discovery = await discoverCareerPageTargetsFromSeeds(seeds);
+  const discovery = await discoverCareerPageTargetsFromSeeds(seeds, {
+    budgetMs: resolveCareerPagesDiscoveryBudgetMs(),
+  });
   const targetsFilePath = persistSnapshot ? resolveCareerPagesDiscoveredTargetsOutputPath() : null;
   const reviewFilePath = persistSnapshot ? resolveCareerPagesDiscoveryReviewOutputPath() : null;
 
@@ -462,14 +464,24 @@ async function loadCareerPagesDiscoverySeeds(connectionString) {
   }
 }
 
-async function discoverCareerPageTargetsFromSeeds(seeds) {
+export async function discoverCareerPageTargetsFromSeeds(seeds, {
+  budgetMs = resolveCareerPagesDiscoveryBudgetMs(),
+  now = Date.now,
+  probe = probeCareerPageSeed,
+} = {}) {
   const targetMap = new Map();
   const review = [];
+  const startedAt = now();
+  let budgetExhausted = false;
 
-  for (const seed of seeds) {
-    const probe = await probeCareerPageSeed(seed);
+  for (const [index, seed] of seeds.entries()) {
+    if (budgetMs > 0 && index > 0 && now() - startedAt >= budgetMs) {
+      budgetExhausted = true;
+      break;
+    }
+    const probeResult = await probe(seed);
 
-    for (const target of probe.targets) {
+    for (const target of probeResult.targets) {
       const dedupeKey = `${target.adapter}:${target.source_url}`;
       const existingTarget = targetMap.get(dedupeKey);
 
@@ -498,11 +510,11 @@ async function discoverCareerPageTargetsFromSeeds(seeds) {
       last_hh_signal_at: seed.lastHhSignalAt,
       signal_count: seed.signalCount,
       last_signal_at: seed.lastSignalAt,
-      detected_targets: probe.targets.length,
-      review_status: probe.targets.length > 0 ? 'resolved' : 'needs_review',
-      attempted_urls: probe.attemptedUrls,
-      detected_same_domain_career_page_url: probe.sameDomainCareerPageUrl,
-      notes: probe.notes,
+      detected_targets: probeResult.targets.length,
+      review_status: probeResult.targets.length > 0 ? 'resolved' : 'needs_review',
+      attempted_urls: probeResult.attemptedUrls,
+      detected_same_domain_career_page_url: probeResult.sameDomainCareerPageUrl,
+      notes: probeResult.notes,
     });
   }
 
@@ -510,11 +522,20 @@ async function discoverCareerPageTargetsFromSeeds(seeds) {
     targets: [...targetMap.values()].sort((left, right) => left.id.localeCompare(right.id)),
     review,
     summary: {
-      seedsConsidered: seeds.length,
+      seedsTotal: seeds.length,
+      seedsConsidered: review.length,
       targetsResolved: targetMap.size,
       unresolvedSeeds: review.filter((item) => item.review_status !== 'resolved').length,
+      budgetExhausted,
     },
   };
+}
+
+function resolveCareerPagesDiscoveryBudgetMs() {
+  const rawValue = process.env.CAREER_PAGES_DISCOVERY_BUDGET_MS?.trim();
+  if (rawValue === undefined || rawValue === '') return 30_000;
+  const parsedValue = Number.parseInt(rawValue, 10);
+  return Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : 30_000;
 }
 
 async function probeCareerPageSeed(seed) {

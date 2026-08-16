@@ -67,23 +67,39 @@ describe('production scheduler authority', () => {
     expect(sourceRefreshWorkflow).toContain('succeeded: body?.data?.succeeded ?? 0')
     expect(sourceRefreshWorkflow).toContain('credentialGated: body?.data?.credentialGated ?? 0')
     expect(sourceRefreshWorkflow).toContain('rateLimited: body?.data?.rateLimited ?? 0')
+    expect(sourceRefreshWorkflow).toContain('failedSources:')
+    expect(sourceRefreshWorkflow).toContain('rateLimitedSources:')
     expect(sourceRefreshWorkflow).toContain("if (response.status === 200) process.exit(0)")
     expect(sourceRefreshWorkflow).toContain("if (response.status === 422) process.exit(0)")
     expect(sourceRefreshWorkflow).not.toContain('[200, 207, 422].includes(response.status)')
+    expect(sourceRefreshWorkflow).not.toContain('result.error')
   })
 
   it('prints the complete safe Daily Radar operator summary', () => {
     for (const field of [
+      'trigger:',
       'runDate:',
       'attempt:',
-      'sourceFailedCount:',
-      'credentialGatedCount:',
-      'profilesTotal:',
+      'finalStatus:',
+      'ingestStatus:',
+      'ingestSucceeded:',
+      'ingestFailed:',
+      'credentialGated:',
+      'temporalStatus:',
+      'temporalReasonCode:',
+      'temporalObservations:',
+      'temporalDerivedEvents:',
+      'profilesEligible:',
+      'profilesActive:',
+      'profileExclusions:',
       'profilesCompleted:',
       'profilesRetryable:',
       'profilesTerminal:',
       'profilesSkipped:',
       'profilesRunning:',
+      'sent:',
+      'failed:',
+      'nextRetryAt:',
     ]) expect(dailyRadarWorkflow).toContain(field)
     expect(dailyRadarWorkflow).not.toContain('destinationId')
     expect(dailyRadarWorkflow).not.toContain('digestEmail')
