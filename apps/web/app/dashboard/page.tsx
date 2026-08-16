@@ -11,19 +11,13 @@ import { getEffectiveEntitlement } from "@/lib/entitlements";
 import DashboardAccountOverview from "./dashboard-account-overview";
 import DashboardTodayRadar from "./dashboard-today-radar";
 import { buildAccountNavigation } from "../ui/account-navigation";
-import {
-  EmptyState,
-  ErrorState,
-} from "../ui/internal-page";
-import {
-  ProductWorkspaceFrame,
-  ProductWorkspaceHeader,
-} from "../ui/product-workspace";
+import { EmptyState, ErrorState } from "../ui/internal-page";
+import { ProductWorkspaceFrame, ProductWorkspaceHeader } from "../ui/product-workspace";
 import dashStyles from "./dashboard-workspace.module.css";
 
 export const metadata: Metadata = {
-  title: "Командный центр — Recruiter Radar",
-  description: "Компании на сегодня, очередь проверки и готовность личного радара.",
+  title: "Сегодня — Recruiter Radar",
+  description: "Приоритетные компании, очередь проверки и рабочий контур на сегодня.",
 };
 
 export const dynamic = "force-dynamic";
@@ -32,41 +26,32 @@ const DASHBOARD_NAV = buildAccountNavigation("dashboard");
 
 export default async function DashboardPage() {
   const authorization = await getSession({
-    permissions: [
-      "workspace:read",
-      "profiles:read",
-      "leads:read",
-      "notifications:read",
-    ],
+    permissions: ["workspace:read", "profiles:read", "leads:read", "notifications:read"],
   });
 
   if (!authorization) {
     return (
       <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader
-          eyebrow="Защищённое рабочее пространство"
-          title="Личный кабинет"
-          subtitle="Войдите, чтобы видеть только свой профиль, лиды и историю работы."
+          title="Сегодня"
+          subtitle="Войдите, чтобы видеть только свой профиль, компании и историю работы."
         />
         <EmptyState
           title="Нужен вход в аккаунт"
-          text="Сессия этого браузера не связана с аккаунтом. Восстановите доступ по данным заказа или активируйте новый радар."
+          text="Сессия этого браузера не связана с аккаунтом. Восстановите доступ или активируйте Радар."
           action={{ href: "/login?returnTo=/dashboard", label: "Войти в аккаунт" }}
         />
       </ProductWorkspaceFrame>
     );
   }
 
-  const accountResult = await Promise.allSettled([
-    getAccountById(authorization.userId),
-  ]);
+  const accountResult = await Promise.allSettled([getAccountById(authorization.userId)]);
   const account = accountResult[0];
   if (account.status === "rejected" || !account.value) {
     return (
       <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader
-          eyebrow="Аккаунт"
-          title="Не удалось загрузить аккаунт"
+          title="Сегодня"
           subtitle="Сессия активна, но данные аккаунта временно недоступны."
         />
         <ErrorState
@@ -84,10 +69,28 @@ export default async function DashboardPage() {
       }).catch(() => null)
     : null;
   if (!entitlement) {
-    return <ProductWorkspaceFrame navItems={DASHBOARD_NAV}><ProductWorkspaceHeader eyebrow="Доступ" title="Не удалось проверить доступ" subtitle="Мы не показываем Radar, пока сервер не подтвердит права аккаунта." /><ErrorState title="Проверка доступа временно недоступна" description="Обновите страницу немного позже. Настройки аккаунта остаются доступны." action={{ href: "/settings/access", label: "Открыть доступ и оплату" }} /></ProductWorkspaceFrame>;
+    return (
+      <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
+        <ProductWorkspaceHeader title="Сегодня" subtitle="Радар не показывает рабочий набор, пока сервер не подтвердит права аккаунта." />
+        <ErrorState
+          title="Проверка доступа временно недоступна"
+          description="Обновите страницу немного позже. Настройки аккаунта остаются доступны."
+          action={{ href: "/settings/access", label: "Открыть доступ и оплату" }}
+        />
+      </ProductWorkspaceFrame>
+    );
   }
   if (entitlement.status !== "active" || !entitlement.features.includes("dashboard")) {
-    return <ProductWorkspaceFrame navItems={DASHBOARD_NAV}><ProductWorkspaceHeader eyebrow="Доступ" title="Доступ к Radar не активен" subtitle="Профиль и история аккаунта сохранены." /><EmptyState title="Нужен активный доступ" text="Выберите срок доступа или обратитесь к оператору. После активации dashboard откроется без повторной настройки." action={{ href: "/settings/access", label: "Проверить доступ" }} /></ProductWorkspaceFrame>;
+    return (
+      <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
+        <ProductWorkspaceHeader title="Сегодня" subtitle="Профиль и история аккаунта сохранены." />
+        <EmptyState
+          title="Доступ к Радару не активен"
+          text="Выберите срок доступа. После активации рабочий набор откроется без повторной настройки."
+          action={{ href: "/settings/access", label: "Проверить доступ" }}
+        />
+      </ProductWorkspaceFrame>
+    );
   }
 
   const [profileResult, todayRadarResult, deliveryPreferencesResult] = await Promise.allSettled([
@@ -99,8 +102,12 @@ export default async function DashboardPage() {
   if (profileResult.status === "rejected") {
     return (
       <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
-        <ProductWorkspaceHeader eyebrow="Radar" title="Не удалось загрузить профиль Radar" subtitle="Это временная ошибка данных, а не незавершённая настройка." />
-        <ErrorState title="Профиль Radar временно недоступен" description="Обновите страницу немного позже. Сохранённые настройки не потеряны." action={{ href: "/settings/radar", label: "Открыть настройки Radar" }} />
+        <ProductWorkspaceHeader title="Сегодня" subtitle="Не удалось загрузить профиль радара." />
+        <ErrorState
+          title="Профиль радара временно недоступен"
+          description="Это временная ошибка данных. Сохранённые настройки не потеряны."
+          action={{ href: "/settings/radar", label: "Открыть профиль радара" }}
+        />
       </ProductWorkspaceFrame>
     );
   }
@@ -113,15 +120,11 @@ export default async function DashboardPage() {
   if (!profile) {
     return (
       <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
-        <ProductWorkspaceHeader
-          eyebrow="Активация"
-          title="Завершите настройку радара"
-          subtitle="Аккаунт найден, но рабочий профиль ещё не создан."
-        />
+        <ProductWorkspaceHeader title="Сегодня" subtitle="Аккаунт найден, но рабочий профиль ещё не создан." />
         <EmptyState
           title="Радар ещё не настроен"
           text="Пройдите четыре коротких шага: команда, практика, рынок и доставка."
-          action={{ href: "/onboarding", label: "Настроить Radar" }}
+          action={{ href: "/onboarding", label: "Настроить Радар" }}
         />
       </ProductWorkspaceFrame>
     );
@@ -130,8 +133,12 @@ export default async function DashboardPage() {
   if (!profile.isActive) {
     return (
       <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
-        <ProductWorkspaceHeader eyebrow="Radar" title="Профиль приостановлен" subtitle="Настройки сохранены, но новые возможности не формируются." />
-        <EmptyState title="Включите Radar-профиль" text="Возобновите профиль в настройках — после этого следующие сканирования снова будут учитывать вашу практику." action={{ href: "/settings/radar", label: "Открыть настройки Radar" }} />
+        <ProductWorkspaceHeader title="Сегодня" subtitle="Настройки сохранены, но новые компании не формируются." />
+        <EmptyState
+          title="Профиль радара приостановлен"
+          text="Возобновите профиль в настройках — после этого следующие сканирования снова будут учитывать вашу практику."
+          action={{ href: "/settings/radar", label: "Открыть профиль радара" }}
+        />
       </ProductWorkspaceFrame>
     );
   }
@@ -143,13 +150,12 @@ export default async function DashboardPage() {
   return (
     <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
       <ProductWorkspaceHeader
-        eyebrow="Утренний обзор"
-        title="Командный центр"
-        subtitle="Приоритетные компании, очередь проверки и состояние радара — в одном рабочем контексте."
+        title="Сегодня"
+        subtitle="Приоритетные компании, изменения и действия, которые требуют внимания сейчас."
         status="Наблюдение активно"
         actions={(
           <Link href="/leads" className={dashStyles.workspaceCta}>
-            Открыть все возможности
+            Все компании
           </Link>
         )}
       />
@@ -158,7 +164,7 @@ export default async function DashboardPage() {
         {deliveryPreferencesUnavailable ? (
           <ErrorState
             title="Не удалось проверить готовность доставки"
-            description="Возможности Radar доступны ниже, но статус каналов доставки сейчас не подтверждён."
+            description="Компании и подтверждения доступны ниже, но статус каналов доставки сейчас не подтверждён."
             action={{ href: "/settings/delivery", label: "Открыть настройки доставки" }}
           />
         ) : (
@@ -182,7 +188,7 @@ export default async function DashboardPage() {
           <ErrorState
             title="Радар временно не загрузился"
             description="Профиль и настройки доступны. Обновите страницу через минуту — данные других аккаунтов здесь не показываются."
-            action={{ href: "/settings/radar", label: "Проверить настройки Radar" }}
+            action={{ href: "/settings/radar", label: "Проверить профиль радара" }}
           />
         )}
       </div>
