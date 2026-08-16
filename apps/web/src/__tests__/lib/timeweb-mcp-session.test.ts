@@ -22,9 +22,41 @@ class MemoryPersistentStore implements TimewebMcpSessionStore {
   async save(session: TimewebMcpSession) {
     const existing = this.rows.get(session.subject)
     const persisted = existing
-      ? { ...clone(session), id: existing.id, createdAt: new Date(existing.createdAt) }
+      ? {
+          ...clone(existing),
+          protocolVersion: session.protocolVersion,
+          lastSeenAt: new Date(session.lastSeenAt),
+          expiresAt: new Date(session.expiresAt),
+        }
       : clone(session)
     this.rows.set(session.subject, persisted)
+    return clone(persisted)
+  }
+
+  async setUpstreamSession(subject: string, upstreamSessionId: string | null, lastSeenAt: Date, expiresAt: Date) {
+    const existing = this.rows.get(subject)
+    if (!existing) throw new Error('missing session')
+    const persisted = {
+      ...clone(existing),
+      upstreamSessionId,
+      lastSeenAt: new Date(lastSeenAt),
+      expiresAt: new Date(expiresAt),
+    }
+    this.rows.set(subject, persisted)
+    return clone(persisted)
+  }
+
+  async markRecovered(subject: string, lastSeenAt: Date, expiresAt: Date) {
+    const existing = this.rows.get(subject)
+    if (!existing) throw new Error('missing session')
+    const persisted = {
+      ...clone(existing),
+      upstreamSessionId: null,
+      recoveryCount: existing.recoveryCount + 1,
+      lastSeenAt: new Date(lastSeenAt),
+      expiresAt: new Date(expiresAt),
+    }
+    this.rows.set(subject, persisted)
     return clone(persisted)
   }
 
@@ -78,6 +110,25 @@ describe('Timeweb MCP persistent session lifecycle', () => {
     expect(first.session.id).toBe(second.session.id)
     expect([first.created, second.created].filter(Boolean)).toHaveLength(1)
     expect((await store.findBySubject('rr_owner'))?.id).toBe(first.session.id)
+  })
+
+  it('does not let a stale request restore an expired upstream session after recovery', async () => {
+    const store = new MemoryPersistentStore()
+    const manager = new TimewebMcpSessionManager(store, 60_000)
+    const now = new Date('2026-08-16T10:00:00.000Z')
+    const first = await manager.getOrCreate('rr_owner', null, '2025-03-26', now)
+    await manager.setUpstreamSession(first.session, 'upstream-session-old', now)
+
+    const stale = clone(first.session)
+    await manager.markRecovered(first.session, new Date(now.getTime() + 100))
+    await manager.setUpstreamSession(first.session, 'upstream-session-new', new Date(now.getTime() + 200))
+    await manager.touch(stale, new Date(now.getTime() + 300))
+
+    expect(stale.upstreamSessionId).toBe('upstream-session-new')
+    expect(stale.recoveryCount).toBe(1)
+    const persisted = await store.findBySubject('rr_owner')
+    expect(persisted?.upstreamSessionId).toBe('upstream-session-new')
+    expect(persisted?.recoveryCount).toBe(1)
   })
 
   it('expires stale sessions and creates a fresh fenced local session', async () => {
