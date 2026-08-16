@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
-import { LeadCard, LeadsListLegend } from '@/app/leads/leads-page-content';
+import { LeadCard } from '@/app/leads/leads-page-content';
 import type { LeadItem } from '@/lib/leads-data';
 
 const baseLead = {
@@ -32,33 +32,36 @@ const baseLead = {
   reviewStatus: 'auto_approved',
 } as unknown as LeadItem;
 
-describe('LeadCard signal-card template', () => {
-  it('uses the landing signal-card hierarchy without a duplicate score band', () => {
+describe('LeadCard V1-V6 decision-row contract', () => {
+  it('renders rank → company → why now → proof → score → confidence without the retired score legend', () => {
     const { container } = render(
       <LeadCard
         lead={baseLead}
         fitPreview={null}
         hiringMode="specialist"
+        rank={1}
       />,
     );
-    const card = container.querySelector('[data-signal-card="true"]');
-    expect(card).not.toBeNull();
-    expect(screen.queryByText('Сигнал радара')).toBeNull();
-    expect(screen.getByRole('meter', { name: 'Сила сигнала: 80 из 100' })).toBeTruthy();
-    expect(screen.getByText('Компания и контакты')).toBeTruthy();
-    expect(screen.getByText('Релевантные вакансии')).toBeTruthy();
-    expect(screen.getByText('Сигналы')).toBeTruthy();
-    expect(screen.queryByText('Почему сейчас')).toBeNull();
-    expect(card?.textContent).not.toContain('01');
-    expect(card?.textContent).not.toContain('02');
-    expect(card?.textContent).not.toContain('03');
-    expect(screen.getByRole('link', { name: /Открыть полную карточку компании/ })).toHaveAttribute('href', '/leads/lead-1');
-    expect(card?.closest('a')).toBeNull();
-    expect(card?.textContent).not.toContain('Горячий');
-    expect(card?.textContent).toContain('A');
+
+    const row = container.querySelector('[data-signal-card="true"]');
+    expect(row).not.toBeNull();
+    expect(row?.textContent).toContain('01');
+    expect(screen.getByRole('link', { name: 'Ромашка' })).toHaveAttribute('href', '/leads/lead-1');
+    expect(screen.getByText('Hiring burst across 3 roles')).toBeInTheDocument();
+    expect(row?.textContent).toContain('4 вакансии');
+    expect(row?.textContent).toContain('1 источник');
+    expect(container.querySelector('[aria-label="Сила сигнала 80 из 100"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Уверенность: высокая"]')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Открыть brief компании Ромашка' })).toHaveAttribute('href', '/leads/lead-1');
+
+    expect(screen.queryByRole('meter')).toBeNull();
+    expect(screen.queryByText('Компания и контакты')).toBeNull();
+    expect(screen.queryByText('Релевантные вакансии')).toBeNull();
+    expect(screen.queryByText('Сигналы')).toBeNull();
+    expect(container.querySelector('[data-legend]')).toBeNull();
   });
 
-  it('keeps primary evidence visible and secondary provenance in an accessible disclosure', () => {
+  it('keeps primary proof scan-friendly and provenance behind a disclosure', () => {
     const { container } = render(
       <LeadCard
         lead={{
@@ -67,61 +70,52 @@ describe('LeadCard signal-card template', () => {
         } as unknown as LeadItem}
         fitPreview={{ icon: 'industry', text: 'Совпадает отрасль' }}
         hiringMode="specialist"
+        rank={2}
       />,
     );
 
     expect(screen.getByText('Hiring burst across 3 roles')).toBeInTheDocument();
-    expect(screen.getByText('Совпадает отрасль')).toBeInTheDocument();
+    expect(container.textContent).toContain('Совпадает отрасль');
 
     const disclosure = container.querySelector('details[data-motion-disclosure]');
     const summary = disclosure?.querySelector('summary');
     expect(disclosure).not.toBeNull();
-    expect(summary).toHaveAttribute('data-motion-interactive');
-    expect(summary?.querySelector('[data-motion-icon="disclosure"]')).not.toBeNull();
+    expect(summary?.textContent).toMatch(/Доказательства и происхождение/i);
 
     fireEvent.click(summary as HTMLElement);
     expect(disclosure).toHaveAttribute('open');
     expect(screen.getByText('Backend')).toBeInTheDocument();
-    expect(screen.getByText('career-pages')).toBeInTheDocument();
+    expect(screen.getByText(/Источник: career-pages/)).toBeInTheDocument();
     expect(screen.getByText('Карьерная страница обновлена')).toBeInTheDocument();
-    expect(container.querySelector('[data-motion-list] [data-motion-item]')).not.toBeNull();
   });
 
-  it('keeps workflow status separate from the score block', () => {
+  it('keeps workflow status subordinate to the decision hierarchy', () => {
     const { container } = render(
       <LeadCard
         lead={baseLead}
         fitPreview={null}
         hiringMode="specialist"
+        rank={3}
       />,
     );
-    const status = container.querySelector('[data-chip-group="status"]');
-    expect(status).not.toBeNull();
-    expect(status?.textContent).toMatch(/В работе/i);
+
+    expect(container.textContent).toMatch(/В работе/i);
+    expect(container.querySelector('[aria-label="Сила сигнала 80 из 100"]')).not.toBeNull();
   });
 
-  it('keeps foreign and AI hints outside the workflow status group', () => {
+  it('renders foreign-employer and AI context as quiet metadata rather than score semantics', () => {
     const foreignLead = { ...baseLead, isForeignEmployer: true } as unknown as LeadItem;
     const { container } = render(
-      <LeadCard lead={foreignLead} fitPreview={null} hiringMode="specialist" />,
+      <LeadCard
+        lead={foreignLead}
+        fitPreview={null}
+        hiringMode="specialist"
+        rank={4}
+      />,
     );
-    const status = container.querySelector('[data-chip-group="status"]');
-    const foreignText = 'Иностранный работодатель';
-    expect(status?.textContent ?? '').not.toContain(foreignText);
-    expect(container.textContent).toContain(foreignText);
-  });
-});
 
-describe('LeadsListLegend (T3.3 — a11y)', () => {
-  it('is not aria-hidden blind — carries a visible + a11y label', () => {
-    const { container } = render(<LeadsListLegend />);
-    // The legend wrapper must not be aria-hidden (the old code marked it blind).
-    const legendRoot = container.querySelector('[data-legend]');
-    expect(legendRoot).not.toBeNull();
-    expect(legendRoot?.getAttribute('aria-hidden')).not.toBe('true');
-    // The three tone dots are labelled for AT.
-    expect(screen.getByText(/высокий/i)).toBeTruthy();
-    expect(screen.getByText(/средний/i)).toBeTruthy();
-    expect(screen.getByText(/низкий/i)).toBeTruthy();
+    expect(container.textContent).toContain('иностранный работодатель');
+    expect(container.textContent).toContain('AI-подсказка доступна');
+    expect(container.querySelector('[aria-label="Сила сигнала 80 из 100"]')).not.toBeNull();
   });
 });
