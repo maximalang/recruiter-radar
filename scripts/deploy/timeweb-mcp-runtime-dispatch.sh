@@ -23,6 +23,15 @@ safe_container_state() {
     "$container"
 }
 
+web_revision() {
+  local container image_id tags revision
+  container="$(container_for_service web)"
+  image_id="$(docker inspect --format '{{.Image}}' "$container")"
+  tags="$(docker image inspect --format '{{join .RepoTags "\n"}}' "$image_id")"
+  revision="$(printf '%s\n' "$tags" | sed -nE 's#^recruiter-radar:([0-9a-f]{40})$#\1#p' | head -n 1)"
+  printf '%s' "$revision"
+}
+
 case "$ACTION" in
   docker_ps)
     exec docker ps --format '{{json .}}'
@@ -59,11 +68,17 @@ case "$ACTION" in
     exec git -C "$ROOT" status --short --branch
     ;;
   deployment_info)
+    revision="$(web_revision)"
     for service in web postgres redis n8n; do
       container="$(container_for_service "$service")"
-      docker inspect --format \
-        '{"service":"'"$service"'","container":"{{.Name}}","image":"{{.Config.Image}}","image_id":"{{.Image}}","revision":"{{index .Config.Labels "org.opencontainers.image.revision"}}","status":"{{.State.Status}}","health":"{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}"}' \
-        "$container"
+      image_id="$(docker inspect --format '{{.Image}}' "$container")"
+      image="$(docker inspect --format '{{.Config.Image}}' "$container")"
+      status="$(docker inspect --format '{{.State.Status}}' "$container")"
+      health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container")"
+      service_revision=""
+      if [ "$service" = web ]; then service_revision="$revision"; fi
+      printf '{"service":"%s","container":"%s","image":"%s","image_id":"%s","revision":"%s","status":"%s","health":"%s"}\n' \
+        "$service" "$container" "$image" "$image_id" "$service_revision" "$status" "$health"
     done
     ;;
   *)
