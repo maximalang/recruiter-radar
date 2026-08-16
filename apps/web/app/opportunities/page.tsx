@@ -30,13 +30,10 @@ import {
   getOpportunityDataAccessContext,
 } from '@/lib/opportunities/authorization'
 import {
-  ContentCard,
   EmptyState,
   ErrorState,
   InternalPageFrame,
   InternalPageHeader,
-  MetricCard,
-  MetricGrid,
 } from '../ui/internal-page'
 import { OpportunityCard } from './opportunity-card'
 import { OpportunityFunnel } from './opportunity-funnel'
@@ -44,12 +41,13 @@ import { OpportunityResearchMode } from './opportunity-research-mode'
 import { OpportunityTodayLanes } from './opportunity-today-lanes'
 import { buildOpportunityNavigation } from './navigation'
 import styles from './opportunities.module.css'
+import pageStyles from './situations-page.module.css'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Сегодня — Recruiter Radar',
-  description: 'Действия по подтверждённым коммерческим возможностям на сегодня.',
+  title: 'Ситуации — Recruiter Radar',
+  description: 'Подтверждённые коммерческие эпизоды, их развитие, доказательства и следующий ход.',
 }
 
 const NAVIGATION = buildOpportunityNavigation()
@@ -77,16 +75,14 @@ export default async function OpportunitiesPage(props: {
     return (
       <InternalPageFrame navItems={NAVIGATION}>
         <InternalPageHeader
-          title="Сегодня"
-          subtitle="Подтверждённые возможности и следующие действия вашего агентства."
+          title="Ситуации"
+          subtitle="Изменяющиеся hiring-эпизоды и подтверждения, которые создают окно для контакта."
         />
-        <ContentCard variant="hero">
-          <EmptyState
-            title="Нет доступа к возможностям"
-            text="Войдите в аккаунт с доступом к рабочему пространству или запросите подходящую роль."
-            action={{ href: '/login', label: 'Войти' }}
-          />
-        </ContentCard>
+        <EmptyState
+          title="Нет доступа к ситуациям"
+          text="Войдите в аккаунт с доступом к рабочему пространству или запросите подходящую роль."
+          action={{ href: '/login', label: 'Войти' }}
+        />
       </InternalPageFrame>
     )
   }
@@ -159,9 +155,9 @@ export default async function OpportunitiesPage(props: {
   if (!result) {
     return (
       <InternalPageFrame navItems={NAVIGATION}>
-        <InternalPageHeader title="Сегодня" />
+        <InternalPageHeader title="Ситуации" />
         <ErrorState
-          title="Возможности временно не загрузились"
+          title="Ситуации временно не загрузились"
           description="Данные других аккаунтов не показываются. Обновите страницу через минуту."
           action={{ href: '/opportunities', label: 'Обновить' }}
         />
@@ -184,11 +180,11 @@ export default async function OpportunitiesPage(props: {
   return (
     <InternalPageFrame navItems={NAVIGATION}>
       <InternalPageHeader
-        title="Сегодня"
-        subtitle="Сначала действия: новые возможности, контакт, follow-up и активный pipeline."
+        title="Ситуации"
+        subtitle="Коммерческие эпизоды: что изменилось, чем подтверждено и какой следующий ход имеет смысл."
         nav={(
           <Link href="/leads" className={styles.headerLink}>
-            Все лиды
+            Компании
           </Link>
         )}
       />
@@ -200,28 +196,12 @@ export default async function OpportunitiesPage(props: {
             activeView={view}
           />
         ) : outcomesUiEnabled ? (
-          <MetricGrid>
-            <MetricCard
-              label="Новые возможности"
-              value={operationalSummary?.newCount ?? 0}
-              tone="info"
-            />
-            <MetricCard
-              label="В работе"
-              value={operationalSummary?.acceptedCount ?? 0}
-              tone="neutral"
-            />
-            <MetricCard
-              label="Коммерческий pipeline"
-              value={operationalSummary?.pipelineCount ?? 0}
-              tone="success"
-            />
-            <MetricCard
-              label="Отложены"
-              value={operationalSummary?.snoozedCount ?? 0}
-              tone="neutral"
-            />
-          </MetricGrid>
+          <div className={pageStyles.summaryLedger} aria-label="Рабочий контур ситуаций">
+            <div><span>Новые</span><strong>{operationalSummary?.newCount ?? 0}</strong></div>
+            <div><span>В работе</span><strong>{operationalSummary?.acceptedCount ?? 0}</strong></div>
+            <div><span>Активная работа</span><strong>{operationalSummary?.pipelineCount ?? 0}</strong></div>
+            <div><span>Отложены</span><strong>{operationalSummary?.snoozedCount ?? 0}</strong></div>
+          </div>
         ) : null}
 
         <OpportunityResearchMode
@@ -249,22 +229,18 @@ export default async function OpportunitiesPage(props: {
               />
             ))}
           </div>
+        ) : isNarrowedResult(view, workflowEnabled, query, confidenceGate) ? (
+          <EmptyState
+            title="В выбранном срезе пока нет ситуаций"
+            text="Выберите другой рабочий контур или сбросьте условия режима исследования."
+            action={{ href: '/opportunities', label: 'Показать активные ситуации' }}
+          />
         ) : (
-          <ContentCard variant="hero">
-            {isNarrowedResult(view, workflowEnabled, query, confidenceGate) ? (
-              <EmptyState
-                title="В выбранной очереди пока нет возможностей."
-                text="Выберите другую очередь или сбросьте условия Режима исследования."
-                action={{ href: '/opportunities', label: 'Вернуться к Сегодня' }}
-              />
-            ) : (
-              <EmptyState
-                title="Радар пока не обнаружил достаточно подтверждённых коммерческих возможностей под ваш профиль."
-                text="Мы не показываем компании только потому, что у них есть одна вакансия."
-                action={{ href: '/leads', label: 'Открыть все лиды' }}
-              />
-            )}
-          </ContentCard>
+          <EmptyState
+            title="Подтверждённых ситуаций пока нет"
+            text="Новая ситуация появится, когда сигналы сложатся в достаточно подтверждённое коммерческое окно."
+            action={{ href: '/leads', label: 'Открыть компании' }}
+          />
         )}
       </div>
     </InternalPageFrame>
@@ -298,6 +274,7 @@ function isNarrowedResult(
   query: string,
   confidenceGate: string,
 ): boolean {
-  const defaultView: OpportunityView = workflowEnabled ? 'today' : 'morning'
-  return view !== defaultView || Boolean(query) || Boolean(confidenceGate)
+  if (query || confidenceGate) return true
+  if (!workflowEnabled) return view !== 'morning'
+  return view !== 'today'
 }
