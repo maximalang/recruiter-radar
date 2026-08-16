@@ -2,38 +2,40 @@
 
 import { generateKeyPairSync, sign } from 'node:crypto'
 
-const LOCAL_SESSION_ID = '7a287cf2-1e6b-4af2-85e8-937a5eea3f0f'
-const mockSession = {
-  id: LOCAL_SESSION_ID,
-  subject: 'rr_owner',
-  upstreamSessionId: null as string | null,
-  protocolVersion: '2025-06-18',
-  createdAt: new Date('2026-08-16T10:00:00.000Z'),
-  lastSeenAt: new Date('2026-08-16T10:00:00.000Z'),
-  expiresAt: new Date('2026-08-16T22:00:00.000Z'),
-  recoveryCount: 0,
-}
-const mockSessionManager = {
-  getOrCreate: jest.fn(async (_subject: string, _requestedId?: string | null, protocolVersion = '2025-03-26') => {
-    mockSession.protocolVersion = protocolVersion
-    return { session: mockSession, created: false }
-  }),
-  touch: jest.fn(async () => mockSession),
-  setUpstreamSession: jest.fn(async (_session: unknown, upstreamSessionId: string | null) => {
-    mockSession.upstreamSessionId = upstreamSessionId
-    return mockSession
-  }),
-  markRecovered: jest.fn(async () => {
-    mockSession.upstreamSessionId = null
-    mockSession.recoveryCount += 1
-    return mockSession
-  }),
-  clear: jest.fn(async () => undefined),
-}
-
-jest.mock('@/lib/timeweb-mcp-session', () => ({
-  timewebMcpSessionManager: mockSessionManager,
-}))
+jest.mock('@/lib/timeweb-mcp-session', () => {
+  const session = {
+    id: '7a287cf2-1e6b-4af2-85e8-937a5eea3f0f',
+    subject: 'rr_owner',
+    upstreamSessionId: null as string | null,
+    protocolVersion: '2025-06-18',
+    createdAt: new Date('2026-08-16T10:00:00.000Z'),
+    lastSeenAt: new Date('2026-08-16T10:00:00.000Z'),
+    expiresAt: new Date('2026-08-16T22:00:00.000Z'),
+    recoveryCount: 0,
+  }
+  const manager = {
+    getOrCreate: jest.fn(async (_subject: string, _requestedId?: string | null, protocolVersion = '2025-03-26') => {
+      session.protocolVersion = protocolVersion
+      return { session, created: false }
+    }),
+    touch: jest.fn(async () => session),
+    setUpstreamSession: jest.fn(async (_session: unknown, upstreamSessionId: string | null) => {
+      session.upstreamSessionId = upstreamSessionId
+      return session
+    }),
+    markRecovered: jest.fn(async () => {
+      session.upstreamSessionId = null
+      session.recoveryCount += 1
+      return session
+    }),
+    clear: jest.fn(async () => undefined),
+  }
+  return {
+    timewebMcpSessionManager: manager,
+    __mockSession: session,
+    __mockSessionManager: manager,
+  }
+})
 
 import { GET as legacyGet, POST as legacyPost } from '@/app/api/internal/mcp/route'
 import {
@@ -47,6 +49,28 @@ import {
   TIMEWEB_MCP_RESOURCE,
   TIMEWEB_MCP_SCOPE,
 } from '@/lib/timeweb-mcp-auth'
+
+const LOCAL_SESSION_ID = '7a287cf2-1e6b-4af2-85e8-937a5eea3f0f'
+type MockSession = {
+  id: string
+  subject: string
+  upstreamSessionId: string | null
+  protocolVersion: string
+  recoveryCount: number
+}
+type MockManager = {
+  getOrCreate: jest.Mock
+  touch: jest.Mock
+  setUpstreamSession: jest.Mock
+  markRecovered: jest.Mock
+  clear: jest.Mock
+}
+const mockedSessionModule = jest.requireMock('@/lib/timeweb-mcp-session') as {
+  __mockSession: MockSession
+  __mockSessionManager: MockManager
+}
+const mockSession = mockedSessionModule.__mockSession
+const mockSessionManager = mockedSessionModule.__mockSessionManager
 
 const API_TOKEN = 'timeweb-server-secret-token-do-not-leak'
 const NOW = Math.floor(Date.now() / 1000)
