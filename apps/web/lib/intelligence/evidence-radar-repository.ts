@@ -19,13 +19,13 @@ export type EvidenceRadarLead = {
   validUntil: string
   location: {
     city: string
-    federalSubjectCode: string
-    federalSubjectName: string
+    federalSubjectCode: string | null
+    federalSubjectName: string | null
     address: string | null
-    latitude: number
-    longitude: number
-    confidence: number
-    locationType: string
+    latitude: number | null
+    longitude: number | null
+    confidence: number | null
+    locationType: string | null
   }
   score: {
     leadScore: number
@@ -85,14 +85,14 @@ export async function listEvidenceRadarLeads(
     recommendedAction: string
     recommendedContactAt: string | null
     validUntil: string
-    city: string
-    federalSubjectCode: string
-    federalSubjectName: string
+    city: string | null
+    federalSubjectCode: string | null
+    federalSubjectName: string | null
     address: string | null
-    latitude: number
-    longitude: number
-    geoConfidence: number
-    locationType: string
+    latitude: number | null
+    longitude: number | null
+    geoConfidence: number | null
+    locationType: string | null
     leadScore: number
     opportunityScore: number
     confidenceScore: number
@@ -150,10 +150,11 @@ export async function listEvidenceRadarLeads(
       AND identity.organization_id = card.organization_id
      JOIN orgs AS organization
        ON organization.id = card.organization_id
-     JOIN organization_locations_v1 AS location
+     LEFT JOIN organization_locations_v1 AS location
        ON location.id = card.location_id
       AND location.workspace_id = card.workspace_id
       AND location.organization_id = card.organization_id
+      AND location.verification_status = 'verified'
      JOIN evidence_lead_score_snapshots_v1 AS score
        ON score.id = card.score_snapshot_id
       AND score.workspace_id = card.workspace_id
@@ -214,9 +215,6 @@ export async function listEvidenceRadarLeads(
        AND card.valid_until >= NOW()
        AND score.valid_until >= NOW()
        AND identity.resolution_status = 'verified'
-       AND location.verification_status = 'verified'
-       AND location.latitude IS NOT NULL
-       AND location.longitude IS NOT NULL
      ORDER BY score.lead_score DESC, card.generated_at DESC, card.id DESC
      LIMIT $2`,
     [String(input.workspaceId), limit],
@@ -234,13 +232,13 @@ export async function listEvidenceRadarLeads(
     recommendedContactAt: row.recommendedContactAt,
     validUntil: row.validUntil,
     location: {
-      city: row.city,
+      city: row.city ?? 'География не подтверждена',
       federalSubjectCode: row.federalSubjectCode,
       federalSubjectName: row.federalSubjectName,
       address: row.address,
-      latitude: Number(row.latitude),
-      longitude: Number(row.longitude),
-      confidence: Number(row.geoConfidence),
+      latitude: row.latitude == null ? null : Number(row.latitude),
+      longitude: row.longitude == null ? null : Number(row.longitude),
+      confidence: row.geoConfidence == null ? null : Number(row.geoConfidence),
       locationType: row.locationType,
     },
     score: {
