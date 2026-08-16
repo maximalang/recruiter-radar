@@ -2,6 +2,41 @@
 
 import { generateKeyPairSync, sign } from 'node:crypto'
 
+jest.mock('@/lib/timeweb-mcp-session', () => {
+  const session = {
+    id: '7a287cf2-1e6b-4af2-85e8-937a5eea3f0f',
+    subject: 'rr_owner',
+    upstreamSessionId: null as string | null,
+    protocolVersion: '2025-06-18',
+    createdAt: new Date('2026-08-16T10:00:00.000Z'),
+    lastSeenAt: new Date('2026-08-16T10:00:00.000Z'),
+    expiresAt: new Date('2026-08-16T22:00:00.000Z'),
+    recoveryCount: 0,
+  }
+  const manager = {
+    getOrCreate: jest.fn(async (_subject: string, _requestedId?: string | null, protocolVersion = '2025-03-26') => {
+      session.protocolVersion = protocolVersion
+      return { session, created: false }
+    }),
+    touch: jest.fn(async () => session),
+    setUpstreamSession: jest.fn(async (_session: unknown, upstreamSessionId: string | null) => {
+      session.upstreamSessionId = upstreamSessionId
+      return session
+    }),
+    markRecovered: jest.fn(async () => {
+      session.upstreamSessionId = null
+      session.recoveryCount += 1
+      return session
+    }),
+    clear: jest.fn(async () => undefined),
+  }
+  return {
+    timewebMcpSessionManager: manager,
+    __mockSession: session,
+    __mockSessionManager: manager,
+  }
+})
+
 import { GET as legacyGet, POST as legacyPost } from '@/app/api/internal/mcp/route'
 import {
   POST,
@@ -14,6 +49,28 @@ import {
   TIMEWEB_MCP_RESOURCE,
   TIMEWEB_MCP_SCOPE,
 } from '@/lib/timeweb-mcp-auth'
+
+const LOCAL_SESSION_ID = '7a287cf2-1e6b-4af2-85e8-937a5eea3f0f'
+type MockSession = {
+  id: string
+  subject: string
+  upstreamSessionId: string | null
+  protocolVersion: string
+  recoveryCount: number
+}
+type MockManager = {
+  getOrCreate: jest.Mock
+  touch: jest.Mock
+  setUpstreamSession: jest.Mock
+  markRecovered: jest.Mock
+  clear: jest.Mock
+}
+const mockedSessionModule = jest.requireMock('@/lib/timeweb-mcp-session') as {
+  __mockSession: MockSession
+  __mockSessionManager: MockManager
+}
+const mockSession = mockedSessionModule.__mockSession
+const mockSessionManager = mockedSessionModule.__mockSessionManager
 
 const API_TOKEN = 'timeweb-server-secret-token-do-not-leak'
 const NOW = Math.floor(Date.now() / 1000)
@@ -43,7 +100,7 @@ function request(body: unknown, headers: Record<string, string> = {}) {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
       'mcp-protocol-version': '2025-06-18',
-      'mcp-session-id': 'session-from-chatgpt',
+      'mcp-session-id': LOCAL_SESSION_ID,
       'x-real-ip': '203.0.113.40',
       ...headers,
     },
@@ -61,6 +118,16 @@ function oauthResponse(url: string) {
   return null
 }
 
+function rpcBody(init?: RequestInit) {
+  return JSON.parse(String(init?.body ?? '{}')) as { id?: string | number | null; method: string }
+}
+
+function upstreamResponse(body: unknown, sessionId?: string, status = 200) {
+  const headers = new Headers({ 'content-type': 'application/json' })
+  if (sessionId) headers.set('mcp-session-id', sessionId)
+  return new Response(JSON.stringify(body), { status, headers })
+}
+
 const originalFetch = global.fetch
 const originalEnv = {
   enabled: process.env.RR_TIMEWEB_MCP_ENABLED,
@@ -69,12 +136,16 @@ const originalEnv = {
   subjects: process.env.RR_MCP_OAUTH_ALLOWED_SUBJECTS,
 }
 
-describe('Timeweb MCP fixed-upstream bridge', () => {
+describe('Timeweb MCP persistent fixed-upstream bridge', () => {
   beforeEach(() => {
     process.env.RR_TIMEWEB_MCP_ENABLED = 'true'
     process.env.RR_TIMEWEB_MCP_TOKEN = API_TOKEN
     process.env.RR_MCP_OAUTH_ISSUER = TIMEWEB_MCP_OAUTH_ISSUER
     process.env.RR_MCP_OAUTH_ALLOWED_SUBJECTS = 'rr_owner'
+    mockSession.upstreamSessionId = null
+    mockSession.protocolVersion = '2025-06-18'
+    mockSession.recoveryCount = 0
+    jest.clearAllMocks()
   })
 
   afterEach(() => {
@@ -104,75 +175,138 @@ describe('Timeweb MCP fixed-upstream bridge', () => {
 
   it('returns 401 + RFC 9728 challenge before contacting any upstream', async () => {
     global.fetch = jest.fn() as unknown as typeof fetch
-    const response = await POST(new Request(TIMEWEB_MCP_RESOURCE, { method: 'POST', headers: { 'content-type': 'application/json', 'x-real-ip': '203.0.113.41' }, body: '{}' }))
+    const response = await POST(new Request(TIMEWEB_MCP_RESOURCE, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-real-ip': '203.0.113.41' },
+      body: '{}',
+    }))
     expect(response.status).toBe(401)
     expect(response.headers.get('www-authenticate')).toContain('resource_metadata="https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/internal/timeweb-mcp"')
     expect(global.fetch).not.toHaveBeenCalled()
   })
 
-  it('proxies tools/list and tools/call unchanged to the one fixed Timeweb endpoint', async () => {
-    const calls: Array<{ url: string; init?: RequestInit }> = []
+  it('initializes the official Timeweb MCP, keeps its session private, and merges local runtime tools', async () => {
+    const upstreamCalls: Array<{ method: string; headers: Headers }> = []
     global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       const oauth = oauthResponse(url); if (oauth) return oauth
-      calls.push({ url, init })
       expect(url).toBe(TIMEWEB_MCP_UPSTREAM)
       const headers = new Headers(init?.headers)
       expect(headers.get('authorization')).toBe(`Bearer ${API_TOKEN}`)
       expect(headers.get('mcp-protocol-version')).toBe('2025-06-18')
-      expect(headers.get('mcp-session-id')).toBe('session-from-chatgpt')
       expect(headers.get('x-user-upstream')).toBeNull()
-      const parsed = JSON.parse(Buffer.from(init?.body as ArrayBuffer).toString('utf8'))
-      return new Response(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { mirroredMethod: parsed.method } }), {
-        status: 200,
-        headers: { 'content-type': 'application/json', 'mcp-session-id': 'session-from-timeweb', 'mcp-protocol-version': '2025-06-18' },
-      })
+      const parsed = rpcBody(init)
+      upstreamCalls.push({ method: parsed.method, headers })
+
+      if (parsed.method === 'initialize') {
+        expect(headers.get('mcp-session-id')).toBeNull()
+        return upstreamResponse({
+          jsonrpc: '2.0',
+          id: parsed.id ?? null,
+          result: { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'timeweb', version: '1' } },
+        }, 'upstream-session-1')
+      }
+      if (parsed.method === 'notifications/initialized') return new Response(null, { status: 202 })
+      if (parsed.method === 'tools/list') {
+        expect(headers.get('mcp-session-id')).toBe('upstream-session-1')
+        return upstreamResponse({
+          jsonrpc: '2.0',
+          id: parsed.id ?? null,
+          result: { tools: [{ name: 'official_timeweb_tool', inputSchema: { type: 'object' } }] },
+        })
+      }
+      throw new Error(`unexpected method ${parsed.method}`)
     }) as unknown as typeof fetch
 
-    for (const [id, method] of [[1, 'tools/list'], [2, 'tools/call']] as const) {
-      const payload = method === 'tools/list'
-        ? { jsonrpc: '2.0', id, method }
-        : { jsonrpc: '2.0', id, method, params: { name: 'read_only_example', arguments: {} } }
-      const response = await POST(request(payload, { 'x-user-upstream': 'https://evil.example/', authorization: `Bearer ${accessToken()}` }))
-      expect(response.status).toBe(200)
-      expect(response.headers.get('mcp-session-id')).toBe('session-from-timeweb')
-      expect(await response.json()).toEqual({ jsonrpc: '2.0', id, result: { mirroredMethod: method } })
-    }
-    expect(calls).toHaveLength(2)
-    expect(calls.every((call) => call.url === TIMEWEB_MCP_UPSTREAM)).toBe(true)
-    expect(JSON.stringify(calls.map((call) => call.url))).not.toContain('evil.example')
+    const response = await POST(request(
+      { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+      { 'x-user-upstream': 'https://evil.example/' },
+    ))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('mcp-session-id')).toBe(LOCAL_SESSION_ID)
+    expect(response.headers.get('mcp-session-id')).not.toBe('upstream-session-1')
+    const body = await response.json() as { result: { tools: Array<{ name: string }> } }
+    expect(body.result.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+      'official_timeweb_tool',
+      'docker_ps',
+      'docker_logs',
+      'ssh_execute',
+    ]))
+    expect(upstreamCalls.map((call) => call.method)).toEqual(['initialize', 'notifications/initialized', 'tools/list'])
   })
 
-  it.each([401, 403, 429, 500, 503])('passes through upstream %i without leaking the server credential', async (status) => {
-    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+  it('recovers an expired upstream session and retries the original request exactly once', async () => {
+    mockSession.upstreamSessionId = 'expired-upstream-session'
+    let listCalls = 0
+    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const oauth = oauthResponse(String(input)); if (oauth) return oauth
-      return new Response(JSON.stringify({ error: `upstream-${status}` }), { status, headers: { 'content-type': 'application/json', 'retry-after': status === 429 ? '10' : '' } })
+      const parsed = rpcBody(init)
+      const headers = new Headers(init?.headers)
+
+      if (parsed.method === 'tools/list') {
+        listCalls += 1
+        if (listCalls === 1) {
+          expect(headers.get('mcp-session-id')).toBe('expired-upstream-session')
+          return upstreamResponse({
+            jsonrpc: '2.0',
+            id: parsed.id ?? null,
+            error: { code: -32000, message: 'session expired' },
+          }, undefined, 410)
+        }
+        expect(headers.get('mcp-session-id')).toBe('recovered-upstream-session')
+        return upstreamResponse({ jsonrpc: '2.0', id: parsed.id ?? null, result: { tools: [] } })
+      }
+      if (parsed.method === 'initialize') {
+        return upstreamResponse({
+          jsonrpc: '2.0',
+          id: parsed.id ?? null,
+          result: { protocolVersion: '2025-06-18', capabilities: {} },
+        }, 'recovered-upstream-session')
+      }
+      if (parsed.method === 'notifications/initialized') return new Response(null, { status: 202 })
+      throw new Error(`unexpected method ${parsed.method}`)
     }) as unknown as typeof fetch
-    const response = await POST(request({ jsonrpc: '2.0', id: 1, method: 'tools/list' }))
-    expect(response.status).toBe(status)
-    const text = await response.text()
-    expect(text).not.toContain(API_TOKEN)
-    expect([...response.headers.entries()].join('\n')).not.toContain(API_TOKEN)
+
+    const response = await POST(request({ jsonrpc: '2.0', id: 5, method: 'tools/list' }))
+    expect(response.status).toBe(200)
+    expect(listCalls).toBe(2)
+    expect(mockSessionManager.markRecovered).toHaveBeenCalledTimes(1)
+    expect(mockSession.recoveryCount).toBe(1)
+    expect(mockSession.upstreamSessionId).toBe('recovered-upstream-session')
   })
 
-  it('refuses upstream redirects instead of following them', async () => {
+  it('does not follow an upstream redirect or leak the server credential', async () => {
+    mockSession.upstreamSessionId = 'upstream-session-1'
     global.fetch = jest.fn(async (input: RequestInfo | URL) => {
       const oauth = oauthResponse(String(input)); if (oauth) return oauth
       return new Response(null, { status: 307, headers: { location: 'https://evil.example/mcp' } })
     }) as unknown as typeof fetch
-    const response = await POST(request({ jsonrpc: '2.0', id: 1, method: 'tools/list' }))
-    expect(response.status).toBe(502)
-    expect(await response.json()).toEqual({ error: 'upstream_redirect_refused' })
+
+    const response = await POST(request({ jsonrpc: '2.0', id: 6, method: 'tools/list' }))
+    expect(response.status).toBe(200)
+    const text = await response.text()
+    expect(text).not.toContain(API_TOKEN)
+    expect(text).not.toContain('evil.example')
+    expect(JSON.parse(text)).toEqual(expect.objectContaining({
+      error: expect.objectContaining({ data: { status: 502 } }),
+    }))
   })
 
-  it('maps an upstream timeout to 504', async () => {
+  it('returns a bounded JSON-RPC timeout error for an established upstream session', async () => {
+    mockSession.upstreamSessionId = 'upstream-session-1'
     global.fetch = jest.fn(async (input: RequestInfo | URL) => {
       const oauth = oauthResponse(String(input)); if (oauth) return oauth
       throw new DOMException('Timed out', 'TimeoutError')
     }) as unknown as typeof fetch
-    const response = await POST(request({ jsonrpc: '2.0', id: 1, method: 'tools/list' }))
-    expect(response.status).toBe(504)
-    expect(await response.json()).toEqual({ error: 'upstream_timeout' })
+
+    const response = await POST(request({ jsonrpc: '2.0', id: 7, method: 'tools/list' }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      jsonrpc: '2.0',
+      id: 7,
+      error: { code: -32002, message: 'Upstream timeout' },
+    })
+    expect(mockSessionManager.markRecovered).not.toHaveBeenCalled()
   })
 
   it('rejects declared oversized bodies before OAuth discovery or Timeweb', async () => {

@@ -1,5 +1,5 @@
 export const EXPECTED_LATEST_MIGRATION =
-  '20260814090000_harden_daily_radar_recovery'
+  '20260816130000_add_timeweb_mcp_sessions'
 
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/
 
