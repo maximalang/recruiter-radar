@@ -66,7 +66,7 @@ export async function handleTimewebMcpProtocol(
     if (upstream?.error) return upstream
     const result = isRecord(upstream?.result) ? upstream.result : {}
     const upstreamTools = Array.isArray(result.tools) ? result.tools : []
-    const localNames = new Set(TIMEWEB_RUNTIME_TOOL_DEFINITIONS.map((item) => item.name))
+    const localNames = new Set<string>(TIMEWEB_RUNTIME_TOOL_DEFINITIONS.map((item) => item.name))
     const merged = upstreamTools.filter((item) => !isRecord(item) || typeof item.name !== 'string' || !localNames.has(item.name))
     return rpcResult(request.id ?? null, { ...result, tools: [...merged, ...TIMEWEB_RUNTIME_TOOL_DEFINITIONS] })
   }
