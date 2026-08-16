@@ -11,13 +11,14 @@ import {
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { logoutAction } from "../login/actions";
-import { ContentCard, ContentCardTitle, EmptyState, InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
+import { EmptyState, InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
 import ppStyles from "../ui/page-primitives.module.css";
 import SettingsOverview from "./settings-overview";
+import styles from "./settings-account.module.css";
 
 export const metadata: Metadata = {
   title: "Настройки — Recruiter Radar",
-  description: "Профиль поиска, расписание и каналы доставки радара.",
+  description: "Аккаунт, профиль радара, расписание и каналы доставки.",
 };
 
 export const dynamic = "force-dynamic";
@@ -35,14 +36,14 @@ export default async function SettingsIndexPage() {
   if (!authorization || !account) {
     return (
       <InternalPageFrame navItems={buildAccountNavigation("settings")}>
-        <InternalPageHeader title="Настройки аккаунта" subtitle="Для доступа к настройкам нужен вход." />
-        <ContentCard variant="hero">
+        <InternalPageHeader title="Настройки" subtitle="Для доступа к настройкам нужен вход." />
+        <div className={styles.emptySection}>
           <EmptyState
             title="Сессия не найдена"
-            text="Восстановите доступ по данным заказа — после входа здесь появятся профиль и каналы доставки."
+            text="Восстановите доступ — после входа здесь появятся профиль радара и каналы доставки."
             action={{ href: "/login", label: "Войти в аккаунт" }}
           />
-        </ContentCard>
+        </div>
       </InternalPageFrame>
     );
   }
@@ -55,19 +56,21 @@ export default async function SettingsIndexPage() {
   if (!profile) {
     return (
       <InternalPageFrame navItems={buildAccountNavigation("settings")}>
-        <InternalPageHeader title="Настройки аккаунта" />
-        <ContentCard variant="hero">
+        <InternalPageHeader title="Настройки" subtitle="Аккаунт активен, профиль радара ещё не создан." />
+        <div className={styles.emptySection}>
           <EmptyState
             title="Профиль ещё не создан"
-            text="Сначала активируйте радар, затем настройте поиск и доставку."
-            action={{ href: "/checkout", label: "Активировать радар" }}
+            text="Сначала активируйте Радар, затем настройте практику и доставку."
+            action={{ href: "/checkout", label: "Активировать Радар" }}
           />
-        </ContentCard>
-        <ContentCard>
-          <ContentCardTitle>Аккаунт</ContentCardTitle>
-          <p>Вы вошли как {account.email}.</p>
-          <form action={logoutAction}><button className={ppStyles.secondaryAction} type="submit">Выйти из аккаунта</button></form>
-        </ContentCard>
+        </div>
+        <section className={styles.accountSection} aria-labelledby="account-title">
+          <h2 id="account-title">Аккаунт</h2>
+          <p>Рабочий email: {account.email}.</p>
+          <form action={logoutAction}>
+            <button className={ppStyles.secondaryAction} type="submit">Выйти из аккаунта</button>
+          </form>
+        </section>
       </InternalPageFrame>
     );
   }
@@ -83,7 +86,7 @@ export default async function SettingsIndexPage() {
     <InternalPageFrame navItems={buildAccountNavigation("settings")}>
       <InternalPageHeader
         title="Настройки"
-        subtitle="Проверьте готовность профиля и каналов. Изменения сохраняются в соответствующем разделе редактора."
+        subtitle="Аккаунт, профиль радара и доставка — в одном спокойном контуре конфигурации."
       />
       <SettingsOverview
         agencyName={profile.agencyName}
@@ -98,11 +101,13 @@ export default async function SettingsIndexPage() {
           && isAuthWorkspacesV2EnabledForUser(account.id)
         }
       />
-      <ContentCard>
-        <ContentCardTitle>Доступ к аккаунту</ContentCardTitle>
+      <section className={styles.accountSection} aria-labelledby="account-access-title">
+        <h2 id="account-access-title">Доступ к аккаунту</h2>
         <p>Рабочий email: {account.email}. Вход выполняется одноразовой ссылкой, без хранения пароля.</p>
-        <form action={logoutAction}><button className={ppStyles.secondaryAction} type="submit">Выйти из аккаунта</button></form>
-      </ContentCard>
+        <form action={logoutAction}>
+          <button className={ppStyles.secondaryAction} type="submit">Выйти из аккаунта</button>
+        </form>
+      </section>
     </InternalPageFrame>
   );
 }
