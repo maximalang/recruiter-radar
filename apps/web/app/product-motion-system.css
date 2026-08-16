@@ -1,22 +1,17 @@
-/*
- * Product Motion System
- *
- * A restrained, opt-in motion vocabulary for authenticated product surfaces.
- * Components declare intent with data-motion-* attributes; idle content stays
- * static and the global interaction-safety layer remains the final authority.
- */
-
+/* Recruiter Radar motion language: state transition, not decoration. */
 :root {
-  --rr-motion-duration-fast: 120ms;
-  --rr-motion-duration-control: 160ms;
+  --rr-motion-duration-instant: 90ms;
+  --rr-motion-duration-fast: 90ms;
+  --rr-motion-duration-control: 140ms;
   --rr-motion-duration-disclosure: 180ms;
-  --rr-motion-duration-emphasis: 220ms;
-  --rr-motion-ease-standard: cubic-bezier(0.2, 0.75, 0.25, 1);
-  --rr-motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
-  --rr-motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
-  --rr-motion-distance-hover: 1px;
+  --rr-motion-duration-navigation: 220ms;
+  --rr-motion-duration-emphasis: 260ms;
+  --rr-motion-duration-signal: 520ms;
+  --rr-motion-ease-standard: cubic-bezier(.2, .75, .25, 1);
+  --rr-motion-ease-enter: cubic-bezier(.22, 1, .36, 1);
+  --rr-motion-ease-exit: cubic-bezier(.4, 0, 1, 1);
+  --rr-motion-ease-signal: cubic-bezier(.2, .8, .2, 1);
   --rr-motion-distance-short: 4px;
-  --rr-motion-press-scale: 0.99;
 }
 
 [data-motion-interactive] {
@@ -24,22 +19,11 @@
     color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
     background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
     border-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    box-shadow var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    transform var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+    opacity var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  [data-motion-interactive]:where(:hover, :focus-visible) {
-    transform: translateY(calc(-1 * var(--rr-motion-distance-hover)));
-  }
-}
-
-[data-motion-interactive]:active {
-  transform: translateY(1px) scale(var(--rr-motion-press-scale));
-  transition-duration: var(--rr-motion-duration-fast);
-}
-
-[data-motion-list] [data-motion-item] {
+[data-motion-list] [data-motion-item],
+[data-motion-status] {
   opacity: 1;
   transform: translateY(0);
   transition:
@@ -48,21 +32,7 @@
 }
 
 @starting-style {
-  [data-motion-list] [data-motion-item] {
-    opacity: 0;
-    transform: translateY(var(--rr-motion-distance-short));
-  }
-}
-
-[data-motion-status] {
-  opacity: 1;
-  transform: translateY(0);
-  transition:
-    opacity var(--rr-motion-duration-control) var(--rr-motion-ease-enter),
-    transform var(--rr-motion-duration-control) var(--rr-motion-ease-enter);
-}
-
-@starting-style {
+  [data-motion-list] [data-motion-item],
   [data-motion-status] {
     opacity: 0;
     transform: translateY(var(--rr-motion-distance-short));
@@ -76,22 +46,25 @@
     content-visibility var(--rr-motion-duration-disclosure) allow-discrete;
 }
 
+@starting-style {
+  [data-motion-disclosure] {
+    opacity: 0;
+  }
+}
+
 [data-motion-icon] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transform: translateY(0) rotate(0deg) scale(1);
   transform-origin: center;
-  transition: transform var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+  transition:
+    color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
+    transform var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
 }
 
 [data-motion-icon] > svg {
   width: 100%;
   height: 100%;
-}
-
-[data-motion-icon][data-motion-state="active"] {
-  transform: translateY(-1px);
 }
 
 [data-motion-icon][data-motion-state="pending"] {
@@ -106,13 +79,43 @@
   animation: rr-motion-icon-error var(--rr-motion-duration-emphasis) var(--rr-motion-ease-standard) both;
 }
 
+[data-motion-signal] {
+  position: relative;
+}
+
+[data-motion-signal]::after {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(.65);
+}
+
+[data-motion-signal][data-motion-state="acquired"]::after {
+  animation: rr-signal-acquired var(--rr-motion-duration-signal) var(--rr-motion-ease-signal) both;
+}
+
+[data-motion-relationship] {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+[data-motion-relationship][data-motion-state="revealed"] {
+  animation: rr-relationship-reveal var(--rr-motion-duration-signal) var(--rr-motion-ease-enter) both;
+}
+
 @keyframes rr-motion-icon-progress {
   to { transform: rotate(360deg); }
 }
 
 @keyframes rr-motion-icon-confirm {
-  0% { transform: scale(0.88); }
-  70% { transform: scale(1.08); }
+  0% { transform: scale(.92); }
+  75% { transform: scale(1.04); }
   100% { transform: scale(1); }
 }
 
@@ -122,10 +125,14 @@
   70% { transform: translateX(2px); }
 }
 
-@starting-style {
-  [data-motion-disclosure] {
-    opacity: 0;
-  }
+@keyframes rr-signal-acquired {
+  0% { opacity: .35; transform: translate(-50%, -50%) scale(.65); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2.75); }
+}
+
+@keyframes rr-relationship-reveal {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -133,9 +140,11 @@
   [data-motion-list] [data-motion-item],
   [data-motion-status],
   [data-motion-disclosure],
-  [data-motion-icon] {
-    animation: none;
-    transform: none;
-    transition-duration: 0.01ms;
+  [data-motion-icon],
+  [data-motion-signal]::after,
+  [data-motion-relationship] {
+    animation: none !important;
+    transform: none !important;
+    transition-duration: .01ms !important;
   }
 }
