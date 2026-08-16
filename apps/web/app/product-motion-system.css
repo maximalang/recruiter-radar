@@ -4,9 +4,11 @@
   --rr-motion-duration-fast: 90ms;
   --rr-motion-duration-control: 140ms;
   --rr-motion-duration-disclosure: 180ms;
-  --rr-motion-duration-navigation: 220ms;
+  --rr-motion-duration-context: 220ms;
+  --rr-motion-duration-navigation: var(--rr-motion-duration-context);
   --rr-motion-duration-emphasis: 260ms;
   --rr-motion-duration-signal: 520ms;
+  --rr-motion-duration-scan: 760ms;
   --rr-motion-ease-standard: cubic-bezier(.2, .75, .25, 1);
   --rr-motion-ease-enter: cubic-bezier(.22, 1, .36, 1);
   --rr-motion-ease-exit: cubic-bezier(.4, 0, 1, 1);
@@ -22,20 +24,16 @@
     opacity var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
 }
 
-[data-motion-list] [data-motion-item],
+/* Status feedback may enter quietly, but ordinary list rows never receive
+ * automatic page-load choreography or positional animation. */
 [data-motion-status] {
   opacity: 1;
-  transform: translateY(0);
-  transition:
-    opacity var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter),
-    transform var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter);
+  transition: opacity var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter);
 }
 
 @starting-style {
-  [data-motion-list] [data-motion-item],
   [data-motion-status] {
     opacity: 0;
-    transform: translateY(var(--rr-motion-distance-short));
   }
 }
 
@@ -59,7 +57,7 @@
   transform-origin: center;
   transition:
     color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    transform var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+    opacity var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
 }
 
 [data-motion-icon] > svg {
@@ -67,16 +65,16 @@
   height: 100%;
 }
 
+/* Rotation is reserved for a real pending/processing state. */
 [data-motion-icon][data-motion-state="pending"] {
   animation: rr-motion-icon-progress 720ms linear infinite;
 }
 
-[data-motion-icon][data-motion-state="success"] {
-  animation: rr-motion-icon-confirm var(--rr-motion-duration-emphasis) var(--rr-motion-ease-enter) both;
-}
-
+/* Success and error are communicated by semantic state/content, never by
+ * bounce or shake decoration. */
+[data-motion-icon][data-motion-state="success"],
 [data-motion-icon][data-motion-state="error"] {
-  animation: rr-motion-icon-error var(--rr-motion-duration-emphasis) var(--rr-motion-ease-standard) both;
+  animation: none;
 }
 
 [data-motion-signal] {
@@ -106,23 +104,11 @@
 }
 
 [data-motion-relationship][data-motion-state="revealed"] {
-  animation: rr-relationship-reveal var(--rr-motion-duration-signal) var(--rr-motion-ease-enter) both;
+  animation: rr-relationship-reveal var(--rr-motion-duration-emphasis) var(--rr-motion-ease-enter) both;
 }
 
 @keyframes rr-motion-icon-progress {
   to { transform: rotate(360deg); }
-}
-
-@keyframes rr-motion-icon-confirm {
-  0% { transform: scale(.92); }
-  75% { transform: scale(1.04); }
-  100% { transform: scale(1); }
-}
-
-@keyframes rr-motion-icon-error {
-  0%, 100% { transform: translateX(0); }
-  35% { transform: translateX(-2px); }
-  70% { transform: translateX(2px); }
 }
 
 @keyframes rr-signal-acquired {
@@ -137,7 +123,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   [data-motion-interactive],
-  [data-motion-list] [data-motion-item],
   [data-motion-status],
   [data-motion-disclosure],
   [data-motion-icon],
