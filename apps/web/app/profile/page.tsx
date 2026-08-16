@@ -3,7 +3,6 @@ import { getSession } from "../../lib/auth-v2/authorization";
 import {
   InternalPageFrame,
   InternalPageHeader,
-  ContentCard,
   EmptyState,
 } from "../ui/internal-page";
 import { buildAccountNavigation } from "../ui/account-navigation";
@@ -23,12 +22,13 @@ import {
 } from "../../lib/agencyDnaProfile";
 import { isAgencyDnaV1EnabledForContext } from "../../lib/opportunities/config";
 import { AgencyDnaForm } from "./agency-dna-form";
+import styles from "./profile-document.module.css";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Профиль — Recruiter Radar",
-  description: "Кого вы ищете: роли, отрасли, география и точная настройка радара.",
+  title: "Профиль радара — Recruiter Radar",
+  description: "Кого и где должен замечать Recruiter Radar: практика, роли, рынок и точная настройка.",
 };
 
 const PROFILE_NAV = buildAccountNavigation("profile");
@@ -37,28 +37,19 @@ export default async function ProfilePage() {
   const session = await getSession({ permission: "profiles:read" });
   const ownerId = session?.dataOwnerId ?? null;
   const profile = ownerId ? await getClientProfileByOwnerId(ownerId) : null;
-  const deliveryPreferences =
-    ownerId && profile ? await getDeliveryPreferencesByOwnerId(ownerId) : null;
-  const notificationConnections =
-    ownerId && profile
-      ? await listNotificationConnectionsByOwnerId(ownerId).catch(() => [])
-      : [];
+  const deliveryPreferences = ownerId && profile
+    ? await getDeliveryPreferencesByOwnerId(ownerId)
+    : null;
+  const notificationConnections = ownerId && profile
+    ? await listNotificationConnectionsByOwnerId(ownerId).catch(() => [])
+    : [];
 
-  // Completion + live match-count: both best-effort. The match count is the same
-  // gate path the digest uses, so the number reflects exactly what the filters do.
-  // Delivery preferences are passed in so the "configured delivery" milestone is
-  // counted toward completion — but only when the prefs were actually loaded.
   const completion = profile
     ? computeProfileCompletion(profile, deliveryPreferences)
     : null;
   const matchCount = profile
     ? await countMatchingCandidatesForProfile(profile).catch(() => null)
     : null;
-  // Resolve the effective hiring mode server-side: 'auto' is inferred from the
-  // agency's declared roles, and the result is shown as a "currently active
-  // mode" badge on the form so the agency sees what the radar is actually doing
-  // — not just what radio card is checked. Degrades to 'specialist' when there
-  // is no profile.
   const resolvedHiringMode = profile ? resolveHiringMode(profile) : "specialist";
   const agencyDnaEnabled = Boolean(
     profile &&
@@ -93,57 +84,70 @@ export default async function ProfilePage() {
   return (
     <InternalPageFrame navItems={PROFILE_NAV}>
       <InternalPageHeader
-        title="Кто ваши идеальные клиенты?"
-        subtitle="Чем точнее профиль, тем релевантнее ежедневная подборка. Заполните сверху вниз — основные блоки идут раньше, точная настройка в конце."
+        title="Профиль радара"
+        subtitle="Кого, где и по каким признакам должен замечать Радар. Основные настройки идут первыми, точная настройка — в конце документа."
       />
-      {profile && completion ? (
-        <ContentCard>
-          <ProfileCompletionPanel completion={completion} matchCount={matchCount} />
-        </ContentCard>
-      ) : null}
-      <ContentCard>
-        {profile ? (
-          <ProfileForm profile={profile} resolvedHiringMode={resolvedHiringMode} />
-        ) : (
-          <EmptyState
-            title={ownerId ? "Профиль ещё не активирован" : "Нужен вход в аккаунт"}
-            text={ownerId
-              ? "Профиль появится после активации радара. Завершите онбординг, чтобы настроить идеального клиента."
-              : "Сессия этого браузера не связана с аккаунтом. Восстановите доступ, чтобы изменить профиль."}
-            action={ownerId
-              ? { href: "/checkout", label: "Активировать радар" }
-              : { href: "/login", label: "Войти в аккаунт" }}
-          />
-        )}
-      </ContentCard>
-      {agencyDnaProfile ? (
-        <ContentCard>
-          <AgencyDnaForm
-            profile={agencyDnaProfile}
-            restrictions={agencyRestrictions}
-            organizations={restrictionOrganizations}
-            matchCount={matchCount}
-          />
-        </ContentCard>
-      ) : null}
-      {profile ? (
-        <div id="notification-channels">
-          <ContentCard>
-            <NotificationChannels connections={notificationConnections} />
-          </ContentCard>
-        </div>
-      ) : null}
-      {profile && deliveryPreferences ? (
-        <div id="delivery">
-          <ContentCard>
-            <InternalPageHeader
-              title="Расписание и резервные каналы"
-              subtitle="Задайте частоту и время. Email и браузерные push работают параллельно с подключёнными Telegram, VK и webhook."
+
+      <div className={styles.document}>
+        {profile && completion ? (
+          <section className={styles.summaryZone} aria-label="Готовность профиля радара">
+            <ProfileCompletionPanel completion={completion} matchCount={matchCount} />
+          </section>
+        ) : null}
+
+        <section className={styles.formZone} aria-label="Настройки профиля радара">
+          {profile ? (
+            <ProfileForm profile={profile} resolvedHiringMode={resolvedHiringMode} />
+          ) : (
+            <div className={styles.emptyZone}>
+              <EmptyState
+                title={ownerId ? "Профиль ещё не активирован" : "Нужен вход в аккаунт"}
+                text={ownerId
+                  ? "Профиль появится после активации Радара. Завершите онбординг, чтобы настроить рабочую практику."
+                  : "Сессия этого браузера не связана с аккаунтом. Восстановите доступ, чтобы изменить профиль."}
+                action={ownerId
+                  ? { href: "/checkout", label: "Активировать Радар" }
+                  : { href: "/login", label: "Войти в аккаунт" }}
+              />
+            </div>
+          )}
+        </section>
+
+        {agencyDnaProfile ? (
+          <section className={styles.secondaryZone}>
+            <div className={styles.sectionIntro}>
+              <h2>Практика агентства</h2>
+              <p>Ограничения и рабочий контекст, которые уточняют соответствие компании вашей практике.</p>
+            </div>
+            <AgencyDnaForm
+              profile={agencyDnaProfile}
+              restrictions={agencyRestrictions}
+              organizations={restrictionOrganizations}
+              matchCount={matchCount}
             />
+          </section>
+        ) : null}
+
+        {profile ? (
+          <section id="notification-channels" className={styles.secondaryZone}>
+            <div className={styles.sectionIntro}>
+              <h2>Каналы доставки</h2>
+              <p>Подключённые каналы для рабочих подборок и уведомлений.</p>
+            </div>
+            <NotificationChannels connections={notificationConnections} />
+          </section>
+        ) : null}
+
+        {profile && deliveryPreferences ? (
+          <section id="delivery" className={styles.secondaryZone}>
+            <div className={styles.sectionIntro}>
+              <h2>Расписание</h2>
+              <p>Частота и местное время доставки. Резервные каналы продолжают использовать существующие настройки.</p>
+            </div>
             <DeliveryForm preferences={deliveryPreferences} />
-          </ContentCard>
-        </div>
-      ) : null}
+          </section>
+        ) : null}
+      </div>
     </InternalPageFrame>
   );
 }
