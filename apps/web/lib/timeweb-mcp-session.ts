@@ -18,7 +18,7 @@ export type TimewebMcpSession = {
 export interface TimewebMcpSessionStore {
   findById(id: string): Promise<TimewebMcpSession | null>
   findBySubject(subject: string): Promise<TimewebMcpSession | null>
-  save(session: TimewebMcpSession): Promise<void>
+  save(session: TimewebMcpSession): Promise<TimewebMcpSession>
   delete(id: string): Promise<void>
 }
 
@@ -37,7 +37,8 @@ export class TimewebMcpSessionManager {
       session.lastSeenAt = now
       session.expiresAt = new Date(now.getTime() + this.ttlMs)
       session.protocolVersion = protocolVersion || session.protocolVersion
-      await this.store.save(session)
+      const persisted = await this.store.save(session)
+      syncSession(session, persisted)
       return { session, created: false }
     }
 
@@ -52,14 +53,15 @@ export class TimewebMcpSessionManager {
       expiresAt: new Date(now.getTime() + this.ttlMs),
       recoveryCount: 0,
     }
-    await this.store.save(created)
-    return { session: created, created: true }
+    const persisted = await this.store.save(created)
+    return { session: persisted, created: persisted.id === created.id }
   }
 
   async touch(session: TimewebMcpSession, now = new Date()) {
     session.lastSeenAt = now
     session.expiresAt = new Date(now.getTime() + this.ttlMs)
-    await this.store.save(session)
+    const persisted = await this.store.save(session)
+    syncSession(session, persisted)
     return session
   }
 
@@ -92,18 +94,18 @@ class PostgresTimewebMcpSessionStore implements TimewebMcpSessionStore {
   }
 
   async save(session: TimewebMcpSession) {
-    await requirePool().query(`
+    const { rows } = await requirePool().query(`
       INSERT INTO timeweb_mcp_sessions (
         session_id, subject, upstream_session_id, protocol_version,
         created_at, last_seen_at, expires_at, recovery_count
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
       ON CONFLICT (subject) DO UPDATE SET
-        session_id = EXCLUDED.session_id,
         upstream_session_id = EXCLUDED.upstream_session_id,
         protocol_version = EXCLUDED.protocol_version,
         last_seen_at = EXCLUDED.last_seen_at,
         expires_at = EXCLUDED.expires_at,
         recovery_count = EXCLUDED.recovery_count
+      RETURNING *
     `, [
       session.id,
       session.subject,
@@ -114,6 +116,8 @@ class PostgresTimewebMcpSessionStore implements TimewebMcpSessionStore {
       session.expiresAt,
       session.recoveryCount,
     ])
+    if (!rows[0]) throw new Error('failed to persist Timeweb MCP session')
+    return fromRow(rows[0])
   }
 
   async delete(id: string) {
@@ -141,6 +145,17 @@ function fromRow(row: Record<string, unknown>): TimewebMcpSession {
     expiresAt: new Date(String(row.expires_at)),
     recoveryCount: Number(row.recovery_count ?? 0),
   }
+}
+
+function syncSession(target: TimewebMcpSession, source: TimewebMcpSession) {
+  target.id = source.id
+  target.subject = source.subject
+  target.upstreamSessionId = source.upstreamSessionId
+  target.protocolVersion = source.protocolVersion
+  target.createdAt = source.createdAt
+  target.lastSeenAt = source.lastSeenAt
+  target.expiresAt = source.expiresAt
+  target.recoveryCount = source.recoveryCount
 }
 
 function sanitizeUpstreamSessionId(value: string | null): string | null {
