@@ -47,7 +47,7 @@ describe("dashboard canonical access states", () => {
     jest.mocked(getEffectiveEntitlement).mockResolvedValue({ status: "inactive", features: [], activeSources: [], source: null, plan: null, startsAt: null, expiresAt: null, reason: "no_active_entitlement" });
     const page = await DashboardPage();
     render(page);
-    expect(screen.getByText(/Нужен активный доступ/)).toBeInTheDocument();
+    expect(screen.getByText(/Доступ к Радару не активен/)).toBeInTheDocument();
     expect(getEffectiveEntitlement).toHaveBeenCalledWith("42", { workspaceId: "ws-1" });
     expect(getClientProfileByOwnerId).not.toHaveBeenCalled();
   });
@@ -67,7 +67,7 @@ describe("dashboard canonical access states", () => {
     const page = await DashboardPage();
     render(page);
 
-    expect(screen.getByText(/Не удалось загрузить аккаунт/)).toBeInTheDocument();
+    expect(screen.getByText(/Данные аккаунта временно недоступны/)).toBeInTheDocument();
     expect(screen.queryByText(/Нужен вход в аккаунт/)).not.toBeInTheDocument();
   });
 
@@ -78,7 +78,7 @@ describe("dashboard canonical access states", () => {
     const page = await DashboardPage();
     render(page);
 
-    expect(screen.getByText(/Не удалось загрузить профиль Radar/)).toBeInTheDocument();
+    expect(screen.getByText(/Профиль радара временно недоступен/)).toBeInTheDocument();
     expect(screen.queryByText(/Радар ещё не настроен/)).not.toBeInTheDocument();
   });
 
@@ -113,6 +113,6 @@ describe("dashboard canonical access states", () => {
     const page = await DashboardPage();
     render(page);
 
-    expect(screen.getByRole("link", { name: "Проверить настройки Radar" })).toHaveAttribute("href", "/settings/radar");
+    expect(screen.getByRole("link", { name: "Проверить профиль радара" })).toHaveAttribute("href", "/settings/radar");
   });
 });
