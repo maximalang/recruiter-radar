@@ -11,21 +11,21 @@ export default function DashboardAccountOverview(props: {
   return (
     <section className={styles.accountOverview} aria-labelledby="account-overview-title">
       <div className={styles.accountOverviewLead}>
-        <span className={styles.accountEyebrow}>Фокус на сегодня</span>
+        <span className={styles.accountEyebrow}>Сегодня</span>
         <h2 id="account-overview-title" className={styles.accountTitle}>{props.agencyName}</h2>
         <p className={styles.accountDescription}>
-          {props.todayLeads} возможностей в приоритетном наборе · {props.pendingReview} требуют проверки
+          {props.todayLeads} компаний в приоритетном наборе · {props.pendingReview} требуют проверки
         </p>
       </div>
-      <div className={styles.accountStatusStrip} aria-label="Состояние рабочего контура">
+      <div className={styles.accountStatusStrip} aria-label="Рабочий контур">
         <Link href="/leads" className={styles.statusFact}>
-          <span>Возможности</span><strong>{props.todayLeads}</strong>
+          <span>Компании</span><strong>{props.todayLeads}</strong>
         </Link>
         <Link href="/review" className={styles.statusFact}>
           <span>На проверке</span><strong>{props.pendingReview}</strong>
         </Link>
         <Link href="/settings/radar" className={styles.statusFact}>
-          <span>Профиль</span><strong>{props.completionPercent}%</strong>
+          <span>Профиль радара</span><strong>{props.completionPercent}%</strong>
         </Link>
         <Link href="/settings/delivery" className={styles.statusFact}>
           <span>Доставка</span><strong>{props.deliveryReady ? "готова" : "настроить"}</strong>
