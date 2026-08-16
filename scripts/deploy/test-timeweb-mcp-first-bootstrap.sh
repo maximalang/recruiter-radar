@@ -67,6 +67,8 @@ test ! -e "$APP_DIR/.rr-timeweb-mcp.compose.yml"
 
 RR_APP_DIR="$APP_DIR" \
 RR_TIMEWEB_MCP_TOKEN_FILE="$TOKEN_FILE" \
+RR_TIMEWEB_RUNTIME_SSH_USER=fixture \
+RR_TIMEWEB_RUNTIME_SSH_PORT=22 \
   bash "$RUNTIME_SCRIPT" --preflight
 
 # Preflight must remain side-effect free.
