@@ -1,231 +1,237 @@
+/* Recruiter Radar — Calm Intelligence Workspace
+ * Canonical semantic theme for marketing and authenticated product surfaces.
+ * Visual hierarchy follows Signal → Why now → Evidence → Confidence → Action.
+ */
+
 :root {
-  --rr-ink-950: #080b09;
-  --rr-ink-900: #0d120f;
-  --rr-ink-800: #18201b;
-  --rr-paper: #f4f1e8;
-  --rr-paper-soft: #ebe8df;
-  --rr-surface: #fffdf7;
-  --rr-surface-soft: rgba(255, 253, 247, 0.82);
-  --rr-text: #111612;
-  --rr-muted: #687168;
-  --rr-line: rgba(17, 22, 18, 0.11);
-  --rr-line-strong: rgba(17, 22, 18, 0.19);
-  --rr-signal: #9fca63;
-  --rr-signal-strong: #c9ec8b;
-  --rr-signal-ink: #345115;
-  --rr-signal-soft: rgba(159, 202, 99, 0.1);
-  --rr-copper: #a37c65;
-  --rr-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Transitional names used by existing modules while they are migrated in this branch.
+   * Every alias resolves to a semantic role; no independent palette exists here. */
+  --surface-app: var(--rr-color-canvas);
+  --surface-panel: var(--rr-color-surface-primary);
+  --surface-raised: var(--rr-color-surface-elevated);
+  --ink-primary: var(--rr-color-text-primary);
+  --ink-secondary: var(--rr-color-text-secondary);
+  --ink-muted: var(--rr-color-text-tertiary);
+  --border-subtle: var(--rr-color-separator);
+  --signal-primary: var(--rr-color-signal);
+  --signal-support: var(--rr-color-signal);
+  --action-primary: var(--rr-color-signal);
+  --status-success: var(--rr-color-positive);
+  --status-warning: var(--rr-color-warning);
+  --status-danger: var(--rr-color-destructive);
+  --focus-ring: var(--rr-color-focus);
 
-  /* Compatibility aliases for product modules that are migrated incrementally. */
-  --rr-ink: var(--rr-text);
-  --rr-page: var(--rr-paper-soft);
-  --rr-surface-strong: var(--rr-surface);
-  --rr-brand: #587a29;
-  --rr-brand-dark: #304718;
-  --rr-shadow-sm: 0 12px 34px rgba(8, 11, 9, 0.055);
-  --rr-shadow-md: 0 22px 56px rgba(8, 11, 9, 0.08);
-  --rr-radius-sm: 9px;
-  --rr-radius-md: 12px;
-  --rr-radius-lg: 18px;
+  --rr-paper: var(--rr-color-canvas);
+  --rr-paper-soft: var(--rr-color-canvas);
+  --rr-surface: var(--rr-color-surface-primary);
+  --rr-surface-soft: var(--rr-color-surface-secondary);
+  --rr-text: var(--rr-color-text-primary);
+  --rr-muted: var(--rr-color-text-tertiary);
+  --rr-line: var(--rr-color-separator);
+  --rr-line-strong: var(--rr-color-separator-strong);
+  --rr-signal: var(--rr-color-signal);
+  --rr-signal-strong: var(--rr-color-signal-hover);
+  --rr-signal-ink: var(--rr-color-signal-hover);
+  --rr-signal-soft: var(--rr-color-signal-soft);
+  --rr-copper: var(--rr-color-copper);
+  --rr-ink: var(--rr-color-text-primary);
+  --rr-page: var(--rr-color-canvas);
+  --rr-surface-strong: var(--rr-color-surface-elevated);
+  --rr-brand: var(--rr-color-signal);
+  --rr-brand-dark: var(--rr-color-signal-hover);
+  --rr-shadow-sm: var(--rr-shadow-float);
+  --rr-shadow-md: var(--rr-shadow-overlay);
+  --rr-radius-sm: var(--rr-radius-control);
+  --rr-radius-md: var(--rr-radius-surface);
+  --rr-radius-lg: var(--rr-radius-overlay);
+  --rr-ease: cubic-bezier(.22, 1, .36, 1);
 
-  --c-text-primary: var(--rr-text);
-  --c-text-secondary: #505951;
-  --c-text-muted: var(--rr-muted);
-  --c-bg-page: var(--rr-paper-soft);
-  --c-bg-card: rgba(255, 253, 247, 0.94);
-  --c-border: var(--rr-line);
-  --c-brand: var(--rr-brand);
-  --c-accent: #355116;
-  --radius-card: 12px;
-  --radius-card-sm: 8px;
+  --c-text-primary: var(--rr-color-text-primary);
+  --c-text-secondary: var(--rr-color-text-secondary);
+  --c-text-muted: var(--rr-color-text-tertiary);
+  --c-bg-page: var(--rr-color-canvas);
+  --c-bg-card: var(--rr-color-surface-primary);
+  --c-border: var(--rr-color-separator);
+  --c-brand: var(--rr-color-signal);
+  --c-accent: var(--rr-color-signal-hover);
+  --radius-card: var(--rr-radius-surface);
+  --radius-card-sm: var(--rr-radius-control);
+  --radius-pill: var(--rr-radius-pill);
+
+  --font-sans: var(--rr-font-sans);
+  --mono: var(--rr-font-mono);
+  --fs-display: var(--rr-type-display-size);
+  --lh-display: .98;
+  --ls-display: -.055em;
+  --fw-display: 520;
+  --fs-title: var(--rr-type-page-size);
+  --lh-title: 1.1;
+  --ls-title: -.04em;
+  --fw-title: 590;
+  --fs-h3: var(--rr-type-object-size);
+  --lh-h3: 1.35;
+  --ls-h3: -.012em;
+  --fw-h3: 650;
+  --fs-body: var(--rr-type-body-size);
+  --lh-body: 1.53;
+  --ls-body: -.002em;
+  --fw-body: 400;
+  --fs-small: var(--rr-type-metadata-size);
+  --lh-small: 1.38;
+  --ls-small: 0;
+  --fw-small: 450;
+  --fs-lg: var(--rr-type-subsection-size);
+  --lh-lg: 1.3;
+  --ls-lg: -.018em;
+  --fw-lg: 620;
+
+  --space-section: var(--rr-space-6);
+  --space-section-lg: var(--rr-space-12);
+  --space-card-padding: var(--rr-space-6);
+  --space-card-padding-lg: var(--rr-space-8);
+
+  --gate-a-color: var(--rr-color-confidence-high);
+  --gate-a-bg: transparent;
+  --gate-b-color: var(--rr-color-confidence-high);
+  --gate-b-bg: transparent;
+  --gate-c-color: var(--rr-color-confidence-medium);
+  --gate-c-bg: transparent;
+  --gate-d-color: var(--rr-color-confidence-low);
+  --gate-d-bg: transparent;
 }
 
 html,
 body {
-  background: var(--rr-paper-soft);
+  background: var(--rr-color-canvas);
+  color: var(--rr-color-text-primary);
 }
 
-body {
-  color: var(--rr-text);
+[data-ui-system="recruiter-radar"],
+[data-product-workspace="true"] {
+  color: var(--rr-color-text-primary);
 }
 
-[data-ui-system="recruiter-radar-v6"],
-[data-ui-system="recruiter-radar-v7"] {
-  --signal-strong: var(--rr-signal-strong);
-  --slate-950: var(--rr-ink-950);
-  --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-  color: var(--rr-text);
-}
-
-[data-ui-system="recruiter-radar-v6"] {
-  background:
-    linear-gradient(rgba(17, 22, 18, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(17, 22, 18, 0.018) 1px, transparent 1px),
-    var(--rr-paper-soft);
-  background-size: 88px 88px;
-}
-
-[data-ui-system="recruiter-radar-v6"] [data-variant="hero"] {
-  border-color: rgba(88, 122, 41, 0.2);
-  border-left-color: var(--rr-signal);
-  background: linear-gradient(90deg, rgba(159, 202, 99, 0.075), rgba(255, 253, 247, 0.96) 38%);
-}
-
-:is(
-  [data-ui-system="recruiter-radar-v6"],
-  [data-ui-system="recruiter-radar-v7"]
-) :where(input, select, textarea) {
-  border-color: var(--rr-line-strong);
-  border-radius: var(--rr-radius-sm);
-  background: var(--rr-surface);
-  color: var(--rr-text);
-  box-shadow: none;
-  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
-}
-
-:is(
-  [data-ui-system="recruiter-radar-v6"],
-  [data-ui-system="recruiter-radar-v7"]
-) :where(input, select, textarea):focus-visible {
-  border-color: #6f9538;
-  outline: 3px solid rgba(159, 202, 99, 0.2);
-  outline-offset: 1px;
-}
-
-:is(
-  [data-ui-system="recruiter-radar-v6"],
-  [data-ui-system="recruiter-radar-v7"]
-) :where(a, button, summary):focus-visible {
-  outline: 2px solid #6f9538;
-  outline-offset: 3px;
-}
-
-:is(
-  [data-ui-system="recruiter-radar-v6"],
-  [data-ui-system="recruiter-radar-v7"]
-) :where(button[type="submit"], input[type="submit"]) {
-  border-color: var(--rr-ink-900);
-  border-radius: var(--rr-radius-sm);
-  background: var(--rr-ink-900);
-  color: var(--rr-surface);
-  box-shadow: none;
-}
-
-:is(
-  [data-ui-system="recruiter-radar-v6"],
-  [data-ui-system="recruiter-radar-v7"]
-) :where(button[type="submit"], input[type="submit"]):hover {
-  border-color: var(--rr-ink-950);
-  background: var(--rr-ink-950);
-}
-
-:is(
-  [data-ui-system="recruiter-radar-v6"],
-  [data-ui-system="recruiter-radar-v7"]
-) table {
-  border-color: var(--rr-line);
-  background: transparent;
-}
-
-:is(
-  [data-ui-system="recruiter-radar-v6"],
-  [data-ui-system="recruiter-radar-v7"]
-) thead {
-  color: var(--rr-muted);
-}
-
-:is(
-  [data-ui-system="recruiter-radar-v6"],
-  [data-ui-system="recruiter-radar-v7"]
-) tbody tr {
-  border-color: var(--rr-line);
-  transition: background-color 140ms ease;
-}
-
-:is(
-  [data-ui-system="recruiter-radar-v6"],
-  [data-ui-system="recruiter-radar-v7"]
-) tbody tr:hover {
-  background: rgba(159, 202, 99, 0.045);
+[data-theme="inverse"] {
+  --rr-color-canvas: #0e1513;
+  --rr-color-surface-primary: #131d1a;
+  --rr-color-surface-secondary: #18231f;
+  --rr-color-surface-selected: #1c2b26;
+  --rr-color-surface-elevated: #202f2a;
+  --rr-color-text-primary: #f3f0e8;
+  --rr-color-text-secondary: #bbc4be;
+  --rr-color-text-tertiary: #919c95;
+  --rr-color-text-disabled: #707a74;
+  --rr-color-text-inverse: #14201c;
+  --rr-color-separator-subtle: rgba(243, 240, 232, .08);
+  --rr-color-separator: rgba(243, 240, 232, .12);
+  --rr-color-separator-strong: rgba(243, 240, 232, .22);
+  --rr-color-signal: #8fc7b8;
+  --rr-color-signal-hover: #a6d5c9;
+  --rr-color-signal-soft: rgba(143, 199, 184, .12);
+  --rr-color-copper: #c18c6f;
+  --rr-color-positive: #7fb996;
+  --rr-color-warning: #d2a365;
+  --rr-color-destructive: #e08b84;
+  --rr-color-information: #86b2c4;
+  --rr-color-focus: #a6d5c9;
 }
 
 [data-product-workspace="true"] {
-  --workspace-accent: var(--rr-signal);
-  --workspace-ink: var(--rr-paper);
-  --workspace-muted: rgba(244, 241, 232, 0.62);
-  --c-text-primary: var(--rr-text);
-  --c-text-secondary: #505951;
-  --c-text-muted: var(--rr-muted);
-  --c-bg-page: var(--rr-paper-soft);
-  --c-bg-card: var(--rr-surface-soft);
-  --c-border: var(--rr-line);
-  --c-brand: var(--rr-brand);
-  --c-accent: var(--rr-signal-ink);
+  --workspace-accent: var(--rr-color-signal);
+  --workspace-ink: var(--rr-color-text-inverse);
+  --workspace-muted: color-mix(in srgb, var(--rr-color-text-inverse) 62%, transparent);
 }
 
-[data-product-workspace="true"] main :where(section, article) {
-  border-color: var(--rr-line);
+:is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea) {
+  min-height: 44px;
+  border: 1px solid var(--rr-color-separator-strong);
+  border-radius: var(--rr-radius-control);
+  background: var(--rr-color-surface-primary);
+  color: var(--rr-color-text-primary);
+  box-shadow: none;
+  transition:
+    border-color var(--rr-motion-duration-control, 140ms) var(--rr-motion-ease-standard, ease),
+    background-color var(--rr-motion-duration-control, 140ms) var(--rr-motion-ease-standard, ease);
 }
 
-[data-product-workspace="true"] main :where(h1, h2) {
-  color: var(--rr-text);
+:is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea):focus-visible {
+  border-color: var(--rr-color-focus);
+  outline: 2px solid var(--rr-color-focus);
+  outline-offset: 2px;
+}
+
+:is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(button[type="submit"], input[type="submit"]) {
+  min-height: 44px;
+  border: 1px solid var(--rr-color-signal);
+  border-radius: var(--rr-radius-control);
+  background: var(--rr-color-signal);
+  color: var(--rr-color-text-inverse);
+  box-shadow: none;
+}
+
+:is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(button[type="submit"], input[type="submit"]):hover {
+  border-color: var(--rr-color-signal-hover);
+  background: var(--rr-color-signal-hover);
+}
+
+[data-product-workspace="true"] main :where(h1, h2, h3) {
+  color: var(--rr-color-text-primary);
 }
 
 [data-product-workspace="true"] main h1 {
+  font-size: var(--rr-type-page-size);
   font-weight: 590;
-  letter-spacing: -0.055em;
+  letter-spacing: -.04em;
+  line-height: 1.1;
 }
 
 [data-product-workspace="true"] main h2 {
-  font-weight: 650;
-  letter-spacing: -0.018em;
+  font-size: var(--rr-type-section-size);
+  font-weight: 600;
+  letter-spacing: -.03em;
+  line-height: 1.2;
 }
 
-[data-product-workspace="true"] main :where(th, td) {
-  border-color: var(--rr-line);
+[data-product-workspace="true"] main h3 {
+  font-size: var(--rr-type-subsection-size);
+  font-weight: 620;
+  letter-spacing: -.018em;
+  line-height: 1.3;
 }
 
-[data-product-workspace="true"] main th {
-  color: #6c756c;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+[data-product-workspace="true"] :where(table, th, td, tbody tr) {
+  border-color: var(--rr-color-separator);
 }
 
-[data-product-workspace="true"] main tbody tr:hover {
-  background: rgba(159, 202, 99, 0.05);
+[data-product-workspace="true"] thead,
+[data-product-workspace="true"] th {
+  color: var(--rr-color-text-tertiary);
 }
 
-[data-product-workspace="true"] nav a {
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+[data-product-workspace="true"] th {
+  font-size: var(--rr-type-label-size);
+  font-weight: 600;
+  letter-spacing: .01em;
+  text-transform: none;
 }
 
-[data-product-workspace="true"] nav a:hover {
-  color: var(--rr-signal-ink);
+[data-product-workspace="true"] tbody tr {
+  transition: background-color var(--rr-motion-duration-control, 140ms) var(--rr-motion-ease-standard, ease);
 }
 
-@media (max-width: 720px) {
-  [data-ui-system="recruiter-radar-v6"] {
-    background-size: 56px 56px;
-  }
+[data-product-workspace="true"] tbody tr:hover {
+  background: var(--rr-color-signal-soft);
+}
 
-  [data-product-workspace="true"] main h1 {
-    font-size: clamp(2rem, 11vw, 3.1rem);
-    line-height: 0.98;
-  }
+[data-product-workspace="true"] :where(.tabular, [data-numeric="true"]) {
+  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(
-    [data-ui-system="recruiter-radar-v6"],
-    [data-ui-system="recruiter-radar-v7"]
-  ),
-  :is(
-    [data-ui-system="recruiter-radar-v6"],
-    [data-ui-system="recruiter-radar-v7"]
-  ) * {
+  [data-ui-system="recruiter-radar"],
+  [data-ui-system="recruiter-radar"] *,
+  [data-product-workspace="true"],
+  [data-product-workspace="true"] * {
     scroll-behavior: auto;
-    transition: none;
-    animation: none;
   }
 }
