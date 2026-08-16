@@ -71,7 +71,7 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
   })
 
   it('keeps Sources outside primary product navigation and labels it as diagnostics', () => {
-    expect(navigation).toContain("href: '/opportunities'")
+    expect(navigation).toContain("buildAccountNavigation('opportunities')")
     expect(navigation).not.toContain("label: 'Возможности'")
     expect(navigation).toContain("label: 'Диагностика источников'")
   })
