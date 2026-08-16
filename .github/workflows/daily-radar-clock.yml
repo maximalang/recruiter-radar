@@ -112,18 +112,25 @@ jobs:
             reason: body?.reason ?? null,
             nextRetryAt: body?.nextRetryAt ?? null,
             durationMs: body?.data?.durationMs ?? null,
+            runtimeStatus: body?.data?.runtime ?? 'unknown',
+            databaseStatus: body?.data?.database ?? 'unknown',
+            migrationsStatus: body?.data?.migrations ?? 'unknown',
+            schedulerStateStatus: body?.data?.schedulerState ?? 'unknown',
+            deliveryInfrastructureStatus: body?.data?.deliveryInfrastructure ?? 'unknown',
             ingestStatus: body?.data?.ingest?.ok === true ? 'healthy' : body?.data?.ingest ? 'failed' : 'unknown',
             ingestSucceeded: body?.data?.ingest?.succeeded ?? 0,
             ingestFailed: body?.data?.ingest?.failed ?? 0,
             credentialGated: body?.data?.ingest?.credentialGated ?? 0,
             ingestNoActiveProfiles: body?.data?.ingest?.noActiveProfiles ?? false,
-            temporalStatus: body?.data?.temporal?.ok === true ? 'healthy' : body?.data?.temporal ? 'failed' : 'unknown',
+            temporalStatus: body?.data?.temporal === 'ready'
+              ? 'ready'
+              : body?.data?.temporal?.ok === true ? 'healthy' : body?.data?.temporal ? 'failed' : 'unknown',
             temporalReasonCode: body?.data?.temporal?.reason ?? null,
             temporalObservations: body?.data?.temporal?.observations ?? 0,
             temporalDerivedEvents: body?.data?.temporal?.derivedEvents ?? 0,
-            profilesActive: body?.data?.digest?.eligibility?.active ?? 0,
-            profilesEligible: body?.data?.digest?.eligibility?.eligible ?? body?.data?.digest?.profilesTotal ?? 0,
-            profileExclusions: body?.data?.digest?.eligibility?.excluded ?? {},
+            profilesActive: body?.data?.profileSelection?.active ?? body?.data?.digest?.eligibility?.active ?? 0,
+            profilesEligible: body?.data?.profileSelection?.eligible ?? body?.data?.digest?.eligibility?.eligible ?? body?.data?.digest?.profilesTotal ?? 0,
+            profileExclusions: body?.data?.profileSelection?.excluded ?? body?.data?.digest?.eligibility?.excluded ?? {},
             profilesCompleted: body?.data?.digest?.profilesCompleted ?? 0,
             profilesRetryable: body?.data?.digest?.profilesRetryable ?? 0,
             profilesTerminal: body?.data?.digest?.profilesTerminal ?? 0,
@@ -134,7 +141,14 @@ jobs:
           }))
 
           if (requestMode === 'verify') {
-            if (response.status === 200 && body?.success === true && body?.mode === 'verify') process.exit(0)
+            const readinessComplete = body?.data?.runtime === 'ready'
+              && body?.data?.database === 'ready'
+              && body?.data?.migrations === 'current'
+              && body?.data?.schedulerState === 'ready'
+              && body?.data?.temporal === 'ready'
+              && body?.data?.deliveryInfrastructure === 'ready'
+              && body?.data?.profileSelection
+            if (response.status === 200 && body?.success === true && body?.mode === 'verify' && readinessComplete) process.exit(0)
             throw new Error(`daily-radar verification failed (HTTP ${response.status})`)
           }
 
