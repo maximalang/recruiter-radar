@@ -10,20 +10,16 @@ export function OpportunityResearchMode(props: {
   workflowEnabled: boolean
   children?: React.ReactNode
 }) {
-  const active = Boolean(
-    props.query || props.confidenceGate ||
-    props.view === 'completed' || props.view === 'all' ||
-    (!props.workflowEnabled && props.view !== 'morning'),
-  )
-
   return (
-    <details className={styles.researchMode} open={active || undefined}>
-      <summary>Режим исследования</summary>
+    <section
+      className={styles.researchMode}
+      aria-label="Поиск и фильтры ситуаций"
+    >
       <div className={styles.researchBody}>
         <form action="/opportunities" method="get" className={styles.researchForm}>
           <input type="hidden" name="view" value={props.view} />
           <label className={styles.researchSearch}>
-            <span>Компания или возможность</span>
+            <span>Компания или ситуация</span>
             <input
               type="search"
               name="q"
@@ -33,7 +29,7 @@ export function OpportunityResearchMode(props: {
             />
           </label>
           <label>
-            <span>Уровень уверенности</span>
+            <span>Уровень подтверждения</span>
             <select name="gate" defaultValue={props.confidenceGate}>
               <option value="">Все уровни</option>
               <option value="A">A — прямые подтверждения</option>
@@ -50,7 +46,7 @@ export function OpportunityResearchMode(props: {
           </div>
         </form>
 
-        <nav className={styles.filters} aria-label="Исследовательские представления">
+        <nav className={styles.filters} aria-label="Представления ситуаций">
           <ResearchLink href="/opportunities?view=today" active={props.view === 'today'}>
             Сегодня
           </ResearchLink>
@@ -77,7 +73,7 @@ export function OpportunityResearchMode(props: {
 
         {props.children}
       </div>
-    </details>
+    </section>
   )
 }
 
