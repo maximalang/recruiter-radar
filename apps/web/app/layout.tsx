@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Inter } from "next/font/google";
+import { IBM_Plex_Mono, Inter } from "next/font/google";
 
 import { PushReadinessBoot } from "./push-readiness-boot";
 import { shouldRunAuthV2SessionRefresh } from "@/lib/auth-v2/config";
@@ -13,6 +13,13 @@ import "./site-interactions.css";
 const inter = Inter({
   subsets: ["cyrillic", "latin"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["cyrillic", "latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
   display: "swap",
 });
 
@@ -46,20 +53,12 @@ export const metadata: Metadata = {
   },
 };
 
-type RootLayoutProps = {
-  children: ReactNode;
-};
+type RootLayoutProps = { children: ReactNode };
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="ru">
-      <body
-        className={`${inter.variable} font-sans`}
-        style={{
-          margin: 0,
-          color: "var(--c-text-primary, #0f172a)",
-        }}
-      >
+    <html lang="ru" className={`${inter.variable} ${plexMono.variable}`}>
+      <body>
         <PushReadinessBoot />
         {shouldRunAuthV2SessionRefresh() ? <AuthSessionRefresh /> : null}
         {children}
