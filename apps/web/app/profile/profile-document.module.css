@@ -1,0 +1,63 @@
+.document {
+  width: min(100%, 760px);
+  display: grid;
+  gap: 0;
+}
+
+.summaryZone,
+.formZone,
+.secondaryZone {
+  padding: 28px 0;
+  border-bottom: 1px solid var(--rr-color-separator);
+}
+
+.summaryZone {
+  padding-top: 0;
+}
+
+.formZone {
+  padding-bottom: 12px;
+}
+
+.secondaryZone {
+  display: grid;
+  gap: 18px;
+}
+
+.sectionIntro {
+  display: grid;
+  gap: 6px;
+}
+
+.sectionIntro h2 {
+  margin: 0;
+  color: var(--rr-color-text-primary);
+  font-size: var(--rr-type-subsection-size);
+  font-weight: 620;
+  letter-spacing: -.018em;
+}
+
+.sectionIntro p {
+  max-width: 64ch;
+  margin: 0;
+  color: var(--rr-color-text-secondary);
+  font-size: var(--rr-type-body-size);
+  line-height: 1.53;
+}
+
+.emptyZone {
+  padding: 24px 0;
+  border-top: 1px solid var(--rr-color-separator);
+}
+
+@media (max-width: 760px) {
+  .summaryZone,
+  .formZone,
+  .secondaryZone {
+    padding-block: 24px;
+  }
+
+  .summaryZone {
+    padding-top: 0;
+  }
+}
