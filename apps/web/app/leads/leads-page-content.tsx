@@ -34,8 +34,8 @@ import styles from './leads-workspace.module.css';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Возможности — Recruiter Radar',
-  description: 'Компании с доказанными hiring signals, приоритетом и безопасным следующим действием.',
+  title: 'Компании — Recruiter Radar',
+  description: 'Компании с подтверждёнными hiring signals, приоритетом и безопасным следующим действием.',
 };
 
 const LEADS_NAV = buildAccountNavigation('leads');
@@ -51,8 +51,8 @@ type ConfidenceView = {
 function confidenceView(gate: LeadItem['confidenceGate']): ConfidenceView {
   if (gate === 'A') return { level: 'high', segments: 3, label: 'высокая' };
   if (gate === 'B') return { level: 'medium', segments: 2, label: 'достаточная' };
-  if (gate === 'C') return { level: 'medium', segments: 2, label: 'ограниченная' };
-  return { level: 'low', segments: 1, label: 'низкая' };
+  if (gate === 'C') return { level: 'medium', segments: 2, label: 'требует проверки' };
+  return { level: 'low', segments: 1, label: 'недостаточно' };
 }
 
 function ConfidenceIndicator({ gate }: { gate: LeadItem['confidenceGate'] }) {
@@ -135,7 +135,7 @@ export function LeadCard({
       </div>
 
       <div className={styles.evidence}>
-        <strong>{vacancies} · {lead.evidenceTitles.length} доказ.</strong>
+        <strong>{vacancies} · {lead.evidenceTitles.length} подтвержд.</strong>
         <div className={styles.evidenceMeta}>
           {lead.sourceFamilies.length > 0
             ? `${lead.sourceFamilies.length} ${lead.sourceFamilies.length === 1 ? 'источник' : 'источника'}`
@@ -145,7 +145,7 @@ export function LeadCard({
 
       <div className={styles.score} data-numeric="true" aria-label={`Сила сигнала ${points} из 100`}>{points}</div>
       <ConfidenceIndicator gate={lead.confidenceGate} />
-      <Link href={`/leads/${lead.id}`} className={styles.action} aria-label={`Открыть brief компании ${lead.orgName}`}>
+      <Link href={`/leads/${lead.id}`} className={styles.action} aria-label={`Открыть анализ компании ${lead.orgName}`}>
         Открыть
       </Link>
 
@@ -158,15 +158,15 @@ export function LeadCard({
       ) : null}
 
       <details className={styles.disclosure} data-motion-disclosure>
-        <summary>Доказательства и происхождение</summary>
+        <summary>Подтверждения и происхождение</summary>
         <div className={styles.ledger}>
           <section className={styles.ledgerSection}>
-            <span className={styles.ledgerTitle}>Evidence</span>
+            <span className={styles.ledgerTitle}>Подтверждения</span>
             {evidenceTitles.length > 0 ? (
               <ul>
                 {evidenceTitles.map((title, index) => <li key={`${title}:${index}`}>{title}</li>)}
               </ul>
-            ) : <div className={styles.meta}>Доказательства уточняются.</div>}
+            ) : <div className={styles.meta}>Подтверждения уточняются.</div>}
             {sourceFamilies.length > 0 ? (
               <div className={styles.provenance}>Источник: {sourceFamilies.join(' · ')}</div>
             ) : null}
@@ -175,7 +175,7 @@ export function LeadCard({
             <span className={styles.ledgerTitle}>Почему этот приоритет</span>
             {scoreReasons.length > 0 ? (
               <ul>{scoreReasons.map((reason, index) => <li key={`${reason}:${index}`}>{reason}</li>)}</ul>
-            ) : <div className={styles.meta}>Декомпозиция доступна в brief.</div>}
+            ) : <div className={styles.meta}>Декомпозиция доступна в анализе компании.</div>}
           </section>
         </div>
       </details>
@@ -204,21 +204,21 @@ export function LeadsList({
 }) {
   if (leads.length === 0) {
     if (workingSet) {
-      return <div className={styles.emptyWrap}><EmptyState icon={ClockIcon} title="Ничего в работе" text="Вы ещё не взяли возможности в работу. Откройте полный Radar и выберите компании для контакта." action={{ href: '/leads', label: 'Открыть полный Radar' }} /></div>;
+      return <div className={styles.emptyWrap}><EmptyState icon={ClockIcon} title="Ничего в работе" text="Вы ещё не взяли компании в работу. Откройте полный список и выберите компании для контакта." action={{ href: '/leads', label: 'Открыть компании' }} /></div>;
     }
     if (!hasActiveProfile) {
       if (hasAnyProfile) {
-        return <div className={styles.emptyWrap}><EmptyState icon={TargetIcon} title="Профиль Radar приостановлен" text="Настройки сохранены, но новые возможности не формируются. Включите профиль для следующего сканирования." action={{ href: '/settings/radar', label: 'Включить профиль Radar' }} /></div>;
+        return <div className={styles.emptyWrap}><EmptyState icon={TargetIcon} title="Профиль радара приостановлен" text="Настройки сохранены, но новые компании не формируются. Включите профиль для следующего сканирования." action={{ href: '/settings/radar', label: 'Включить профиль радара' }} /></div>;
       }
-      return <div className={styles.emptyWrap}><EmptyState icon={TargetIcon} title="Настройте профиль идеального клиента" text="Опишите роли, отрасли и регионы — после этого Radar начнёт ранжировать компании по доказанным сигналам." action={{ href: '/settings/radar', label: 'Настроить профиль' }} /></div>;
+      return <div className={styles.emptyWrap}><EmptyState icon={TargetIcon} title="Настройте профиль радара" text="Опишите роли, отрасли и регионы — после этого Радар начнёт ранжировать компании по подтверждённым сигналам." action={{ href: '/settings/radar', label: 'Настроить профиль' }} /></div>;
     }
     if (!lastRunAt) {
-      return <div className={styles.emptyWrap}><EmptyState icon={ClockIcon} title="Первое сканирование ещё не завершено" text="Профиль сохранён. После первого прохода здесь появятся компании, why now и доказательства." action={{ href: '/settings/radar', label: 'Проверить настройки Radar' }} /></div>;
+      return <div className={styles.emptyWrap}><EmptyState icon={ClockIcon} title="Первое сканирование ещё не завершено" text="Профиль сохранён. После первого прохода здесь появятся компании, причины приоритета и подтверждения." action={{ href: '/settings/radar', label: 'Проверить профиль радара' }} /></div>;
     }
     if (narrowProfile) {
       return <div className={styles.emptyWrap}><EmptyState icon={SearchIcon} title="По специализации пока мало сигналов" text="Для узкой практики это нормальный результат. Расширьте ключевые фразы или дождитесь следующего сканирования." action={{ href: '/settings/radar#fine-tuning', label: 'Расширить профиль' }} /></div>;
     }
-    return <div className={styles.emptyWrap}><EmptyState icon={BriefcaseIcon} title="Подходящих компаний пока нет" text="Последний запуск завершён, но текущие условия не дали достаточно сильных возможностей." action={{ href: '/settings/radar#fine-tuning', label: 'Уточнить профиль' }} /></div>;
+    return <div className={styles.emptyWrap}><EmptyState icon={BriefcaseIcon} title="Подходящих компаний пока нет" text="Последний запуск завершён, но текущие условия не дали достаточно сильных сигналов." action={{ href: '/settings/radar#fine-tuning', label: 'Уточнить профиль' }} /></div>;
   }
 
   return (
@@ -246,8 +246,8 @@ export default async function LeadsPage({
   if (!authorization) {
     return (
       <InternalPageFrame navItems={LEADS_NAV}>
-        <InternalPageHeader title="Возможности" subtitle="Защищённое рабочее пространство" />
-        <EmptyState title="Нужен вход в аккаунт" text="Войдите, чтобы открыть возможности только вашего workspace." action={{ href: '/login?returnTo=/leads', label: 'Войти' }} />
+        <InternalPageHeader title="Компании" subtitle="Защищённое рабочее пространство" />
+        <EmptyState title="Нужен вход в аккаунт" text="Войдите, чтобы открыть компании только вашего рабочего пространства." action={{ href: '/login?returnTo=/leads', label: 'Войти' }} />
       </InternalPageFrame>
     );
   }
@@ -259,7 +259,7 @@ export default async function LeadsPage({
   if (!entitlement) {
     return (
       <InternalPageFrame navItems={LEADS_NAV}>
-        <InternalPageHeader title="Возможности" subtitle="Проверка доступа" />
+        <InternalPageHeader title="Компании" subtitle="Проверка доступа" />
         <ErrorState title="Не удалось проверить доступ" description="Обновите страницу позже. Данные не показываются, пока сервер не подтвердит права аккаунта." action={{ href: '/settings/access', label: 'Доступ и оплата' }} />
       </InternalPageFrame>
     );
@@ -267,8 +267,8 @@ export default async function LeadsPage({
   if (entitlement.status !== 'active' || !entitlement.features.includes('dashboard')) {
     return (
       <InternalPageFrame navItems={LEADS_NAV}>
-        <InternalPageHeader title="Возможности" subtitle="Доступ не активен" />
-        <EmptyState title="Нужен активный доступ" text="Профиль и история сохранены. После активации возможности снова станут доступны." action={{ href: '/settings/access', label: 'Проверить доступ' }} />
+        <InternalPageHeader title="Компании" subtitle="Доступ не активен" />
+        <EmptyState title="Нужен активный доступ" text="Профиль и история сохранены. После активации компании снова станут доступны." action={{ href: '/settings/access', label: 'Проверить доступ' }} />
       </InternalPageFrame>
     );
   }
@@ -279,8 +279,8 @@ export default async function LeadsPage({
   } catch {
     return (
       <InternalPageFrame navItems={LEADS_NAV}>
-        <InternalPageHeader title="Возможности" subtitle="Radar" />
-        <ErrorState title="Не удалось загрузить профиль" description="Это временная ошибка данных, а не пустой результат Radar." action={{ href: '/settings/radar', label: 'Открыть настройки Radar' }} />
+        <InternalPageHeader title="Компании" subtitle="Профиль радара" />
+        <ErrorState title="Не удалось загрузить профиль" description="Это временная ошибка данных, а не пустой результат Радара." action={{ href: '/settings/radar', label: 'Открыть профиль радара' }} />
       </InternalPageFrame>
     );
   }
@@ -364,12 +364,12 @@ export default async function LeadsPage({
   return (
     <InternalPageFrame navItems={LEADS_NAV}>
       <InternalPageHeader
-        title="Возможности"
+        title="Компании"
         subtitle={workingSet
           ? 'Компании, по которым уже начата работа сегодня'
           : selectedProfile
             ? `Практика: ${selectedProfile.agencyName}`
-            : 'Кому написать сейчас — и на каких доказательствах держится приоритет'}
+            : 'Кому написать сейчас — и на каких подтверждениях держится приоритет'}
         nav={allLeads.length > 0 ? <a href={exportHref} download>Экспорт CSV</a> : null}
       />
 
@@ -392,7 +392,7 @@ export default async function LeadsPage({
         </div>
 
         {leadsFetchError ? (
-          <ErrorState title="Не удалось загрузить возможности" description="Повторите через минуту. Если ошибка сохранится, проверьте профиль Radar или напишите в поддержку." action={{ href: '/settings/radar', label: 'Проверить профиль' }} />
+          <ErrorState title="Не удалось загрузить компании" description="Повторите через минуту. Если ошибка сохранится, проверьте профиль радара или напишите в поддержку." action={{ href: '/settings/radar', label: 'Проверить профиль' }} />
         ) : (
           <Suspense fallback={<LoadingState variant="skeleton" />}>
             <LeadsList
