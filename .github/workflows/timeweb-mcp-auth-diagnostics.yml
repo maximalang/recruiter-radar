@@ -27,3 +27,10 @@ jobs:
           ssh -p "${{ secrets.RR_SSH_PORT }}" -o LogLevel=ERROR \
             "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" \
             'docker logs --since 2h recruiter-radar-operator-auth-1 2>&1 | grep -E "\"component\":\"timeweb-mcp-auth\"" | grep -E "authorization_granted|refresh_compatibility_path|token_refresh|token_refresh_failed|refresh_token_rotated|grant_revoked|client_registered" || true'
+
+      - name: Read safe MCP bridge audit events
+        run: |
+          set -euo pipefail
+          ssh -p "${{ secrets.RR_SSH_PORT }}" -o LogLevel=ERROR \
+            "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" \
+            'docker logs --since 2h recruiter-radar-web-1 2>&1 | grep -E "\"component\":\"timeweb-mcp-bridge\"" | tail -n 200 || true'
