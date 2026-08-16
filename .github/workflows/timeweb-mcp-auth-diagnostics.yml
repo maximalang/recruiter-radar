@@ -35,9 +35,9 @@ jobs:
             "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" \
             'docker logs --since 2h recruiter-radar-web-1 2>&1 | grep -E "\"component\":\"timeweb-mcp-bridge\"" | tail -n 200 || true'
 
-      - name: Read failure context around refresh
+      - name: Inspect failing session protocol
         run: |
           set -euo pipefail
           ssh -p "${{ secrets.RR_SSH_PORT }}" -o LogLevel=ERROR \
             "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" \
-            'docker logs --timestamps --since 2026-08-16T16:28:05Z --until 2026-08-16T16:28:20Z recruiter-radar-web-1 2>&1 | grep -Eiv "authorization:|bearer |RR_TIMEWEB_MCP_TOKEN|TIMEWEB_API_TOKEN" | tail -n 300 || true'
+            "docker exec recruiter-radar-postgres-1 sh -lc 'psql -At -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -c \"SELECT session_id, protocol_version, (upstream_session_id IS NOT NULL) AS has_upstream_session, recovery_count, last_seen_at, expires_at FROM timeweb_mcp_sessions WHERE session_id = ''3a7438ab-a476-4771-a833-934797eeb23b'';\"'"
