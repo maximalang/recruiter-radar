@@ -149,6 +149,7 @@ export interface TemporalIntelligenceResult {
   success: boolean
   observations: number
   derivedEvents: number
+  reason: 'derived-events' | 'expected-zero' | 'process-failed' | 'timeout' | 'malformed-output'
   error?: string
 }
 
@@ -165,6 +166,7 @@ export function runSourceTemporalIntelligence(): Promise<TemporalIntelligenceRes
       success: false,
       observations: 0,
       derivedEvents: 0,
+      reason: 'process-failed',
       error: 'Temporal intelligence script path escapes scripts directory.',
     })
   }
@@ -177,30 +179,43 @@ export function runSourceTemporalIntelligence(): Promise<TemporalIntelligenceRes
       windowsHide: true,
     }, (error, stdout, stderr) => {
       if (error) {
+        const timedOut = 'killed' in error && error.killed === true
         resolvePromise({
           success: false,
           observations: 0,
           derivedEvents: 0,
-          error: stderr?.trim() || error.message,
+          reason: timedOut ? 'timeout' : 'process-failed',
+          error: timedOut ? 'Temporal intelligence timed out.' : stderr?.trim() || error.message,
         })
         return
       }
 
       try {
-        const summary = JSON.parse(stdout.trim()) as Record<string, unknown>
-        if (!Number.isInteger(summary.observations) || !Number.isInteger(summary.derivedEvents)) {
-          throw new Error('Temporal intelligence summary is missing integer counts.')
+        const output = stdout.trim()
+        if (!output) throw new Error('Temporal intelligence summary is empty.')
+        const summary = JSON.parse(output) as Record<string, unknown>
+        if (
+          !Number.isInteger(summary.observations)
+          || !Number.isInteger(summary.derivedEvents)
+          || Number(summary.observations) < 0
+          || Number(summary.derivedEvents) < 0
+        ) {
+          throw new Error('Temporal intelligence summary is missing non-negative integer counts.')
         }
+        const observations = summary.observations as number
+        const derivedEvents = summary.derivedEvents as number
         resolvePromise({
           success: true,
-          observations: summary.observations as number,
-          derivedEvents: summary.derivedEvents as number,
+          observations,
+          derivedEvents,
+          reason: observations === 0 && derivedEvents === 0 ? 'expected-zero' : 'derived-events',
         })
       } catch (parseError) {
         resolvePromise({
           success: false,
           observations: 0,
           derivedEvents: 0,
+          reason: 'malformed-output',
           error: parseError instanceof Error ? parseError.message : 'Invalid temporal intelligence summary.',
         })
       }

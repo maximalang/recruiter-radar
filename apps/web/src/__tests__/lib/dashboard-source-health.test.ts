@@ -52,6 +52,9 @@ describe('getDashboardSourceHealth', () => {
       recordsProcessed1h: 3,
       recordsProcessed24h: 30,
       recordsProcessed7d: 300,
+      organizationResolutionRejects: 2,
+      blocked: 1,
+      rateLimited: 4,
     })
   })
 
