@@ -36,6 +36,7 @@ jobs:
           [[ "$DEPLOY_SHA" =~ ^[a-f0-9]{40}$ ]]
           bash -n scripts/deploy/configure-timeweb-mcp-auth.sh
           bash -n scripts/deploy/configure-timeweb-mcp-runtime.sh
+          bash -n scripts/deploy/timeweb-mcp-runtime-dispatch.sh
           bash -n scripts/deploy/configure-timeweb-mcp-caddy.sh
           node --check operator-auth/src/entrypoint.js
           node --check operator-auth/src/timeweb-server.js
@@ -95,6 +96,9 @@ jobs:
             scripts/deploy/configure-timeweb-mcp-runtime.sh \
             "$remote:$stage/configure-runtime.sh"
           scp -P "$port" -o LogLevel=ERROR \
+            scripts/deploy/timeweb-mcp-runtime-dispatch.sh \
+            "$remote:$stage/runtime-dispatch.sh"
+          scp -P "$port" -o LogLevel=ERROR \
             scripts/deploy/configure-timeweb-mcp-caddy.sh \
             "$remote:$stage/configure-caddy.sh"
           scp -P "$port" -o LogLevel=ERROR \
@@ -112,7 +116,7 @@ jobs:
           set -euo pipefail
           ssh -p "${{ secrets.RR_SSH_PORT }}" -o LogLevel=ERROR \
             "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" \
-            "EXPECTED_DEPLOY_SHA='${DEPLOY_SHA}' bash -s" <<'SSH_EOF'
+            "EXPECTED_DEPLOY_SHA='${DEPLOY_SHA}' RUNTIME_USER='${{ secrets.RR_SSH_USER }}' RUNTIME_PORT='${{ secrets.RR_SSH_PORT }}' bash -s" <<'SSH_EOF'
           set -Eeuo pipefail
           cd /opt/recruiter-radar
           stage="/opt/recruiter-radar/.timeweb-bootstrap-${EXPECTED_DEPLOY_SHA}"
@@ -124,7 +128,7 @@ jobs:
 
           test -d "$stage"
           chmod 700 "$stage"
-          chmod 700 "$stage/configure-auth.sh" "$stage/configure-runtime.sh" "$stage/configure-caddy.sh"
+          chmod 700 "$stage/configure-auth.sh" "$stage/configure-runtime.sh" "$stage/runtime-dispatch.sh" "$stage/configure-caddy.sh"
           chmod 600 "$stage/timeweb-token" "$stage/owner-password-hash" "$stage/auth-image.tar.gz"
 
           install -d -m 0700 /var/lib/recruiter-radar-timeweb
@@ -135,6 +139,7 @@ jobs:
 
           install -m 0700 "$stage/configure-auth.sh" /opt/recruiter-radar/configure-timeweb-mcp-auth.sh
           install -m 0700 "$stage/configure-runtime.sh" /opt/recruiter-radar/configure-timeweb-mcp-runtime.sh
+          install -m 0700 "$stage/runtime-dispatch.sh" /opt/recruiter-radar/timeweb-mcp-runtime-dispatch.sh
           install -m 0700 "$stage/configure-caddy.sh" /opt/recruiter-radar/configure-timeweb-mcp-caddy.sh
 
           # Close the legacy public path before changing the local services.
@@ -149,8 +154,12 @@ jobs:
           RR_MCP_OWNER_PASSWORD_HASH_FILE="$stage/owner-password-hash" \
             /opt/recruiter-radar/configure-timeweb-mcp-auth.sh
 
+          RR_TIMEWEB_RUNTIME_SSH_USER="$RUNTIME_USER" \
+          RR_TIMEWEB_RUNTIME_SSH_PORT="$RUNTIME_PORT" \
           RR_TIMEWEB_MCP_TOKEN_FILE=/var/lib/recruiter-radar-timeweb/token \
             /opt/recruiter-radar/configure-timeweb-mcp-runtime.sh --preflight
+          RR_TIMEWEB_RUNTIME_SSH_USER="$RUNTIME_USER" \
+          RR_TIMEWEB_RUNTIME_SSH_PORT="$RUNTIME_PORT" \
           RR_TIMEWEB_MCP_TOKEN_FILE=/var/lib/recruiter-radar-timeweb/token \
             /opt/recruiter-radar/configure-timeweb-mcp-runtime.sh
 
@@ -158,6 +167,7 @@ jobs:
           /opt/recruiter-radar/configure-timeweb-mcp-caddy.sh
 
           test "$(stat -c '%a' /var/lib/recruiter-radar-timeweb/token)" = 600
+          test "$(stat -c '%a' /var/lib/recruiter-radar-timeweb/runtime/id_ed25519)" = 600
           if docker ps --format '{{.Names}}' | grep -Fxq recruiter-radar-operator-1; then
             echo "Legacy operator container is still running" >&2
             exit 1
@@ -168,6 +178,40 @@ jobs:
           fi
           curl -fsS http://127.0.0.1:3002/healthz >/dev/null
           curl -fsS http://127.0.0.1:3000/api/health >/dev/null
+
+          runtime_ssh() {
+            docker exec recruiter-radar-web-1 /usr/bin/ssh -T -p "$RUNTIME_PORT" \
+              -i /run/rr-timeweb-runtime/id_ed25519 \
+              -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile=/run/rr-timeweb-runtime/known_hosts -o ConnectTimeout=5 \
+              "$RUNTIME_USER@rr-timeweb-host" "$1"
+          }
+
+          echo '=== TIMEWEB_STAGE1_SYSTEM_INFO ==='
+          runtime_ssh system_info
+          echo '=== TIMEWEB_STAGE1_DISK_USAGE ==='
+          runtime_ssh disk_usage
+          echo '=== TIMEWEB_STAGE1_MEMORY_USAGE ==='
+          runtime_ssh memory_usage
+          echo '=== TIMEWEB_STAGE1_DOCKER_HEALTH ==='
+          runtime_ssh docker_health
+          echo '=== TIMEWEB_STAGE1_DOCKER_COMPOSE ==='
+          runtime_ssh docker_compose_ps
+          echo '=== TIMEWEB_STAGE1_DEPLOYMENT_INFO ==='
+          runtime_ssh deployment_info
+          echo '=== TIMEWEB_STAGE1_GIT_REVISION ==='
+          runtime_ssh git_rev_parse
+          runtime_ssh docker_logs:web >/dev/null
+
+          if runtime_ssh bash >/dev/null 2>&1; then
+            echo "Restricted runtime SSH accepted arbitrary shell execution" >&2
+            exit 1
+          fi
+          if runtime_ssh 'docker_ps;rm' >/dev/null 2>&1; then
+            echo "Restricted runtime SSH accepted compound command execution" >&2
+            exit 1
+          fi
+          echo '=== TIMEWEB_STAGE1_RUNTIME_SECURITY_OK ==='
           SSH_EOF
 
       - name: Verify public OAuth and MCP discovery boundary
@@ -202,6 +246,7 @@ jobs:
             if(v.issuer!==i||v.authorization_endpoint!==i+"/auth"||v.token_endpoint!==i+"/token"||v.jwks_uri!==i+"/jwks"||v.registration_endpoint!==i+"/reg")process.exit(1);
             if(JSON.stringify(v.code_challenge_methods_supported)!==JSON.stringify(["S256"]))process.exit(1);
             if(!v.scopes_supported?.includes("rr.timeweb.manage")||!v.scopes_supported?.includes("offline_access"))process.exit(1);
+            if(!v.grant_types_supported?.includes("authorization_code")||!v.grant_types_supported?.includes("refresh_token"))process.exit(1);
           '
 
           curl -fsS https://recruiter-radar.ru/operator/oauth/jwks > /tmp/timeweb-jwks.json
@@ -221,6 +266,7 @@ jobs:
             --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}')"
           test "$unauth_code" = 401
           grep -Fiq 'resource_metadata="https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/internal/timeweb-mcp"' /tmp/timeweb-headers.txt
+          echo 'STAGE 1 VERIFICATION COMPLETE'
 
       - name: Cleanup runner secret material
         if: always()
