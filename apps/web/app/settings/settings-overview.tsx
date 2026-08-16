@@ -1,6 +1,4 @@
 import Link from "next/link";
-
-import { BellIcon, MailIcon, TargetIcon } from "../ui/icons";
 import styles from "./settings-overview.module.css";
 
 export default function SettingsOverview(props: {
@@ -13,75 +11,55 @@ export default function SettingsOverview(props: {
   webPushEnabled: boolean;
   authSecurityEnabled: boolean;
 }) {
-  const deliveryReady = props.deliveryEnabled && (
-    props.telegramConnected || props.emailEnabled || props.webPushEnabled
-  );
+  const deliveryReady = props.deliveryEnabled && (props.telegramConnected || props.emailEnabled || props.webPushEnabled);
 
   return (
     <div className={styles.overview}>
-      <section className={styles.intro}>
-        <div>
-          <span className={styles.eyebrow}>Центр настроек</span>
-          <h2 className={styles.title}>{props.agencyName}</h2>
-          <p>Здесь только состояние аккаунта. Детальные поля открываются в одном редакторе профиля, поэтому настройки не дублируются и не расходятся.</p>
-        </div>
-        <span className={styles.introStatus}>{props.completionPercent}% готово</span>
-      </section>
+      <nav className={styles.settingsNav} aria-label="Разделы настроек">
+        <Link href="/settings/account">Аккаунт</Link>
+        <Link href="/settings/radar">Radar profile</Link>
+        <Link href="/settings/delivery">Доставка</Link>
+        {props.authSecurityEnabled ? <Link href="/settings/team">Команда</Link> : null}
+        {props.authSecurityEnabled ? <Link href="/settings/security">Безопасность</Link> : null}
+        {props.authSecurityEnabled ? <Link href="/settings/access">Доступ и оплата</Link> : null}
+      </nav>
 
-      <div className={styles.grid}>
-        <article className={styles.card}>
-          <TargetIcon className={styles.cardIcon} aria-hidden="true" />
-          <span className={styles.cardLabel}>Профиль поиска</span>
-          <strong>{props.completionPercent}% готово</strong>
-          <div className={styles.cardMeta}>
-            <span>Роли, отрасли, география, размер компаний и порог сигнала.</span>
-          </div>
-          <Link href="/settings/radar#agency">Изменить профиль</Link>
-        </article>
+      <div className={styles.document}>
+        <section className={styles.section}>
+          <span className={styles.eyebrow}>Radar profile</span>
+          <h2>{props.agencyName}</h2>
+          <p>Роли, отрасли, география, размер компаний и порог сигнала определяют, какие возможности попадают в рабочий набор.</p>
+          <dl className={styles.factList}>
+            <div><dt>Готовность профиля</dt><dd>{props.completionPercent}%</dd></div>
+          </dl>
+          <Link href="/settings/radar" className={styles.action}>Изменить профиль</Link>
+        </section>
 
-        <article className={styles.card}>
-          <BellIcon className={styles.cardIcon} aria-hidden="true" />
-          <span className={styles.cardLabel}>Расписание</span>
-          <strong>
-            {deliveryReady
-              ? "Доставка включена"
-              : props.deliveryEnabled
-                ? "Доставка ожидает канал"
-                : "Доставка выключена"}
-          </strong>
-          <div className={styles.cardMeta}>
-            <span>{deliveryReady ? props.deliverySchedule : "Подключите хотя бы один канал доставки."}</span>
-          </div>
-          <Link href="/settings/delivery">Настроить расписание</Link>
-        </article>
+        <section className={styles.section}>
+          <span className={styles.eyebrow}>Доставка</span>
+          <h2>{deliveryReady ? "Доставка настроена" : props.deliveryEnabled ? "Нужен канал доставки" : "Доставка выключена"}</h2>
+          <p>{deliveryReady ? props.deliverySchedule : "Подключите хотя бы один канал и задайте расписание получения радара."}</p>
+          <dl className={styles.factList}>
+            <div><dt>Telegram</dt><dd>{props.telegramConnected ? "подключён" : "нет"}</dd></div>
+            <div><dt>Email</dt><dd>{props.emailEnabled ? "включён" : "выключен"}</dd></div>
+            <div><dt>Web push</dt><dd>{props.webPushEnabled ? "включён" : "выключен"}</dd></div>
+          </dl>
+          <Link href="/settings/delivery" className={styles.action}>Настроить доставку</Link>
+        </section>
 
-        <article className={styles.card}>
-          <MailIcon className={styles.cardIcon} aria-hidden="true" />
-          <span className={styles.cardLabel}>Каналы</span>
-          <strong>{props.telegramConnected ? "Telegram подключён" : "Telegram не подключён"}</strong>
-          <div className={styles.cardMeta}>
-            <span>Email: {props.emailEnabled ? "включён" : "выключен"}</span>
-            <span>Web push: {props.webPushEnabled ? "включён" : "выключен"}</span>
-          </div>
-          <Link href="/settings/delivery">Настроить каналы</Link>
-        </article>
+        {props.authSecurityEnabled ? (
+          <section className={styles.section}>
+            <span className={styles.eyebrow}>Workspace</span>
+            <h2>Доступ и команда</h2>
+            <p>Участники, роли, безопасность аккаунта и срок доступа управляются отдельно от Radar profile.</p>
+            <div className={styles.inlineLinks}>
+              <Link href="/settings/team">Команда</Link>
+              <Link href="/settings/security">Безопасность</Link>
+              <Link href="/settings/access">Доступ и оплата</Link>
+            </div>
+          </section>
+        ) : null}
       </div>
-      {props.authSecurityEnabled ? (
-        <nav className={styles.accountLinks} aria-label="Доступ к аккаунту">
-          <Link href="/settings/access">
-            <strong>Доступ и оплата</strong>
-            <span>Текущий тариф, срок доступа и история разовых заказов</span>
-          </Link>
-          <Link href="/settings/security">
-            <strong>Аккаунт и безопасность</strong>
-            <span>Профиль, email, активные сессии и удаление аккаунта</span>
-          </Link>
-          <Link href="/settings/team">
-            <strong>Команда</strong>
-            <span>Участники, приглашения, роли и передача владения</span>
-          </Link>
-        </nav>
-      ) : null}
     </div>
   );
 }
