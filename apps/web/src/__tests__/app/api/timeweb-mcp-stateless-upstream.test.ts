@@ -1,37 +1,38 @@
 /** @jest-environment node */
 
-const mockSession = {
-  id: '3a7438ab-a476-4771-a833-934797eeb23b',
-  subject: 'rr_owner',
-  upstreamSessionId: null as string | null,
-  protocolVersion: '2025-11-25',
-  createdAt: new Date('2026-08-16T16:10:00.000Z'),
-  lastSeenAt: new Date('2026-08-16T16:10:00.000Z'),
-  expiresAt: new Date('2026-08-17T04:10:00.000Z'),
-  recoveryCount: 0,
-}
+jest.mock('@/lib/timeweb-mcp-session', () => {
+  const session = {
+    id: '3a7438ab-a476-4771-a833-934797eeb23b',
+    subject: 'rr_owner',
+    upstreamSessionId: null as string | null,
+    protocolVersion: '2025-11-25',
+    createdAt: new Date('2026-08-16T16:10:00.000Z'),
+    lastSeenAt: new Date('2026-08-16T16:10:00.000Z'),
+    expiresAt: new Date('2026-08-17T04:10:00.000Z'),
+    recoveryCount: 0,
+  }
 
-const mockManager = {
-  getOrCreate: jest.fn(async (_subject: string, _requestedId?: string | null, protocolVersion = '2025-03-26') => {
-    mockSession.protocolVersion = protocolVersion
-    return { session: mockSession, created: false }
-  }),
-  touch: jest.fn(async () => mockSession),
-  setUpstreamSession: jest.fn(async (_session: unknown, upstreamSessionId: string | null) => {
-    mockSession.upstreamSessionId = upstreamSessionId
-    return mockSession
-  }),
-  markRecovered: jest.fn(async () => {
-    mockSession.upstreamSessionId = null
-    mockSession.recoveryCount += 1
-    return mockSession
-  }),
-  clear: jest.fn(async () => undefined),
-}
-
-jest.mock('@/lib/timeweb-mcp-session', () => ({
-  timewebMcpSessionManager: mockManager,
-}))
+  return {
+    __mockSession: session,
+    timewebMcpSessionManager: {
+      getOrCreate: jest.fn(async (_subject: string, _requestedId?: string | null, protocolVersion = '2025-03-26') => {
+        session.protocolVersion = protocolVersion
+        return { session, created: false }
+      }),
+      touch: jest.fn(async () => session),
+      setUpstreamSession: jest.fn(async (_session: unknown, upstreamSessionId: string | null) => {
+        session.upstreamSessionId = upstreamSessionId
+        return session
+      }),
+      markRecovered: jest.fn(async () => {
+        session.upstreamSessionId = null
+        session.recoveryCount += 1
+        return session
+      }),
+      clear: jest.fn(async () => undefined),
+    },
+  }
+})
 
 jest.mock('@/lib/timeweb-mcp-auth', () => ({
   TIMEWEB_MCP_PREAUTH_RATE_LIMIT: 120,
@@ -46,6 +47,23 @@ jest.mock('@/lib/timeweb-mcp-auth', () => ({
 }))
 
 import { POST, TIMEWEB_MCP_UPSTREAM } from '@/app/api/internal/timeweb-mcp/route'
+
+const { __mockSession: mockSession, timewebMcpSessionManager: mockManager } = jest.requireMock('@/lib/timeweb-mcp-session') as {
+  __mockSession: {
+    id: string
+    subject: string
+    upstreamSessionId: string | null
+    protocolVersion: string
+    createdAt: Date
+    lastSeenAt: Date
+    expiresAt: Date
+    recoveryCount: number
+  }
+  timewebMcpSessionManager: {
+    setUpstreamSession: jest.Mock
+    markRecovered: jest.Mock
+  }
+}
 
 const originalFetch = global.fetch
 const originalToken = process.env.RR_TIMEWEB_MCP_TOKEN
