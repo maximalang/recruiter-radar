@@ -230,7 +230,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </section>
 
         <div className={styles.layout}>
-          <main className={styles.main}>
+          <div className={styles.main}>
             {summaryLines.length > 0 ? (
               <section className={styles.section}>
                 <h2>Контекст компании и найма</h2>
@@ -278,7 +278,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <ul className={styles.riskList}>{lead.negativeSignals.map((signal, index) => <li key={index}>{signal}</li>)}</ul>
               </section>
             ) : null}
-          </main>
+          </div>
 
           <aside className={styles.aside} aria-label="Действия и контекст">
             <div className={styles.rail}>
