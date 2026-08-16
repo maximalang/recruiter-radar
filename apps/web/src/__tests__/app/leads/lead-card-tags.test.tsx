@@ -35,12 +35,7 @@ const baseLead = {
 describe('LeadCard V1-V6 decision-row contract', () => {
   it('renders rank → company → why now → proof → score → confidence without the retired score legend', () => {
     const { container } = render(
-      <LeadCard
-        lead={baseLead}
-        fitPreview={null}
-        hiringMode="specialist"
-        rank={1}
-      />,
+      <LeadCard lead={baseLead} fitPreview={null} hiringMode="specialist" rank={1} />,
     );
 
     const row = container.querySelector('[data-signal-card="true"]');
@@ -52,7 +47,7 @@ describe('LeadCard V1-V6 decision-row contract', () => {
     expect(row?.textContent).toContain('1 источник');
     expect(container.querySelector('[aria-label="Сила сигнала 80 из 100"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Уверенность: высокая"]')).not.toBeNull();
-    expect(screen.getByRole('link', { name: 'Открыть brief компании Ромашка' })).toHaveAttribute('href', '/leads/lead-1');
+    expect(screen.getByRole('link', { name: 'Открыть анализ компании Ромашка' })).toHaveAttribute('href', '/leads/lead-1');
 
     expect(screen.queryByRole('meter')).toBeNull();
     expect(screen.queryByText('Компания и контакты')).toBeNull();
@@ -64,10 +59,7 @@ describe('LeadCard V1-V6 decision-row contract', () => {
   it('keeps primary proof scan-friendly and provenance behind a disclosure', () => {
     const { container } = render(
       <LeadCard
-        lead={{
-          ...baseLead,
-          reasons: ['Карьерная страница обновлена'],
-        } as unknown as LeadItem}
+        lead={{ ...baseLead, reasons: ['Карьерная страница обновлена'] } as unknown as LeadItem}
         fitPreview={{ icon: 'industry', text: 'Совпадает отрасль' }}
         hiringMode="specialist"
         rank={2}
@@ -80,7 +72,7 @@ describe('LeadCard V1-V6 decision-row contract', () => {
     const disclosure = container.querySelector('details[data-motion-disclosure]');
     const summary = disclosure?.querySelector('summary');
     expect(disclosure).not.toBeNull();
-    expect(summary?.textContent).toMatch(/Доказательства и происхождение/i);
+    expect(summary?.textContent).toMatch(/Подтверждения и происхождение/i);
 
     fireEvent.click(summary as HTMLElement);
     expect(disclosure).toHaveAttribute('open');
@@ -91,14 +83,8 @@ describe('LeadCard V1-V6 decision-row contract', () => {
 
   it('keeps workflow status subordinate to the decision hierarchy', () => {
     const { container } = render(
-      <LeadCard
-        lead={baseLead}
-        fitPreview={null}
-        hiringMode="specialist"
-        rank={3}
-      />,
+      <LeadCard lead={baseLead} fitPreview={null} hiringMode="specialist" rank={3} />,
     );
-
     expect(container.textContent).toMatch(/В работе/i);
     expect(container.querySelector('[aria-label="Сила сигнала 80 из 100"]')).not.toBeNull();
   });
@@ -106,14 +92,8 @@ describe('LeadCard V1-V6 decision-row contract', () => {
   it('renders foreign-employer and AI context as quiet metadata rather than score semantics', () => {
     const foreignLead = { ...baseLead, isForeignEmployer: true } as unknown as LeadItem;
     const { container } = render(
-      <LeadCard
-        lead={foreignLead}
-        fitPreview={null}
-        hiringMode="specialist"
-        rank={4}
-      />,
+      <LeadCard lead={foreignLead} fitPreview={null} hiringMode="specialist" rank={4} />,
     );
-
     expect(container.textContent).toContain('иностранный работодатель');
     expect(container.textContent).toContain('AI-подсказка доступна');
     expect(container.querySelector('[aria-label="Сила сигнала 80 из 100"]')).not.toBeNull();
