@@ -34,3 +34,10 @@ jobs:
           ssh -p "${{ secrets.RR_SSH_PORT }}" -o LogLevel=ERROR \
             "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" \
             'docker logs --since 2h recruiter-radar-web-1 2>&1 | grep -E "\"component\":\"timeweb-mcp-bridge\"" | tail -n 200 || true'
+
+      - name: Read failure context around refresh
+        run: |
+          set -euo pipefail
+          ssh -p "${{ secrets.RR_SSH_PORT }}" -o LogLevel=ERROR \
+            "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" \
+            'docker logs --timestamps --since 2026-08-16T16:28:05Z --until 2026-08-16T16:28:20Z recruiter-radar-web-1 2>&1 | grep -Eiv "authorization:|bearer |RR_TIMEWEB_MCP_TOKEN|TIMEWEB_API_TOKEN" | tail -n 300 || true'
