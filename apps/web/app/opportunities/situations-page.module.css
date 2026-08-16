@@ -28,6 +28,87 @@
   font-variant-numeric: tabular-nums;
 }
 
+.workflowLedger {
+  display: grid;
+  gap: 10px;
+}
+
+.workflowLedgerHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.workflowLedgerHeader h2 {
+  margin: 0;
+  color: var(--rr-color-text-primary);
+  font-size: var(--rr-type-subsection-size);
+  font-weight: 620;
+}
+
+.workflowLedgerHeader span {
+  color: var(--rr-color-text-tertiary);
+  font-size: var(--rr-type-metadata-size);
+}
+
+.todayLanes {
+  display: grid;
+  border-top: 1px solid var(--rr-color-separator);
+}
+
+.todayLane {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 20px;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--rr-color-separator);
+  color: var(--rr-color-text-secondary);
+  text-decoration: none;
+}
+
+.todayLane:hover {
+  background: color-mix(in srgb, var(--rr-color-surface-secondary) 60%, transparent);
+}
+
+.todayLane:focus-visible {
+  outline: 2px solid var(--rr-color-focus);
+  outline-offset: -2px;
+}
+
+.todayLane[data-active="true"] {
+  background: var(--rr-color-surface-selected);
+  box-shadow: inset 2px 0 0 var(--rr-color-signal);
+  color: var(--rr-color-text-primary);
+}
+
+.todayLane[data-tone="danger"] strong {
+  color: var(--rr-color-destructive);
+}
+
+.todayLane[data-tone="attention"] strong {
+  color: var(--rr-color-signal);
+}
+
+.todayLane span {
+  font-size: var(--rr-type-metadata-size);
+  font-weight: 600;
+}
+
+.todayLane strong {
+  color: var(--rr-color-text-primary);
+  font-size: var(--rr-type-data-size);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.todayLane i {
+  color: var(--rr-color-text-tertiary);
+  font-style: normal;
+}
+
 @media (max-width: 760px) {
   .summaryLedger {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -39,5 +120,11 @@
 
   .summaryLedger > div:nth-child(-n + 2) {
     border-bottom: 1px solid var(--rr-color-separator-subtle);
+  }
+
+  .workflowLedgerHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
 }
