@@ -16,11 +16,11 @@ export function PageFrame(props: {
     <Frame
       className={`${styles.pageFrame}${props.className ? ` ${props.className}` : ""}`}
       data-deploy-anchor={props.dataDeployAnchor}
-      data-ui-system="recruiter-radar-v6"
+      data-ui-system="recruiter-radar"
     >
       <div
         style={{
-          maxWidth: props.maxWidth ?? "1080px",
+          maxWidth: props.maxWidth ?? "1536px",
         }}
         className={styles.pageFrameInner}
       >
@@ -30,6 +30,10 @@ export function PageFrame(props: {
   );
 }
 
+/**
+ * Compatibility primitive for surfaces that are genuinely standalone objects.
+ * New page sections should prefer semantic sections/rows and separators.
+ */
 export function SurfaceCard(props: {
   children: ReactNode;
   padding?: string;
@@ -39,9 +43,10 @@ export function SurfaceCard(props: {
   return (
     <section
       className={`${styles.surfaceCard}${props.className ? ` ${props.className}` : ""}`}
+      data-surface="standalone"
       style={{
-        padding: props.padding ?? "22px",
-        ...props.style
+        padding: props.padding ?? "24px",
+        ...props.style,
       }}
     >
       {props.children}
@@ -77,6 +82,7 @@ export function NoticeBox(props: {
     <div
       className={styles.notice}
       data-tone={props.tone ?? "neutral"}
+      role={props.tone === "danger" ? "alert" : undefined}
       style={props.style}
     >
       {props.title ? <div className={styles.noticeTitle}>{repairVisibleNode(props.title)}</div> : null}
@@ -106,10 +112,6 @@ export function SectionIntro(props: {
   title: string;
   description?: ReactNode;
   style?: React.CSSProperties;
-  /** Brand-accent eyebrow variant: a brand-tinted label with a leading dot.
-   *  Used on the landing to give section heads a structured, premium read.
-   *  Default (false) keeps the minimal plain eyebrow used on legal/privacy/
-   *  terms/checkout — so existing pages are unchanged. */
   accent?: boolean;
 }) {
   return (
