@@ -20,7 +20,12 @@ class MemoryPersistentStore implements TimewebMcpSessionStore {
   }
 
   async save(session: TimewebMcpSession) {
-    this.rows.set(session.subject, clone(session))
+    const existing = this.rows.get(session.subject)
+    const persisted = existing
+      ? { ...clone(session), id: existing.id, createdAt: new Date(existing.createdAt) }
+      : clone(session)
+    this.rows.set(session.subject, persisted)
+    return clone(persisted)
   }
 
   async delete(id: string) {
@@ -58,6 +63,21 @@ describe('Timeweb MCP persistent session lifecycle', () => {
     expect(recovered.created).toBe(false)
     expect(recovered.session.id).toBe(first.session.id)
     expect(recovered.session.upstreamSessionId).toBe('upstream-session-1')
+  })
+
+  it('fences concurrent session creation for one subject to a single canonical id', async () => {
+    const store = new MemoryPersistentStore()
+    const manager = new TimewebMcpSessionManager(store, 60_000)
+    const now = new Date('2026-08-16T10:00:00.000Z')
+
+    const [first, second] = await Promise.all([
+      manager.getOrCreate('rr_owner', null, '2025-03-26', now),
+      manager.getOrCreate('rr_owner', null, '2025-03-26', now),
+    ])
+
+    expect(first.session.id).toBe(second.session.id)
+    expect([first.created, second.created].filter(Boolean)).toHaveLength(1)
+    expect((await store.findBySubject('rr_owner'))?.id).toBe(first.session.id)
   })
 
   it('expires stale sessions and creates a fresh fenced local session', async () => {
