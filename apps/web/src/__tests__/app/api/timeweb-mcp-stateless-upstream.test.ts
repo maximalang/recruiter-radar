@@ -1,6 +1,6 @@
 /** @jest-environment node */
 
-const session = {
+const mockSession = {
   id: '3a7438ab-a476-4771-a833-934797eeb23b',
   subject: 'rr_owner',
   upstreamSessionId: null as string | null,
@@ -11,26 +11,26 @@ const session = {
   recoveryCount: 0,
 }
 
-const manager = {
+const mockManager = {
   getOrCreate: jest.fn(async (_subject: string, _requestedId?: string | null, protocolVersion = '2025-03-26') => {
-    session.protocolVersion = protocolVersion
-    return { session, created: false }
+    mockSession.protocolVersion = protocolVersion
+    return { session: mockSession, created: false }
   }),
-  touch: jest.fn(async () => session),
+  touch: jest.fn(async () => mockSession),
   setUpstreamSession: jest.fn(async (_session: unknown, upstreamSessionId: string | null) => {
-    session.upstreamSessionId = upstreamSessionId
-    return session
+    mockSession.upstreamSessionId = upstreamSessionId
+    return mockSession
   }),
   markRecovered: jest.fn(async () => {
-    session.upstreamSessionId = null
-    session.recoveryCount += 1
-    return session
+    mockSession.upstreamSessionId = null
+    mockSession.recoveryCount += 1
+    return mockSession
   }),
   clear: jest.fn(async () => undefined),
 }
 
 jest.mock('@/lib/timeweb-mcp-session', () => ({
-  timewebMcpSessionManager: manager,
+  timewebMcpSessionManager: mockManager,
 }))
 
 jest.mock('@/lib/timeweb-mcp-auth', () => ({
@@ -58,7 +58,7 @@ function request(id: number) {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
       'mcp-protocol-version': '2025-11-25',
-      'mcp-session-id': session.id,
+      'mcp-session-id': mockSession.id,
       'x-real-ip': '203.0.113.50',
     },
     body: JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/list' }),
@@ -129,7 +129,7 @@ describe('Timeweb MCP stateless upstream compatibility', () => {
 
     for (const response of [first, second, third]) {
       expect(response.status).toBe(200)
-      expect(response.headers.get('mcp-session-id')).toBe(session.id)
+      expect(response.headers.get('mcp-session-id')).toBe(mockSession.id)
       const body = await response.json() as { result?: { tools?: Array<{ name: string }> } }
       expect(body.result?.tools?.some((tool) => tool.name === 'official_timeweb_tool')).toBe(true)
     }
@@ -137,8 +137,8 @@ describe('Timeweb MCP stateless upstream compatibility', () => {
     expect(initializeCalls).toBe(1)
     expect(notificationCalls).toBe(1)
     expect(listCalls).toBe(3)
-    expect(manager.setUpstreamSession).not.toHaveBeenCalled()
-    expect(manager.markRecovered).not.toHaveBeenCalled()
-    expect(session.upstreamSessionId).toBeNull()
+    expect(mockManager.setUpstreamSession).not.toHaveBeenCalled()
+    expect(mockManager.markRecovered).not.toHaveBeenCalled()
+    expect(mockSession.upstreamSessionId).toBeNull()
   })
 })
