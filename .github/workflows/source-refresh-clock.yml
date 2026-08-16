@@ -77,6 +77,12 @@ jobs:
             deferred: body?.data?.deferred ?? 0,
             credentialGated: body?.data?.credentialGated ?? 0,
             rateLimited: body?.data?.rateLimited ?? 0,
+            failedSources: (body?.data?.details ?? [])
+              .filter((result) => result?.success === false)
+              .map((result) => ({ source: result?.source ?? 'unknown', outcome: result?.outcome ?? 'failed' })),
+            rateLimitedSources: (body?.data?.details ?? [])
+              .filter((result) => result?.outcome === 'rate-limited')
+              .map((result) => result?.source ?? 'unknown'),
           }))
           if (response.status === 200) process.exit(0)
           if (response.status === 422) process.exit(0)
