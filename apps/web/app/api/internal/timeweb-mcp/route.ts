@@ -9,6 +9,7 @@ import {
   isTimewebMcpConfigured,
   verifyTimewebMcpAccessToken,
 } from '../../../../lib/timeweb-mcp-auth'
+import { withSingleTimewebMcpRecovery } from '../../../../lib/timeweb-mcp-recovery'
 import {
   handleTimewebMcpProtocol,
   isJsonRpcRequest,
@@ -31,7 +32,6 @@ const RESPONSE_HEADERS = ['cache-control', 'retry-after'] as const
 
 type AuthorizedContext = {
   requestId: string
-  subject: string
   baseHeaders: Record<string, string>
   session: TimewebMcpSession
 }
@@ -41,6 +41,13 @@ type UpstreamAttempt = {
   status: number
   sessionId: string | null
   expired: boolean
+}
+
+class UpstreamBridgeError extends Error {
+  constructor(readonly status: 502 | 504, message: string) {
+    super(message)
+    this.name = 'UpstreamBridgeError'
+  }
 }
 
 export async function OPTIONS() {
@@ -117,7 +124,7 @@ export async function DELETE(request: Request) {
 
   try {
     if (authorized.session.upstreamSessionId) {
-      await fetchUpstreamTransport('DELETE', authorized.session.upstreamSessionId)
+      await fetchUpstreamTransport('DELETE', authorized.session)
     }
     await timewebMcpSessionManager.clear(authorized.session)
     audit('session_deleted', authorized.requestId, request.method, 204, 0, authorized.session)
@@ -176,18 +183,21 @@ async function authorize(request: Request): Promise<AuthorizedContext | Response
   const protocolVersion = request.headers.get('mcp-protocol-version')?.trim() || '2025-03-26'
   const requestedSessionId = request.headers.get('mcp-session-id')
   const { session } = await timewebMcpSessionManager.getOrCreate(auth.subject, requestedSessionId, protocolVersion)
-  return { requestId, subject: auth.subject, baseHeaders, session }
+  return { requestId, baseHeaders, session }
 }
 
 async function proxyTransport(request: Request, context: AuthorizedContext): Promise<Response> {
   const started = Date.now()
   await ensureUpstreamInitialized(context.session)
-  let upstream = await fetchUpstreamTransport('GET', context.session.upstreamSessionId)
-  if (isExpiredStatus(upstream.status)) {
-    await timewebMcpSessionManager.markRecovered(context.session)
-    await ensureUpstreamInitialized(context.session)
-    upstream = await fetchUpstreamTransport('GET', context.session.upstreamSessionId)
-  }
+  const outcome = await withSingleTimewebMcpRecovery(
+    () => fetchUpstreamTransport('GET', context.session),
+    async () => {
+      await timewebMcpSessionManager.markRecovered(context.session)
+      await ensureUpstreamInitialized(context.session)
+    },
+    (response) => isExpiredStatus(response.status),
+  )
+  const upstream = outcome.result
 
   const headers = new Headers(mcpHeaders(context))
   for (const name of RESPONSE_HEADERS) {
@@ -202,19 +212,21 @@ async function proxyTransport(request: Request, context: AuthorizedContext): Pro
 
 async function callUpstreamWithSingleRecovery(session: TimewebMcpSession, request: JsonRpcRequest): Promise<JsonRpcResponse | null> {
   if (request.method === 'initialize') {
-    const attempt = await fetchUpstreamRpc(request, null)
+    const attempt = await fetchUpstreamRpc(request, null, session.protocolVersion)
     if (attempt.sessionId) await timewebMcpSessionManager.setUpstreamSession(session, attempt.sessionId)
     return attempt.response ?? upstreamError(request, attempt.status)
   }
 
   await ensureUpstreamInitialized(session)
-  let attempt = await fetchUpstreamRpc(request, session.upstreamSessionId)
-  if (!attempt.expired) return attempt.response ?? upstreamError(request, attempt.status)
-
-  await timewebMcpSessionManager.markRecovered(session)
-  await ensureUpstreamInitialized(session)
-  attempt = await fetchUpstreamRpc(request, session.upstreamSessionId)
-  return attempt.response ?? upstreamError(request, attempt.status)
+  const outcome = await withSingleTimewebMcpRecovery(
+    () => fetchUpstreamRpc(request, session.upstreamSessionId, session.protocolVersion),
+    async () => {
+      await timewebMcpSessionManager.markRecovered(session)
+      await ensureUpstreamInitialized(session)
+    },
+    (attempt) => attempt.expired,
+  )
+  return outcome.result.response ?? upstreamError(request, outcome.result.status)
 }
 
 async function ensureUpstreamInitialized(session: TimewebMcpSession) {
@@ -229,17 +241,25 @@ async function ensureUpstreamInitialized(session: TimewebMcpSession) {
       clientInfo: { name: 'recruiter-radar-timeweb-bridge', version: process.env.RR_DEPLOY_SHA ?? 'unknown' },
     },
   }
-  const attempt = await fetchUpstreamRpc(initialize, null)
+  const attempt = await fetchUpstreamRpc(initialize, null, session.protocolVersion)
   if (!attempt.response || attempt.response.error || !attempt.sessionId) {
-    throw new Error(`timeweb_mcp_initialize_failed:${attempt.status}`)
+    throw new UpstreamBridgeError(attempt.status === 504 ? 504 : 502, `timeweb_mcp_initialize_failed:${attempt.status}`)
   }
   await timewebMcpSessionManager.setUpstreamSession(session, attempt.sessionId)
-  await fetchUpstreamRpc({ jsonrpc: '2.0', method: 'notifications/initialized', params: {} }, attempt.sessionId)
+  await fetchUpstreamRpc(
+    { jsonrpc: '2.0', method: 'notifications/initialized', params: {} },
+    attempt.sessionId,
+    session.protocolVersion,
+  )
 }
 
-async function fetchUpstreamRpc(request: JsonRpcRequest, upstreamSessionId: string | null): Promise<UpstreamAttempt> {
+async function fetchUpstreamRpc(
+  request: JsonRpcRequest,
+  upstreamSessionId: string | null,
+  protocolVersion: string,
+): Promise<UpstreamAttempt> {
   try {
-    const headers = upstreamHeaders(upstreamSessionId)
+    const headers = upstreamHeaders(upstreamSessionId, protocolVersion)
     headers.set('content-type', 'application/json')
     const upstream = await fetch(TIMEWEB_MCP_UPSTREAM, {
       method: 'POST',
@@ -272,20 +292,21 @@ async function fetchUpstreamRpc(request: JsonRpcRequest, upstreamSessionId: stri
   }
 }
 
-async function fetchUpstreamTransport(method: 'GET' | 'DELETE', upstreamSessionId: string | null) {
+async function fetchUpstreamTransport(method: 'GET' | 'DELETE', session: TimewebMcpSession) {
   return fetch(TIMEWEB_MCP_UPSTREAM, {
     method,
-    headers: upstreamHeaders(upstreamSessionId),
+    headers: upstreamHeaders(session.upstreamSessionId, session.protocolVersion),
     redirect: 'manual',
     signal: AbortSignal.timeout(TIMEWEB_MCP_TIMEOUT_MS),
     cache: 'no-store',
   })
 }
 
-function upstreamHeaders(upstreamSessionId: string | null) {
+function upstreamHeaders(upstreamSessionId: string | null, protocolVersion: string) {
   const headers = new Headers({
     accept: 'application/json, text/event-stream',
     authorization: `Bearer ${process.env.RR_TIMEWEB_MCP_TOKEN!.trim()}`,
+    'mcp-protocol-version': protocolVersion,
   })
   if (upstreamSessionId) headers.set('mcp-session-id', upstreamSessionId)
   return headers
@@ -334,7 +355,8 @@ function mcpHeaders(context: AuthorizedContext) {
 }
 
 function bridgeFailure(context: AuthorizedContext, method: string, error: unknown, durationMs = 0) {
-  const timeout = error instanceof DOMException && error.name === 'TimeoutError'
+  const timeout = (error instanceof DOMException && error.name === 'TimeoutError')
+    || (error instanceof UpstreamBridgeError && error.status === 504)
   const status = timeout ? 504 : 502
   audit(timeout ? 'upstream_timeout' : 'bridge_error', context.requestId, method, status, durationMs, context.session)
   return NextResponse.json({ error: timeout ? 'upstream_timeout' : 'upstream_unavailable' }, {
