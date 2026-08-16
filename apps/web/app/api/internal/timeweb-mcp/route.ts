@@ -29,6 +29,8 @@ export const TIMEWEB_MCP_MAX_BODY_BYTES = 1024 * 1024
 export const TIMEWEB_MCP_TIMEOUT_MS = 30_000
 
 const RESPONSE_HEADERS = ['cache-control', 'retry-after'] as const
+const statelessUpstreamSubjects = new Set<string>()
+const upstreamInitializationPromises = new Map<string, Promise<string | null>>()
 
 type AuthorizedContext = {
   requestId: string
@@ -126,6 +128,8 @@ export async function DELETE(request: Request) {
     if (authorized.session.upstreamSessionId) {
       await fetchUpstreamTransport('DELETE', authorized.session)
     }
+    statelessUpstreamSubjects.delete(authorized.session.subject)
+    upstreamInitializationPromises.delete(authorized.session.subject)
     await timewebMcpSessionManager.clear(authorized.session)
     audit('session_deleted', authorized.requestId, request.method, 204, 0, authorized.session)
     return new Response(null, { status: 204, headers: authorized.baseHeaders })
@@ -192,6 +196,7 @@ async function proxyTransport(request: Request, context: AuthorizedContext): Pro
   const outcome = await withSingleTimewebMcpRecovery(
     () => fetchUpstreamTransport('GET', context.session),
     async () => {
+      statelessUpstreamSubjects.delete(context.session.subject)
       await timewebMcpSessionManager.markRecovered(context.session)
       await ensureUpstreamInitialized(context.session)
     },
@@ -213,7 +218,15 @@ async function proxyTransport(request: Request, context: AuthorizedContext): Pro
 async function callUpstreamWithSingleRecovery(session: TimewebMcpSession, request: JsonRpcRequest): Promise<JsonRpcResponse | null> {
   if (request.method === 'initialize') {
     const attempt = await fetchUpstreamRpc(request, null, session.protocolVersion)
-    if (attempt.sessionId) await timewebMcpSessionManager.setUpstreamSession(session, attempt.sessionId)
+    if (attempt.response && !attempt.response.error) {
+      if (attempt.sessionId) {
+        statelessUpstreamSubjects.delete(session.subject)
+        await timewebMcpSessionManager.setUpstreamSession(session, attempt.sessionId)
+      } else {
+        statelessUpstreamSubjects.add(session.subject)
+        session.upstreamSessionId = null
+      }
+    }
     return attempt.response ?? upstreamError(request, attempt.status)
   }
 
@@ -221,6 +234,7 @@ async function callUpstreamWithSingleRecovery(session: TimewebMcpSession, reques
   const outcome = await withSingleTimewebMcpRecovery(
     () => fetchUpstreamRpc(request, session.upstreamSessionId, session.protocolVersion),
     async () => {
+      statelessUpstreamSubjects.delete(session.subject)
       await timewebMcpSessionManager.markRecovered(session)
       await ensureUpstreamInitialized(session)
     },
@@ -230,7 +244,26 @@ async function callUpstreamWithSingleRecovery(session: TimewebMcpSession, reques
 }
 
 async function ensureUpstreamInitialized(session: TimewebMcpSession) {
-  if (session.upstreamSessionId) return
+  if (session.upstreamSessionId || statelessUpstreamSubjects.has(session.subject)) return
+
+  const pending = upstreamInitializationPromises.get(session.subject)
+  if (pending) {
+    session.upstreamSessionId = await pending
+    return
+  }
+
+  const initialization = initializeUpstream(session)
+  upstreamInitializationPromises.set(session.subject, initialization)
+  try {
+    session.upstreamSessionId = await initialization
+  } finally {
+    if (upstreamInitializationPromises.get(session.subject) === initialization) {
+      upstreamInitializationPromises.delete(session.subject)
+    }
+  }
+}
+
+async function initializeUpstream(session: TimewebMcpSession): Promise<string | null> {
   const initialize: JsonRpcRequest = {
     jsonrpc: '2.0',
     id: `rr-init-${randomUUID()}`,
@@ -242,15 +275,24 @@ async function ensureUpstreamInitialized(session: TimewebMcpSession) {
     },
   }
   const attempt = await fetchUpstreamRpc(initialize, null, session.protocolVersion)
-  if (!attempt.response || attempt.response.error || !attempt.sessionId) {
+  if (!attempt.response || attempt.response.error) {
     throw new UpstreamBridgeError(attempt.status === 504 ? 504 : 502, `timeweb_mcp_initialize_failed:${attempt.status}`)
   }
-  await timewebMcpSessionManager.setUpstreamSession(session, attempt.sessionId)
+
+  if (attempt.sessionId) {
+    statelessUpstreamSubjects.delete(session.subject)
+    await timewebMcpSessionManager.setUpstreamSession(session, attempt.sessionId)
+  } else {
+    statelessUpstreamSubjects.add(session.subject)
+    session.upstreamSessionId = null
+  }
+
   await fetchUpstreamRpc(
     { jsonrpc: '2.0', method: 'notifications/initialized', params: {} },
     attempt.sessionId,
     session.protocolVersion,
   )
+  return attempt.sessionId
 }
 
 async function fetchUpstreamRpc(
