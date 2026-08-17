@@ -69,6 +69,7 @@ export default function ConversionPanel(props: {
             {PILOT_BULLETS.map((bullet) => <li key={bullet}><ArrowGlyph size={14} />{bullet}</li>)}
           </ul>
           <Link
+            prefetch={false}
             href={buildCheckoutHref({ ...props.previewInput, planCode: pilotPlan.code })}
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricingPilot}
@@ -99,6 +100,7 @@ export default function ConversionPanel(props: {
                   <span>{quarterly ? "Экономия 1 980 ₽" : "На 30% выгоднее недели"}</span>
                 </div>
                 <Link
+                  prefetch={false}
                   href={buildCheckoutHref({ ...props.previewInput, planCode: plan.code })}
                   data-analytics-event={LANDING_ANALYTICS_EVENT.continuationCtaClicked}
                   data-analytics-context={quarterly ? LANDING_ANALYTICS_CONTEXT.quarterly : LANDING_ANALYTICS_CONTEXT.monthly}
@@ -155,6 +157,7 @@ export default function ConversionPanel(props: {
         </div>
         <div className={styles.finalActions}>
           <Link
+            prefetch={false}
             href={buildCheckoutHref({ ...props.previewInput, planCode: pilotPlan.code })}
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.closing}

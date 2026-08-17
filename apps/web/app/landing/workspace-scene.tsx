@@ -208,6 +208,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
 
         <div className={sceneStyles.footerRail}>
           <Link
+            prefetch={false}
             href={props.checkoutHref}
             className={`${styles.workspaceCheckout} ${sceneStyles.checkout}`}
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
@@ -243,6 +244,7 @@ function WorkspaceResultsFailure({ checkoutHref, embedded }: { checkoutHref: str
       </div>
       <div className={sceneStyles.footerRail}>
         <Link
+          prefetch={false}
           href={checkoutHref}
           className={`${styles.workspaceCheckout} ${sceneStyles.checkout}`}
           data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
