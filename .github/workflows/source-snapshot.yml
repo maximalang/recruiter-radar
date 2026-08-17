@@ -1,0 +1,35 @@
+name: V1-V6 source snapshot
+
+on:
+  push:
+    branches:
+      - chatgpt/full-v1-v6-implementation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v7
+        with:
+          name: v1-v6-source-snapshot
+          path: |
+            .github
+            apps
+            packages
+            scripts
+            docs
+            n8n
+            package.json
+            package-lock.json
+            tsconfig.json
+            docker-compose*.yml
+            Dockerfile*
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 1
