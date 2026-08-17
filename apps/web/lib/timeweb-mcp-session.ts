@@ -16,17 +16,22 @@ export type TimewebMcpSession = {
 }
 
 export interface TimewebMcpSessionStore {
-  findById(id: string): Promise<TimewebMcpSession | null>
-  findBySubject(subject: string): Promise<TimewebMcpSession | null>
+  findOwned(id: string, subject: string): Promise<TimewebMcpSession | null>
   save(session: TimewebMcpSession): Promise<TimewebMcpSession>
   setUpstreamSession(
+    id: string,
     subject: string,
     upstreamSessionId: string | null,
     lastSeenAt: Date,
     expiresAt: Date,
   ): Promise<TimewebMcpSession>
-  markRecovered(subject: string, lastSeenAt: Date, expiresAt: Date): Promise<TimewebMcpSession>
-  delete(id: string): Promise<void>
+  markRecovered(
+    id: string,
+    subject: string,
+    lastSeenAt: Date,
+    expiresAt: Date,
+  ): Promise<TimewebMcpSession>
+  delete(id: string, subject: string): Promise<void>
 }
 
 export class TimewebMcpSessionManager {
@@ -35,21 +40,11 @@ export class TimewebMcpSessionManager {
     private readonly ttlMs = TIMEWEB_MCP_SESSION_TTL_MS,
   ) {}
 
-  async getOrCreate(subject: string, requestedId?: string | null, protocolVersion = '2025-03-26', now = new Date()) {
-    let session = requestedId ? await this.store.findById(requestedId) : null
-    if (session && session.subject !== subject) session = null
-    if (!session) session = await this.store.findBySubject(subject)
-
-    if (session && session.expiresAt.getTime() > now.getTime()) {
-      session.lastSeenAt = now
-      session.expiresAt = new Date(now.getTime() + this.ttlMs)
-      session.protocolVersion = protocolVersion || session.protocolVersion
-      const persisted = await this.store.save(session)
-      syncSession(session, persisted)
-      return { session, created: false }
-    }
-
-    if (session) await this.store.delete(session.id)
+  async createSession(
+    subject: string,
+    protocolVersion = '2025-03-26',
+    now = new Date(),
+  ): Promise<TimewebMcpSession> {
     const created: TimewebMcpSession = {
       id: randomUUID(),
       subject,
@@ -60,8 +55,22 @@ export class TimewebMcpSessionManager {
       expiresAt: new Date(now.getTime() + this.ttlMs),
       recoveryCount: 0,
     }
-    const persisted = await this.store.save(created)
-    return { session: persisted, created: persisted.id === created.id }
+    return this.store.save(created)
+  }
+
+  async findOwnedSession(
+    id: string,
+    subject: string,
+    now = new Date(),
+  ): Promise<TimewebMcpSession | null> {
+    if (!isUuid(id)) return null
+    const session = await this.store.findOwned(id, subject)
+    if (!session) return null
+    if (session.expiresAt.getTime() <= now.getTime()) {
+      await this.store.delete(id, subject)
+      return null
+    }
+    return session
   }
 
   async touch(session: TimewebMcpSession, now = new Date()) {
@@ -74,6 +83,7 @@ export class TimewebMcpSessionManager {
 
   async setUpstreamSession(session: TimewebMcpSession, upstreamSessionId: string | null, now = new Date()) {
     const persisted = await this.store.setUpstreamSession(
+      session.id,
       session.subject,
       sanitizeUpstreamSessionId(upstreamSessionId),
       now,
@@ -85,6 +95,7 @@ export class TimewebMcpSessionManager {
 
   async markRecovered(session: TimewebMcpSession, now = new Date()) {
     const persisted = await this.store.markRecovered(
+      session.id,
       session.subject,
       now,
       new Date(now.getTime() + this.ttlMs),
@@ -94,19 +105,17 @@ export class TimewebMcpSessionManager {
   }
 
   async clear(session: TimewebMcpSession) {
-    await this.store.delete(session.id)
+    await this.store.delete(session.id, session.subject)
   }
 }
 
 class PostgresTimewebMcpSessionStore implements TimewebMcpSessionStore {
-  async findById(id: string) {
+  async findOwned(id: string, subject: string) {
     if (!isUuid(id)) return null
-    const { rows } = await requirePool().query('SELECT * FROM timeweb_mcp_sessions WHERE session_id = $1 LIMIT 1', [id])
-    return rows[0] ? fromRow(rows[0]) : null
-  }
-
-  async findBySubject(subject: string) {
-    const { rows } = await requirePool().query('SELECT * FROM timeweb_mcp_sessions WHERE subject = $1 LIMIT 1', [subject])
+    const { rows } = await requirePool().query(
+      'SELECT * FROM timeweb_mcp_sessions WHERE session_id = $1 AND subject = $2 LIMIT 1',
+      [id, subject],
+    )
     return rows[0] ? fromRow(rows[0]) : null
   }
 
@@ -116,10 +125,11 @@ class PostgresTimewebMcpSessionStore implements TimewebMcpSessionStore {
         session_id, subject, upstream_session_id, protocol_version,
         created_at, last_seen_at, expires_at, recovery_count
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-      ON CONFLICT (subject) DO UPDATE SET
+      ON CONFLICT (session_id) DO UPDATE SET
         protocol_version = EXCLUDED.protocol_version,
         last_seen_at = EXCLUDED.last_seen_at,
         expires_at = EXCLUDED.expires_at
+      WHERE timeweb_mcp_sessions.subject = EXCLUDED.subject
       RETURNING *
     `, [
       session.id,
@@ -131,38 +141,47 @@ class PostgresTimewebMcpSessionStore implements TimewebMcpSessionStore {
       session.expiresAt,
       session.recoveryCount,
     ])
-    if (!rows[0]) throw new Error('failed to persist Timeweb MCP session')
+    if (!rows[0]) throw new Error('failed to persist owned Timeweb MCP session')
     return fromRow(rows[0])
   }
 
-  async setUpstreamSession(subject: string, upstreamSessionId: string | null, lastSeenAt: Date, expiresAt: Date) {
+  async setUpstreamSession(
+    id: string,
+    subject: string,
+    upstreamSessionId: string | null,
+    lastSeenAt: Date,
+    expiresAt: Date,
+  ) {
     const { rows } = await requirePool().query(`
       UPDATE timeweb_mcp_sessions
-      SET upstream_session_id = $2, last_seen_at = $3, expires_at = $4
-      WHERE subject = $1
+      SET upstream_session_id = $3, last_seen_at = $4, expires_at = $5
+      WHERE session_id = $1 AND subject = $2
       RETURNING *
-    `, [subject, upstreamSessionId, lastSeenAt, expiresAt])
-    if (!rows[0]) throw new Error('Timeweb MCP session disappeared while setting upstream session')
+    `, [id, subject, upstreamSessionId, lastSeenAt, expiresAt])
+    if (!rows[0]) throw new Error('owned Timeweb MCP session disappeared while setting upstream session')
     return fromRow(rows[0])
   }
 
-  async markRecovered(subject: string, lastSeenAt: Date, expiresAt: Date) {
+  async markRecovered(id: string, subject: string, lastSeenAt: Date, expiresAt: Date) {
     const { rows } = await requirePool().query(`
       UPDATE timeweb_mcp_sessions
       SET upstream_session_id = NULL,
           recovery_count = recovery_count + 1,
-          last_seen_at = $2,
-          expires_at = $3
-      WHERE subject = $1
+          last_seen_at = $3,
+          expires_at = $4
+      WHERE session_id = $1 AND subject = $2
       RETURNING *
-    `, [subject, lastSeenAt, expiresAt])
-    if (!rows[0]) throw new Error('Timeweb MCP session disappeared while recording recovery')
+    `, [id, subject, lastSeenAt, expiresAt])
+    if (!rows[0]) throw new Error('owned Timeweb MCP session disappeared while recording recovery')
     return fromRow(rows[0])
   }
 
-  async delete(id: string) {
+  async delete(id: string, subject: string) {
     if (!isUuid(id)) return
-    await requirePool().query('DELETE FROM timeweb_mcp_sessions WHERE session_id = $1', [id])
+    await requirePool().query(
+      'DELETE FROM timeweb_mcp_sessions WHERE session_id = $1 AND subject = $2',
+      [id, subject],
+    )
   }
 }
 

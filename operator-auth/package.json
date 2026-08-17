@@ -8,8 +8,8 @@
   },
   "scripts": {
     "start": "node src/entrypoint.js",
-    "check": "node --check src/timeweb-server.js && node --check src/entrypoint.js && node --check src/postgres-adapter.js && node --check test/security.test.js && node --check test/timeweb-security.test.js && node --check test/timeweb-lifecycle.test.js",
-    "test": "node --test --test-concurrency=1 test/security.test.js test/timeweb-security.test.js test/timeweb-lifecycle.test.js"
+    "check": "node --check src/timeweb-server.js && node --check src/entrypoint.js && node --check src/postgres-adapter.js && node --check test/security.test.js && node --check test/timeweb-security.test.js && node --check test/timeweb-lifecycle.test.js && node --check test/timeweb-refresh-concurrency.test.js",
+    "test": "node --test --test-concurrency=1 test/security.test.js test/timeweb-security.test.js test/timeweb-lifecycle.test.js test/timeweb-refresh-concurrency.test.js"
   },
   "dependencies": {
     "argon2": "0.45.1",

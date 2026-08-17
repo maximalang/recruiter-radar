@@ -15,10 +15,14 @@ jest.mock('@/lib/timeweb-mcp-session', () => {
   return {
     __mockSession: session,
     timewebMcpSessionManager: {
-      getOrCreate: jest.fn(async (_subject: string, _requestedId?: string | null, protocolVersion = '2025-03-26') => {
+      createSession: jest.fn(async (subject: string, protocolVersion = '2025-03-26') => {
+        session.subject = subject
         session.protocolVersion = protocolVersion
-        return { session, created: false }
+        return session
       }),
+      findOwnedSession: jest.fn(async (id: string, subject: string) => (
+        id === session.id && subject === session.subject ? session : null
+      )),
       touch: jest.fn(async () => session),
       setUpstreamSession: jest.fn(async (_session: unknown, upstreamSessionId: string | null) => {
         session.upstreamSessionId = upstreamSessionId
@@ -60,6 +64,8 @@ const { __mockSession: mockSession, timewebMcpSessionManager: mockManager } = je
     recoveryCount: number
   }
   timewebMcpSessionManager: {
+    createSession: jest.Mock
+    findOwnedSession: jest.Mock
     setUpstreamSession: jest.Mock
     markRecovered: jest.Mock
   }
@@ -155,6 +161,8 @@ describe('Timeweb MCP stateless upstream compatibility', () => {
     expect(initializeCalls).toBe(1)
     expect(notificationCalls).toBe(1)
     expect(listCalls).toBe(3)
+    expect(mockManager.createSession).not.toHaveBeenCalled()
+    expect(mockManager.findOwnedSession).toHaveBeenCalledTimes(3)
     expect(mockManager.setUpstreamSession).not.toHaveBeenCalled()
     expect(mockManager.markRecovered).not.toHaveBeenCalled()
     expect(mockSession.upstreamSessionId).toBeNull()

@@ -63,9 +63,21 @@ jobs:
         working-directory: operator-auth
         run: npm run check
 
-      - name: Run legacy and Timeweb OAuth persistence/security suites
+      - name: Run legacy OAuth security suite
         working-directory: operator-auth
-        run: npm test
+        run: node --test --test-concurrency=1 test/security.test.js
+
+      - name: Run Timeweb OAuth security suite
+        working-directory: operator-auth
+        run: node --test --test-concurrency=1 test/timeweb-security.test.js
+
+      - name: Run Timeweb OAuth lifecycle suite
+        working-directory: operator-auth
+        run: node --test --test-concurrency=1 test/timeweb-lifecycle.test.js
+
+      - name: Run Timeweb concurrent refresh suite
+        working-directory: operator-auth
+        run: node --test --test-concurrency=1 test/timeweb-refresh-concurrency.test.js
 
       - name: Validate Timeweb deployment scripts and fail-closed bootstrap contract
         run: |
