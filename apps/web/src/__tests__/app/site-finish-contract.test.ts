@@ -64,6 +64,24 @@ describe("cross-route visual layer contract", () => {
     expect(pendingAuth).not.toMatch(/rgba\(/gi);
   });
 
+  it("keeps Company Brief feedback states on semantic roles instead of a local rainbow palette", () => {
+    const feedback = readAppFile("leads/[id]/feedback-buttons.module.css");
+
+    for (const token of [
+      "--rr-color-positive",
+      "--rr-color-warning",
+      "--rr-color-information",
+      "--rr-color-destructive",
+      "--rr-color-focus",
+      "--rr-color-text-inverse",
+    ]) {
+      expect(feedback).toContain(token);
+    }
+    expect(feedback).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
+    expect(feedback).not.toMatch(/rgba\(/gi);
+    expect(feedback).not.toContain("text-transform: uppercase");
+  });
+
   it("keeps the authenticated shell addressable after the frame migration", () => {
     const workspace = readAppFile("ui/product-workspace.tsx");
     const internalPage = readAppFile("ui/internal-page.tsx");
