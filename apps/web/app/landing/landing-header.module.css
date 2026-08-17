@@ -135,6 +135,7 @@
   color: currentColor;
 }
 
+.brand:focus-visible,
 .navLink:focus-visible,
 .login:focus-visible,
 .cta:focus-visible,
