@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: a992f8aeff6f1737a3ef9e9ca4c8644fe6b17faa
           fetch-depth: 0
       - name: Final production legacy grammar audit
         shell: bash
