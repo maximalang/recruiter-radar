@@ -1,0 +1,77 @@
+name: V1-V6 PASS 10 final audit
+
+on:
+  push:
+    branches:
+      - chatgpt/v1-v6-pass10-final-audit
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Final production legacy grammar audit
+        shell: bash
+        run: |
+          set -u
+          pattern='LeadCard|OpportunityCard|ScoreGauge|ScoreBar|ScoreBandChip|SettingsOverview|radioCard|modeBadge|metricCard|signalLeadCard|signalLeadSections|signalLeadScoreTrack|ContentCard|recruiter-radar-v6|recruiter-radar-v7|#9fca63|#9FCA63|#c8f36a|#C8F36A|#c9ec8b|#C9EC8B|Возможности|Дашборд|Командный центр|Карта спроса|Source Registry|translateY\(-1px\)|translateY\(\s*-1px\s*\)'
+          hits="$(rg -n --hidden --glob '!**/__tests__/**' --glob '!**/*.test.*' --glob '!**/*.spec.*' --glob '!**/node_modules/**' --glob '!**/.next/**' "$pattern" apps/web/app apps/web/lib 2>/dev/null || true)"
+          printf '%s\n' "$hits"
+          test -z "$hits"
+      - name: Final test and source legacy audit
+        shell: bash
+        run: |
+          set -u
+          pattern='LeadCard|OpportunityCard|ScoreGauge|ScoreBar|ScoreBandChip|SettingsOverview|radioCard|modeBadge|metricCard|signalLeadCard|signalLeadSections|signalLeadScoreTrack|ContentCard|recruiter-radar-v6|recruiter-radar-v7|#9fca63|#9FCA63|#c8f36a|#C8F36A|#c9ec8b|#C9EC8B|Возможности|Дашборд|Командный центр|Карта спроса|Source Registry|translateY\(-1px\)|translateY\(\s*-1px\s*\)'
+          hits="$(rg -n --hidden --glob '!**/node_modules/**' --glob '!**/.next/**' "$pattern" apps/web/src/__tests__ scripts packages .github/workflows 2>/dev/null | grep -v 'v1-v6-pass10-final-audit.yml' || true)"
+          printf '%s\n' "$hits"
+          test -z "$hits"
+      - name: Token and ambient-motion audit
+        shell: bash
+        run: |
+          token_hits="$(rg -n --hidden -- '--c-[a-zA-Z0-9_-]+|--rr-(paper|ink|surface|signal|accent|muted|line|border|radius|shadow)[a-zA-Z0-9_-]*' apps/web/app/product-visual-system.css apps/web/app/globals.css apps/web/app 2>/dev/null || true)"
+          printf '%s\n' "$token_hits"
+          test -z "$token_hits"
+          motion_hits="$(rg -n --hidden --glob '*.css' --glob '*.tsx' --glob '*.ts' 'animation[^;]*(infinite|linear infinite)|animation-iteration-count\s*:\s*infinite|requestAnimationFrame|setInterval\(' apps/web/app 2>/dev/null || true)"
+          printf '%s\n' "$motion_hits"
+          test -z "$motion_hits"
+      - name: Retired Today and duplicate primitive audit
+        shell: bash
+        run: |
+          retired="$(rg -n --hidden 'DashboardAccountOverview|dashboard-account-overview|getDeliveryPreferencesByOwnerId|computeProfileCompletion|accountOverview|accountStatusStrip|statusFact' apps/web/app/dashboard apps/web/src/__tests__/app/dashboard 2>/dev/null || true)"
+          printf '%s\n' "$retired"
+          test -z "$retired"
+          for term in LeadCard OpportunityCard ScoreGauge ScoreBar ScoreBandChip SettingsOverview ContentCard; do
+            refs="$(rg -n --hidden --glob '!**/node_modules/**' --glob '!**/.next/**' "$term" apps/web 2>/dev/null || true)"
+            if [ -n "$refs" ]; then
+              echo "Unexpected $term references:"
+              printf '%s\n' "$refs"
+              exit 1
+            fi
+          done
+      - name: Classify remaining card-named production files
+        shell: bash
+        run: |
+          echo '=== CARD-NAMED FILES ==='
+          find apps/web/app -type f \( -iname '*card*' -o -iname '*gauge*' -o -iname '*overview*' \) | sort
+          echo '=== ACTIVE REFERENCES ==='
+          rg -n --hidden 'BrowserPushCard|browser-push-card|OpportunityCommercialSignalCard|opportunity-commercial-signal-card|AdminUserCard|admin-user-card' apps/web/app apps/web/src/__tests__ 2>/dev/null || true
+      - name: Diff cleanup counts against main
+        shell: bash
+        run: |
+          git fetch origin main --depth=1
+          echo '=== DIFF STATUS ==='
+          git diff --name-status origin/main...HEAD > /tmp/diff-status.txt
+          cat /tmp/diff-status.txt
+          echo "TOTAL_CHANGED=$(wc -l < /tmp/diff-status.txt)"
+          echo "DELETED_FILES=$(awk '$1=="D"{n++} END{print n+0}' /tmp/diff-status.txt)"
+          echo "ADDED_FILES=$(awk '$1=="A"{n++} END{print n+0}' /tmp/diff-status.txt)"
+          echo "MODIFIED_FILES=$(awk '$1=="M"{n++} END{print n+0}' /tmp/diff-status.txt)"
+          echo '=== RETIRED VISUAL FILES ==='
+          awk '$1=="D" && $2 ~ /(lead-card|opportunity-card|score|settings-overview|content-card|metric|legend|workspace-frame|navigation)/ {print}' /tmp/diff-status.txt || true
