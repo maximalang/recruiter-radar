@@ -1,7 +1,7 @@
 /* Recruiter Radar — interaction hardening loaded after the visual finish layer. */
 
 :where(a, button, input, select, textarea, summary) {
-  -webkit-tap-highlight-color: rgba(35, 128, 111, 0.14);
+  -webkit-tap-highlight-color: var(--rr-color-selection);
 }
 
 :where(button, input, select, textarea) {
@@ -43,10 +43,7 @@ main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
   min-height: 44px;
 }
 
-[data-product-workspace="true"] :is(
-  [class*="sidebarBrand"],
-  [class*="mobileTopbar"]
-) > a {
+[data-product-workspace="true"] [class*="mobileTopbar"] > a {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
