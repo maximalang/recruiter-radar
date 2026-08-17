@@ -1,0 +1,42 @@
+name: Agent World Pinggy edge observer
+
+on:
+  workflow_run:
+    workflows:
+      - Agent World Pinggy temporary edge
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    if: github.event.workflow_run.head_branch == 'codex/agent-world-edge-temp'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/agent-world-edge-temp
+
+      - name: Record edge result
+        env:
+          RESULT: ${{ github.event.workflow_run.conclusion }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          {
+            echo "conclusion=$RESULT"
+            echo "run_id=$RUN_ID"
+            echo "head_sha=$HEAD_SHA"
+          } > ops/agent-world-edge-pinggy-result.txt
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ops/agent-world-edge-pinggy-result.txt
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m 'chore: record temporary Pinggy edge result [skip ci]'
+          git push origin HEAD:codex/agent-world-edge-temp
