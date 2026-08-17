@@ -12,10 +12,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  preflight:
+  deploy-preview:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
+    env:
+      AGENT_WORLD_SHA: 5047968494e7adb5fe1bc914645cd409daa02b6e
+      AGENT_WORLD_OWNER_PASSWORD_HASH: 'scrypt-v1$32768$8$1$VY98vE1S4yVPhSkLVvhb7g$ioPyf_XxtntzCAHBqc1c4gZ_gmqduAT4q5_hTvXOg4U'
     steps:
+      - name: Checkout exact Agent World revision
+        uses: actions/checkout@v7
+        with:
+          repository: maximalang/site
+          ref: ${{ env.AGENT_WORLD_SHA }}
+          path: agent-world-src
+          persist-credentials: false
+
+      - name: Build immutable web image
+        run: |
+          set -euo pipefail
+          test "$(git -C agent-world-src rev-parse HEAD)" = "$AGENT_WORLD_SHA"
+          docker build \
+            -f agent-world-src/Dockerfile \
+            -t "agent-world-preview-web:${AGENT_WORLD_SHA}" \
+            agent-world-src
+          docker save "agent-world-preview-web:${AGENT_WORLD_SHA}" | gzip -1 > /tmp/agent-world-preview-web.tar.gz
+          ls -lh /tmp/agent-world-preview-web.tar.gz
+
       - name: Setup SSH
         run: |
           set -euo pipefail
@@ -24,26 +46,252 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p "${{ secrets.RR_SSH_PORT }}" -t ed25519 "${{ secrets.RR_SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Read-only VDS capacity preflight
+      - name: Upload preview image
+        run: |
+          set -euo pipefail
+          remote="${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}"
+          port="${{ secrets.RR_SSH_PORT }}"
+          ssh -p "$port" -o LogLevel=ERROR "$remote" 'install -d -m 0700 /opt/agent-world-preview'
+          scp -P "$port" -o LogLevel=ERROR \
+            /tmp/agent-world-preview-web.tar.gz \
+            "$remote:/opt/agent-world-preview/web-${AGENT_WORLD_SHA}.tar.gz"
+
+      - name: Deploy resource-bounded preview beside Recruiter Radar
         run: |
           set -euo pipefail
           ssh -p "${{ secrets.RR_SSH_PORT }}" -o LogLevel=ERROR \
-            "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" <<'SSH_EOF'
-          set -euo pipefail
-          echo '=== AGENT_WORLD_PREFLIGHT_SYSTEM ==='
-          uname -a
-          echo "cpus=$(nproc)"
-          echo '=== AGENT_WORLD_PREFLIGHT_MEMORY ==='
+            "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" \
+            "AGENT_WORLD_SHA='${AGENT_WORLD_SHA}' AGENT_WORLD_OWNER_PASSWORD_HASH='${AGENT_WORLD_OWNER_PASSWORD_HASH}' bash -s" <<'SSH_EOF'
+          set -Eeuo pipefail
+          preview_dir=/opt/agent-world-preview
+          image_archive="$preview_dir/web-${AGENT_WORLD_SHA}.tar.gz"
+          network=agent-world-preview-net
+          db_container=agent-world-preview-db
+          web_container=agent-world-preview-web
+          db_volume=agent-world-preview-postgres-data
+          image="agent-world-preview-web:${AGENT_WORLD_SHA}"
+          secret_file="$preview_dir/secrets.env"
+          web_env="$preview_dir/web.env"
+          caddy_config=/etc/caddy/Caddyfile
+          caddy_begin='# BEGIN Agent World Preview (managed)'
+          caddy_end='# END Agent World Preview (managed)'
+
+          exec 9>/tmp/agent-world-preview.lock
+          flock -w 120 9
+
+          test -f "$image_archive"
+          test -f "$caddy_config"
+          test "$(docker inspect --format '{{.State.Health.Status}}' recruiter-radar-web-1)" = healthy
+          test "$(docker inspect --format '{{.State.Health.Status}}' recruiter-radar-db-1)" = healthy
+          curl -fsS http://127.0.0.1:3000/api/health >/dev/null
+
+          free_mb="$(free -m | awk '/^Mem:/ {print $7}')"
+          disk_mb="$(df -Pm / | awk 'NR==2 {print $4}')"
+          if [ "$free_mb" -lt 420 ]; then
+            echo "Insufficient available memory for bounded preview: ${free_mb} MB" >&2
+            exit 1
+          fi
+          if [ "$disk_mb" -lt 2500 ]; then
+            echo "Insufficient disk for preview: ${disk_mb} MB" >&2
+            exit 1
+          fi
+
+          if [ ! -f "$secret_file" ]; then
+            umask 077
+            db_password="$(openssl rand -hex 24)"
+            csrf_secret="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
+            master_key="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
+            test "${#csrf_secret}" -eq 43
+            test "${#master_key}" -eq 43
+            cat > "$secret_file" <<SECRETS
+DB_PASSWORD=$db_password
+CSRF_SECRET=$csrf_secret
+MASTER_KEY=$master_key
+SECRETS
+            chmod 600 "$secret_file"
+          fi
+          # shellcheck disable=SC1090
+          . "$secret_file"
+          test -n "$DB_PASSWORD"
+          test "${#CSRF_SECRET}" -eq 43
+          test "${#MASTER_KEY}" -eq 43
+
+          umask 077
+          cat > "$web_env" <<ENV
+DATABASE_URL=postgresql://agent_world:${DB_PASSWORD}@${db_container}:5432/agent_world
+AGENT_WORLD_DATABASE_TLS=disable
+AGENT_WORLD_DATABASE_PLAINTEXT_ACK=private-network
+AGENT_WORLD_OWNER_PASSWORD_HASH=${AGENT_WORLD_OWNER_PASSWORD_HASH}
+AGENT_WORLD_CSRF_SECRET=${CSRF_SECRET}
+AGENT_WORLD_SECRET_MASTER_KEY=${MASTER_KEY}
+AGENT_WORLD_SECRET_KEY_VERSION=1
+AGENT_WORLD_INSTANCE_ID=agent-world-preview
+AGENT_WORLD_SCHEDULE_POLL_MS=60000
+AGENT_WORLD_MISSION_HANDOFF_POLL_MS=15000
+NODE_OPTIONS=--max-old-space-size=224
+HOSTNAME=0.0.0.0
+PORT=3000
+ENV
+          chmod 600 "$web_env"
+
+          docker network inspect "$network" >/dev/null 2>&1 || docker network create "$network" >/dev/null
+          docker volume inspect "$db_volume" >/dev/null 2>&1 || docker volume create "$db_volume" >/dev/null
+
+          if ! docker container inspect "$db_container" >/dev/null 2>&1; then
+            docker run -d \
+              --name "$db_container" \
+              --restart unless-stopped \
+              --network "$network" \
+              --memory 192m \
+              --memory-swap 384m \
+              --cpus 0.25 \
+              --pids-limit 128 \
+              --security-opt no-new-privileges:true \
+              --health-cmd 'pg_isready -U agent_world -d agent_world' \
+              --health-interval 5s \
+              --health-timeout 3s \
+              --health-retries 12 \
+              --health-start-period 15s \
+              -e POSTGRES_DB=agent_world \
+              -e POSTGRES_USER=agent_world \
+              -e POSTGRES_PASSWORD="$DB_PASSWORD" \
+              -v "$db_volume:/var/lib/postgresql" \
+              pgvector/pgvector:0.8.6-pg18-bookworm@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a \
+              -c shared_buffers=32MB \
+              -c max_connections=20 \
+              -c work_mem=2MB \
+              -c maintenance_work_mem=16MB >/dev/null
+          else
+            docker start "$db_container" >/dev/null 2>&1 || true
+          fi
+
+          db_ready=false
+          for _ in $(seq 1 30); do
+            if [ "$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$db_container")" = healthy ]; then
+              db_ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$db_ready" != true ]; then
+            docker logs --tail 100 "$db_container" >&2 || true
+            exit 1
+          fi
+
+          gzip -dc "$image_archive" | docker load >/dev/null
+          docker image inspect "$image" >/dev/null
+
+          rollback_available=false
+          if docker container inspect "$web_container" >/dev/null 2>&1; then
+            old_image_id="$(docker inspect --format '{{.Image}}' "$web_container")"
+            if [ -n "$old_image_id" ] && docker image inspect "$old_image_id" >/dev/null 2>&1; then
+              docker tag "$old_image_id" agent-world-preview-web:rollback
+              rollback_available=true
+            fi
+            docker rm -f "$web_container" >/dev/null
+          fi
+
+          run_web() {
+            run_image="$1"
+            docker run -d \
+              --name "$web_container" \
+              --restart unless-stopped \
+              --network "$network" \
+              -p 127.0.0.1:3100:3000 \
+              --env-file "$web_env" \
+              --memory 384m \
+              --memory-swap 768m \
+              --cpus 0.45 \
+              --pids-limit 256 \
+              --read-only \
+              --tmpfs /tmp:size=64m,mode=1777 \
+              --cap-drop ALL \
+              --security-opt no-new-privileges:true \
+              "$run_image" >/dev/null
+          }
+
+          run_web "$image"
+          web_ready=false
+          for _ in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:3100/api/health/ready >/dev/null 2>&1; then
+              web_ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$web_ready" != true ]; then
+            docker logs --tail 150 "$web_container" >&2 || true
+            docker rm -f "$web_container" >/dev/null 2>&1 || true
+            if [ "$rollback_available" = true ]; then
+              run_web agent-world-preview-web:rollback
+            fi
+            exit 1
+          fi
+
+          caddy_tmp="$(mktemp /etc/caddy/Caddyfile.agent-world-preview.XXXXXX)"
+          caddy_previous="$(mktemp /etc/caddy/Caddyfile.agent-world-previous.XXXXXX)"
+          cp "$caddy_config" "$caddy_previous"
+          awk -v begin="$caddy_begin" -v end="$caddy_end" '
+            $0 == begin { skip = 1; next }
+            $0 == end { skip = 0; next }
+            !skip { print }
+          ' "$caddy_config" > "$caddy_tmp"
+          cat >> "$caddy_tmp" <<'CADDY'
+
+# BEGIN Agent World Preview (managed)
+https://recruiter-radar.ru:8443 {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3100 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto https
+        header_up Host {host}
+    }
+}
+# END Agent World Preview (managed)
+CADDY
+          chmod --reference="$caddy_config" "$caddy_tmp"
+          chown --reference="$caddy_config" "$caddy_tmp"
+          caddy validate --config "$caddy_tmp" --adapter caddyfile
+          mv "$caddy_tmp" "$caddy_config"
+          if ! systemctl reload caddy.service; then
+            mv "$caddy_previous" "$caddy_config"
+            systemctl reload caddy.service || true
+            exit 1
+          fi
+          rm -f "$caddy_previous"
+
+          curl -fsS http://127.0.0.1:3100/api/health/ready >/dev/null
+          curl -kfsS --resolve recruiter-radar.ru:8443:127.0.0.1 \
+            https://recruiter-radar.ru:8443/api/health/ready >/dev/null
+          curl -fsS http://127.0.0.1:3000/api/health >/dev/null
+
+          rm -f "$image_archive"
+          docker image prune -f >/dev/null 2>&1 || true
+
+          echo '=== AGENT_WORLD_PREVIEW_STATUS ==='
+          docker ps --filter "name=agent-world-preview" --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
           free -m
-          echo '=== AGENT_WORLD_PREFLIGHT_DISK ==='
-          df -h / /opt /var/lib/docker 2>/dev/null || df -h /
-          echo '=== AGENT_WORLD_PREFLIGHT_DOCKER_DF ==='
-          docker system df
-          echo '=== AGENT_WORLD_PREFLIGHT_RUNNING_CONTAINERS ==='
-          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-          echo '=== AGENT_WORLD_PREFLIGHT_PORTS ==='
-          ss -lnt | awk 'NR==1 || $4 ~ /:(80|443|3000|3001|3002|3100|3200|8080|8443)$/'
-          echo '=== AGENT_WORLD_PREFLIGHT_LOAD ==='
-          uptime
-          echo '=== AGENT_WORLD_PREFLIGHT_DONE ==='
+          df -h /
+          echo '=== AGENT_WORLD_PREVIEW_READY ==='
           SSH_EOF
+
+      - name: Verify preview and Recruiter Radar externally
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 12); do
+            if curl -fsS --max-time 15 https://recruiter-radar.ru:8443/api/health/ready >/tmp/agent-world-ready.json; then
+              break
+            fi
+            if [ "$i" -eq 12 ]; then
+              echo 'Agent World preview is healthy locally but public HTTPS:8443 is unreachable.' >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          curl -fsS --max-time 15 https://recruiter-radar.ru/api/health >/tmp/radar-ready.json
+          curl -fsSI --max-time 15 https://recruiter-radar.ru:8443/ | head -20
+          echo 'PREVIEW_URL=https://recruiter-radar.ru:8443'
+
+      - name: Cleanup runner material
+        if: always()
+        run: rm -f /tmp/agent-world-preview-web.tar.gz /tmp/agent-world-ready.json /tmp/radar-ready.json
