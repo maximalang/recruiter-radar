@@ -8,6 +8,7 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
   const mapCss = readFileSync(resolve(opportunitiesRoot, 'evidence-radar-map.module.css'), 'utf8')
   const radarPage = readFileSync(resolve(opportunitiesRoot, 'radar', 'page.tsx'), 'utf8')
   const sourcePage = readFileSync(resolve(process.cwd(), 'app', 'settings', 'diagnostics', 'sources', 'page.tsx'), 'utf8')
+  const sourceCss = readFileSync(resolve(process.cwd(), 'app', 'settings', 'diagnostics', 'sources', 'source-registry.module.css'), 'utf8')
   const legacySourcePage = readFileSync(resolve(opportunitiesRoot, 'sources', 'page.tsx'), 'utf8')
   const repository = readFileSync(resolve(intelligenceRoot, 'evidence-radar-repository.ts'), 'utf8')
   const governance = readFileSync(resolve(intelligenceRoot, 'evidence-source-governance-repository.ts'), 'utf8')
@@ -90,5 +91,18 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
     expect(governance).toContain('source_registry_reviews_v1')
     expect(governance).toContain('evidence_radar_source_allowed_v1(source.id)')
     expect(governance).toContain('ORDER BY item.reviewed_at DESC, item.id DESC')
+  })
+
+  it('keeps all source governance facts reachable on mobile instead of hiding table columns', () => {
+    expect(sourcePage).toContain('className={styles.mobileSources}')
+    expect(sourcePage).toContain('className={styles.mobileDetails}')
+    for (const label of ['Runtime', 'Доступ', 'Legal', 'Cadence', 'Надёжность', 'Match', 'План', 'Условия']) {
+      expect(sourcePage).toContain(`<dt>${label}</dt>`)
+    }
+    expect(sourcePage).toContain("pluralForm(count, forms)")
+    expect(sourceCss).toContain('.desktopTable{display:none}')
+    expect(sourceCss).toContain('.mobileSources{display:grid}')
+    expect(sourceCss).not.toMatch(/\.table th:nth-child\(n\+4\)/)
+    expect(sourceCss).not.toMatch(/\.table td:nth-child\(n\+4\)/)
   })
 })
