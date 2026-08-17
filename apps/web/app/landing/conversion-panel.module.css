@@ -40,12 +40,11 @@
 }
 
 .pilotOffer {
-  transition: background-color .22s ease, border-color .22s ease, transform .22s ease;
+  transition: background-color .22s ease, border-color .22s ease;
 }
 
 .pilotOffer:hover {
   background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(141,217,193,.04));
-  transform: translateY(-2px);
 }
 
 .pricing [data-pricing-primary="true"] > :global(a) {
@@ -312,8 +311,6 @@
   .faq {
     padding-block: 4.25rem;
   }
-
-  .pilotOffer:hover { transform: none; }
 
   .pricing [data-pricing-secondary="true"] {
     grid-template-rows: none;
