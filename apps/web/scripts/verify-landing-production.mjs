@@ -32,6 +32,7 @@ const requiredSelectors = [
   "#preview-configurator",
   "#preview-results",
   "#scene-evidence",
+  "#scene-radar",
   "#scene-delivery",
   "#pricing",
   "#faq",
@@ -43,6 +44,7 @@ const hashSpecs = [
   { name: "hash-preview-configurator-1440x900", hash: "preview-configurator", target: "#preview-configurator" },
   { name: "hash-preview-results-1440x900", hash: "preview-results", target: "#preview-results" },
   { name: "hash-evidence-1440x900", hash: "scene-evidence", target: "#scene-evidence" },
+  { name: "hash-radar-1440x900", hash: "scene-radar", target: "#scene-radar" },
   { name: "hash-delivery-1440x900", hash: "scene-delivery", target: "#scene-delivery" },
   { name: "hash-pricing-1440x900", hash: "pricing", target: "#pricing" },
   { name: "hash-faq-1440x900", hash: "faq", target: "#faq" },
@@ -122,6 +124,9 @@ async function assertRequiredSurface(page, label) {
   assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
   assert.match(await page.locator("#scene-workspace").innerText(), /пример сегодняшней выдачи|приоритет по вашему профилю/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
+  assert.match(await page.locator("#scene-radar").innerText(), /свежесть|подтвержден/i);
+  assert.equal(await page.locator("#scene-radar [data-radar-spatial-model]").getAttribute("data-radar-spatial-model"), "recency-confidence");
+  assert.equal(await page.locator("#scene-radar [data-radar-semantic-list]").count(), 1);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const pricingText = await page.locator("#pricing").innerText();
   assert.match(pricingText, /Проверьте радар на своей нише за 7 дней/i);
@@ -189,6 +194,7 @@ async function assertNoOverlapOrClipping(page, label) {
       "#preview-configurator",
       "#preview-results",
       "#scene-evidence",
+      "#scene-radar",
       "#scene-delivery",
       "#pricing",
       "#faq",
@@ -212,6 +218,7 @@ async function assertKeyHeadingBounds(page, label) {
       "#scene-detection h1",
       "#scene-workspace h2",
       "#scene-evidence h2",
+      "#scene-radar h2",
       "#scene-delivery h2",
       "#pricing h2",
       "#faq h2",
@@ -510,7 +517,12 @@ async function assertActiveNavigationAndTone(browser) {
   await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
   await page.waitForTimeout(180);
   assert.match(await brandHeader.locator("a[aria-current='location']").first().innerText(), /Как работает/);
+  assert.equal(await brandHeader.getAttribute("data-tone"), "light");
+  await page.locator("#scene-radar").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(180);
   assert.equal(await brandHeader.getAttribute("data-tone"), "dark");
+  assert.equal(await page.locator("#scene-radar [data-radar-spatial-model]").getAttribute("data-radar-spatial-model"), "recency-confidence");
+  assert.equal(await page.locator("#scene-radar [data-radar-semantic-list]").count(), 1);
   await page.locator("#scene-delivery").scrollIntoViewIfNeeded();
   await page.waitForTimeout(180);
   assert.equal(await brandHeader.getAttribute("data-tone"), "light");
