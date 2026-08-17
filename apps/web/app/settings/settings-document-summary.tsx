@@ -49,7 +49,7 @@ export default function SettingsDocumentSummary(props: {
 
         {props.authSecurityEnabled ? (
           <section className={styles.section}>
-            <span className={styles.eyebrow}>Workspace</span>
+            <span className={styles.eyebrow}>Рабочее пространство</span>
             <h2>Доступ и команда</h2>
             <p>Участники, роли, безопасность аккаунта и срок доступа управляются отдельно от профиля радара.</p>
             <div className={styles.inlineLinks}>
