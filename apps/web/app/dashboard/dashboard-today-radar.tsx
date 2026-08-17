@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LeadItem } from "@/lib/leads-data";
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from "@/lib/leads/lead-quality";
+import { formatVacanciesCount, pluralForm } from "@/lib/format/plural";
 import { formatSignalFreshness, EmptyState } from "../ui/internal-page";
 import { TargetIcon } from "../ui/icons";
 import styles from "./dashboard-workspace.module.css";
@@ -17,6 +18,14 @@ function confidenceLabel(gate: LeadItem["confidenceGate"]) {
   if (gate === "B") return "достаточное подтверждение";
   if (gate === "C") return "требует проверки";
   return "недостаточно подтверждений";
+}
+
+function formatEvidenceCount(count: number) {
+  return `${count} ${pluralForm(count, ["подтверждение", "подтверждения", "подтверждений"])}`;
+}
+
+function formatSourceCount(count: number) {
+  return `${count} ${pluralForm(count, ["источник", "источника", "источников"])}`;
 }
 
 export default function DashboardTodayRadar({ topLeads, pendingReview, hiringModeByProfileId, lastRunAt }: DashboardTodayRadarProps) {
@@ -58,8 +67,8 @@ export default function DashboardTodayRadar({ topLeads, pendingReview, hiringMod
                   <small>{freshness} · {roles}</small>
                 </span>
                 <span className={styles.todayEvidence}>
-                  <strong>{lead.evidenceTitles.length} подтверждений</strong>
-                  <small>{lead.sourceFamilies.length} ист. · {lead.vacanciesCount} вакансий</small>
+                  <strong>{formatEvidenceCount(lead.evidenceTitles.length)}</strong>
+                  <small>{formatSourceCount(lead.sourceFamilies.length)} · {formatVacanciesCount(lead.vacanciesCount)}</small>
                 </span>
                 <span className={styles.todayConfidence}>{confidenceLabel(lead.confidenceGate)}</span>
                 <span className={styles.todayAction}>Открыть</span>
