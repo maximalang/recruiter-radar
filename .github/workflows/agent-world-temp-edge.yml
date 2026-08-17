@@ -1,0 +1,168 @@
+name: Temporary AI World edge
+
+on:
+  push:
+    branches: [codex/agent-world-temp-edge]
+    paths:
+      - .agent-world-tunnel-url
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-world-temp-edge
+  cancel-in-progress: false
+
+jobs:
+  edge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve temporary edge mode
+        id: edge
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f .agent-world-tunnel-url ]; then
+            origin="$(tr -d '\r\n' < .agent-world-tunnel-url)"
+            if ! [[ "$origin" =~ ^https://[a-z0-9-]+\.trycloudflare\.com$ ]]; then
+              echo "Invalid temporary tunnel origin" >&2
+              exit 1
+            fi
+            echo "mode=install" >> "$GITHUB_OUTPUT"
+            echo "origin=$origin" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=remove" >> "$GITHUB_OUTPUT"
+            echo "origin=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup existing Recruiter Radar SSH path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${{ secrets.RR_SSH_PORT }}" -t ed25519 "${{ secrets.RR_SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Install or remove isolated temporary Caddy routes
+        env:
+          EDGE_MODE: ${{ steps.edge.outputs.mode }}
+          TUNNEL_ORIGIN: ${{ steps.edge.outputs.origin }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -p "${{ secrets.RR_SSH_PORT }}" -o LogLevel=ERROR \
+            "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" \
+            "AGENT_WORLD_EDGE_MODE='$EDGE_MODE' AGENT_WORLD_TUNNEL_ORIGIN='$TUNNEL_ORIGIN' bash -s" <<'SSH_EOF'
+          set -Eeuo pipefail
+          mode="${AGENT_WORLD_EDGE_MODE:?}"
+          origin="${AGENT_WORLD_TUNNEL_ORIGIN:-}"
+          caddyfile=/etc/caddy/Caddyfile
+          marker_begin='# BEGIN AGENT_WORLD_TEMP_EDGE'
+          marker_end='# END AGENT_WORLD_TEMP_EDGE'
+
+          command -v python3 >/dev/null
+          command -v caddy >/dev/null
+          command -v systemctl >/dev/null
+          test -f "$caddyfile"
+
+          if [ "$mode" = install ]; then
+            case "$origin" in
+              https://*.trycloudflare.com) ;;
+              *) echo 'Refusing non-TryCloudflare temporary origin' >&2; exit 1 ;;
+            esac
+          elif [ "$mode" != remove ]; then
+            echo "Unknown edge mode: $mode" >&2
+            exit 1
+          fi
+
+          previous="$(mktemp)"
+          candidate="$(mktemp)"
+          cleanup() { rm -f "$previous" "$candidate"; }
+          trap cleanup EXIT
+          sudo cp "$caddyfile" "$previous"
+
+          EDGE_MODE="$mode" TUNNEL_ORIGIN="$origin" CADDYFILE="$caddyfile" CANDIDATE="$candidate" python3 <<'PY'
+          import os, re
+          from pathlib import Path
+
+          mode = os.environ['EDGE_MODE']
+          origin = os.environ.get('TUNNEL_ORIGIN', '')
+          source = Path(os.environ['CADDYFILE']).read_text(encoding='utf-8')
+          begin = '# BEGIN AGENT_WORLD_TEMP_EDGE'
+          end = '# END AGENT_WORLD_TEMP_EDGE'
+
+          # Remove only our previously marked block; refuse malformed marker state.
+          if source.count(begin) != source.count(end):
+              raise SystemExit('Malformed AI World temporary Caddy markers; refusing mutation')
+          while begin in source:
+              start = source.index(begin)
+              finish = source.index(end, start) + len(end)
+              while finish < len(source) and source[finish] in '\r\n':
+                  finish += 1
+              source = source[:start] + source[finish:]
+
+          if mode == 'install':
+              host = re.fullmatch(r'https://([a-z0-9-]+\.trycloudflare\.com)', origin)
+              if not host:
+                  raise SystemExit('Invalid temporary tunnel origin')
+              upstream_host = host.group(1)
+              lines = source.splitlines(keepends=True)
+              candidates = [
+                  i for i, line in enumerate(lines)
+                  if 'recruiter-radar.ru' in line
+                  and line.strip().endswith('{')
+                  and not line.lstrip().startswith('#')
+              ]
+              if len(candidates) != 1:
+                  raise SystemExit(f'Expected exactly one recruiter-radar.ru Caddy site block, found {len(candidates)}')
+              i = candidates[0]
+              base = re.match(r'\s*', lines[i]).group(0)
+              ind = base + '    '
+              block = f'''{ind}{begin}\n{ind}@agent_world_mcp path /agent-world/api/mcp\n{ind}handle @agent_world_mcp {{\n{ind}    rewrite * /api/mcp\n{ind}    reverse_proxy {origin} {{\n{ind}        header_up Host {upstream_host}\n{ind}    }}\n{ind}}}\n\n{ind}@agent_world_mcp_metadata path /.well-known/oauth-protected-resource/agent-world/api/mcp\n{ind}handle @agent_world_mcp_metadata {{\n{ind}    rewrite * /.well-known/oauth-protected-resource/api/mcp\n{ind}    reverse_proxy {origin} {{\n{ind}        header_up Host {upstream_host}\n{ind}    }}\n{ind}}}\n\n{ind}@agent_world_oauth path /oauth* /.well-known/oauth-authorization-server/oauth\n{ind}handle @agent_world_oauth {{\n{ind}    reverse_proxy {origin} {{\n{ind}        header_up Host {upstream_host}\n{ind}    }}\n{ind}}}\n{ind}{end}\n'''
+              lines.insert(i + 1, block)
+              source = ''.join(lines)
+
+          Path(os.environ['CANDIDATE']).write_text(source, encoding='utf-8')
+          PY
+
+          sudo install -m 0644 "$candidate" "$caddyfile"
+          if ! sudo caddy validate --config "$caddyfile"; then
+            sudo install -m 0644 "$previous" "$caddyfile"
+            sudo caddy validate --config "$caddyfile"
+            echo 'Caddy validation failed; restored previous configuration' >&2
+            exit 1
+          fi
+          if ! sudo systemctl reload caddy; then
+            sudo install -m 0644 "$previous" "$caddyfile"
+            sudo caddy validate --config "$caddyfile"
+            sudo systemctl reload caddy
+            echo 'Caddy reload failed; restored previous configuration' >&2
+            exit 1
+          fi
+
+          if ! curl --fail --silent --show-error --max-time 15 https://recruiter-radar.ru/ >/dev/null; then
+            sudo install -m 0644 "$previous" "$caddyfile"
+            sudo caddy validate --config "$caddyfile"
+            sudo systemctl reload caddy
+            echo 'Recruiter Radar public smoke check failed; rolled Caddy back' >&2
+            exit 1
+          fi
+
+          if [ "$mode" = install ]; then
+            curl --fail --silent --show-error --max-time 20 \
+              https://recruiter-radar.ru/.well-known/oauth-protected-resource/agent-world/api/mcp >/dev/null
+            curl --fail --silent --show-error --max-time 20 \
+              https://recruiter-radar.ru/.well-known/oauth-authorization-server/oauth >/dev/null
+            echo 'Temporary AI World MCP/OAuth edge installed and verified.'
+          else
+            if grep -qF "$marker_begin" "$caddyfile" || grep -qF "$marker_end" "$caddyfile"; then
+              echo 'Temporary marker removal failed' >&2
+              exit 1
+            fi
+            echo 'Temporary AI World edge removed; Recruiter Radar remains healthy.'
+          fi
+          SSH_EOF
