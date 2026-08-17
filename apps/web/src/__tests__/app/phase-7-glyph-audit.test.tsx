@@ -49,6 +49,7 @@ const RENDER_FILES = [
   'terms/page.tsx',
   'privacy/page.tsx',
   'admin/page.tsx',
+  'admin/admin-user-card.tsx',
   'checkout/page.tsx',
   'ui/internal-page.tsx',
   'ui/site-footer.tsx',
@@ -72,10 +73,13 @@ describe('T7.3 — literal/glyph audit', () => {
 
   it('no mojibake / broken Cyrillic byte sequences in render code', () => {
     // Mojibake from inline-shell encoding mistakes shows as Ã/Ð/Â/ï¿½ runs.
+    // A prior UTF-8→Windows-style corruption also produced Cyrillic-looking
+    // text containing the otherwise-unexpected µ / ‚ characters.
     for (const f of RENDER_FILES) {
       const src = readApp(f);
       expect(src).not.toMatch(/[ÃÐÂ][\x80-\xBF]/);
       expect(src).not.toMatch(/ï¿½/);
+      expect(src).not.toMatch(/[µ‚]/);
     }
   })
 })
