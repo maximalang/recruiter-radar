@@ -1,0 +1,120 @@
+name: V1-V6 Final Audit
+
+on:
+  push:
+    branches:
+      - chatgpt/full-v1-v6-implementation
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Audit final V1-V6 source grammar
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import re
+
+          ROOT = Path('.')
+          PROD_ROOTS = [Path('apps/web/app'), Path('apps/web/components'), Path('apps/web/lib')]
+          TEST_ROOTS = [Path('apps/web/src/__tests__'), Path('packages'), Path('scripts')]
+          TEXT_SUFFIXES = {'.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.scss', '.md', '.json', '.yml', '.yaml'}
+
+          legacy_terms = [
+              'LeadCard', 'OpportunityCard', 'ScoreGauge', 'ScoreBar', 'ScoreBandChip',
+              'SettingsOverview', 'radioCard', 'modeBadge', 'metricCard', 'signalLeadCard',
+              'signalLeadSections', 'signalLeadScoreTrack', 'ContentCard',
+              'recruiter-radar-v6', 'recruiter-radar-v7', '#9fca63', '#c8f36a', '#c9ec8b',
+              'Возможности', 'Дашборд', 'Командный центр', 'Карта спроса', 'Source Registry',
+          ]
+
+          def files_under(roots):
+              for root in roots:
+                  if not root.exists():
+                      continue
+                  for path in root.rglob('*'):
+                      if path.is_file() and path.suffix.lower() in TEXT_SUFFIXES:
+                          yield path
+
+          def read(path):
+              try:
+                  return path.read_text(encoding='utf-8')
+              except Exception:
+                  return ''
+
+          report = {
+              'production_legacy_hits': [],
+              'test_script_legacy_hits': [],
+              'hover_transform_hits': [],
+              'infinite_animation_hits': [],
+              'static_tabindex_hits': [],
+              'legacy_named_files': [],
+          }
+
+          prod_files = list(files_under(PROD_ROOTS))
+          test_files = list(files_under(TEST_ROOTS))
+
+          for path in prod_files:
+              text = read(path)
+              lines = text.splitlines()
+              lower_path = str(path).lower()
+              for term in legacy_terms:
+                  if term.lower() in text.lower():
+                      for idx, line in enumerate(lines, 1):
+                          if term.lower() in line.lower():
+                              report['production_legacy_hits'].append({
+                                  'term': term, 'path': str(path), 'line': idx, 'text': line.strip()[:260],
+                              })
+              if re.search(r'(?is):hover[^\{]*\{[^\}]*transform\s*:\s*(?!none\b|translateY\(0\))', text):
+                  for m in re.finditer(r'(?is)([^\{]{0,180}:hover[^\{]*)\{([^\}]*)\}', text):
+                      body = m.group(2)
+                      tm = re.search(r'transform\s*:\s*([^;]+)', body, re.I)
+                      if tm and tm.group(1).strip().lower() not in {'none', 'translatey(0)', 'translatey(0px)'}:
+                          line = text[:m.start()].count('\n') + 1
+                          report['hover_transform_hits'].append({
+                              'path': str(path), 'line': line, 'selector': ' '.join(m.group(1).split())[-180:],
+                              'transform': tm.group(1).strip(),
+                          })
+              for idx, line in enumerate(lines, 1):
+                  if re.search(r'\banimation(?:-iteration-count)?\s*:[^;\n]*\binfinite\b', line, re.I):
+                      report['infinite_animation_hits'].append({'path': str(path), 'line': idx, 'text': line.strip()[:260]})
+                  if re.search(r'<article\b[^>]*\btabIndex=\{?0\}?', line):
+                      report['static_tabindex_hits'].append({'path': str(path), 'line': idx, 'text': line.strip()[:260]})
+              stem_lower = path.stem.lower()
+              if any(token.lower() in stem_lower for token in ['lead-card', 'opportunity-card', 'score-gauge', 'score-bar', 'settings-overview']):
+                  report['legacy_named_files'].append(str(path))
+
+          for path in test_files:
+              text = read(path)
+              lines = text.splitlines()
+              for term in legacy_terms:
+                  if term.lower() in text.lower():
+                      for idx, line in enumerate(lines, 1):
+                          if term.lower() in line.lower():
+                              report['test_script_legacy_hits'].append({
+                                  'term': term, 'path': str(path), 'line': idx, 'text': line.strip()[:260],
+                              })
+
+          Path('v1-v6-final-audit.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+
+          print('=== V1-V6 FINAL AUDIT ===')
+          for key, values in report.items():
+              print(f'\n## {key}: {len(values)}')
+              for item in values[:300]:
+                  print(json.dumps(item, ensure_ascii=False))
+          print('\nAUDIT_JSON=v1-v6-final-audit.json')
+          PY
+      - name: Upload audit report
+        uses: actions/upload-artifact@v7
+        with:
+          name: v1-v6-final-audit
+          path: v1-v6-final-audit.json
+          if-no-files-found: error
