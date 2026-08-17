@@ -26,6 +26,12 @@ describe('cross-route interaction hardening', () => {
     expect(interactions).toContain('scroll-margin-top: 104px');
   });
 
+  it('keeps touch feedback on the final semantic token system without dead sidebar selectors', () => {
+    expect(interactions).toContain('-webkit-tap-highlight-color: var(--rr-color-selection)');
+    expect(interactions).not.toContain('rgba(35, 128, 111');
+    expect(interactions).not.toContain('sidebarBrand');
+  });
+
   it('audits the complete public and product route families', () => {
     for (const route of [
       "'/opportunities'",
