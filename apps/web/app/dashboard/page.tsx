@@ -5,10 +5,7 @@ import { getAccountById } from "@/lib/account-auth";
 import { getSession } from "@/lib/auth-v2/authorization";
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
 import { getDashboardTodayRadar } from "@/lib/dashboard-data";
-import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";
-import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { getEffectiveEntitlement } from "@/lib/entitlements";
-import DashboardAccountOverview from "./dashboard-account-overview";
 import DashboardTodayRadar from "./dashboard-today-radar";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { EmptyState, ErrorState } from "../ui/internal-page";
@@ -93,10 +90,9 @@ export default async function DashboardPage() {
     );
   }
 
-  const [profileResult, todayRadarResult, deliveryPreferencesResult] = await Promise.allSettled([
+  const [profileResult, todayRadarResult] = await Promise.allSettled([
     getClientProfileByOwnerId(authorization.dataOwnerId),
     getDashboardTodayRadar(authorization.dataOwnerId),
-    getDeliveryPreferencesByOwnerId(authorization.dataOwnerId),
   ]);
 
   if (profileResult.status === "rejected") {
@@ -114,8 +110,6 @@ export default async function DashboardPage() {
 
   const profile = profileResult.value;
   const todayRadar = todayRadarResult.status === "fulfilled" ? todayRadarResult.value : null;
-  const deliveryPreferences = deliveryPreferencesResult.status === "fulfilled" ? deliveryPreferencesResult.value : null;
-  const deliveryPreferencesUnavailable = deliveryPreferencesResult.status === "rejected";
 
   if (!profile) {
     return (
@@ -143,9 +137,6 @@ export default async function DashboardPage() {
     );
   }
 
-  const completion = deliveryPreferencesUnavailable ? null : computeProfileCompletion(profile, deliveryPreferences);
-  const deliveryReady = completion?.groups.find((group) => group.key === "delivery")?.filled ?? false;
-  const completionPercent = completion ? Math.round(completion.ratio * 100) : 0;
 
   return (
     <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
@@ -161,21 +152,6 @@ export default async function DashboardPage() {
       />
 
       <div className={dashStyles.dashboardStack}>
-        {deliveryPreferencesUnavailable ? (
-          <ErrorState
-            title="Не удалось проверить готовность доставки"
-            description="Компании и подтверждения доступны ниже, но статус каналов доставки сейчас не подтверждён."
-            action={{ href: "/settings/delivery", label: "Открыть настройки доставки" }}
-          />
-        ) : (
-          <DashboardAccountOverview
-            agencyName={profile.agencyName}
-            todayLeads={todayRadar?.topLeads.length ?? 0}
-            pendingReview={todayRadar?.pendingReview ?? 0}
-            completionPercent={completionPercent}
-            deliveryReady={deliveryReady}
-          />
-        )}
 
         {todayRadar ? (
           <DashboardTodayRadar

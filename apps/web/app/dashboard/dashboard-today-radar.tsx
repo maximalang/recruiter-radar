@@ -27,7 +27,6 @@ export default function DashboardTodayRadar({ topLeads, pendingReview, hiringMod
           <span className={styles.sectionEyebrow}>Приоритет</span>
           <h2 id="today-radar-heading" className={styles.analyticsHeading}>Что требует внимания</h2>
         </div>
-        <Link href="/review" className={styles.reviewLink}>На проверке {pendingReview}</Link>
       </div>
 
       {topLeads.length === 0 ? (
@@ -69,6 +68,15 @@ export default function DashboardTodayRadar({ topLeads, pendingReview, hiringMod
           })}
         </div>
       )}
+
+      <div className={styles.todayWorkflow} aria-labelledby="today-workflow-heading">
+        <h3 id="today-workflow-heading">Рабочий контур</h3>
+        <Link href="/review" className={styles.todayWorkflowRow}>
+          <span>На проверке</span>
+          <strong>{pendingReview}</strong>
+          <i aria-hidden="true">→</i>
+        </Link>
+      </div>
     </section>
   );
 }

@@ -23,5 +23,7 @@ describe("DashboardTodayRadar radar icon", () => {
     const link = screen.getByText(/проверить профиль радара/i).closest("a");
     expect(link).not.toBeNull();
     expect(link?.getAttribute("href")).toBe("/settings/radar");
+    expect(screen.getByRole("heading", { name: "Рабочий контур" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /На проверке 0/ })).toHaveAttribute("href", "/review");
   });
 });
