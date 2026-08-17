@@ -225,7 +225,7 @@ describe('opportunities page', () => {
     render(await OpportunitiesPage({ searchParams: Promise.resolve({}) }))
 
     expect(screen.getByRole('heading', { name: 'Ситуации' })).toBeInTheDocument()
-    const lanes = screen.getByRole('navigation', { name: 'Действия на сегодня' })
+    const lanes = screen.getByRole('navigation', { name: 'Рабочий контур ситуаций' })
     for (const [label, value, href] of [
       ['Новые ситуации', '2', '/opportunities?view=morning'],
       ['Связаться', '3', '/opportunities?view=accepted'],

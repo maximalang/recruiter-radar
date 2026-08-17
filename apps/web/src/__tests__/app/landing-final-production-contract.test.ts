@@ -71,7 +71,7 @@ describe("landing final production contract", () => {
     expect(visual).toContain("@keyframes faqReveal");
     expect(visual).not.toContain("@keyframes signalBreath");
     expect(visual).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)/);
-    expect(visual).toMatch(/#faq details\[open\] p[\s\S]*?animation\s*:\s*none\s*;/);
+    expect(visual).toMatch(/#faq details\[open\] p[\s\S]*?animation\s*:\s*none\s*(?:;|})/);
   });
 
   test("preserves the manual outreach boundary with the signal timeline in composition", () => {

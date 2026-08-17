@@ -25,7 +25,7 @@ describe("opportunities empty states", () => {
   test("distinguishes a saved inactive profile from an account with no profile", () => {
     renderEmptyState({ hasActiveProfile: false, hasAnyProfile: true, lastRunAt: null });
     expect(screen.getByText("Профиль радара приостановлен")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Включить профиль Radar" })).toHaveAttribute("href", "/settings/radar");
+    expect(screen.getByRole("link", { name: "Включить профиль радара" })).toHaveAttribute("href", "/settings/radar");
   });
 
   test("distinguishes the first run from a completed run with no matches", () => {

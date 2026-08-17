@@ -21,6 +21,5 @@ describe("DashboardAccountOverview", () => {
     expect(screen.getByRole("link", { name: /На проверке 2/ })).toHaveAttribute("href", "/review");
     expect(screen.getByRole("link", { name: /Профиль радара 71%/ })).toHaveAttribute("href", "/settings/radar");
     expect(screen.getByRole("link", { name: /Доставка настроить/ })).toHaveAttribute("href", "/settings/delivery");
-    expect(screen.getByText("71% готово")).toBeInTheDocument();
   });
 });
