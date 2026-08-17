@@ -7,7 +7,7 @@ import { OpportunityDecisionContext, OpportunityDecisionPlan } from './opportuni
 import { OpportunityEvidenceSection } from './opportunity-evidence'
 import { OpportunityOutcomeImpression, OpportunityOutcomePanel } from './opportunity-outcome-panel'
 import { OpportunityWorkflowPanel } from './opportunity-workflow-panel'
-import { OpportunityCommercialSignalCard } from './opportunity-commercial-signal-card'
+import { OpportunityCommercialSignalCard, OpportunitySignalDiagnostics } from './opportunity-commercial-signal-card'
 import { SituationDisclosure } from './situation-disclosure'
 import styles from './opportunities.module.css'
 import rowStyles from './situation-row.module.css'
@@ -112,7 +112,11 @@ export function OpportunityCard(props: {
         ) : null}
 
         {commercialSignalCard ? (
-          <OpportunityCommercialSignalCard opportunityId={opportunity.id} card={commercialSignalCard} />
+          <OpportunityCommercialSignalCard
+            opportunityId={opportunity.id}
+            card={commercialSignalCard}
+            showDiagnostics={false}
+          />
         ) : !props.commercialSignalUiEnabled ? (
           <OpportunityDecisionContext opportunity={opportunity} />
         ) : null}
@@ -143,6 +147,8 @@ export function OpportunityCard(props: {
           )}
         </section>
       </SituationDisclosure>
+
+      {commercialSignalCard ? <OpportunitySignalDiagnostics card={commercialSignalCard} /> : null}
     </article>
   )
 }
