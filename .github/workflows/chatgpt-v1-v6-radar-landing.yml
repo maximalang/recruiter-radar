@@ -1,0 +1,96 @@
+name: ChatGPT V1-V6 landing Radar validation
+
+on:
+  push:
+    branches:
+      - chatgpt/full-v1-v6-implementation
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: chatgpt/full-v1-v6-implementation
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Align browser QA with final landing scene tones
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/scripts/verify-landing-production.mjs')
+          text = path.read_text()
+          old = '''  const brandHeader = page.locator('header[data-brand-header="recruiter-radar"]');
+  await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(180);
+  assert.match(await brandHeader.locator("a[aria-current='location']").first().innerText(), /Как работает/);
+  assert.equal(await brandHeader.getAttribute("data-tone"), "dark");
+  await page.locator("#scene-delivery").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(180);
+  assert.equal(await brandHeader.getAttribute("data-tone"), "light");'''
+          new = '''  const brandHeader = page.locator('header[data-brand-header="recruiter-radar"]');
+  await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(180);
+  assert.match(await brandHeader.locator("a[aria-current='location']").first().innerText(), /Как работает/);
+  assert.equal(await brandHeader.getAttribute("data-tone"), "light");
+  await page.locator("#scene-radar").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(180);
+  assert.equal(await brandHeader.getAttribute("data-tone"), "dark");
+  assert.equal(await page.locator("#scene-radar").getAttribute("data-radar-spatial-model"), null);
+  await page.locator("#scene-delivery").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(180);
+  assert.equal(await brandHeader.getAttribute("data-tone"), "light");'''
+          if text.count(old) != 1:
+              raise SystemExit(f'landing tone QA block mismatch: {text.count(old)}')
+          text = text.replace(old, new)
+          # Assert the spatial model on its actual stage rather than the section wrapper.
+          text = text.replace(
+              'assert.equal(await page.locator("#scene-radar").getAttribute("data-radar-spatial-model"), null);',
+              'assert.equal(await page.locator("#scene-radar [data-radar-spatial-model]").getAttribute("data-radar-spatial-model"), "recency-confidence");\n  assert.equal(await page.locator("#scene-radar [data-radar-semantic-list]").count(), 1);',
+          )
+          path.write_text(text)
+          PY
+          node --check apps/web/scripts/verify-landing-production.mjs
+          grep -Fq '#scene-radar' apps/web/scripts/verify-landing-production.mjs
+          grep -Fq '"recency-confidence"' apps/web/scripts/verify-landing-production.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify landing contracts
+        run: >-
+          npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath
+          src/__tests__/app/landing-final-production-contract.test.ts
+          src/__tests__/app/landing-visual-polish.test.ts
+          src/__tests__/app/landing-runtime-truth-contract.test.ts
+          src/__tests__/app/home-page-section-intros.test.tsx
+      - name: Typecheck and build web
+        shell: bash
+        run: |
+          npm run web:check
+          npm run test:types --workspace @recruiter-radar/web
+          NEXT_PUBLIC_YANDEX_METRIKA_ID=12345678 npm run web:build
+      - name: Verify no raw legacy styling in Radar scene
+        shell: bash
+        run: |
+          ! rg -n '#[0-9a-fA-F]{3,8}|#9fca63|#c8f36a|#c9ec8b|infinite|glow|diamond|geograph' apps/web/app/landing/radar-scene.module.css
+          grep -Fq 'data-theme="inverse"' apps/web/app/landing/radar-scene.tsx
+          grep -Fq 'data-radar-semantic-list' apps/web/app/landing/radar-scene.tsx
+          git diff --check
+      - name: Commit browser QA and remove temporary workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/chatgpt-v1-v6-radar-landing.yml
+          git config user.name "chatgpt-remediation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "test: cover final landing Radar scene"
+          git push origin HEAD:chatgpt/full-v1-v6-implementation
