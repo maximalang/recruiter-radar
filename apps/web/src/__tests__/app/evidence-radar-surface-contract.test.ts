@@ -48,6 +48,10 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
     expect(mapCss).toContain('animation: none')
   })
 
+  it('keeps mobile visual order aligned with DOM reading order', () => {
+    expect(mapCss).not.toMatch(/\.semanticListWrap\s*\{[^}]*order\s*:/)
+  })
+
   it('keeps verified geography as metadata rather than primary Radar geometry', () => {
     expect(radarPage).not.toContain('listEvidenceRadarRegionBoundaries')
     expect(radarPage).not.toContain('boundaries={boundaries}')
