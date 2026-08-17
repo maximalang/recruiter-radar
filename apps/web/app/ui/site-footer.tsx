@@ -50,7 +50,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark"; showCookieSet
             </nav>
             <nav aria-label="Сервис">
               <strong>Сервис</strong>
-              {SERVICE_LINKS.map((item) => <Link key={item.href} href={item.href} className={s.footerLink}>{item.label}</Link>)}
+              {SERVICE_LINKS.map((item) => <Link key={item.href} href={item.href} prefetch={false} className={s.footerLink}>{item.label}</Link>)}
             </nav>
             <nav aria-label="Документы">
               <strong>Документы</strong>
