@@ -1,12 +1,6 @@
-import { DEMO_COMPANY } from "./landing-copy";
+import { DEMO_COMPANY, DEMO_EVIDENCE_SOURCES } from "./landing-copy";
 import sceneStyles from "./evidence-scene.module.css";
 import styles from "./landing.module.css";
-
-const SOURCE_ROWS = [
-  { source: "Карьерная страница", fact: "8 инженерных позиций", eventDate: "4 августа", confidence: "Прямой источник" },
-  { source: "Публичные вакансии", fact: "Новая руководящая роль", eventDate: "1 августа", confidence: "Подтверждено" },
-  { source: "Повторная публикация", fact: "3 роли появились снова", eventDate: "сегодня", confidence: "Свежий сигнал" },
-] as const;
 
 export default function EvidenceScene() {
   return (
@@ -30,7 +24,7 @@ export default function EvidenceScene() {
             <p>Источник · факт · дата · статус</p>
           </header>
           <ul className={sceneStyles.records}>
-            {SOURCE_ROWS.map((row, index) => (
+            {DEMO_EVIDENCE_SOURCES.map((row, index) => (
               <li key={row.source} className={sceneStyles.record} tabIndex={0} data-evidence-row aria-label={`${row.source}: ${row.fact}. ${row.confidence}`}>
                 <span className={sceneStyles.recordIndex}>{String(index + 1).padStart(2, "0")}</span>
                 <div className={sceneStyles.recordFact}><span>{row.source}</span><strong>{row.fact}</strong></div>

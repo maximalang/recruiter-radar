@@ -78,14 +78,19 @@ describe("landing final production contract", () => {
     expect(visual).toMatch(/#faq details\[open\] p[\s\S]*?animation\s*:\s*none\s*(?:;|})/);
   });
 
-  test("preserves the manual outreach boundary with the signal timeline in composition", () => {
+  test("preserves the manual outreach boundary and the full signal journey", () => {
     const page = source("app/landing/landing-page.tsx");
     const timeline = source("app/landing/signal-timeline-scene.tsx");
     const delivery = source("app/landing/delivery-scene.tsx");
     const evidence = source("app/landing/evidence-scene.tsx");
+    const radar = source("app/landing/radar-scene.tsx");
+    const radarStyles = source("app/landing/radar-scene.module.css");
 
     expect(page).not.toContain("<OutreachScene");
     expect(page).toContain("<SignalTimelineScene");
+    expect(page).toContain("<RadarScene");
+    expect(page.indexOf("<EvidenceScene")).toBeLessThan(page.indexOf("<RadarScene"));
+    expect(page.indexOf("<RadarScene")).toBeLessThan(page.indexOf("<DeliveryScene"));
     expect(timeline).toContain('id="scene-signal-timeline"');
     expect(timeline).toContain("data-timeline-event");
     expect(timeline).toContain('data-opportunity-lock="true"');
@@ -99,6 +104,15 @@ describe("landing final production contract", () => {
     expect(evidence).toContain("Источник</span><i aria-hidden=\"true\">→</i><span>Факт");
     expect(evidence).not.toContain("открыть факт");
     expect(evidence).not.toContain("SOURCE_ROLES");
+    expect(radar).toContain('id="scene-radar"');
+    expect(radar).toContain('data-theme="inverse"');
+    expect(radar).toContain('data-radar-spatial-model="recency-confidence"');
+    expect(radar).toContain("География остаётся фильтром и контекстом");
+    expect(radar).toContain("data-radar-semantic-list");
+    expect(radar).toContain("DEMO_COMPANY.name");
+    expect(radarStyles).not.toMatch(/#[0-9a-f]{3,8}/i);
+    expect(radarStyles).not.toContain("infinite");
+    expect(radarStyles).not.toContain("glow");
   });
 
   test("keeps FAQ copy professional and free of internal delivery terminology", () => {
