@@ -100,6 +100,15 @@ try {
       });
       await page.waitForLoadState('networkidle', { timeout: 30_000 });
 
+      const analyticsConsent = page.locator('[data-analytics-consent="true"]');
+      if (await analyticsConsent.isVisible().catch(() => false)) {
+        const allowAnalytics = analyticsConsent.getByRole('button', { name: 'Разрешить' });
+        if (await allowAnalytics.count() > 0) {
+          await allowAnalytics.click();
+          await analyticsConsent.waitFor({ state: 'hidden', timeout: 5_000 });
+        }
+      }
+
       const status = response?.status() ?? 0;
       const result = await page.evaluate(() => {
         const root = document.documentElement;
