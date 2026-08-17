@@ -75,12 +75,14 @@ describe("auth v2 onboarding view", () => {
     );
   });
 
-  test("keeps market targeting in a separate third step", () => {
+  test("keeps market targeting in a separate third step with final Radar terminology", () => {
     render(<OnboardingView snapshot={{ ...baseSnapshot, step: "market", data: { fullName: "Анна", agencyName: "North Star", teamRole: "leader" } }} />);
     expect(screen.getByRole("heading", { level: 2, name: "Где искать клиентов" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Отрасли" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Размер компаний" })).toBeInTheDocument();
     expect(screen.getByLabelText("Россия и регионы")).toBeInTheDocument();
+    expect(screen.getByText(/расширенных настройках Радара/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("настройках Radar");
   });
 
   test("summarizes readiness without promising immediate delivery", () => {
@@ -103,6 +105,7 @@ describe("auth v2 onboarding view", () => {
       level: 2,
       name: "Основа радара готова",
     })).toBeInTheDocument();
+    expect(screen.getByText("Радар готов")).toBeInTheDocument();
     expect(screen.getByText(/Доставка работает только при активном доступе/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Перейти в кабинет" }))
       .toBeInTheDocument();
