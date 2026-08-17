@@ -9,7 +9,6 @@ import {
   isTimewebMcpConfigured,
   verifyTimewebMcpAccessToken,
 } from '../../../../lib/timeweb-mcp-auth'
-import { withSingleTimewebMcpRecovery } from '../../../../lib/timeweb-mcp-recovery'
 import {
   handleTimewebMcpProtocol,
   isJsonRpcRequest,
@@ -29,12 +28,18 @@ export const TIMEWEB_MCP_MAX_BODY_BYTES = 1024 * 1024
 export const TIMEWEB_MCP_TIMEOUT_MS = 30_000
 
 const RESPONSE_HEADERS = ['cache-control', 'retry-after'] as const
-const statelessUpstreamSubjects = new Set<string>()
+const statelessUpstreamSessions = new Set<string>()
 const upstreamInitializationPromises = new Map<string, Promise<string | null>>()
+const recoveryPromises = new Map<string, Promise<void>>()
 
-type AuthorizedContext = {
+type AuthenticatedContext = {
   requestId: string
   baseHeaders: Record<string, string>
+  subject: string
+  protocolVersion: string
+}
+
+type AuthorizedContext = AuthenticatedContext & {
   session: TimewebMcpSession
 }
 
@@ -64,8 +69,11 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: Request) {
-  const authorized = await authorize(request)
+  const authenticated = await authenticate(request)
+  if (authenticated instanceof Response) return authenticated
+  const authorized = await resolveOwnedSession(request, authenticated)
   if (authorized instanceof Response) return authorized
+
   try {
     return await proxyTransport(request, authorized)
   } catch (error) {
@@ -74,12 +82,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const authorized = await authorize(request)
-  if (authorized instanceof Response) return authorized
+  const authenticated = await authenticate(request)
+  if (authenticated instanceof Response) return authenticated
 
   const bytes = await request.arrayBuffer()
   if (bytes.byteLength > TIMEWEB_MCP_MAX_BODY_BYTES) {
-    return NextResponse.json({ error: 'request_too_large' }, { status: 413, headers: authorized.baseHeaders })
+    return NextResponse.json({ error: 'request_too_large' }, { status: 413, headers: authenticated.baseHeaders })
   }
 
   let payload: unknown
@@ -88,7 +96,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, {
       status: 400,
-      headers: mcpHeaders(authorized),
+      headers: authenticated.baseHeaders,
     })
   }
 
@@ -96,9 +104,16 @@ export async function POST(request: Request) {
   if (requests.length === 0 || requests.length > 64 || requests.some((item) => !isJsonRpcRequest(item))) {
     return NextResponse.json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } }, {
       status: 400,
-      headers: mcpHeaders(authorized),
+      headers: authenticated.baseHeaders,
     })
   }
+
+  const authorized = await resolvePostSession(
+    request,
+    authenticated,
+    requests as JsonRpcRequest[],
+  )
+  if (authorized instanceof Response) return authorized
 
   const started = Date.now()
   try {
@@ -121,15 +136,21 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const authorized = await authorize(request)
+  const authenticated = await authenticate(request)
+  if (authenticated instanceof Response) return authenticated
+  const authorized = await resolveOwnedSession(request, authenticated)
   if (authorized instanceof Response) return authorized
 
   try {
+    const pendingRecovery = recoveryPromises.get(authorized.session.id)
+    if (pendingRecovery) await pendingRecovery
+
     if (authorized.session.upstreamSessionId) {
       await fetchUpstreamTransport('DELETE', authorized.session)
     }
-    statelessUpstreamSubjects.delete(authorized.session.subject)
-    upstreamInitializationPromises.delete(authorized.session.subject)
+    statelessUpstreamSessions.delete(authorized.session.id)
+    upstreamInitializationPromises.delete(authorized.session.id)
+    recoveryPromises.delete(authorized.session.id)
     await timewebMcpSessionManager.clear(authorized.session)
     audit('session_deleted', authorized.requestId, request.method, 204, 0, authorized.session)
     return new Response(null, { status: 204, headers: authorized.baseHeaders })
@@ -138,7 +159,7 @@ export async function DELETE(request: Request) {
   }
 }
 
-async function authorize(request: Request): Promise<AuthorizedContext | Response> {
+async function authenticate(request: Request): Promise<AuthenticatedContext | Response> {
   const requestId = safeRequestId(request.headers.get('x-request-id'))
   const baseHeaders = {
     'Cache-Control': 'no-store',
@@ -184,22 +205,67 @@ async function authorize(request: Request): Promise<AuthorizedContext | Response
     })
   }
 
-  const protocolVersion = request.headers.get('mcp-protocol-version')?.trim() || '2025-03-26'
-  const requestedSessionId = request.headers.get('mcp-session-id')
-  const { session } = await timewebMcpSessionManager.getOrCreate(auth.subject, requestedSessionId, protocolVersion)
-  return { requestId, baseHeaders, session }
+  return {
+    requestId,
+    baseHeaders,
+    subject: auth.subject,
+    protocolVersion: request.headers.get('mcp-protocol-version')?.trim() || '2025-03-26',
+  }
+}
+
+async function resolvePostSession(
+  request: Request,
+  context: AuthenticatedContext,
+  requests: JsonRpcRequest[],
+): Promise<AuthorizedContext | Response> {
+  const requestedSessionId = request.headers.get('mcp-session-id')?.trim()
+  if (requestedSessionId) {
+    return resolveOwnedSession(request, context)
+  }
+
+  if (!requests.some((item) => item.method === 'initialize')) {
+    return sessionFailure(context, 'missing_session', 400)
+  }
+
+  const session = await timewebMcpSessionManager.createSession(
+    context.subject,
+    context.protocolVersion,
+  )
+  return { ...context, session }
+}
+
+async function resolveOwnedSession(
+  request: Request,
+  context: AuthenticatedContext,
+): Promise<AuthorizedContext | Response> {
+  const requestedSessionId = request.headers.get('mcp-session-id')?.trim()
+  if (!requestedSessionId) {
+    return sessionFailure(context, 'missing_session', 400)
+  }
+
+  const session = await timewebMcpSessionManager.findOwnedSession(
+    requestedSessionId,
+    context.subject,
+  )
+  if (!session) {
+    return sessionFailure(context, 'invalid_session', 404)
+  }
+
+  session.protocolVersion = context.protocolVersion || session.protocolVersion
+  await timewebMcpSessionManager.touch(session)
+  return { ...context, session }
+}
+
+function sessionFailure(context: AuthenticatedContext, error: 'missing_session' | 'invalid_session', status: 400 | 404) {
+  return NextResponse.json({ error }, { status, headers: context.baseHeaders })
 }
 
 async function proxyTransport(request: Request, context: AuthorizedContext): Promise<Response> {
   const started = Date.now()
   await ensureUpstreamInitialized(context.session)
-  const outcome = await withSingleTimewebMcpRecovery(
+  const outcome = await withSessionRecovery(
+    context.session,
     () => fetchUpstreamTransport('GET', context.session),
-    async () => {
-      statelessUpstreamSubjects.delete(context.session.subject)
-      await timewebMcpSessionManager.markRecovered(context.session)
-      await ensureUpstreamInitialized(context.session)
-    },
     (response) => isExpiredStatus(response.status),
   )
   const upstream = outcome.result
@@ -220,10 +286,10 @@ async function callUpstreamWithSingleRecovery(session: TimewebMcpSession, reques
     const attempt = await fetchUpstreamRpc(request, null, session.protocolVersion)
     if (attempt.response && !attempt.response.error) {
       if (attempt.sessionId) {
-        statelessUpstreamSubjects.delete(session.subject)
+        statelessUpstreamSessions.delete(session.id)
         await timewebMcpSessionManager.setUpstreamSession(session, attempt.sessionId)
       } else {
-        statelessUpstreamSubjects.add(session.subject)
+        statelessUpstreamSessions.add(session.id)
         session.upstreamSessionId = null
       }
     }
@@ -231,34 +297,67 @@ async function callUpstreamWithSingleRecovery(session: TimewebMcpSession, reques
   }
 
   await ensureUpstreamInitialized(session)
-  const outcome = await withSingleTimewebMcpRecovery(
+  const outcome = await withSessionRecovery(
+    session,
     () => fetchUpstreamRpc(request, session.upstreamSessionId, session.protocolVersion),
-    async () => {
-      statelessUpstreamSubjects.delete(session.subject)
-      await timewebMcpSessionManager.markRecovered(session)
-      await ensureUpstreamInitialized(session)
-    },
     (attempt) => attempt.expired,
   )
   return outcome.result.response ?? upstreamError(request, outcome.result.status)
 }
 
-async function ensureUpstreamInitialized(session: TimewebMcpSession) {
-  if (session.upstreamSessionId || statelessUpstreamSubjects.has(session.subject)) return
+async function withSessionRecovery<T>(
+  session: TimewebMcpSession,
+  attempt: () => Promise<T>,
+  isExpired: (result: T) => boolean,
+): Promise<{ result: T; recovered: boolean }> {
+  let result = await attempt()
+  if (!isExpired(result)) return { result, recovered: false }
 
-  const pending = upstreamInitializationPromises.get(session.subject)
+  await recoverSessionRuntime(session)
+  result = await attempt()
+  return { result, recovered: true }
+}
+
+async function recoverSessionRuntime(session: TimewebMcpSession) {
+  const sessionId = session.id
+  let recovery = recoveryPromises.get(sessionId)
+  if (!recovery) {
+    recovery = (async () => {
+      statelessUpstreamSessions.delete(sessionId)
+      await timewebMcpSessionManager.markRecovered(session)
+      await ensureUpstreamInitialized(session)
+    })().finally(() => {
+      if (recoveryPromises.get(sessionId) === recovery) {
+        recoveryPromises.delete(sessionId)
+      }
+    })
+    recoveryPromises.set(sessionId, recovery)
+  }
+
+  await recovery
+  const persisted = await timewebMcpSessionManager.findOwnedSession(sessionId, session.subject)
+  if (!persisted) {
+    throw new UpstreamBridgeError(502, 'timeweb_mcp_session_disappeared_during_recovery')
+  }
+  syncRuntimeSession(session, persisted)
+}
+
+async function ensureUpstreamInitialized(session: TimewebMcpSession) {
+  if (session.upstreamSessionId || statelessUpstreamSessions.has(session.id)) return
+
+  const pending = upstreamInitializationPromises.get(session.id)
   if (pending) {
     session.upstreamSessionId = await pending
     return
   }
 
   const initialization = initializeUpstream(session)
-  upstreamInitializationPromises.set(session.subject, initialization)
+  upstreamInitializationPromises.set(session.id, initialization)
   try {
     session.upstreamSessionId = await initialization
   } finally {
-    if (upstreamInitializationPromises.get(session.subject) === initialization) {
-      upstreamInitializationPromises.delete(session.subject)
+    if (upstreamInitializationPromises.get(session.id) === initialization) {
+      upstreamInitializationPromises.delete(session.id)
     }
   }
 }
@@ -280,10 +379,10 @@ async function initializeUpstream(session: TimewebMcpSession): Promise<string | 
   }
 
   if (attempt.sessionId) {
-    statelessUpstreamSubjects.delete(session.subject)
+    statelessUpstreamSessions.delete(session.id)
     await timewebMcpSessionManager.setUpstreamSession(session, attempt.sessionId)
   } else {
-    statelessUpstreamSubjects.add(session.subject)
+    statelessUpstreamSessions.add(session.id)
     session.upstreamSessionId = null
   }
 
@@ -410,6 +509,17 @@ function bridgeFailure(context: AuthorizedContext, method: string, error: unknow
 function safeRequestId(value: string | null): string {
   const candidate = value?.trim() ?? ''
   return /^[A-Za-z0-9:._-]{1,128}$/.test(candidate) ? candidate : randomUUID()
+}
+
+function syncRuntimeSession(target: TimewebMcpSession, source: TimewebMcpSession) {
+  target.id = source.id
+  target.subject = source.subject
+  target.upstreamSessionId = source.upstreamSessionId
+  target.protocolVersion = source.protocolVersion
+  target.createdAt = source.createdAt
+  target.lastSeenAt = source.lastSeenAt
+  target.expiresAt = source.expiresAt
+  target.recoveryCount = source.recoveryCount
 }
 
 function audit(event: string, requestId: string, method: string, status: number, durationMs: number, session?: TimewebMcpSession) {
