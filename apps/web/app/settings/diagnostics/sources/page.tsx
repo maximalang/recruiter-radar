@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { pluralForm } from '@/lib/format/plural'
 import { isEvidenceRadarV1EnabledForContext } from '@/lib/intelligence/evidence-radar-config'
 import { listEvidenceSourceGovernance } from '@/lib/intelligence/evidence-source-governance-repository'
 import {
@@ -75,7 +76,7 @@ export default async function DiagnosticsSourcesPage() {
         />
         <ErrorState
           title="Диагностика источников временно не загрузилась"
-          description="Статический policy-файл не используется как подмена operational журнал review. Проверьте миграции и подключение к БД."
+          description="Статический policy-файл не используется как подмена operational журнала review. Проверьте миграции и подключение к БД."
           action={{ href: '/settings/diagnostics/sources', label: 'Обновить' }}
         />
       </InternalPageFrame>
@@ -104,8 +105,8 @@ export default async function DiagnosticsSourcesPage() {
 
         <section className={styles.noticeSurface}>
           <p className={styles.notice}>
-            На текущем контуре {pending} источников остаются без зафиксированного legal review.
-            Таблица ниже читает последнюю запись журнал review из PostgreSQL, поэтому обновление статического
+            На текущем контуре {formatCount(pending, ['источник', 'источника', 'источников'])} {pluralForm(pending, ['остаётся', 'остаются', 'остаются'])} без зафиксированного legal review.
+            Таблица ниже читает последнюю запись журнала review из PostgreSQL, поэтому обновление статического
             TypeScript policy не может само разрешить сбор. CAPTCHA, закрытые API, private groups и персональный
             contact enrichment не используются.
           </p>
@@ -115,10 +116,12 @@ export default async function DiagnosticsSourcesPage() {
           const roleSources = sources.filter((source) => source.role === role)
           return (
             <section key={role} className={styles.roleCard} aria-labelledby={`source-role-${role}`}>
-                <div className={styles.roleHeader}>
-                  <h2 id={`source-role-${role}`}>{ROLE_LABELS[role]}</h2>
-                  <span>{roleSources.length} источников</span>
-                </div>
+              <div className={styles.roleHeader}>
+                <h2 id={`source-role-${role}`}>{ROLE_LABELS[role]}</h2>
+                <span>{formatCount(roleSources.length, ['источник', 'источника', 'источников'])}</span>
+              </div>
+
+              <div className={styles.desktopTable}>
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
                     <thead>
@@ -146,9 +149,7 @@ export default async function DiagnosticsSourcesPage() {
                           <td>{source.entityMatchQuality}<small>{source.geography}</small></td>
                           <td>{source.phase} · P{source.priority}<small>{source.costClass} · {source.complexity}</small></td>
                           <td>
-                            {source.operational.termsReference?.startsWith('https://') ? (
-                              <a className={styles.link} href={source.operational.termsReference} target="_blank" rel="noreferrer">review reference</a>
-                            ) : source.operational.termsReference ?? 'не зафиксированы'}
+                            <TermsReference source={source} />
                             <small>{source.retentionPolicy}</small>
                           </td>
                         </tr>
@@ -156,6 +157,34 @@ export default async function DiagnosticsSourcesPage() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+
+              <div className={styles.mobileSources} role="list" aria-label={`${ROLE_LABELS[role]} — источники`}>
+                {roleSources.map((source) => (
+                  <details key={source.id} className={styles.mobileSource}>
+                    <summary>
+                      <span className={styles.mobileIdentity}>
+                        <strong>{source.name}</strong>
+                        <small>{source.category}</small>
+                      </span>
+                      <span className={styles.mobileState}>
+                        <span className={styles.badge} data-state={source.operational.integrationStatus}>{source.operational.integrationStatus}</span>
+                        <small>{source.operational.reviewStatus}</small>
+                      </span>
+                    </summary>
+                    <dl className={styles.mobileDetails}>
+                      <div><dt>Runtime</dt><dd>{source.runtimeSourceIds.length > 0 ? source.runtimeSourceIds.join(', ') : 'нет adapter binding'} · {source.operational.automationAllowed ? 'automation allowed' : 'fail-closed'}</dd></div>
+                      <div><dt>Доступ</dt><dd>{source.accessMethod}<small>{source.authorization} · {source.requestLimits}</small></dd></div>
+                      <div><dt>Legal</dt><dd><span className={styles.badge} data-review={source.operational.reviewStatus}>{source.operational.reviewStatus}</span><small>{source.operational.automationPolicy}{source.operational.reviewedAt ? ` · ${formatReviewDate(source.operational.reviewedAt)}` : ''}</small></dd></div>
+                      <div><dt>Cadence</dt><dd>{source.refreshCadence}<small>{source.historicalDepth}</small></dd></div>
+                      <div><dt>Надёжность</dt><dd>{source.reliability}<small>{source.primaryEvidence ? 'primary evidence eligible' : 'supporting evidence'}</small></dd></div>
+                      <div><dt>Match</dt><dd>{source.entityMatchQuality}<small>{source.geography}</small></dd></div>
+                      <div><dt>План</dt><dd>{source.phase} · P{source.priority}<small>{source.costClass} · {source.complexity}</small></dd></div>
+                      <div><dt>Условия</dt><dd><TermsReference source={source} /><small>{source.retentionPolicy}</small></dd></div>
+                    </dl>
+                  </details>
+                ))}
+              </div>
             </section>
           )
         })}
@@ -173,4 +202,14 @@ function formatReviewDate(value: string): string {
         month: '2-digit',
         year: 'numeric',
       }).format(date)
+}
+
+function formatCount(count: number, forms: readonly [string, string, string]): string {
+  return `${count} ${pluralForm(count, forms)}`
+}
+
+function TermsReference({ source }: { source: Awaited<ReturnType<typeof listEvidenceSourceGovernance>>[number] }) {
+  return source.operational.termsReference?.startsWith('https://') ? (
+    <a className={styles.link} href={source.operational.termsReference} target="_blank" rel="noreferrer">review reference</a>
+  ) : source.operational.termsReference ?? 'не зафиксированы'
 }
