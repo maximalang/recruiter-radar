@@ -82,6 +82,21 @@ describe("cross-route visual layer contract", () => {
     expect(feedback).not.toContain("text-transform: uppercase");
   });
 
+  it("keeps Company Brief next actions on semantic motion, focus and target-size contracts", () => {
+    const nextSteps = readAppFile("leads/[id]/next-steps-block.module.css");
+
+    expect(nextSteps).toContain("var(--rr-motion-duration-control)");
+    expect(nextSteps).toContain("var(--rr-motion-ease-standard)");
+    expect(nextSteps).toContain("outline: 2px solid var(--rr-color-focus)");
+    expect(nextSteps).toContain("background-color: var(--rr-color-signal-soft)");
+    expect(nextSteps).toContain("color: var(--rr-color-destructive)");
+    expect(nextSteps).toContain("min-height: 40px");
+    expect(nextSteps).toContain("min-height: 44px");
+    expect(nextSteps).not.toContain("transition: all");
+    expect(nextSteps).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
+    expect(nextSteps).not.toMatch(/rgba\(/gi);
+  });
+
   it("keeps the authenticated shell addressable after the frame migration", () => {
     const workspace = readAppFile("ui/product-workspace.tsx");
     const internalPage = readAppFile("ui/internal-page.tsx");
