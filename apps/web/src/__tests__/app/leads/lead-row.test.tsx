@@ -74,6 +74,20 @@ describe('LeadRow V1-V6 decision-row contract', () => {
     expect(container.querySelector('[data-legend]')).toBeNull();
   });
 
+  it('uses shared Russian pluralization for source-family counts', () => {
+    const fiveSources = {
+      ...baseLead,
+      sourceFamilies: ['career-pages', 'hh', 'newsroom', 'registry', 'crm'],
+    } as unknown as LeadItem;
+
+    const { container } = render(
+      <LeadRow lead={fiveSources} fitPreview={null} hiringMode="specialist" rank={5} />,
+    );
+
+    expect(container.textContent).toContain('5 источников');
+    expect(container.textContent).not.toContain('5 источника');
+  });
+
   it('keeps workflow status subordinate to the decision hierarchy', () => {
     const { container } = render(
       <LeadRow lead={baseLead} fitPreview={null} hiringMode="specialist" rank={3} />,
