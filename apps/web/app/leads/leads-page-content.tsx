@@ -79,7 +79,7 @@ function WorkflowState({ lead }: { lead: LeadItem }) {
   return null;
 }
 
-export function LeadCard({
+export function LeadRow({
   lead,
   fitPreview,
   hiringMode,
@@ -102,36 +102,31 @@ export function LeadCard({
   const vacancies = formatVacanciesCount(lead.vacanciesCount);
   const roles = shownRoles.length > 0
     ? `${shownRoles.join(' · ')}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}`
-    : 'роли уточняются';
+    : null;
   const whyNow = lead.whyNow || urgency.label;
-  const evidenceTitles = lead.evidenceTitles.slice(0, 4);
-  const sourceFamilies = lead.sourceFamilies.slice(0, 4);
-  const scoreReasons = lead.reasons.slice(0, 3);
-  const risk = lead.negativeSignals[0] ?? null;
   const workflowState = (
     (lead.reviewStatus && lead.reviewStatus !== 'auto_approved') ||
     (lead.feedbackStatus && lead.feedbackStatus !== 'none')
   );
   const secondarySignals = [
-    lead.isForeignEmployer ? 'иностранный работодатель' : null,
-    lead.hasAiHint ? 'AI-подсказка доступна' : null,
+    lead.isForeignEmployer ? 'зарубежный ATS' : null,
     fitPreview?.text ?? null,
   ].filter(Boolean).join(' · ');
 
   return (
-    <article className={styles.row} data-signal-card="true" data-motion-item>
+    <article className={styles.row} data-lead-row="true">
       <div className={styles.rank}>{String(rank).padStart(2, '0')}</div>
 
       <div className={styles.identity}>
         <Link href={`/leads/${lead.id}`} className={styles.company}>{lead.orgName}</Link>
-        <div className={styles.meta}>
-          {lead.locationNames.length > 0 ? lead.locationNames.slice(0, 2).join(', ') : 'география уточняется'}
-        </div>
+        {lead.locationNames.length > 0 ? (
+          <div className={styles.meta}>{lead.locationNames.slice(0, 2).join(', ')}</div>
+        ) : null}
       </div>
 
       <div className={styles.decision}>
         <strong>{whyNow}</strong>
-        <div className={styles.decisionMeta}>{freshness} · {roles}</div>
+        <div className={styles.decisionMeta}>{[freshness, roles].filter(Boolean).join(' · ')}</div>
       </div>
 
       <div className={styles.evidence}>
@@ -139,46 +134,23 @@ export function LeadCard({
         <div className={styles.evidenceMeta}>
           {lead.sourceFamilies.length > 0
             ? `${lead.sourceFamilies.length} ${lead.sourceFamilies.length === 1 ? 'источник' : 'источника'}`
-            : 'источник уточняется'}
+            : 'источник не подтверждён'}
         </div>
       </div>
 
-      <div className={styles.score} data-numeric="true" aria-label={`Сила сигнала ${points} из 100`}>{points}</div>
+      <div className={styles.score} data-numeric="true" aria-label={`Сила сигнала ${points}`}>{points}</div>
       <ConfidenceIndicator gate={lead.confidenceGate} />
       <Link href={`/leads/${lead.id}`} className={styles.action} aria-label={`Открыть анализ компании ${lead.orgName}`}>
         Открыть
       </Link>
 
-      {(workflowState || risk || secondarySignals) ? (
+      {(workflowState || lead.negativeSignals[0] || secondarySignals) ? (
         <div className={styles.workflow}>
           {workflowState ? <WorkflowState lead={lead} /> : null}
-          {risk ? <span className={styles.risk}>{risk}</span> : null}
+          {lead.negativeSignals[0] ? <span className={styles.risk}>{lead.negativeSignals[0]}</span> : null}
           {secondarySignals ? <span className={styles.secondaryMeta}>{secondarySignals}</span> : null}
         </div>
       ) : null}
-
-      <details className={styles.disclosure} data-motion-disclosure>
-        <summary>Подтверждения и происхождение</summary>
-        <div className={styles.ledger}>
-          <section className={styles.ledgerSection}>
-            <span className={styles.ledgerTitle}>Подтверждения</span>
-            {evidenceTitles.length > 0 ? (
-              <ul>
-                {evidenceTitles.map((title, index) => <li key={`${title}:${index}`}>{title}</li>)}
-              </ul>
-            ) : <div className={styles.meta}>Подтверждения уточняются.</div>}
-            {sourceFamilies.length > 0 ? (
-              <div className={styles.provenance}>Источник: {sourceFamilies.join(' · ')}</div>
-            ) : null}
-          </section>
-          <section className={styles.ledgerSection}>
-            <span className={styles.ledgerTitle}>Почему этот приоритет</span>
-            {scoreReasons.length > 0 ? (
-              <ul>{scoreReasons.map((reason, index) => <li key={`${reason}:${index}`}>{reason}</li>)}</ul>
-            ) : <div className={styles.meta}>Декомпозиция доступна в анализе компании.</div>}
-          </section>
-        </div>
-      </details>
     </article>
   );
 }
@@ -224,7 +196,7 @@ export function LeadsList({
   return (
     <div className={styles.list} data-motion-list>
       {leads.map((lead, index) => (
-        <LeadCard key={lead.id} lead={lead} rank={index + 1} fitPreview={fitPreviewFor(lead)} hiringMode={hiringModeFor(lead)} />
+        <LeadRow key={lead.id} lead={lead} rank={index + 1} fitPreview={fitPreviewFor(lead)} hiringMode={hiringModeFor(lead)} />
       ))}
     </div>
   );

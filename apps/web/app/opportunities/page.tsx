@@ -35,7 +35,7 @@ import {
   InternalPageFrame,
   InternalPageHeader,
 } from '../ui/internal-page'
-import { OpportunityCard } from './opportunity-card'
+import { SituationRow } from './situation-row'
 import { OpportunityFunnel } from './opportunity-funnel'
 import { OpportunityResearchMode } from './opportunity-research-mode'
 import { OpportunityTodayLanes } from './opportunity-today-lanes'
@@ -216,7 +216,7 @@ export default async function OpportunitiesPage(props: {
         {visibleOpportunities.length > 0 ? (
           <div className={styles.cardList}>
             {visibleOpportunities.map((opportunity) => (
-              <OpportunityCard
+              <SituationRow
                 key={opportunity.id}
                 opportunity={opportunity}
                 outcomesUiEnabled={outcomesUiEnabled}

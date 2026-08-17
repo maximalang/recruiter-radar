@@ -13,7 +13,7 @@ import { buildAccountNavigation } from "../ui/account-navigation";
 import { logoutAction } from "../login/actions";
 import { EmptyState, InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
 import ppStyles from "../ui/page-primitives.module.css";
-import SettingsDocumentSummary from "./settings-overview";
+import SettingsDocumentSummary from "./settings-document-summary";
 import styles from "./settings-account.module.css";
 
 export const metadata: Metadata = {

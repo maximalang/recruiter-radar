@@ -54,7 +54,7 @@
 }
 
 .pricing [data-pricing-primary="true"] > :global(a):hover {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .pricing [data-pricing-primary="true"] > :global(a):active {
@@ -244,7 +244,7 @@
 .final a:first-child:focus-visible {
   border-color: #b5ead8;
   background: #b5ead8;
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .final a:first-child:active {

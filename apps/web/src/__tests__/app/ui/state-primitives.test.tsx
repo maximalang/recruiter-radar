@@ -23,9 +23,6 @@ import {
   EmptyState,
   NotFoundState,
   LoadingState,
-  MetricCard,
-  MetricGrid,
-  GateBadgeInline,
 } from '@/app/ui/internal-page';
 import { SearchIcon, CheckIcon } from '@/app/ui/icons';
 
@@ -89,30 +86,6 @@ describe('EmptyState (T0.2 — SVG icon API)', () => {
   });
 });
 
-describe('MetricGrid', () => {
-  it('exposes the metric strip as a list of related values', () => {
-    render(
-      <MetricGrid>
-        <MetricCard label="Новые" value="3" />
-        <MetricCard label="На проверке" value="2" tone="info" />
-      </MetricGrid>,
-    );
-
-    expect(screen.getByRole('list')).toBeTruthy();
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
-  });
-});
-
-describe('GateBadgeInline', () => {
-  it('presents the evidence confirmation grade separately from score or automation', () => {
-    render(<GateBadgeInline gate="A" />);
-
-    expect(screen.getByText('Подтверждение A')).toHaveAccessibleName(
-      'Уровень подтверждения доказательствами: A',
-    );
-    expect(screen.queryByText('Авто (A)')).toBeNull();
-  });
-});
 
 describe('NotFoundState (T0.2 — SVG icon API)', () => {
   it('renders the SVG icon when provided, plus a back link', () => {

@@ -103,8 +103,6 @@ main[data-ui-system] :where([id]) {
 @media (hover: none) {
   [data-product-workspace="true"] :is(
     section[class*="contentCard"],
-    div[class*="metricCard"],
-    article[class*="metricCard"],
     button,
     a
   ):hover {

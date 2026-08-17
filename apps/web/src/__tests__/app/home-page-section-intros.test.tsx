@@ -273,7 +273,7 @@ describe("final unified evidence-first landing contract", () => {
     const results = await WorkspaceResults({ previewInput: input, checkoutHref: buildCheckoutHref(input) });
     const markup = renderToStaticMarkup(results);
 
-    expect(markup.match(/data-lead-card="true"/g)).toHaveLength(2);
+    expect(markup.match(/data-lead-row="true"/g)).toHaveLength(2);
     expect(markup.match(/data-primary-lead="true"/g)).toHaveLength(1);
     expect(markup.match(/name="preview-leads"/g)).toHaveLength(2);
     expect(markup).toContain("Почему сейчас");

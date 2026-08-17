@@ -164,7 +164,7 @@
 .docNavAction:hover {
   border-color: rgba(26, 111, 96, 0.22);
   background: rgba(255, 255, 255, 0.94);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .docBrandLink:focus-visible,

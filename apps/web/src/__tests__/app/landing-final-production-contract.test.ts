@@ -15,10 +15,14 @@ describe("landing final production contract", () => {
     const page = source("app/landing/landing-page.tsx");
 
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
-    expect(hero).toContain('data-hero-layout="ambient-radar"');
+    expect(hero).toContain('data-hero-layout="signal-spine"');
     expect(hero).toContain("Компании, которым стоит написать сегодня.");
     expect(hero).toContain("Посмотреть пример");
-    expect(hero).toContain("Уже есть доступ? Войти");
+    expect(hero).toContain(">Войти</Link>");
+    expect(hero).toContain("Почему сейчас");
+    expect(hero).toContain("Подтверждения");
+    expect(hero).toContain("Следующий ход");
+    expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HeroInstrument");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("заявка без списания");

@@ -12,7 +12,7 @@
  *      description + optional next-step with role="alert" and never exposes
  *      a raw error message to the DOM.
  *   2. The surfaces that previously swallowed errors or rendered raw text
- *      (dashboard-quality raw `{error}`, leads/review silent catch blocks,
+ *      (leads/review silent catch blocks,
  *      dashboard Promise.all with no recovery) now route through ErrorState
  *      or a human copy path and no longer leak raw internals.
  *
@@ -70,14 +70,6 @@ describe('T7.2 — ErrorState primitive', () => {
 })
 
 describe('T7.2 — surfaces route errors through human paths (source-level)', () => {
-  it('dashboard-quality no longer renders the raw error string', () => {
-    const src = readApp('dashboard/dashboard-quality.tsx')
-    // The old raw `{error}` interpolation is gone.
-    expect(src).not.toMatch(/Ошибка загрузки метрик: \{error\}/)
-    // An ErrorState (or equivalent human path) is used instead.
-    expect(src).toMatch(/ErrorState/)
-  })
-
   it('leads/page.tsx surfaces an error state instead of silently swallowing the leads fetch', () => {
     const src = readApp('leads/leads-page-content.tsx')
     // The leads fetch catch block must not silently set empty arrays and render

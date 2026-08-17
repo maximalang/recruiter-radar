@@ -25,17 +25,9 @@
   color: #397966;
 }
 
-.productFrame {
-  overflow: hidden;
-  border: 1px solid rgba(23, 35, 45, .13);
-  border-radius: 12px;
-  background: #fbfaf6;
-  box-shadow: 0 18px 48px rgba(8, 12, 10, .065);
-}
+.productFrame { overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 
-.section:global([data-motion-state="visible"]) .productFrame {
-  animation: frameResolve .62s .08s cubic-bezier(.2,.75,.25,1) both;
-}
+
 
 .productRail {
   display: flex;
@@ -44,8 +36,8 @@
   justify-content: space-between;
   gap: 1rem;
   padding: .66rem .95rem;
-  background: linear-gradient(90deg, #111b17, var(--slate-900));
-  color: #f2efe7;
+  background: transparent;
+  color: var(--rr-color-text-primary);
 }
 
 .railIdentity {
@@ -59,14 +51,14 @@
   text-transform: uppercase;
 }
 
-.railIdentity strong { color: #b5ead8; font-weight: 650; }
-.railIdentity span { color: rgba(242, 239, 231, .62); }
+.railIdentity strong { color: var(--rr-color-signal); font-weight: 650; }
+.railIdentity span { color: var(--rr-color-text-tertiary); }
 
 .railStatus {
   display: inline-flex;
   align-items: center;
   gap: .45rem;
-  color: rgba(242, 239, 231, .7);
+  color: var(--rr-color-text-tertiary);
   font-family: var(--rr-font-mono);
   font-size: .56rem;
   text-transform: uppercase;
@@ -76,14 +68,12 @@
   width: .38rem;
   height: .38rem;
   border-radius: 50%;
-  background: #8dd9c1;
+  background: var(--rr-color-signal);
   content: "";
   box-shadow: 0 0 0 0 rgba(141,217,193,0);
 }
 
-.section:global([data-motion-state="visible"]) .railStatus::before {
-  animation: statusResolve .7s .55s ease-out both;
-}
+
 
 .controls {
   display: grid;
@@ -186,10 +176,7 @@
   transform: translateX(-90%);
 }
 
-.commandForm:global([data-submitting]) button::after {
-  opacity: 1;
-  animation: signalScan .72s ease-in-out infinite;
-}
+
 
 .commandForm:global([data-submitting]) {
   opacity: 1;
@@ -227,16 +214,16 @@
   transition: background-color .18s ease, border-color .18s ease, opacity .18s ease;
 }
 
-.lead summary {
+.leadRow {
   min-height: 4.65rem;
   transition: color .18s ease, background-color .18s ease;
 }
 
-.lead:not(.leadPrimary) summary:hover {
+.lead:not(.leadPrimary) .leadRow:hover {
   background: rgba(78, 142, 124, .035);
 }
 
-.leadPrimary summary {
+.leadPrimary .leadRow {
   min-height: 5.35rem;
   grid-template-columns: 2rem minmax(13rem, 1.05fr) minmax(15rem, 1.4fr) minmax(5.3rem, .48fr) 1rem;
 }
@@ -253,10 +240,10 @@
 
 .leadPrimary :global([data-lead-score] strong) {
   color: var(--signal-deep, #315f52);
-  font-size: clamp(2rem, 3.5vw, 3rem);
+  font-size: 1.25rem;
   font-weight: 520;
-  line-height: .82;
-  letter-spacing: -.075em;
+  line-height: 1;
+  letter-spacing: -.02em;
 }
 
 .leadPrimary :global([data-lead-score] small) {
@@ -266,11 +253,9 @@
 
 .confidence {
   color: #315f52;
-  font-family: var(--rr-font-mono);
-  font-size: .54rem;
-  font-weight: 700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
+  font-size: var(--rr-type-label-size);
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .leadSignal { color: rgba(23, 35, 45, .78); }
@@ -282,9 +267,6 @@
   padding: .25rem 0 1rem 3rem;
 }
 
-.lead:global([open]) .leadBody {
-  animation: leadReveal .22s cubic-bezier(.2, .75, .25, 1) both;
-}
 
 .proofStack {
   display: grid;
@@ -401,26 +383,9 @@
   text-transform: uppercase;
 }
 
-@keyframes frameResolve {
-  from { opacity: .9; transform: translate3d(0, 8px, 0); box-shadow: 0 8px 28px rgba(8,12,10,.035); }
-  to { opacity: 1; transform: none; box-shadow: 0 18px 48px rgba(8,12,10,.065); }
-}
 
-@keyframes statusResolve {
-  0% { box-shadow: 0 0 0 0 rgba(141,217,193,.26); }
-  70% { box-shadow: 0 0 0 7px rgba(141,217,193,0); }
-  100% { box-shadow: 0 0 0 0 rgba(141,217,193,0); }
-}
 
-@keyframes signalScan {
-  from { transform: translateX(-90%); }
-  to { transform: translateX(90%); }
-}
 
-@keyframes leadReveal {
-  from { opacity: 0; transform: translate3d(0, -4px, 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
-}
 
 @media (max-width: 1080px) {
   .intro {
@@ -448,17 +413,17 @@
   .commandForm { grid-template-columns: 1fr; }
   .results { min-height: 17rem; padding-inline: .8rem; }
   .results :global([data-primary-lead]) { padding-inline: .2rem; }
-  .leadPrimary summary,
-  .lead summary {
+  .leadPrimary .leadRow,
+  .leadRow {
     grid-template-columns: 1.6rem minmax(0, 1fr) 4.6rem 1rem;
     gap: .55rem .7rem;
   }
   .leadPrimary :global([data-lead-company] strong) { font-size: 1rem; }
-  .leadPrimary :global([data-lead-score] strong) { font-size: 2.25rem; }
+  .leadPrimary :global([data-lead-score] strong) { font-size: 1.2rem; }
   .lead :global([data-lead-company] small) { font-size: .72rem; }
-  .lead:not(.leadPrimary) summary { min-height: 4.5rem; }
+  .lead:not(.leadPrimary) .leadRow { min-height: 4.5rem; }
   .leadSignal {
-    grid-column: 2 / 5;
+    grid-column: 2 / 4;
     grid-row: 2;
     padding-bottom: .55rem;
     font-size: .82rem;
@@ -482,8 +447,8 @@
   .intro :global(h2) { max-width: 11ch; }
   .presets a { min-height: 44px; white-space: nowrap; }
   .footerRail small { max-width: 18rem; font-size: .7rem; line-height: 1.45; }
-  .leadPrimary summary,
-  .lead summary {
+  .leadPrimary .leadRow,
+  .leadRow {
     grid-template-columns: 1.45rem minmax(0, 1fr) 4.2rem .8rem;
     padding-inline: .15rem;
   }
@@ -500,13 +465,12 @@
 @media (prefers-reduced-motion: reduce) {
   .productFrame,
   .railStatus::before,
-  .commandForm button::after { animation: none !important; }
+  .commandForm button::after { animation: none; }
   .commandForm button::after { opacity: 0 !important; }
   .results,
   .presets a,
   .commandForm input,
   .commandForm button,
   .lead,
-  .lead summary { transition: none; }
-  .lead:global([open]) .leadBody { animation: none !important; }
-}
+  .leadRow { transition: none; }
+  }

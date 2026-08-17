@@ -130,12 +130,12 @@ export function ProfileForm(props: {
         {(() => {
           const ModeGlyph = modeIcon(resolvedHiringMode);
           return (
-            <div className={styles.modeBadgeRow}>
-              <span className={styles.modeBadge} data-mode={resolvedHiringMode}>
-                {ModeGlyph ? <ModeGlyph className={styles.modeBadgeIcon} aria-hidden="true" /> : null}
+            <div className={styles.modeSummary}>
+              <span className={styles.modeSummaryValue} data-mode={resolvedHiringMode}>
+                {ModeGlyph ? <ModeGlyph className={styles.modeSummaryIcon} aria-hidden="true" /> : null}
                 Сейчас действует: {resolvedLabel}
               </span>
-              <span className={styles.modeBadgeSource}>
+              <span className={styles.modeSummarySource}>
                 {modeIsAuto
                   ? 'определено автоматически по ролям'
                   : 'выбрано вручную'}
@@ -143,17 +143,17 @@ export function ProfileForm(props: {
             </div>
           );
         })()}
-        <div className={styles.radioCards}>
+        <div className={styles.radioOptions}>
           {HIRING_MODE_OPTIONS.map((opt) => (
-            <label key={opt.key} className={styles.radioCard}>
+            <label key={opt.key} className={styles.radioOption}>
               <input
                 type="radio"
                 name="hiringMode"
                 value={opt.key}
                 defaultChecked={(profile.hiringMode ?? "auto") === opt.key}
               />
-              <span className={styles.radioCardTitle}>{opt.label}</span>
-              <span className={styles.radioCardHint}>{opt.hint}</span>
+              <span className={styles.radioOptionTitle}>{opt.label}</span>
+              <span className={styles.radioOptionHint}>{opt.hint}</span>
             </label>
           ))}
         </div>

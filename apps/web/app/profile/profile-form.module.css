@@ -46,8 +46,8 @@
 
 .groupHint,
 .groupEmptyHint,
-.radioCardHint,
-.modeBadgeSource,
+.radioOptionHint,
+.modeSummarySource,
 .modeNote {
   color: var(--rr-color-text-tertiary);
   font-size: var(--rr-type-metadata-size);
@@ -59,7 +59,7 @@
 }
 
 .chips,
-.radioCards {
+.radioOptions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 20px;
@@ -67,7 +67,7 @@
 }
 
 .chip,
-.radioCard {
+.radioOption {
   min-height: 48px;
   display: grid;
   align-items: center;
@@ -89,24 +89,24 @@
 }
 
 .chip:hover,
-.radioCard:hover {
+.radioOption:hover {
   background: color-mix(in srgb, var(--rr-color-surface-secondary) 56%, transparent);
 }
 
 .chip:has(input:focus-visible),
-.radioCard:has(input:focus-visible) {
+.radioOption:has(input:focus-visible) {
   outline: 2px solid var(--rr-color-focus);
   outline-offset: -2px;
 }
 
 .chip:has(input:checked),
-.radioCard:has(input:checked) {
+.radioOption:has(input:checked) {
   color: var(--rr-color-text-primary);
   box-shadow: inset 2px 0 0 var(--rr-color-signal);
 }
 
 .chip input,
-.radioCard > input {
+.radioOption > input {
   position: static;
   width: 18px;
   height: 18px;
@@ -115,11 +115,11 @@
   accent-color: var(--rr-color-signal);
 }
 
-.radioCards {
+.radioOptions {
   grid-template-columns: 1fr;
 }
 
-.radioCard {
+.radioOption {
   grid-template-columns: 20px minmax(0, 1fr);
   grid-template-areas:
     "input title"
@@ -129,24 +129,24 @@
   padding: 12px 2px;
 }
 
-.radioCard > input {
+.radioOption > input {
   grid-area: input;
   align-self: start;
   margin-top: 2px;
 }
 
-.radioCardTitle {
+.radioOptionTitle {
   grid-area: title;
   font-size: var(--rr-type-body-size);
   font-weight: 600;
   letter-spacing: -.002em;
 }
 
-.radioCardHint {
+.radioOptionHint {
   grid-area: hint;
 }
 
-.modeBadgeRow {
+.modeSummary {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -156,7 +156,7 @@
   border-bottom: 1px solid var(--rr-color-separator-subtle);
 }
 
-.modeBadge {
+.modeSummaryValue {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -170,7 +170,7 @@
   letter-spacing: 0;
 }
 
-.modeBadgeIcon {
+.modeSummaryIcon {
   flex: 0 0 auto;
   width: 15px;
   height: 15px;

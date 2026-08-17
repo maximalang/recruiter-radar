@@ -38,12 +38,7 @@ const RENDER_FILES = [
   'review/page.tsx',
   'review/review-actions.tsx',
   'dashboard/page.tsx',
-  'dashboard/dashboard-analytics.tsx',
   'dashboard/dashboard-today-radar.tsx',
-  'dashboard/dashboard-quality.tsx',
-  'dashboard/dashboard-overview.tsx',
-  'dashboard/dashboard-sources.tsx',
-  'dashboard/dashboard-alerts.tsx',
   'profile/page.tsx',
   'profile/profile-form.tsx',
   'profile/profile-completion-panel.tsx',
@@ -82,18 +77,6 @@ describe('T7.3 — literal/glyph audit', () => {
       expect(src).not.toMatch(/[ÃÐÂ][\x80-\xBF]/);
       expect(src).not.toMatch(/ï¿½/);
     }
-  })
-})
-
-describe('T7.3 — anglicism "скоринг" canonicalized to "балл" in metric labels', () => {
-  it('dashboard analytics metric labels use "балл", not the anglicism "скоринг"', () => {
-    const src = readApp('dashboard/dashboard-analytics.tsx');
-    // The avg-score metric card label.
-    expect(src).not.toMatch(/Средний скоринг/);
-    expect(src).not.toMatch(/Ср\. скоринг/);
-    // Canonicalized to "балл".
-    expect(src).toMatch(/Средний балл/);
-    expect(src).toMatch(/Ср\. балл/);
   })
 })
 

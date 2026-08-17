@@ -17,7 +17,7 @@ describe('opportunities page states', () => {
   it('renders a recoverable error boundary', () => {
     render(<OpportunitiesError reset={jest.fn()} />)
     expect(screen.getByRole('heading', { name: 'Сегодня' })).toBeInTheDocument()
-    expect(screen.getByText('Возможности временно не загрузились')).toBeInTheDocument()
+    expect(screen.getByText('Ситуации временно не загрузились')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Попробовать снова' })).toBeInTheDocument()
   })
 })

@@ -308,22 +308,16 @@ async function assertHeroGeometry(page, label) {
   }
 }
 
-async function assertLeadExpansion(page, label) {
-  const leads = page.locator("details[data-lead-card]");
+async function assertLeadRows(page, label) {
+  const leads = page.locator("article[data-lead-row]");
   const count = await leads.count();
   assert.ok(count >= 2, `${label}: expected at least two recommendations, received ${count}`);
-  const active = leads.nth(0);
+  const primary = leads.nth(0);
   const secondary = leads.nth(count - 1);
-  assert.equal(await active.getAttribute("open"), "", `${label}: top-ranked recommendation must be expanded by default`);
-  assert.equal(await active.getAttribute("data-primary-lead"), "true", `${label}: top-ranked recommendation must be the primary lead`);
-  await active.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
-  assert.equal(await secondary.getAttribute("open"), null, `${label}: secondary recommendation must not be expanded by default`);
-  await secondary.locator("summary").click();
-  assert.equal(await secondary.getAttribute("open"), "", `${label}: secondary recommendation did not expand`);
-  await secondary.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
-  assert.equal(await active.getAttribute("open"), null, `${label}: named details did not collapse the previous active recommendation`);
-  await active.locator("summary").click();
-  assert.equal(await active.getAttribute("open"), "", `${label}: top-ranked recommendation did not restore`);
+  assert.equal(await primary.getAttribute("data-primary-lead"), "true", `${label}: top-ranked recommendation must be the primary lead`);
+  await primary.locator("[data-selected-lead-detail]").waitFor({ state: "visible" });
+  await primary.getByText("Подтверждения и источники", { exact: true }).waitFor({ state: "visible" });
+  assert.equal(await secondary.locator("[data-selected-lead-detail]").count(), 0, `${label}: secondary recommendation must remain a scan row`);
 }
 
 async function measurePageHeight(page, viewport) {
@@ -393,7 +387,7 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertRequiredSurface(page, viewport.name);
   await assertHeaderLayout(page, viewport);
   await assertHeroGeometry(page, viewport.name);
-  await assertLeadExpansion(page, viewport.name);
+  await assertLeadRows(page, viewport.name);
   await revealAllMotionSections(page, viewport.name);
 
   await assertNoHorizontalOverflow(page, viewport.name);
@@ -599,16 +593,14 @@ async function assertInteractionContracts(browser) {
   assert.equal(new URL(page.url()).searchParams.get("includeKeywords"), privateInclude);
   assert.equal(new URL(page.url()).searchParams.get("excludeKeywords"), privateExclude);
 
-  const leads = page.locator("details[data-lead-card]");
+  const leads = page.locator("article[data-lead-row]");
   const leadCount = await leads.count();
   assert.ok(leadCount >= 2, "interaction: expected at least two recommendations");
   const activeLead = leads.nth(0);
   const secondaryLead = leads.nth(leadCount - 1);
-  assert.equal(await activeLead.getAttribute("open"), "", "interaction: top-ranked recommendation is not open by default");
   assert.equal(await activeLead.getAttribute("data-primary-lead"), "true", "interaction: top-ranked recommendation is not primary");
-  await secondaryLead.locator("summary").click();
-  assert.equal(await secondaryLead.getAttribute("open"), "", "interaction: secondary recommendation did not open");
-  await secondaryLead.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
+  await activeLead.locator("[data-selected-lead-detail]").waitFor({ state: "visible" });
+  assert.equal(await secondaryLead.locator("[data-selected-lead-detail]").count(), 0, "interaction: secondary recommendation must remain a compact scan row");
 
   const companyNames = (await page.locator("[data-lead-company] strong").allTextContents())
     .map((value) => value.trim())

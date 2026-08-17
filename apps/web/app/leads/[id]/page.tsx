@@ -59,8 +59,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   if (!authorization) {
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
-        <InternalPageHeader title="Возможность" subtitle="Защищённое рабочее пространство" />
-        <EmptyState title="Нужен вход в аккаунт" text="Войдите, чтобы открыть эту возможность в своём workspace." action={{ href: `/login?returnTo=/leads/${encodeURIComponent(id)}`, label: 'Войти' }} />
+        <InternalPageHeader title="Компания" subtitle="Защищённое рабочее пространство" />
+        <EmptyState title="Нужен вход в аккаунт" text="Войдите, чтобы открыть эту компанию в своём workspace." action={{ href: `/login?returnTo=/leads/${encodeURIComponent(id)}`, label: 'Войти' }} />
       </InternalPageFrame>
     );
   }
@@ -72,7 +72,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   if (!entitlement) {
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
-        <InternalPageHeader title="Возможность" subtitle="Проверка доступа" />
+        <InternalPageHeader title="Компания" subtitle="Проверка доступа" />
         <ErrorState title="Не удалось проверить доступ" description="Данные не показываются, пока сервер не подтвердит права аккаунта." action={{ href: '/settings/access', label: 'Доступ и оплата' }} />
       </InternalPageFrame>
     );
@@ -80,8 +80,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   if (entitlement.status !== 'active' || !entitlement.features.includes('dashboard')) {
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
-        <InternalPageHeader title="Возможность" subtitle="Доступ не активен" />
-        <EmptyState title="Нужен активный доступ" text="Профиль и история сохранены. После активации возможность снова станет доступна." action={{ href: '/settings/access', label: 'Проверить доступ' }} />
+        <InternalPageHeader title="Компания" subtitle="Доступ не активен" />
+        <EmptyState title="Нужен активный доступ" text="Профиль и история сохранены. После активации компания снова станет доступна." action={{ href: '/settings/access', label: 'Проверить доступ' }} />
       </InternalPageFrame>
     );
   }
@@ -92,14 +92,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   } catch {
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
-        <InternalPageHeader title="Возможность" subtitle="Radar" />
-        <ErrorState title="Не удалось загрузить возможность" description="Это временная ошибка данных, а не признак удаления компании." action={{ href: '/leads', label: 'Вернуться к возможностям' }} />
+        <InternalPageHeader title="Компания" subtitle="Радар" />
+        <ErrorState title="Не удалось загрузить компанию" description="Это временная ошибка данных, а не признак удаления компании." action={{ href: '/leads', label: 'Вернуться к компаниям' }} />
       </InternalPageFrame>
     );
   }
 
   if (!lead) {
-    return <main><NotFoundState icon={SearchIcon} title="Возможность не найдена" backHref="/leads" backLabel="Назад к возможностям" /></main>;
+    return <main><NotFoundState icon={SearchIcon} title="Компания не найдена" backHref="/leads" backLabel="Назад к компаниям" /></main>;
   }
 
   const profileResult = await Promise.allSettled([getClientProfileById(lead.clientProfileId, ownerId)]);
@@ -195,7 +195,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <InternalPageHeader
           title={lead.orgName}
           subtitle={lead.locationNames.length > 0 ? lead.locationNames.join(', ') : 'Регион не указан'}
-          nav={<InternalBackLink href="/leads">Возможности</InternalBackLink>}
+          nav={<InternalBackLink href="/leads">Компании</InternalBackLink>}
         />
 
         {profileUnavailable ? (
@@ -210,7 +210,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             {lead.reviewStatus && lead.reviewStatus !== 'auto_approved' ? <span>на проверке</span> : null}
           </div>
           <div className={styles.scoreBlock}>
-            <div className={styles.score} data-numeric="true">{score}<small>/100</small></div>
+            <div className={styles.score} data-numeric="true" aria-label={`Сила сигнала ${score}`}>{score}</div>
             <ConfidenceIndicator gate={lead.confidenceGate} />
           </div>
         </div>
@@ -230,6 +230,55 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </section>
 
         <div className={styles.layout}>
+          <div className={styles.main}>
+            {summaryLines.length > 0 ? (
+              <section className={styles.section}>
+                <h2>Контекст компании и найма</h2>
+                <div className={styles.summary}>
+                  {summaryLines.map((line, index) => <p key={index}>{line}</p>)}
+                  {summary.isThin ? <p>Доказательств пока немного; вывод будет уточняться по мере новых сигналов.</p> : null}
+                </div>
+              </section>
+            ) : null}
+
+            <section className={styles.section}>
+              <h2>Подтверждения</h2>
+              <div className={styles.stats}>
+                <span>{lead.vacanciesCount} вакансий</span>
+                <span>{lead.distinctVacancyNamesCount} разных ролей</span>
+                <span>{lead.sourceFamilies.length} источников</span>
+              </div>
+              {lead.evidenceTitles.length > 0 ? (
+                <ol className={styles.evidenceList}>
+                  {lead.evidenceTitles.map((title, index) => (
+                    <li key={`${title}:${index}`}>
+                      <span className={styles.evidenceIndex}>{String(index + 1).padStart(2, '0')}</span>
+                      <span>{title}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p className={styles.body}>Подтверждённые факты пока не сформированы.</p>}
+              {lead.sourceFamilies.length > 0 ? (
+                <div className={styles.provenance}>Источники: {lead.sourceFamilies.join(' · ')}</div>
+              ) : null}
+            </section>
+
+            {fit && !fit.isEmpty ? (
+              <section className={styles.section}>
+                <h2>Соответствие вашему профилю</h2>
+                <ul className={styles.fitList}>{fit.lines.map((line, index) => <li key={index}>{line.text}</li>)}</ul>
+              </section>
+            ) : null}
+
+            <AiEnrichmentBlock enrichment={lead.aiEnrichment} />
+
+            {lead.negativeSignals.length > 0 ? (
+              <section className={styles.section}>
+                <h2>Риски и ограничения</h2>
+                <ul className={styles.riskList}>{lead.negativeSignals.map((signal, index) => <li key={index}>{signal}</li>)}</ul>
+              </section>
+            ) : null}
+          </div>
           <aside className={styles.aside} aria-label="Действия и контекст">
             <div className={styles.rail}>
               <section className={styles.railSection}>
@@ -285,55 +334,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </div>
           </aside>
 
-          <div className={styles.main}>
-            {summaryLines.length > 0 ? (
-              <section className={styles.section}>
-                <h2>Контекст компании и найма</h2>
-                <div className={styles.summary}>
-                  {summaryLines.map((line, index) => <p key={index}>{line}</p>)}
-                  {summary.isThin ? <p>Доказательств пока немного; вывод будет уточняться по мере новых сигналов.</p> : null}
-                </div>
-              </section>
-            ) : null}
-
-            <section className={styles.section}>
-              <h2>Evidence ledger</h2>
-              <div className={styles.stats}>
-                <span>{lead.vacanciesCount} вакансий</span>
-                <span>{lead.distinctVacancyNamesCount} разных ролей</span>
-                <span>{lead.sourceFamilies.length} источников</span>
-              </div>
-              {lead.evidenceTitles.length > 0 ? (
-                <ol className={styles.evidenceList}>
-                  {lead.evidenceTitles.map((title, index) => (
-                    <li key={`${title}:${index}`}>
-                      <span className={styles.evidenceIndex}>{String(index + 1).padStart(2, '0')}</span>
-                      <span>{title}</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : <p className={styles.body}>Фактические evidence items пока не сформированы.</p>}
-              {lead.sourceFamilies.length > 0 ? (
-                <div className={styles.provenance}>Provenance: {lead.sourceFamilies.join(' · ')}</div>
-              ) : null}
-            </section>
-
-            {fit && !fit.isEmpty ? (
-              <section className={styles.section}>
-                <h2>Соответствие вашему профилю</h2>
-                <ul className={styles.fitList}>{fit.lines.map((line, index) => <li key={index}>{line.text}</li>)}</ul>
-              </section>
-            ) : null}
-
-            <AiEnrichmentBlock enrichment={lead.aiEnrichment} />
-
-            {lead.negativeSignals.length > 0 ? (
-              <section className={styles.section}>
-                <h2>Риски и ограничения</h2>
-                <ul className={styles.riskList}>{lead.negativeSignals.map((signal, index) => <li key={index}>{signal}</li>)}</ul>
-              </section>
-            ) : null}
-          </div>
         </div>
       </div>
     </InternalPageFrame>

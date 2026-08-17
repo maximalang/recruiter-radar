@@ -109,10 +109,10 @@
 .lock strong { font-size: 1rem; font-weight: 650; letter-spacing: -.015em; }
 .lock small { color: rgba(23,35,45,.5); font-family: var(--rr-font-mono); font-size: .52rem; text-transform: uppercase; }
 
-.section:global([data-motion-state="visible"]) .trajectory::before { animation: lineDrawY .65s .08s cubic-bezier(.2,.75,.25,1) forwards; }
-.section:global([data-motion-state="visible"]) .trajectory i { animation: lineDrawX .38s .68s cubic-bezier(.2,.75,.25,1) forwards; }
-.section:global([data-motion-state="visible"]) .event { animation: eventResolve .36s calc(.18s + var(--event-index) * .16s) cubic-bezier(.2,.75,.25,1) forwards; }
-.section:global([data-motion-state="visible"]) .lock { animation: lockResolve .4s 1.04s cubic-bezier(.2,.75,.25,1) forwards; }
+.section:global([data-motion-state="visible"]) .trajectory::before { animation: none; }
+.section:global([data-motion-state="visible"]) .trajectory i { animation: none; }
+.section:global([data-motion-state="visible"]) .event { animation: none; }
+.section:global([data-motion-state="visible"]) .lock { animation: none; }
 
 @keyframes lineDrawY { to { transform: scaleY(1); } }
 @keyframes lineDrawX { to { transform: scaleX(1); } }
@@ -139,6 +139,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .trajectory::before, .trajectory i, .event, .lock { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .trajectory::before, .trajectory i, .event, .lock { animation: none; opacity: 1 !important; transform: none !important; }
   .event, .event::before, .node::before { transition: none !important; }
 }

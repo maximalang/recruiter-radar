@@ -24,7 +24,7 @@ export function OpportunityCommercialSignalCard(props: {
     <div className={styles.commercialSignalBrief}>
       <div className={styles.commercialSignalHeading}>
         <div>
-          <span>Коммерческая возможность</span>
+          <span>Коммерческая ситуация</span>
           <strong>{STATUS_LABELS[props.card.status]}</strong>
         </div>
       </div>
@@ -76,7 +76,7 @@ export function OpportunityCommercialSignalCard(props: {
           />
           <Metric heading="Соответствие вашему профилю" metric={props.card.metrics.agencyFit} />
           <Metric
-            heading="Сила возможности"
+            heading="Сила ситуации"
             metric={props.card.metrics.opportunityQuality}
           />
           <Metric
@@ -185,7 +185,7 @@ export function OpportunitySignalDiagnostics({ card }: { card: CommercialSignalC
   const diagnostics = [
     ['Вероятность внешнего подбора', card.metrics.externalAgencyPropensity.reasonCodes],
     ['Соответствие вашему профилю', card.metrics.agencyFit.reasonCodes],
-    ['Сила возможности', card.metrics.opportunityQuality.reasonCodes],
+    ['Сила ситуации', card.metrics.opportunityQuality.reasonCodes],
     ['Готовность к контакту', card.metrics.actionability.reasonCodes],
   ] as const
 

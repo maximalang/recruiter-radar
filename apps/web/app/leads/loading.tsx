@@ -6,7 +6,7 @@ const LEADS_NAV = buildAccountNavigation("leads");
 export default function LeadsLoading() {
   return (
     <InternalPageFrame navItems={LEADS_NAV}>
-      <InternalPageHeader title="Возможности" subtitle="Загружаем доказательства и статусы" />
+      <InternalPageHeader title="Компании" subtitle="Загружаем доказательства и статусы" />
       <LoadingState variant="skeleton" />
     </InternalPageFrame>
   );

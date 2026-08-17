@@ -240,7 +240,7 @@ function DeliveryStep({ snapshot }: { snapshot: OnboardingSnapshot }) {
   return (
     <section className={styles.stepPanel} aria-labelledby="delivery-step-title">
       <p className={styles.kicker}>Шаг 4 из 4</p>
-      <h2 id="delivery-step-title">Как получать новые возможности</h2>
+      <h2 id="delivery-step-title">Как получать новые компании</h2>
       <p className={styles.stepLead}>
         Выберите один основной канал. Настройку можно изменить позже; пропуск явно оставит доставку выключенной.
       </p>

@@ -30,7 +30,7 @@ describe('cross-route interaction hardening', () => {
     for (const route of [
       "'/opportunities'",
       "'/opportunities/radar'",
-      "'/opportunities/sources'",
+      "'/settings/diagnostics/sources'",
       "'/admin/payments'",
       "'/settings/access'",
       "'/settings/delivery'",

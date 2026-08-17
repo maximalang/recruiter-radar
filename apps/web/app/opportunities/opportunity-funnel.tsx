@@ -41,9 +41,9 @@ export function OpportunityFunnel(props: { summary: OutcomeFunnelSummary }) {
             'раз',
           )} · ${item.opportunityCount} ${plural(
             item.opportunityCount,
-            'возможность',
-            'возможности',
-            'возможностей',
+            'ситуация',
+            'ситуации',
+            'ситуаций',
           )}`).join(' · ') ||
           'событий нет'}
       </p>

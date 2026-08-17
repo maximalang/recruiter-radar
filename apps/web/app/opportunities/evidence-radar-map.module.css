@@ -359,7 +359,7 @@
   background: var(--rr-color-surface-secondary);
 }
 
-.leadCard {
+.detailBody {
   display: grid;
   gap: 0;
   padding: 24px;
@@ -704,7 +704,7 @@
     background: transparent;
   }
 
-  .leadCard {
+  .detailBody {
     padding: 20px 0 0;
   }
 

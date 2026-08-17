@@ -186,7 +186,7 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
   const confidence = radarConfidence(lead)
 
   return (
-    <article className={styles.leadCard} data-evidence-lead-card>
+    <article className={styles.detailBody} data-evidence-lead-detail>
       <header className={styles.leadHeader}>
         <div>
           <span className={styles.eyebrow}>Компания с подтверждённым сигналом</span>

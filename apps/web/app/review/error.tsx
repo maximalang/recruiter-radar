@@ -14,7 +14,7 @@ export default function ReviewError({ error, reset }: { error: Error & { digest?
 
   return (
     <InternalPageFrame navItems={REVIEW_NAV}>
-      <InternalPageHeader title="Очередь проверки" subtitle="Radar" />
+      <InternalPageHeader title="На проверке" subtitle="Радар" />
       <ErrorState title="Не удалось загрузить очередь" description="Повторите загрузку. Решения по кандидатам не изменились." retryAction={{ label: "Повторить", onClick: reset }} />
     </InternalPageFrame>
   );

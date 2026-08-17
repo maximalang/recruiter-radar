@@ -14,8 +14,8 @@ export default function LeadsError({ error, reset }: { error: Error & { digest?:
 
   return (
     <InternalPageFrame navItems={LEADS_NAV}>
-      <InternalPageHeader title="Возможности" subtitle="Radar" />
-      <ErrorState title="Не удалось загрузить возможности" description="Повторите загрузку. Сохранённые данные и статусы не изменились." retryAction={{ label: "Повторить", onClick: reset }} />
+      <InternalPageHeader title="Компании" subtitle="Радар" />
+      <ErrorState title="Не удалось загрузить компании" description="Повторите загрузку. Сохранённые данные и статусы не изменились." retryAction={{ label: "Повторить", onClick: reset }} />
     </InternalPageFrame>
   );
 }

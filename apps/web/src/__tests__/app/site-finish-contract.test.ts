@@ -34,9 +34,7 @@ describe("cross-route visual layer contract", () => {
       "ui/brand-logo.module.css",
       "ui/internal-page.module.css",
       "ui/page-primitives.module.css",
-      "dashboard/dashboard.module.css",
-      "dashboard/dashboard-analytics.tsx",
-      "dashboard/dashboard-quality.tsx",
+      "dashboard/dashboard-workspace.module.css",
       "opportunities/opportunities.module.css",
       "profile/agency-dna-form.module.css",
       "profile/profile-form.module.css",
@@ -44,7 +42,7 @@ describe("cross-route visual layer contract", () => {
       "login/login.module.css",
       "leads/[id]/next-steps-block.module.css",
       "leads/[id]/feedback-buttons.module.css",
-      "settings/settings-overview.module.css",
+      "settings/settings-document-summary.module.css",
       "settings/security/security-settings.module.css",
       "settings/team/team-settings.module.css",
     ];
@@ -83,7 +81,9 @@ describe("cross-route visual layer contract", () => {
     expect(internalPage).toContain(".leadDetailContainer .detailMain > .contentCard");
     expect(internalPage).toContain(".leadDetailContainer .detailSidebar > .contentCard");
     expect(internalPage).toMatch(/\.signalCardList \{[\s\S]*?gap: 0;[\s\S]*?background: transparent;/);
-    expect(internalPage).toMatch(/\.signalLeadSections \{[\s\S]*?gap: 0;/);
+    expect(internalPage).not.toContain("signalLeadSections");
+    expect(internalPage).not.toContain("scoreGauge");
+    expect(internalPage).not.toContain("scoreBar");
     expect(opportunities).toMatch(/\.cardList \{[\s\S]*?gap: 0;/);
     expect(opportunities).toMatch(/\.decisionGrid \{[\s\S]*?border-radius: 0;/);
     expect(radar).toMatch(/\.detailPanel \{[\s\S]*?border-left: 1px solid var\(--rr-color-separator-strong\);[\s\S]*?background: var\(--rr-color-surface-secondary\);/);

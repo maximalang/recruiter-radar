@@ -10,48 +10,42 @@ function source(path: string) {
 }
 
 describe("polished unified landing visual contract", () => {
-  it("keeps one hero layout owner with a lightweight ambient radar", () => {
+  it("uses the final warm-paper hero with an unboxed Signal Spine", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
-    const radar = source("app/landing/hero-radar.tsx");
-    const radarStyles = source("app/landing/hero-radar.module.css");
     const landingStyles = source("app/landing/landing.module.css");
     const visualStyles = source("app/landing/landing-visual-system.module.css");
     const obsoleteResponsiveStyles = resolve(WEB_ROOT, "app/landing/detection-responsive.module.css");
-    const compatibilityRadar = source("app/landing/brand-glyphs.tsx");
+    const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
+    const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(heroScene).toContain('data-hero-layout="ambient-radar"');
-    expect(heroScene).toContain("<HeroRadar />");
-    expect(radar).toContain('data-hero-radar="premium"');
-    expect(radarStyles).toMatch(/\.ringLayer\s+circle\s*\{/);
-    expect(radarStyles).not.toContain("sweep");
+    expect(heroScene).toContain('data-hero-layout="signal-spine"');
+    expect(heroScene).toContain('data-hero-visual');
+    expect(heroScene).toContain("Компания");
+    expect(heroScene).toContain("Почему сейчас");
+    expect(heroScene).toContain("Подтверждения");
+    expect(heroScene).toContain("Следующий ход");
+    expect(heroScene).not.toContain("HeroRadar");
     expect(heroScene).not.toContain("HeroInstrument");
-    expect(heroScene).not.toContain("data-hero-signal-card");
-    expect(heroScene).not.toContain("detectionFooter");
-    expect(sceneStyles).toContain("grid-template-columns: minmax(0, 1fr);");
-    expect(sceneStyles).toMatch(/\.fieldFigure\s*\{[\s\S]*?position:\s*absolute;/);
-    expect(sceneStyles).not.toContain("grid-template-columns: minmax(0, 47%) minmax(0, 53%);");
-    expect(sceneStyles).toContain("@media (max-width: 959px)");
-    expect(sceneStyles).toContain("@media (max-width: 480px)");
-    expect(landingStyles).not.toMatch(/\.(detectionScene|detectionField|detectionCopy|detectionLock|detectionFooter|instrumentCaption)\b/);
+    expect(existsSync(retiredRadar)).toBe(false);
+    expect(existsSync(retiredRadarStyles)).toBe(false);
+    expect(sceneStyles).toContain("var(--rr-color-canvas)");
+    expect(sceneStyles).toContain("var(--rr-color-signal)");
+    expect(sceneStyles).not.toMatch(/animation\s*:/);
+    expect(sceneStyles).not.toContain("translateY(-1px)");
+    expect(landingStyles).not.toMatch(/\.(detectionScene|detectionField|detectionCopy|detectionLock|detectionFooter|instrumentCaption)/);
     expect(visualStyles).not.toContain('#scene-detection [class*=');
     expect(existsSync(obsoleteResponsiveStyles)).toBe(false);
-    expect(compatibilityRadar).not.toContain("styles.instrumentCore");
-    expect(landingStyles).not.toContain(".instrumentGuides");
-    expect(landingStyles).not.toContain(".instrumentConnection");
-    expect(landingStyles).not.toContain(".instrumentCore");
   });
 
-  it("uses the same ambient radar marker on mobile without exposing tablet hotspots", () => {
+  it("keeps the same Signal Spine readable on mobile without a separate radar runtime", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
-    const radarStyles = source("app/landing/hero-radar.module.css");
 
     expect(heroScene).toContain("data-mobile-hero-signal");
-    expect(heroScene).toContain("<HeroRadar />");
-    expect(sceneStyles).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.fieldFigure\s*\{/);
-    expect(radarStyles).toMatch(/@media \(max-width: 1100px\)[\s\S]*?\.clusterTargets\s*\{\s*display:\s*none;/);
-    expect(sceneStyles).not.toMatch(/@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?bottom:\s*-12rem;/);
+    expect(heroScene).toContain('className={sceneStyles.signalSpine}');
+    expect(sceneStyles).toMatch(/@media \(max-width:\s*760px\)[\s\S]*?\.signalSpine\s*\{/);
+    expect(sceneStyles).not.toContain("HeroRadar");
   });
 
   it("keeps the compact signal timeline between detection and workspace", () => {

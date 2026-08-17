@@ -25,27 +25,26 @@ describe("landing visual and login reliability polish", () => {
     expect(visual).toContain(':global(#faq summary)');
   });
 
-  test("uses a restrained ambient radar without the retired instrument runtime", () => {
+  test("uses the final static Signal Spine hero without an ambient radar runtime", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const heroScene = source("app/landing/detection-scene.module.css");
-    const heroRadar = source("app/landing/hero-radar.tsx");
-    const heroRadarStyles = source("app/landing/hero-radar.module.css");
     const visual = source("app/landing/landing-visual-system.module.css");
+    const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
+    const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(hero).toContain('data-hero-layout="ambient-radar"');
-    expect(hero).toContain("<HeroRadar />");
-    expect(hero).not.toContain("HeroInstrument");
-    expect(heroScene).toContain("var(--signal-strong)");
-    expect(heroRadar).toContain('data-hero-radar="premium"');
-    expect(heroRadarStyles).toContain(".ringLayer");
-    expect(heroRadarStyles).not.toContain("sweep");
-    expect(heroScene).not.toContain("#7fd8bd");
-    expect(heroScene).not.toContain("#dcff8a");
+    expect(hero).toContain('data-hero-layout="signal-spine"');
+    expect(hero).toContain("Компания");
+    expect(hero).toContain("Почему сейчас");
+    expect(hero).toContain("Подтверждения");
+    expect(hero).toContain("Следующий ход");
+    expect(hero).not.toContain("HeroRadar");
+    expect(existsSync(retiredRadar)).toBe(false);
+    expect(existsSync(retiredRadarStyles)).toBe(false);
+    expect(heroScene).toContain("var(--rr-color-canvas)");
+    expect(heroScene).toContain("var(--rr-color-signal)");
+    expect(heroScene).not.toMatch(/animation\s*:/);
     expect(heroScene).not.toContain("#c8f36a");
     expect(visual).not.toContain("data-hero-instrument");
-    expect(visual).not.toContain("@keyframes signalBreath");
-    expect(heroScene).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(heroRadarStyles).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
   test("sends the landing login CTA directly to the login flow and restores mobile-menu focus synchronously", () => {

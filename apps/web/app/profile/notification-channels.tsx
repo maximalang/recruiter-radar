@@ -118,7 +118,7 @@ function AddVkForm() {
             <input name="token" type="password" autoComplete="off" required />
           </label>
         </div>
-        <p className={styles.hint}>Нужны права на сообщения и управление Callback API. Radar попробует настроить сервер автоматически.</p>
+        <p className={styles.hint}>Нужны права на сообщения и управление Callback API. Радар попробует настроить сервер автоматически.</p>
         <FormSubmitButton idleLabel="Подключить VK" pendingLabel="Настраиваем Callback API..." className={styles.submit} />
       </form>
       <ActionFeedback state={state} />
@@ -225,7 +225,7 @@ export function NotificationChannels({ connections }: { connections: Notificatio
       <div className={styles.intro}>
         <div>
           <span className={styles.eyebrow}>Система уведомлений</span>
-          <h2 id="notification-channels-title">Куда отправлять новые возможности</h2>
+          <h2 id="notification-channels-title">Куда отправлять новые компании</h2>
           <p>Подключите собственные каналы агентства. Токены шифруются, а каждая доставка записывается с защитой от дублей.</p>
         </div>
         <span className={styles.count}>{connections.length} подключено</span>

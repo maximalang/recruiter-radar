@@ -15,7 +15,7 @@ const routes = [
   { path: '/dashboard' },
   { path: '/opportunities', allowNotFound: true, unavailableReason: 'feature-flagged' },
   { path: '/opportunities/radar', allowNotFound: true, unavailableReason: 'feature-flagged' },
-  { path: '/opportunities/sources', allowNotFound: true, unavailableReason: 'feature-flagged' },
+  { path: '/settings/diagnostics/sources', allowNotFound: true, unavailableReason: 'feature-flagged' },
   { path: '/leads' },
   { path: '/review' },
   { path: '/profile' },

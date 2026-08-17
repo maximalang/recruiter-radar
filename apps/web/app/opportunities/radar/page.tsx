@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   description: 'Свежие подтверждённые hiring signals в пространстве свежести и уровня подтверждения.',
 }
 
-const NAVIGATION = buildOpportunityRadarNavigation('radar')
+const NAVIGATION = buildOpportunityRadarNavigation()
 
 export default async function EvidenceRadarPage() {
   const authorization = await getOpportunityAuthorizationContext('opportunities:read')

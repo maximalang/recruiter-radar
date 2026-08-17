@@ -25,7 +25,6 @@ export default function DashboardError({
   return (
     <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
       <ProductWorkspaceHeader
-        eyebrow="Dashboard"
         title="Не удалось открыть командный центр"
         subtitle="Сессия и сохранённые настройки не изменились."
       />

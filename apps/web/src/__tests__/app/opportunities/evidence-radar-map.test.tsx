@@ -76,7 +76,7 @@ describe('EvidenceRadarMap V1-V6 contract', () => {
     ]
 
     const { container } = render(<EvidenceRadarMap leads={[radarLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
-    const card = container.querySelector('[data-evidence-lead-card]')
+    const card = container.querySelector('[data-evidence-lead-detail]')
     expect(card).not.toBeNull()
     const text = card?.textContent ?? ''
 
@@ -144,7 +144,7 @@ describe('EvidenceRadarMap V1-V6 contract', () => {
     expect(alpha).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByRole('status')).toHaveTextContent('Выбрано: Бета, Казань')
     expect(screen.getByRole('heading', { name: 'Бета' })).toBeInTheDocument()
-    expect(container.querySelector('[data-evidence-lead-card]')).not.toBeNull()
+    expect(container.querySelector('[data-evidence-lead-detail]')).not.toBeNull()
   })
 
   it('renders evidence points only for real evidence rows, never from source-count decoration', () => {

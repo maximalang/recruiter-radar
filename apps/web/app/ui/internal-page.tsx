@@ -6,11 +6,7 @@ import { ProductWorkspaceFrame } from "./product-workspace";
 import s from "./internal-page.module.css";
 import { repairPossiblyMojibakeText } from "../../lib/copy/repair";
 import {
-  scorePercent,
   scoreTone as scoreToneFromRaw,
-  scoreLevelLabel,
-  formatScorePoints,
-  scoreBand,
   type ScoreTone as DisplayScoreTone,
 } from "../../lib/scoring/score-display";
 import {
@@ -28,15 +24,6 @@ import {
   WaveIcon,
   XIcon,
   SearchIcon,
-  FlameIcon,
-  TrendIcon,
-  SparkIcon,
-  DropIcon,
-  BriefcaseIcon,
-  FileIcon,
-  LayersIcon,
-  CalendarIcon,
-  GlobeIcon,
   BackIcon,
 } from "./icons";
 
@@ -191,36 +178,6 @@ export function InternalBackLink(props: {
   );
 }
 
-/* ── Metric card ── */
-
-export function MetricCard(props: {
-  label: string;
-  value: ReactNode;
-  tone?: "success" | "info" | "neutral";
-}) {
-  return (
-    <div className={s.metricCard} role="listitem">
-      <div className={s.metricLabel}>{props.label}</div>
-      <div
-        className={s.metricValue}
-        data-tone={props.tone && props.tone !== "neutral" ? props.tone : undefined}
-      >
-        {props.value}
-      </div>
-    </div>
-  );
-}
-
-/* ── Metric grid ── */
-
-export function MetricGrid(props: { children: ReactNode }) {
-  return (
-    <div className={s.metricGrid} role="list">
-      {props.children}
-    </div>
-  );
-}
-
 /* ── Content card ── */
 
 export function ContentCard(props: {
@@ -315,14 +272,6 @@ export const FEEDBACK_LABELS: Record<string, { label: string; icon: (p: SVGProps
   client: { label: "Клиент", icon: HandshakeIcon },
 };
 
-export function GateBadgeInline(props: { gate: string }) {
-  return (
-    <span className={s.gateBadgeInline} data-gate={props.gate} aria-label={`Уровень подтверждения доказательствами: ${props.gate}`}>
-      {repairVisibleNode(GATE_LABELS[props.gate] ?? props.gate)}
-    </span>
-  );
-}
-
 /* ── Feedback badge ── */
 
 const FEEDBACK_SHORT_LABELS: Record<string, string> = Object.fromEntries(
@@ -348,73 +297,6 @@ export function getScoreTone(score: number): ScoreTone {
   return scoreToneFromRaw(score);
 }
 
-/* ── Score gauge (large, for detail page) ── */
-
-export function ConfidenceMeter(props: { score: number }) {
-  const pct = scorePercent(props.score);
-  const tone = scoreToneFromRaw(props.score);
-  const points = formatScorePoints(props.score);
-
-  return (
-    <div className={s.scoreGauge} role="meter" aria-valuenow={Number(points)} aria-valuemin={0} aria-valuemax={100} aria-label={`Сила сигнала: ${points} из 100`}>
-      <div className={s.scoreGaugeCircle} data-tone={tone}>
-        {points}
-      </div>
-      <div className={s.scoreGaugeInfo}>
-        <div className={s.scoreGaugeLabel}>Сила сигнала</div>
-        {/* The level label (Высокий/Средний/Низкий) is visible on desktop but
-            collapses to sr-only on mobile so it doesn't duplicate the band chip
-            (Горячий/Тёплый/Холодный) on a narrow screen. Always announced to AT. */}
-        <div className={`${s.scoreGaugeLevel} ${s.srOnlyMobile}`} data-score-level="true" data-tone={tone}>
-          {scoreLevelLabel(props.score)}
-        </div>
-        <div className={s.scoreGaugeBar}>
-          <div
-            className={s.scoreGaugeBarFill}
-            data-tone={tone}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Score bar (compact, for table rows) ── */
-
-export function ConfidenceTrack(props: { score: number }) {
-  const pct = scorePercent(props.score);
-  const tone = scoreToneFromRaw(props.score);
-  const points = formatScorePoints(props.score);
-
-  return (
-    <div className={s.scoreBar} title={`Сила сигнала: ${points} из 100`}>
-      <div className={s.scoreBarTrack}>
-        <div className={s.scoreBarFill} data-tone={tone} style={{ width: `${pct}%` }} />
-      </div>
-      <span className={s.scoreBarValue}>{points}</span>
-    </div>
-  );
-}
-
-/* ── Score band chip (one-glance temperature: Горячий / Тёплый / Холодный) ── */
-
-/**
- * Compact temperature read for a lead, mirroring the Telegram/email card band.
- * Pairs with ConfidenceTrack (which shows the numeric strength) so the list, detail,
- * and delivery channels all speak the same "горячий/тёплый/холодный" language.
- */
-export function ConfidenceBand(props: { score: number }) {
-  const band = scoreBand(props.score);
-  const Icon = band.tone === 'success' ? FlameIcon : band.tone === 'warning' ? DropIcon : DropIcon;
-  return (
-    <span className={s.scoreBandChip} data-tone={band.tone}>
-      <Icon className={s.chipIcon} aria-hidden="true" />
-      {band.label}
-    </span>
-  );
-}
-
 /* ── Signal freshness ── */
 
 /**
@@ -434,48 +316,6 @@ export function formatSignalFreshness(
   if (days === 0) return { label: "сигнал сегодня", tone };
   if (days === 1) return { label: "сигнал вчера", tone };
   return { label: `сигнал ${days} дн. назад`, tone };
-}
-
-export function SignalFreshnessChip(props: { latestPublishedAt: string | null }) {
-  const fresh = formatSignalFreshness(props.latestPublishedAt);
-  if (!fresh) return null;
-  return (
-    <span className={s.freshnessChip} data-tone={fresh.tone}>
-      <ClockIcon className={s.chipIcon} /> {fresh.label}
-    </span>
-  );
-}
-
-/* ── AI-hint presence chip ── */
-
-/**
- * Compact "this lead carries an AI advisory layer" marker. Presence only — the
- * actual attributed hint renders on the detail page (AiEnrichmentBlock). Lets a
- * recruiter spot which list rows have extra AI context before drilling in.
- */
-export function AiHintChip(props: { present: boolean }) {
-  if (!props.present) return null;
-  return (
-    <span className={s.aiHintChip} title="Для этого лида есть AI-подсказка по найму">
-      <SparkIcon className={s.chipIcon} /> AI
-    </span>
-  );
-}
-
-/* ── Foreign-employer badge ── */
-
-/**
- * «Иностранный работодатель» marker — set when the geo gate flagged the lead as
- * a foreign-ATS employer with no RU footprint. Presence only; the score already
- * reflects the soft foreign penalty. Renders nothing when the lead is domestic.
- */
-export function ForeignEmployerBadge(props: { isForeign: boolean }) {
-  if (!props.isForeign) return null;
-  return (
-    <span className={s.foreignBadge} title="Иностранный работодатель — сигнал только на зарубежном ATS, релевантность для рынка РФ понижена">
-      <GlobeIcon className={s.chipIcon} /> Иностранный работодатель
-    </span>
-  );
 }
 
 /* ── Review-status badge (analyst gate) ── */
@@ -515,95 +355,9 @@ export function ReviewStatusBadge(props: { status: string | null }) {
             : 'Отклонён аналитиком — скрыт из радара'
       }
     >
-      <Icon className={s.chipIcon} /> {entry.label}
+      <Icon className={s.reviewBadgeIcon} /> {entry.label}
     </span>
   );
-}
-
-/* ── Urgency cue chip ── */
-
-/**
- * Concrete urgency cue (burst / active / fresh / stale) for the lead card, so the
- * recruiter reads the hiring tempo without opening the lead. `stale` carries a
- * downgrade tone; everything else is neutral-to-positive.
- */
-export function UrgencyCueChip(props: { level: string; label: string }) {
-  const tone =
-    props.level === 'burst' ? 'success'
-    : props.level === 'active' ? 'info'
-    : props.level === 'fresh' ? 'success'
-    : props.level === 'stale' ? 'danger'
-    : 'neutral';
-  const Icon =
-    props.level === 'burst' ? FlameIcon
-    : props.level === 'active' ? TrendIcon
-    : props.level === 'fresh' ? SparkIcon
-    : props.level === 'stale' ? ClockIcon
-    : null;
-  return (
-    <span className={s.urgencyCueChip} data-tone={tone}>
-      {Icon ? <Icon className={s.chipIcon} /> : null} {props.label}
-    </span>
-  );
-}
-
-/* ── Lead-detail verdict chips (decision / meta grouping) ── */
-
-/**
- * The one-glance verdict chip row for the lead-detail hero. Splits the previous
- * flat chip row into two visual clusters so the verdict reads separate from
- * metadata:
- *
- *   decision — band (temperature) + gate (confidence) + urgency (tempo). The
- *              three signals that answer "is this worth contacting now?"
- *   meta     — foreign-employer marker + analyst-review status + signal
- *              freshness. Contextual metadata, not the verdict.
- *
- * The meta group is rendered only when at least one meta chip would show, so a
- * clean A/B domestic lead doesn't carry an empty wrapper. Reuses the existing
- * chip primitives — the grouping is layout, not new components.
- */
-export function LeadVerdictChips(props: {
-  score: number;
-  confidenceGate: string;
-  isForeignEmployer: boolean;
-  reviewStatus: string | null;
-  urgencyLevel: string;
-  urgencyLabel: string;
-  latestPublishedAt: string | null;
-}) {
-  const showMeta =
-    props.isForeignEmployer ||
-    (props.reviewStatus != null && props.reviewStatus !== 'auto_approved') ||
-    props.latestPublishedAt != null;
-  return (
-    <div className={s.leadVerdictChips}>
-      <span className={s.leadVerdictChipGroup} data-chip-group="decision">
-        <ConfidenceBand score={props.score} />
-        <GateBadgeInline gate={props.confidenceGate} />
-        <UrgencyCueChip level={props.urgencyLevel} label={props.urgencyLabel} />
-      </span>
-      {showMeta ? (
-        <span className={s.leadVerdictChipGroup} data-chip-group="meta">
-          <ForeignEmployerBadge isForeign={props.isForeignEmployer} />
-          <ReviewStatusBadge status={props.reviewStatus} />
-          <SignalFreshnessChip latestPublishedAt={props.latestPublishedAt} />
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-/* ── Evidence tag ── */
-
-export function EvidenceTag(props: { children: ReactNode }) {
-  return <span className={s.evidenceTag}>{props.children}</span>;
-}
-
-/* ── Source chip ── */
-
-export function SourceChip(props: { children: ReactNode }) {
-  return <span className={s.sourceChip}>{props.children}</span>;
 }
 
 /* ── Empty state ── */
@@ -749,9 +503,7 @@ export function ErrorState(props: {
 
 /* ── Table card ── */
 
-export function TableCard(props: { children: ReactNode }) {
-  return <div className={s.tableCard}>{props.children}</div>;
-}
+
 
 /* ── CSS class re-exports for use in sub-components ── */
 
