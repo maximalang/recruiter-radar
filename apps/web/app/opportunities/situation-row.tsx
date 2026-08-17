@@ -23,7 +23,7 @@ const EPISODE_LABELS: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  new: 'Новая', review: 'Нужна проверка', accepted: 'В работе', dismissed: 'Не подходит',
+  new: 'Новая', review: 'На проверке', accepted: 'В работе', dismissed: 'Не подходит',
   snoozed: 'Отложена', contacted: 'Связались', replied: 'Ответили', meeting: 'Встреча',
   proposal: 'Предложение', won: 'Успешно', lost: 'Проиграно', expired: 'Истекла',
 }
