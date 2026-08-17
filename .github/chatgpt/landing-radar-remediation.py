@@ -13,8 +13,8 @@ replacements = [
         '  { name: "hash-evidence-1440x900", hash: "scene-evidence", target: "#scene-evidence" },\n  { name: "hash-radar-1440x900", hash: "scene-radar", target: "#scene-radar" },\n  { name: "hash-delivery-1440x900", hash: "scene-delivery", target: "#scene-delivery" },',
     ),
     (
-        '  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);\n  assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);',
-        '  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);\n  assert.match(await page.locator("#scene-radar").innerText(), /свежесть|подтвержден/i);\n  assert.equal(await page.locator("#scene-radar [data-radar-spatial-model]").getAttribute("data-radar-spatial-model"), "recency-confidence");\n  assert.equal(await page.locator("#scene-radar [data-radar-semantic-list]").count(), 1);\n  assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);',
+        '  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);\n  assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);\n  const pricingText = await page.locator("#pricing").innerText();',
+        '  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);\n  assert.match(await page.locator("#scene-radar").innerText(), /свежесть|подтвержден/i);\n  assert.equal(await page.locator("#scene-radar [data-radar-spatial-model]").getAttribute("data-radar-spatial-model"), "recency-confidence");\n  assert.equal(await page.locator("#scene-radar [data-radar-semantic-list]").count(), 1);\n  assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);\n  const pricingText = await page.locator("#pricing").innerText();',
     ),
     (
         '      "#scene-evidence",\n      "#scene-delivery",',
