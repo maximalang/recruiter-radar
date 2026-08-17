@@ -1,0 +1,123 @@
+name: V1-V6 Final Contract Audit
+
+on:
+  push:
+    branches:
+      - chatgpt/v1-v6-final-audit-f931
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: f93149314fe3d4240a115ee0186b45e79d860dd2
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run V1-V6 semantic contracts
+        run: npm test --workspace @recruiter-radar/web -- --runInBand src/__tests__/app/v1-v6-visual-contract.test.ts src/__tests__/app/site-finish-contract.test.ts src/__tests__/app/landing-final-production-contract.test.ts
+      - name: Audit exact-head legacy regression gates
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('apps/web/app')
+          text_files = [p for p in root.rglob('*') if p.is_file() and p.suffix in {'.ts','.tsx','.js','.jsx','.css','.mjs'}]
+          failures = []
+
+          exact_bans = {
+              'recruiter-radar-v6': 'versioned visual selector',
+              'recruiter-radar-v7': 'versioned visual selector',
+              '#9fca63': 'legacy lime',
+              '#c8f36a': 'legacy lime',
+              '#c9ec8b': 'legacy lime',
+              'translateY(-1px)': 'generic hover lift',
+              'leadDetailContainer': 'dead lead detail compatibility selector',
+              'DashboardAccountOverview': 'retired Today account overview',
+          }
+          for path in text_files:
+              text = path.read_text(encoding='utf-8', errors='ignore')
+              for needle, reason in exact_bans.items():
+                  if needle.lower() in text.lower():
+                      failures.append(f'{reason}: {path} contains {needle}')
+
+          # No temporary chatgpt workflows/scripts may remain in the actual PR tree.
+          for path in Path('.github/workflows').glob('chatgpt-*.yml'):
+              failures.append(f'temporary workflow remains: {path}')
+          if Path('.github/chatgpt').exists():
+              for path in Path('.github/chatgpt').rglob('*'):
+                  if path.is_file():
+                      failures.append(f'temporary helper remains: {path}')
+
+          # Core customer surfaces must not consume retired score/card-era components.
+          core_roots = [
+              Path('apps/web/app/dashboard'),
+              Path('apps/web/app/leads'),
+              Path('apps/web/app/opportunities'),
+              Path('apps/web/app/settings'),
+              Path('apps/web/app/onboarding'),
+          ]
+          retired_core = [
+              'LeadCard', 'OpportunityCard', 'ScoreGauge', 'ScoreBar', 'ScoreBandChip',
+              'SettingsOverview', 'signalLeadCard', 'signalLeadSections', 'signalLeadScoreTrack',
+          ]
+          for core in core_roots:
+              if not core.exists():
+                  continue
+              for path in core.rglob('*'):
+                  if not path.is_file() or path.suffix not in {'.ts','.tsx','.js','.jsx','.css'}:
+                      continue
+                  text = path.read_text(encoding='utf-8', errors='ignore')
+                  for needle in retired_core:
+                      if needle.lower() in text.lower():
+                          failures.append(f'retired core grammar: {path} contains {needle}')
+
+          # Navigation vocabulary is strict; ordinary marketing prose may still use the word “возможность”.
+          nav_files = [
+              Path('apps/web/app/ui/account-navigation.ts'),
+              Path('apps/web/app/ui/product-workspace.tsx'),
+              Path('apps/web/app/ui/mobile-navigation.tsx'),
+          ]
+          nav_bans = ['Возможности', 'Дашборд', 'Командный центр', 'Карта спроса']
+          for path in nav_files:
+              if not path.exists():
+                  continue
+              text = path.read_text(encoding='utf-8', errors='ignore')
+              for needle in nav_bans:
+                  if needle.lower() in text.lower():
+                      failures.append(f'legacy navigation vocabulary: {path} contains {needle}')
+
+          radar = Path('apps/web/app/landing/radar-scene.tsx').read_text(encoding='utf-8')
+          for needle in [
+              'data-radar-spatial-model="recency-confidence"',
+              'data-radar-semantic-list',
+              'DEMO_COMPANY',
+              'DEMO_EVIDENCE_SOURCES',
+          ]:
+              if needle not in radar:
+                  failures.append(f'landing Radar contract missing {needle}')
+
+          # Infinite motion is allowed only for bounded processing/loading primitives explicitly permitted by V6.
+          allowed_infinite = {'rr-motion-icon-progress', 'loadingShimmer'}
+          for path in text_files:
+              text = path.read_text(encoding='utf-8', errors='ignore')
+              for idx, line in enumerate(text.splitlines(), 1):
+                  if re.search(r'animation\s*:[^;\n]*\binfinite\b', line, re.I):
+                      if not any(name in line for name in allowed_infinite):
+                          failures.append(f'unapproved perpetual animation: {path}:{idx}: {line.strip()}')
+
+          if failures:
+              print('\n'.join(failures))
+              raise SystemExit(f'V1-V6 final contract audit failed: {len(failures)} violations')
+          print('V1-V6 final contract audit: CLEAN')
+          PY
