@@ -32,6 +32,12 @@ describe('cross-route interaction hardening', () => {
     expect(interactions).not.toContain('sidebarBrand');
   });
 
+  it('keeps structural loading placeholders static instead of running ambient shimmer', () => {
+    expect(interactions).toContain('[data-skeleton="true"]');
+    expect(interactions).toContain('animation: none !important');
+    expect(interactions).toContain('background-image: none !important');
+  });
+
   it('audits the complete public and product route families', () => {
     for (const route of [
       "'/opportunities'",
