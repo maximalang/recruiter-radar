@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import argon2 from 'argon2'
 import pg from 'pg'
+import { REFRESH_TOKEN_REUSE_GRACE_MS } from '../src/postgres-adapter.js'
 
 const { Pool } = pg
 const ADMIN_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:5432/postgres'
@@ -240,10 +241,11 @@ test('private operator OAuth is resource-bound, persistent and rotation-safe', a
     const afterRestart = await refresh(httpClient, clientId, firstRotated.refresh_token)
     assert.equal(afterRestart.status, 200)
     const secondRotated = await afterRestart.json(); assert.ok(secondRotated.refresh_token)
+    await new Promise((resolve) => setTimeout(resolve, REFRESH_TOKEN_REUSE_GRACE_MS + 100))
     const reuse = await refresh(httpClient, clientId, firstRotated.refresh_token)
     assert.equal(reuse.status, 400)
     const afterReuse = await refresh(httpClient, clientId, secondRotated.refresh_token)
-    assert.equal(afterReuse.status, 400, 'reuse must revoke the refresh-token grant family')
+    assert.equal(afterReuse.status, 400, 'reuse outside bounded grace must revoke the refresh-token grant family')
 
     // Authorization-code replay revokes its grant family. Keep this on a separate
     // grant so it cannot invalidate the refresh-rotation assertions above.
