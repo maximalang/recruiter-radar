@@ -72,9 +72,9 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
             value={source}
             onChange={(e) => setSource(e.target.value)}
             style={{
-              fontSize: "var(--fs-base)",
+              fontSize: "var(--rr-type-body-size)",
               padding: "8px 12px",
-              border: "1px solid var(--c-border, #e2e8f0)",
+              border: "1px solid var(--rr-color-separator)",
               borderRadius: "10px",
             }}
           >
@@ -88,7 +88,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
       </div>
 
       {mode === "single" && sources.find((s) => s.id === source && !s.isPrimary) ? (
-        <p style={{ fontSize: "0.78rem", color: "var(--c-text-muted, #667085)", margin: 0 }}>
+        <p style={{ fontSize: "0.78rem", color: "var(--rr-color-text-tertiary)", margin: 0 }}>
           Не-primary источники обогащают и подтверждают уже собранные лиды — они не
           создают лиды сами и не входят в ежедневный автоинжест.
         </p>
@@ -98,12 +98,12 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
         type="submit"
         disabled={pending}
         style={{
-          background: "var(--c-brand, #1d4ed8)",
+          background: "var(--rr-color-signal)",
           color: "#fff",
           padding: "12px 22px",
           borderRadius: "12px",
           fontWeight: 600,
-          fontSize: "var(--fs-base)",
+          fontSize: "var(--rr-type-body-size)",
           border: "none",
           cursor: pending ? "wait" : "pointer",
           opacity: pending ? 0.7 : 1,
@@ -140,7 +140,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
                 gap: "12px",
                 alignItems: "center",
                 padding: "8px 12px",
-                border: "1px solid var(--c-border, #e2e8f0)",
+                border: "1px solid var(--rr-color-separator)",
                 borderRadius: "10px",
                 fontSize: "0.82rem",
               }}

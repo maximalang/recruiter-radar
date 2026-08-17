@@ -14,12 +14,12 @@ export default function AdminLogoutButton() {
       onClick={() => startTransition(() => logoutOperator())}
       style={{
         background: "transparent",
-        color: "var(--c-text-secondary, #475569)",
+        color: "var(--rr-color-text-secondary)",
         padding: "8px 16px",
         borderRadius: "10px",
         fontWeight: 600,
-        fontSize: "var(--fs-sm)",
-        border: "1px solid var(--c-border, #e2e8f0)",
+        fontSize: "var(--rr-type-metadata-size)",
+        border: "1px solid var(--rr-color-separator)",
         cursor: pending ? "wait" : "pointer",
         opacity: pending ? 0.7 : 1,
         justifySelf: "end",

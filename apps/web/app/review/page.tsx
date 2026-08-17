@@ -12,8 +12,8 @@ import {
   MetricGrid,
   MetricCard,
   GateBadgeInline,
-  ScoreBar,
-  ScoreBandChip,
+  ConfidenceTrack,
+  ConfidenceBand,
   SignalFreshnessChip,
   ForeignEmployerBadge,
   EvidenceTag,
@@ -146,7 +146,7 @@ function ReviewCard({
               <span className={ipStyles.leadCardOrg}>{candidate.orgName}</span>
             </Link>
             <div className={ipStyles.leadCardTags}>
-              <ScoreBandChip score={candidate.score} />
+              <ConfidenceBand score={candidate.score} />
               <GateBadgeInline gate={candidate.confidenceGate} />
               <ForeignEmployerBadge isForeign={candidate.isForeignEmployer ?? false} />
               {reason ? <ReviewReasonChip reason={reason} /> : null}
@@ -154,7 +154,7 @@ function ReviewCard({
           </div>
           <div className={ipStyles.leadCardHeadAside}>
             <div className={ipStyles.leadCardScore}>
-              <ScoreBar score={candidate.score} />
+              <ConfidenceTrack score={candidate.score} />
             </div>
           </div>
         </div>

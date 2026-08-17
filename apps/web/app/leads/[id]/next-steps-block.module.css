@@ -12,7 +12,7 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 .nextStepsLinks {
@@ -29,21 +29,21 @@
   font-size: 0.8rem;
   font-weight: 500;
   border-radius: 8px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-secondary);
+  border: 1px solid var(--rr-color-separator);
+  background-color: var(--rr-color-surface-primary);
+  color: var(--rr-color-text-secondary);
   text-decoration: none;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .nextStepsLink:hover {
-  border-color: var(--c-brand);
-  color: var(--c-brand);
+  border-color: var(--rr-color-signal);
+  color: var(--rr-color-signal);
 }
 
 .nextStepsLink:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
@@ -61,9 +61,9 @@
   font-size: 0.8rem;
   font-weight: 600;
   border-radius: 8px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-secondary);
+  border: 1px solid var(--rr-color-separator);
+  background-color: var(--rr-color-surface-primary);
+  color: var(--rr-color-text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -77,18 +77,18 @@
 }
 
 .nextStepsBtn[data-variant="primary"] {
-  border-color: var(--c-brand);
+  border-color: var(--rr-color-signal);
   background-color: rgba(35, 128, 111, 0.08);
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
 }
 
 .nextStepsBtn:hover {
-  border-color: var(--c-brand);
-  color: var(--c-brand);
+  border-color: var(--rr-color-signal);
+  color: var(--rr-color-signal);
 }
 
 .nextStepsBtn:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
@@ -109,13 +109,13 @@
 
 .nextStepsPreview > summary {
   font-size: 0.72rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   cursor: pointer;
   user-select: none;
 }
 
 .nextStepsPreview > summary:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
@@ -124,9 +124,9 @@
   padding: 10px 12px;
   font-size: 0.72rem;
   line-height: 1.5;
-  color: var(--c-text-secondary);
-  background-color: var(--c-bg-page);
-  border: 1px solid var(--c-border);
+  color: var(--rr-color-text-secondary);
+  background-color: var(--rr-color-canvas);
+  border: 1px solid var(--rr-color-separator);
   border-radius: 8px;
   white-space: pre-wrap;
   word-break: break-word;

@@ -57,12 +57,12 @@ describe("landing final production contract", () => {
     expect(conversion).toContain("data-faq-list");
     expect(visual).toContain(":global([data-conversion-panel])");
     expect(visual).not.toContain("[class*=");
-    expect(visual).toContain(".visualSystem :global(#pricing),");
-    expect(visual).toContain(".visualSystem :global(#faq) {");
-    expect(visual).toContain("max-width: none;");
-    expect(landing).toContain("font-size: clamp(2.35rem, 12vw, 3.25rem);");
+    expect(visual).toMatch(/\.visualSystem\s*:global\(#pricing\),/);
+    expect(visual).toMatch(/\.visualSystem\s*:global\(#faq\)\s*\{/);
+    expect(visual).toMatch(/max-width\s*:\s*none\s*;/);
+    expect(landing).toMatch(/font-size\s*:\s*clamp\(2\.35rem,\s*12vw,\s*3\.25rem\)\s*;/);
     expect(visual).toContain(":global(#faq details)");
-    expect(visual).toContain("background: transparent;");
+    expect(visual).toMatch(/background\s*:\s*transparent\s*;/);
   });
 
   test("keeps FAQ motion restrained and removable", () => {
@@ -70,8 +70,8 @@ describe("landing final production contract", () => {
 
     expect(visual).toContain("@keyframes faqReveal");
     expect(visual).not.toContain("@keyframes signalBreath");
-    expect(visual).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(visual).toMatch(/#faq details\[open\] p[\s\S]*animation: none;/);
+    expect(visual).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)/);
+    expect(visual).toMatch(/#faq details\[open\] p[\s\S]*?animation\s*:\s*none\s*;/);
   });
 
   test("preserves the manual outreach boundary with the signal timeline in composition", () => {

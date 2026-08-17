@@ -81,7 +81,7 @@
 }
 
 .heroMetric strong {
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   font-size: 2rem;
   line-height: 1;
 }
@@ -141,7 +141,7 @@
   padding: 5px 9px;
   border-radius: 999px;
   background: rgba(35, 128, 111, 0.08);
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   font-size: 0.74rem;
   font-weight: 800;
   text-align: center;
@@ -199,8 +199,8 @@
 }
 
 .primaryButton {
-  border: 1px solid var(--action-primary);
-  background: var(--action-primary);
+  border: 1px solid var(--rr-color-signal);
+  background: var(--rr-color-signal);
   color: #fff;
   box-shadow: 0 12px 24px rgba(35, 128, 111, 0.2);
 }
@@ -245,8 +245,8 @@
   width: 40px;
   height: 40px;
   border-radius: 13px;
-  background: linear-gradient(145deg, rgba(35, 128, 111, 0.12), var(--surface-panel));
-  color: var(--action-primary);
+  background: linear-gradient(145deg, rgba(35, 128, 111, 0.12), var(--rr-color-surface-primary));
+  color: var(--rr-color-signal);
   font-weight: 850;
 }
 
@@ -297,7 +297,7 @@
 
 .roleBadge[data-role="owner"] {
   background: rgba(35, 128, 111, 0.08);
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
 }
 
 .roleBadge[data-role="admin"] {

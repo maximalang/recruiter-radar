@@ -12,6 +12,7 @@ const MAX_PERSISTENT_LABELS = 8
 export function EvidenceRadarMap(props: {
   leads: readonly EvidenceRadarLead[]
   boundaries?: readonly EvidenceRadarRegionBoundary[]
+  referenceTimestamp: number
 }) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(
     props.leads[0]?.cardId ?? null,
@@ -50,7 +51,7 @@ export function EvidenceRadarMap(props: {
           </div>
         </header>
 
-        <p className={styles.selectedStatus} role="status" aria-live="polite">
+        <p className={styles.selectedStatus} data-motion-status role="status" aria-live="polite">
           {selected ? `Выбрано: ${selected.organizationName}, ${selected.location.city}` : ''}
         </p>
 
@@ -73,6 +74,7 @@ export function EvidenceRadarMap(props: {
               selected={lead.cardId === selected?.cardId}
               labelled={labelledIds.has(lead.cardId) || lead.cardId === selected?.cardId}
               onSelect={() => setSelectedCardId(lead.cardId)}
+              referenceTimestamp={props.referenceTimestamp}
             />
           ))}
         </div>
@@ -91,7 +93,7 @@ export function EvidenceRadarMap(props: {
                     <span className={styles.semanticRank}>{String(index + 1).padStart(2, '0')}</span>
                     <span className={styles.semanticIdentity}>
                       <strong>{lead.organizationName}</strong>
-                      <small>{lead.location.city} · {freshnessLabel(lead)}</small>
+                      <small>{lead.location.city} · {freshnessLabel(lead, props.referenceTimestamp)}</small>
                     </span>
                     <span className={styles.semanticWhy}>{lead.whyNow}</span>
                     <span className={styles.semanticConfidence} data-level={confidence.level}>
@@ -117,14 +119,15 @@ function RadarOrganization(props: {
   selected: boolean
   labelled: boolean
   onSelect: () => void
+  referenceTimestamp: number
 }) {
-  const point = radarPoint(props.lead)
+  const point = radarPoint(props.lead, props.referenceTimestamp)
   const relevance = clamp01(props.lead.score.opportunityScore / 100)
   const actualEvidence = props.lead.evidence.slice(0, 3)
   const style = {
-    left: `${point.x}%`,
-    top: `${point.y}%`,
-    '--relevance': relevance,
+    left: `${point.x.toFixed(4)}%`,
+    top: `${point.y.toFixed(4)}%`,
+    '--relevance': relevance.toFixed(6),
   } as CSSProperties
 
   return (
@@ -156,6 +159,7 @@ function RadarOrganization(props: {
       <button
         type="button"
         className={styles.organizationMarker}
+        data-motion-interactive
         onClick={props.onSelect}
         aria-pressed={props.selected}
         aria-label={`${props.lead.organizationName}, ${props.lead.location.city}`}
@@ -163,7 +167,7 @@ function RadarOrganization(props: {
         <span className={styles.organizationNode} aria-hidden="true" />
         <span className={styles.markerLabel} data-visible={props.labelled ? 'true' : undefined}>
           <strong>{props.lead.organizationName}</strong>
-          <small>{freshnessLabel(props.lead)} · {radarConfidence(props.lead).label}</small>
+          <small>{freshnessLabel(props.lead, props.referenceTimestamp)} · {radarConfidence(props.lead).label}</small>
         </span>
       </button>
     </div>
@@ -269,7 +273,7 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
       <details className={styles.diagnostics}>
         <summary>Диагностика оценки</summary>
         <div className={styles.diagnosticsBody}>
-          <div className={styles.scoreGrid}>
+          <div className={styles.diagnosticMetrics}>
             <Score label="Коммерческая релевантность" value={lead.score.opportunityScore} />
             <Score label="Подтверждение" value={lead.score.confidenceScore} />
             <Score label="Срочность" value={lead.score.urgencyScore} />
@@ -372,9 +376,9 @@ function rankRadarLeads(leads: readonly EvidenceRadarLead[]): EvidenceRadarLead[
   })
 }
 
-function radarPoint(lead: EvidenceRadarLead) {
+function radarPoint(lead: EvidenceRadarLead, referenceTimestamp: number) {
   const timestamp = latestEvidenceTimestamp(lead)
-  const ageDays = timestamp > 0 ? Math.max(0, (Date.now() - timestamp) / 86_400_000) : RADAR_WINDOW_DAYS
+  const ageDays = timestamp > 0 ? Math.max(0, (referenceTimestamp - timestamp) / 86_400_000) : RADAR_WINDOW_DAYS
   const recency = clamp01(1 - ageDays / RADAR_WINDOW_DAYS)
   const confidence = clamp01(lead.score.confidenceScore / 100)
   return {
@@ -394,10 +398,10 @@ function latestEvidenceTimestamp(lead: EvidenceRadarLead): number {
   return latest
 }
 
-function freshnessLabel(lead: EvidenceRadarLead): string {
+function freshnessLabel(lead: EvidenceRadarLead, referenceTimestamp: number): string {
   const timestamp = latestEvidenceTimestamp(lead)
   if (!timestamp) return 'дата подтверждения не определена'
-  const ageHours = Math.max(0, (Date.now() - timestamp) / 3_600_000)
+  const ageHours = Math.max(0, (referenceTimestamp - timestamp) / 3_600_000)
   if (ageHours < 24) return ageHours < 1 ? 'подтверждено недавно' : `${Math.floor(ageHours)} ч назад`
   const ageDays = Math.floor(ageHours / 24)
   if (ageDays === 1) return 'вчера'

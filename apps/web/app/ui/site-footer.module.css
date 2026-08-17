@@ -1,8 +1,8 @@
 .siteFooter {
   container-type: inline-size;
   margin-top: clamp(16px, 2vw, 24px);
-  border-top: 1px solid var(--c-border, rgba(15, 23, 42, .08));
-  color: var(--c-text-secondary, #475569);
+  border-top: 1px solid var(--rr-color-separator);
+  color: var(--rr-color-text-secondary);
 }
 
 .siteFooter[data-tone="dark"] {
@@ -175,16 +175,16 @@
 .siteFooter[data-tone="light"] .footerLink,
 .siteFooter[data-tone="light"] .footerOperator,
 .siteFooter[data-tone="light"] .footerOperatorEmail {
-  color: var(--c-text-secondary, #475569);
+  color: var(--rr-color-text-secondary);
 }
 
 .siteFooter[data-tone="light"] .footerNav strong,
 .siteFooter[data-tone="light"] .footerOperatorName {
-  color: var(--c-text-primary, #0f172a);
+  color: var(--rr-color-text-primary);
 }
 
 .siteFooter[data-tone="light"] .footerCopy {
-  color: var(--c-text-muted, #667085);
+  color: var(--rr-color-text-tertiary);
 }
 
 .siteFooter[data-tone="light"] .footerMark {

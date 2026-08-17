@@ -102,13 +102,15 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
 
       <select value={currentGate} disabled={isPending}
         onChange={(event) => updateFilter('gate', event.target.value)}
-        className={s.filterSelect} aria-label="Уровень подтверждения">
+        className={s.filterSelect} aria-label="Уровень подтверждения"
+        data-active={currentGate ? 'true' : undefined}>
         {GATE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
 
       <select value={currentFeedback} disabled={isPending}
         onChange={(event) => updateFilter('feedback', event.target.value)}
-        className={s.filterSelect} aria-label="Статус работы">
+        className={s.filterSelect} aria-label="Статус работы"
+        data-active={currentFeedback ? 'true' : undefined}>
         {FEEDBACK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
 

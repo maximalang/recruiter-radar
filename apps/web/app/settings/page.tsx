@@ -13,7 +13,7 @@ import { buildAccountNavigation } from "../ui/account-navigation";
 import { logoutAction } from "../login/actions";
 import { EmptyState, InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
 import ppStyles from "../ui/page-primitives.module.css";
-import SettingsOverview from "./settings-overview";
+import SettingsDocumentSummary from "./settings-overview";
 import styles from "./settings-account.module.css";
 
 export const metadata: Metadata = {
@@ -88,7 +88,7 @@ export default async function SettingsIndexPage() {
         title="Настройки"
         subtitle="Аккаунт, профиль радара и доставка — в одном спокойном контуре конфигурации."
       />
-      <SettingsOverview
+      <SettingsDocumentSummary
         agencyName={profile.agencyName}
         completionPercent={completionPercent}
         deliveryEnabled={preferences?.deliveryEnabled ?? false}

@@ -53,7 +53,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: .45rem .8rem;
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .58rem;
   letter-spacing: .055em;
   text-transform: uppercase;
@@ -67,7 +67,7 @@
   align-items: center;
   gap: .45rem;
   color: rgba(242, 239, 231, .7);
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .56rem;
   text-transform: uppercase;
 }
@@ -114,7 +114,7 @@
 }
 
 .presets::-webkit-scrollbar { display: none; }
-.presets > span { margin-right: .15rem; color: rgba(23,35,45,.52); font-family: var(--mono); font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; }
+.presets > span { margin-right: .15rem; color: rgba(23,35,45,.52); font-family: var(--rr-font-mono); font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; }
 .presets a {
   min-height: 44px;
   padding: .42rem .58rem;
@@ -266,7 +266,7 @@
 
 .confidence {
   color: #315f52;
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .54rem;
   font-weight: 700;
   letter-spacing: .05em;
@@ -306,7 +306,7 @@
 .evidenceBlock > span,
 .factors > span {
   color: rgba(23, 35, 45, .62);
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .58rem;
   letter-spacing: .045em;
   text-transform: uppercase;
@@ -396,7 +396,7 @@
 
 .footerRail small {
   color: rgba(23, 35, 45, .6);
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .56rem;
   text-transform: uppercase;
 }

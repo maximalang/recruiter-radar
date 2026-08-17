@@ -19,7 +19,7 @@ describe("landing visual and login reliability polish", () => {
     expect(conversion).toContain('data-faq-surface="true"');
     expect(visual).toContain(':global(#pricing),');
     expect(visual).toContain(':global(#faq)');
-    expect(visual).toContain('color: var(--ink);');
+    expect(visual).toMatch(/color\s*:\s*var\(--ink\)\s*;/);
     expect(visual).toContain(':global(#pricing [data-pricing-primary])');
     expect(visual).toContain(':global(#pricing [data-pricing-secondary] p)');
     expect(visual).toContain(':global(#faq summary)');
@@ -54,7 +54,7 @@ describe("landing visual and login reliability polish", () => {
     expect(header).toContain('const LOGIN_HREF = "/login?returnTo=%2Fdashboard";');
     expect(header).toContain("href={LOGIN_HREF}");
     expect(header).not.toContain('<Link href="/dashboard" className={headerStyles.login}>');
-    expect(header).toContain('data-brand-header="recruiter-radar-v3"');
+    expect(header).toContain('data-brand-header="recruiter-radar"');
     expect(header).toMatch(/if \(restoreFocus\) menuButtonRef\.current\?\.focus\(\{ preventScroll: true \}\);\s+setMenuOpen\(false\);/);
     expect(header).not.toContain("if (restoreFocus) window.requestAnimationFrame");
   });
@@ -76,23 +76,25 @@ describe("landing visual and login reliability polish", () => {
 
     expect(authShell).toContain('data-auth-compass="true"');
     expect(authShell).toContain('data-signal-cluster="primary"');
-    expect(authShell).toContain("Рабочее пространство Recruiter Radar");
-    expect(authShell).toContain("Сигналы, доказательства и история работы агентства в одном месте.");
+    expect(authShell).toContain("Сигнал → доказательство → действие");
+    expect(authShell).toContain("Рабочий контекст агентства остаётся рядом с подтверждённым следующим ходом.");
+    expect(authShell).not.toContain("<ul");
     expect(authShell).not.toContain("radarCore");
     expect(authShell).not.toContain("radarSweep");
     expect(authStyles).not.toContain(".radarCore");
     expect(authStyles).not.toContain(".radarSweep");
     expect(authStyles).not.toContain("@keyframes");
-    expect(authStyles).toMatch(/@media \(max-width: 820px\)[\s\S]*?\.compass\s*\{[\s\S]*?display:\s*block;/);
+    expect(authStyles).toMatch(/@media\s*\(max-width:\s*820px\)[\s\S]*?\.story\s*\{[\s\S]*?min-height:\s*168px;[\s\S]*?max-height:\s*180px;/);
+    expect(authStyles).toMatch(/@media\s*\(max-width:\s*820px\)[\s\S]*?\.compass\s*\{/);
   });
 
   test("keeps onboarding in the current product system without serif or copper branding", () => {
     const onboarding = source("app/onboarding/onboarding-page-content.tsx");
     const onboardingStyles = source("app/onboarding/onboarding.module.css");
 
-    expect(onboarding).toContain('data-ui-system="recruiter-radar-v7"');
-    expect(onboardingStyles).toContain("var(--surface-app)");
-    expect(onboardingStyles).toContain("var(--action-primary)");
+    expect(onboarding).toContain('data-ui-system="recruiter-radar"');
+    expect(onboardingStyles).toContain("var(--rr-color-canvas)");
+    expect(onboardingStyles).toContain("var(--rr-color-signal)");
     expect(onboardingStyles).not.toMatch(/Georgia|Times New Roman|serif/);
     expect(onboardingStyles).not.toMatch(/#(?:a85924|b8662e|ca7c38|bd7138)/i);
   });

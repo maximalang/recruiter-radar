@@ -1,5 +1,5 @@
 /* Review actions — approve / reject inline on a review card.
-   Uses the shared --c-* tokens; tone is encoded via data-tone so the active
+   Uses the shared semantic tokens; tone is encoded via data-tone so the active
    state reads as a decision (green approve, red reject) without emoji. */
 
 .row {
@@ -13,9 +13,9 @@
   gap: 6px;
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-secondary);
+  border: 1px solid var(--rr-color-separator);
+  background-color: var(--rr-color-surface-primary);
+  color: var(--rr-color-text-secondary);
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
@@ -23,7 +23,7 @@
 }
 
 .btn:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 

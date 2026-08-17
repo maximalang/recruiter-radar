@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 };
 
 const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Дашборд" },
+  { href: "/dashboard", label: "Обзор" },
   { href: "/admin", label: "Оператор", active: true },
 ];
 

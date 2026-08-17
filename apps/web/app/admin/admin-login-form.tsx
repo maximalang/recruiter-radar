@@ -15,7 +15,7 @@ export default function AdminLoginForm() {
   return (
     <form action={formAction} style={{ display: "grid", gap: "12px", maxWidth: "380px" }}>
       <label style={{ display: "grid", gap: "6px" }}>
-        <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--c-text-secondary, #475569)" }}>
+        <span style={{ fontSize: "var(--rr-type-metadata-size)", fontWeight: 600, color: "var(--rr-color-text-secondary)" }}>
           Пароль оператора
         </span>
         <input
@@ -26,9 +26,9 @@ export default function AdminLoginForm() {
           autoComplete="current-password"
           placeholder="••••••••"
           style={{
-            fontSize: "var(--fs-base)",
+            fontSize: "var(--rr-type-body-size)",
             padding: "12px 16px",
-            border: "1px solid var(--c-border, #e2e8f0)",
+            border: "1px solid var(--rr-color-separator)",
             borderRadius: "12px",
             width: "100%",
           }}
@@ -45,12 +45,12 @@ export default function AdminLoginForm() {
         type="submit"
         disabled={pending}
         style={{
-          background: "var(--c-brand, #1d4ed8)",
+          background: "var(--rr-color-signal)",
           color: "#fff",
           padding: "12px 22px",
           borderRadius: "12px",
           fontWeight: 600,
-          fontSize: "var(--fs-base)",
+          fontSize: "var(--rr-type-body-size)",
           border: "none",
           cursor: pending ? "wait" : "pointer",
           opacity: pending ? 0.7 : 1,

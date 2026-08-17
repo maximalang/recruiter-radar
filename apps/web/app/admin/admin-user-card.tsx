@@ -46,7 +46,7 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
         gap: "12px",
         alignItems: "start",
         padding: "12px 14px",
-        border: "1px solid var(--c-border, #e2e8f0)",
+        border: "1px solid var(--rr-color-separator)",
         borderRadius: "12px",
       }}
     >
@@ -54,10 +54,10 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
         <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>
           {user.fullName ?? user.email}
           {user.fullName ? (
-            <span style={{ fontWeight: 400, color: "var(--c-text-muted, #667085)" }}> · {user.email}</span>
+            <span style={{ fontWeight: 400, color: "var(--rr-color-text-tertiary)" }}> · {user.email}</span>
           ) : null}
         </div>
-        <div style={{ fontSize: "0.76rem", color: "var(--c-text-muted, #667085)", display: "grid", gap: "2px", marginTop: "4px" }}>
+        <div style={{ fontSize: "0.76rem", color: "var(--rr-color-text-tertiary)", display: "grid", gap: "2px", marginTop: "4px" }}>
           <span>
             Workspace: {user.workspace ? `${user.workspace.name} В· ${user.workspace.role}` : "РЅРµС‚"}
           </span>
@@ -112,7 +112,7 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
         {profileActive && hasTelegram ? (
           <span style={tagStyle("#7c3aed", "#ede9fe")}>доставка</span>
         ) : null}
-        <span style={{ fontSize: "0.72rem", color: "var(--c-text-muted, #667085)", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "0.72rem", color: "var(--rr-color-text-tertiary)", whiteSpace: "nowrap" }}>
           {new Date(user.createdAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" })}
         </span>
       </div>

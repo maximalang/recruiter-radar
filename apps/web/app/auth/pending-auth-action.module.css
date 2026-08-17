@@ -6,7 +6,7 @@
   box-sizing: border-box;
   background:
     radial-gradient(circle at 50% 0%, rgba(35, 128, 111, 0.17), transparent 38%),
-    var(--surface-app);
+    var(--rr-color-canvas);
 }
 
 .shell {
@@ -17,7 +17,7 @@
 
 .brand {
   justify-self: center;
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   font-size: 0.82rem;
   font-weight: 850;
   letter-spacing: 0.08em;
@@ -43,7 +43,7 @@
   margin-bottom: 20px;
   place-items: center;
   border-radius: 19px;
-  background: linear-gradient(145deg, rgba(35, 128, 111, 0.12), var(--surface-panel));
+  background: linear-gradient(145deg, rgba(35, 128, 111, 0.12), var(--rr-color-surface-primary));
   box-shadow: inset 0 0 0 1px rgba(35, 128, 111, 0.1);
 }
 
@@ -51,7 +51,7 @@
   position: relative;
   width: 22px;
   height: 17px;
-  border: 2px solid var(--action-primary);
+  border: 2px solid var(--rr-color-signal);
   border-radius: 5px;
 }
 
@@ -62,13 +62,13 @@
   top: -10px;
   width: 8px;
   height: 9px;
-  border: 2px solid var(--action-primary);
+  border: 2px solid var(--rr-color-signal);
   border-bottom: 0;
   border-radius: 8px 8px 0 0;
 }
 
 .eyebrow {
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   font-size: 0.72rem;
   font-weight: 850;
   letter-spacing: 0.09em;
@@ -105,8 +105,8 @@
 }
 
 .primary {
-  border: 1px solid var(--action-primary);
-  background: var(--action-primary);
+  border: 1px solid var(--rr-color-signal);
+  background: var(--rr-color-signal);
   color: #fff;
   box-shadow: 0 14px 28px rgba(35, 128, 111, 0.22);
 }

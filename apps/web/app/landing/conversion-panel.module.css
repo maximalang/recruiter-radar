@@ -108,7 +108,7 @@
 
 .offerTopline > span {
   color: var(--copper);
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .55rem;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -118,7 +118,7 @@
   padding: .26rem .4rem;
   border: 1px solid rgba(141, 217, 193, .25);
   color: #b5ead8;
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .5rem;
   font-weight: 650;
   letter-spacing: .055em;
@@ -128,7 +128,7 @@
 .planEquivalent {
   margin-top: -.35rem;
   color: rgba(242, 239, 231, .52);
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .52rem;
 }
 
@@ -137,7 +137,7 @@
   flex-wrap: wrap;
   gap: .35rem .65rem;
   color: rgba(242, 239, 231, .55);
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .51rem;
   text-transform: uppercase;
 }
@@ -275,7 +275,7 @@
   align-items: center;
   gap: .45rem;
   color: rgba(242, 239, 231, .68);
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .56rem;
   letter-spacing: .015em;
 }

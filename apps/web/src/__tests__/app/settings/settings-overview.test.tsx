@@ -2,12 +2,12 @@
 
 import { render, screen } from "@testing-library/react";
 
-import SettingsOverview from "@/app/settings/settings-overview";
+import SettingsDocumentSummary from "@/app/settings/settings-overview";
 
-describe("SettingsOverview", () => {
+describe("SettingsDocumentSummary", () => {
   it("summarizes profile and delivery readiness without duplicating forms", () => {
     render(
-      <SettingsOverview
+      <SettingsDocumentSummary
         agencyName="Команда"
         completionPercent={86}
         deliveryEnabled
@@ -19,22 +19,20 @@ describe("SettingsOverview", () => {
       />,
     );
 
-    expect(screen.getAllByText("86% готово")).toHaveLength(2);
+    expect(screen.getByText("86%")).toBeInTheDocument();
     expect(screen.getByText("Каждый день, 09:00")).toBeInTheDocument();
-    expect(screen.getByText("Telegram не подключён")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Изменить профиль/ })).toHaveAttribute("href", "/settings/radar#agency");
-    expect(screen.getByRole("link", { name: /Настроить каналы/ })).toHaveAttribute("href", "/settings/delivery");
-    expect(screen.getByRole("link", { name: /^Доступ и оплата/ })).toHaveAttribute("href", "/settings/access");
-    expect(screen.queryByRole("link", { name: /^Аккаунт$/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /^Аккаунт и безопасность/ })).toHaveAttribute("href", "/settings/security");
-    expect(screen.getByRole("link", { name: /^Команда/ })).toHaveAttribute(
-      "href",
-      "/settings/team",
-    );
+    expect(screen.getByRole("heading", { name: "Доставка настроена" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Изменить профиль/ })).toHaveAttribute("href", "/settings/radar");
+    expect(screen.getByRole("link", { name: /Настроить доставку/ })).toHaveAttribute("href", "/settings/delivery");
+    expect(screen.getByRole("navigation", { name: "Разделы настроек" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /^Доступ и оплата/ }).some((link) => link.getAttribute("href") === "/settings/access")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /^Команда/ }).some((link) => link.getAttribute("href") === "/settings/team")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /^Безопасность/ }).some((link) => link.getAttribute("href") === "/settings/security")).toBe(true);
   });
+
   it("does not claim delivery is ready when no channel is connected", () => {
     render(
-      <SettingsOverview
+      <SettingsDocumentSummary
         agencyName="Команда"
         completionPercent={50}
         deliveryEnabled
@@ -46,8 +44,10 @@ describe("SettingsOverview", () => {
       />,
     );
 
-    expect(screen.getByText("Доставка ожидает канал")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /^Аккаунт и безопасность/ })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Нужен канал доставки" })).toBeInTheDocument();
+    expect(screen.getByText("Подключите хотя бы один канал и задайте расписание получения радара.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Команда/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Безопасность/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Доступ и оплата/ })).toBeNull();
   });
 });

@@ -48,7 +48,7 @@
 }
 
 .todayLane[data-active="true"] {
-  border-color: var(--action-primary);
+  border-color: var(--rr-color-signal);
   background: rgba(35, 128, 111, 0.08);
 }
 
@@ -135,8 +135,8 @@
 }
 
 .researchActions button {
-  border-color: var(--action-primary);
-  background: var(--action-primary);
+  border-color: var(--rr-color-signal);
+  background: var(--rr-color-signal);
   color: #fff;
 }
 
@@ -147,7 +147,7 @@
   padding: 0 14px;
   border: 1px solid rgba(35, 128, 111, 0.2);
   border-radius: 11px;
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   font-size: 0.82rem;
   font-weight: 720;
   text-decoration: none;
@@ -174,9 +174,9 @@
 }
 
 .filterLink[data-active="true"] {
-  border-color: var(--action-primary);
+  border-color: var(--rr-color-signal);
   background: #eaf2ff;
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
 }
 
 .cardList {
@@ -210,7 +210,7 @@
 
 .eyebrow {
   margin-bottom: 7px;
-  color: var(--signal-support);
+  color: var(--rr-color-signal);
   font-size: 0.68rem;
   font-weight: 780;
   letter-spacing: 0.08em;
@@ -377,7 +377,7 @@
 }
 
 .conclusionBasis a {
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   font-size: inherit;
   text-underline-offset: 3px;
 }
@@ -609,7 +609,7 @@
   margin-top: 4px;
   border: 2px solid rgba(35, 128, 111, 0.24);
   border-radius: 50%;
-  background: var(--signal-support);
+  background: var(--rr-color-signal);
 }
 
 .timelineItem > div {
@@ -745,7 +745,7 @@
   min-height: 44px;
   align-items: center;
   width: fit-content;
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   cursor: pointer;
   font-size: 0.76rem;
   font-weight: 720;
@@ -838,7 +838,7 @@
 }
 
 .outcomeToggle > span:last-child {
-  color: var(--signal-support);
+  color: var(--rr-color-signal);
   font-size: 0.74rem;
   font-weight: 720;
 }
@@ -954,7 +954,7 @@
 }
 
 .funnelHeading span {
-  color: var(--signal-support);
+  color: var(--rr-color-signal);
   font-size: 0.66rem;
   font-weight: 760;
   letter-spacing: 0.08em;
@@ -1056,8 +1056,8 @@
 }
 
 .actionButton[data-tone="primary"] {
-  border-color: var(--action-primary);
-  background: var(--action-primary);
+  border-color: var(--rr-color-signal);
+  background: var(--rr-color-signal);
   color: #fff;
 }
 

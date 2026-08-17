@@ -60,6 +60,8 @@ function evidence(id: string, occurredAt: string) {
   }
 }
 
+const REFERENCE_TIMESTAMP = Date.parse('2026-08-17T10:00:00.000Z')
+
 describe('EvidenceRadarMap V1-V6 contract', () => {
   it('presents selected company in Why Now → Evidence → Action order', () => {
     const radarLead = lead('77', 'Альфа', 'Москва')
@@ -73,7 +75,7 @@ describe('EvidenceRadarMap V1-V6 contract', () => {
       },
     ]
 
-    const { container } = render(<EvidenceRadarMap leads={[radarLead]} />)
+    const { container } = render(<EvidenceRadarMap leads={[radarLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
     const card = container.querySelector('[data-evidence-lead-card]')
     expect(card).not.toBeNull()
     const text = card?.textContent ?? ''
@@ -108,7 +110,7 @@ describe('EvidenceRadarMap V1-V6 contract', () => {
     const betaLead = lead('78', 'Бета', 'Казань')
     betaLead.evidence = [evidence('beta-evidence', '2026-08-10T00:00:00.000Z')]
 
-    const { container } = render(<EvidenceRadarMap leads={[alphaLead, betaLead]} />)
+    const { container } = render(<EvidenceRadarMap leads={[alphaLead, betaLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
 
     expect(screen.getByText('Свежесть × уровень подтверждения')).toBeInTheDocument()
     expect(screen.getByText('по горизонтали — свежесть')).toBeInTheDocument()
@@ -122,6 +124,7 @@ describe('EvidenceRadarMap V1-V6 contract', () => {
   it('keeps 44px semantic markers and updates live detail without losing focus', () => {
     const { container } = render(
       <EvidenceRadarMap
+        referenceTimestamp={REFERENCE_TIMESTAMP}
         leads={[
           lead('77', 'Альфа', 'Москва'),
           lead('78', 'Бета', 'Казань'),
@@ -152,7 +155,7 @@ describe('EvidenceRadarMap V1-V6 contract', () => {
       evidence('evidence-2', '2026-08-14T00:00:00.000Z'),
     ]
 
-    const { container } = render(<EvidenceRadarMap leads={[radarLead]} />)
+    const { container } = render(<EvidenceRadarMap leads={[radarLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
     expect(container.querySelectorAll('[data-evidence-source]')).toHaveLength(2)
   })
 })

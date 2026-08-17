@@ -15,7 +15,7 @@
   top: 0;
   z-index: 100;
   padding: 8px 16px;
-  background-color: var(--c-brand);
+  background-color: var(--rr-color-signal);
   color: #ffffff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -32,8 +32,8 @@
 
 /* ── Top navigation bar ── */
 .topNav {
-  background-color: var(--c-bg-card);
-  border-bottom: 1px solid var(--c-border);
+  background-color: var(--rr-color-surface-primary);
+  border-bottom: 1px solid var(--rr-color-separator);
   padding: 0 16px;
 }
 
@@ -49,7 +49,7 @@
 .topNavBrand {
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -58,16 +58,16 @@
 }
 
 .topNavBrand:hover {
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
 }
 
 .topNavBrand:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
 .topNavBrandAccent {
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
 }
 
 .topNavLinks {
@@ -79,24 +79,24 @@
   padding: 6px 12px;
   font-size: 0.82rem;
   font-weight: 500;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   text-decoration: none;
   border-radius: 6px;
   transition: background-color 0.15s, color 0.15s;
 }
 
 .topNavLink:hover {
-  background-color: var(--c-bg-page);
-  color: var(--c-text-primary);
+  background-color: var(--rr-color-canvas);
+  color: var(--rr-color-text-primary);
 }
 
 .topNavLink:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
 .topNavLink[data-active="true"] {
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
   background-color: rgba(35, 128, 111, 0.06);
   font-weight: 600;
 }
@@ -133,8 +133,8 @@
 /* ── Page frame ── */
 .internalPageFrame {
   min-height: 100vh;
-  background-color: var(--c-bg-page);
-  color: var(--c-text-primary);
+  background-color: var(--rr-color-canvas);
+  color: var(--rr-color-text-primary);
 }
 
 .internalPageFrameInner {
@@ -196,7 +196,7 @@
 .internalPageBackLink {
   min-height: 44px;
   font-size: 0.875rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -210,30 +210,30 @@
 }
 
 .internalPageBackLink:hover {
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
 }
 
 .internalPageBackLink:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
 .navLink {
   font-size: 0.875rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   text-decoration: none;
   padding: 6px 12px;
   border-radius: 6px;
-  border: 1px solid var(--c-border);
+  border: 1px solid var(--rr-color-separator);
 }
 
 .navLink:hover {
-  color: var(--c-brand);
-  border-color: var(--c-brand);
+  color: var(--rr-color-signal);
+  border-color: var(--rr-color-signal);
 }
 
 .navLink:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
@@ -246,16 +246,16 @@
 }
 
 .metricCard {
-  background-color: var(--surface-panel);
+  background-color: var(--rr-color-surface-primary);
   border-radius: 10px;
   padding: 13px 14px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--rr-color-separator);
 }
 
 .metricLabel {
   font-size: 0.7rem;
   line-height: 1.3;
-  color: var(--ink-muted);
+  color: var(--rr-color-text-tertiary);
   font-weight: 600;
 }
 
@@ -263,24 +263,24 @@
   font-size: 1.35rem;
   line-height: 1.1;
   font-weight: 720;
-  color: var(--ink-primary);
+  color: var(--rr-color-text-primary);
   margin-top: 5px;
 }
 
 .metricValue[data-tone="success"] {
-  color: var(--status-success);
+  color: var(--rr-color-positive);
 }
 
 .metricValue[data-tone="info"] {
-  color: var(--signal-primary);
+  color: var(--rr-color-signal);
 }
 
 /* ── Content card (detail sections, sidebar blocks) ── */
 .contentCard {
-  background-color: var(--surface-panel);
+  background-color: var(--rr-color-surface-primary);
   border-radius: 10px;
   padding: 18px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--rr-color-separator);
 }
 
 .contentCard[data-tone="danger"] {
@@ -292,12 +292,12 @@
    evidence/action cards without shouting. */
 .contentCard[data-variant="hero"] {
   border-color: rgba(35, 128, 111, 0.24);
-  border-left: 3px solid var(--signal-primary);
+  border-left: 3px solid var(--rr-color-signal);
   background-color: rgba(35, 128, 111, 0.035);
 }
 
 .contentCard[data-variant="hero"] .contentCardTitle {
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
 }
 
 /* Muted: advisory blocks (AI hint) recede — they inform but never drive the
@@ -305,7 +305,7 @@
 .contentCard[data-variant="muted"] {
   background-color: transparent;
   border-style: dashed;
-  border-color: var(--c-border);
+  border-color: var(--rr-color-separator);
 }
 
 .contentCardTitle {
@@ -356,7 +356,7 @@
 }
 
 .dataTableHead {
-  border-bottom: 2px solid var(--c-border);
+  border-bottom: 2px solid var(--rr-color-separator);
 }
 
 .dataTableTh {
@@ -364,7 +364,7 @@
   text-align: left;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -379,7 +379,7 @@
 }
 
 .dataTableTr {
-  border-bottom: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--rr-color-separator);
 }
 
 /* ── Score gauge ── */
@@ -398,8 +398,8 @@
   justify-content: center;
   font-size: 1.5rem;
   font-weight: 700;
-  border: 4px solid var(--c-border);
-  color: var(--c-text-primary);
+  border: 4px solid var(--rr-color-separator);
+  color: var(--rr-color-text-primary);
 }
 
 .scoreGaugeCircle[data-tone="success"] {
@@ -425,7 +425,7 @@
 
 .scoreGaugeLabel {
   font-size: 0.75rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   font-weight: 500;
 }
 
@@ -450,7 +450,7 @@
   width: 120px;
   height: 4px;
   border-radius: 2px;
-  background-color: var(--c-border);
+  background-color: var(--rr-color-separator);
   overflow: hidden;
 }
 
@@ -479,7 +479,7 @@
   gap: 8px;
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px solid var(--c-border);
+  border-top: 1px solid var(--rr-color-separator);
 }
 
 /* ── Score bar (compact, for table rows) ── */
@@ -493,7 +493,7 @@
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background-color: var(--c-border);
+  background-color: var(--rr-color-separator);
   overflow: hidden;
 }
 
@@ -518,7 +518,7 @@
 .scoreBarValue {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
   min-width: 2ch;
 }
 
@@ -528,7 +528,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
@@ -556,7 +556,7 @@
 
 .scoreBandChip[data-tone="danger"] {
   background-color: rgba(35, 128, 111, 0.08);
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   border: 1px solid rgba(35, 128, 111, 0.24);
 }
 
@@ -575,7 +575,7 @@
 }
 
 .freshnessChip[data-tone="recent"] {
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 .freshnessChip[data-tone="stale"] {
@@ -588,11 +588,11 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.72rem;
   font-weight: 600;
-  background-color: var(--gate-b-bg);
-  color: var(--gate-b-color);
+  background-color: transparent;
+  color: var(--rr-color-confidence-high);
   border: 1px solid rgba(35, 128, 111, 0.2);
   white-space: nowrap;
 }
@@ -603,7 +603,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.72rem;
   font-weight: 600;
   background-color: #fef2f2;
@@ -620,7 +620,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
@@ -629,7 +629,7 @@
 
 .reviewBadge[data-tone="info"] {
   background-color: rgba(35, 128, 111, 0.1);
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   border-color: rgba(35, 128, 111, 0.3);
 }
 
@@ -651,7 +651,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
@@ -666,7 +666,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
@@ -683,7 +683,7 @@
 
 .urgencyCueChip[data-tone="info"] {
   background-color: rgba(35, 128, 111, 0.08);
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   border: 1px solid rgba(35, 128, 111, 0.24);
 }
 
@@ -694,45 +694,45 @@
 }
 
 .urgencyCueChip[data-tone="neutral"] {
-  background-color: var(--c-surface-muted, #f3f4f6);
-  color: var(--c-text-muted);
-  border: 1px solid var(--c-border, #e5e7eb);
+  background-color: var(--rr-color-surface-secondary);
+  color: var(--rr-color-text-tertiary);
+  border: 1px solid var(--rr-color-separator);
 }
 
 /* ── Gate badge (inline, for leads pages) ── */
 .gateBadgeInline {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .gateBadgeInline[data-gate="A"] {
-  background: var(--gate-a-bg, #d1fae5);
-  color: var(--gate-a-color, #065f46);
+  background: transparent;
+  color: var(--rr-color-confidence-high);
 }
 
 .gateBadgeInline[data-gate="B"] {
-  background: var(--gate-b-bg, rgba(35, 128, 111, 0.12));
-  color: var(--gate-b-color, var(--action-primary));
+  background: transparent;
+  color: var(--rr-color-confidence-high);
 }
 
 .gateBadgeInline[data-gate="C"] {
-  background: var(--gate-c-bg, #fef3c7);
-  color: var(--gate-c-color, #92400e);
+  background: transparent;
+  color: var(--rr-color-confidence-medium);
 }
 
 .gateBadgeInline[data-gate="D"] {
-  background: var(--gate-d-bg, #f3f4f6);
-  color: var(--gate-d-color, #4b5563);
+  background: transparent;
+  color: var(--rr-color-confidence-low);
 }
 
 /* ── Feedback badge ── */
 .feedbackBadge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.75rem;
   font-weight: 500;
   background-color: #f0fdf4;
@@ -746,7 +746,7 @@
   border-radius: 6px;
   font-size: 0.8rem;
   background-color: rgba(35, 128, 111, 0.06);
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   border: 1px solid rgba(35, 128, 111, 0.24);
   display: inline-block;
 }
@@ -757,7 +757,7 @@
   border-radius: 4px;
   font-size: 0.75rem;
   background-color: #f3f4f6;
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
   display: inline-block;
 }
 
@@ -768,11 +768,11 @@
 }
 
 .leadLink:hover {
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
 }
 
 .leadLink:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -780,18 +780,18 @@
 .leadOrgName {
   font-weight: 600;
   font-size: 0.9rem;
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
 }
 
 .leadLocation {
   font-size: 0.75rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   margin-top: 2px;
 }
 
 .leadMeta {
   font-size: 0.8rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 .leadDate {
@@ -803,7 +803,7 @@
 .filterActive {
   margin-left: 8px;
   font-size: 0.75rem;
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
 }
 
 /* ── Reason / signal list ── */
@@ -816,7 +816,7 @@
 .reasonItem {
   padding: 8px 0;
   font-size: 0.9rem;
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
 }
 
 .reasonItem + .reasonItem {
@@ -836,7 +836,7 @@
 /* ── Gate description ── */
 .gateDescription {
   font-size: 0.75rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   margin-top: 8px;
   line-height: 1.4;
 }
@@ -844,14 +844,14 @@
 /* ── Sidebar section ── */
 .sidebarLabel {
   font-size: 0.75rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   font-weight: 500;
   margin-bottom: 8px;
 }
 
 .sidebarValue {
   font-size: 0.9rem;
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
   margin-bottom: 12px;
 }
 
@@ -869,7 +869,7 @@
 
 .sidebarLink {
   font-size: 0.85rem;
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
   text-decoration: none;
   display: block;
   margin-bottom: 4px;
@@ -880,7 +880,7 @@
 }
 
 .sidebarLink:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
@@ -903,7 +903,7 @@
   display: flex;
   gap: 16px;
   font-size: 0.8rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 /* ── Empty / not-found states ── */
@@ -917,7 +917,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--ink-secondary);
+  color: var(--rr-color-text-secondary);
 }
 
 .emptyStateIcon {
@@ -926,7 +926,7 @@
   display: flex;
   justify-content: center;
   margin-bottom: 12px;
-  color: var(--signal-primary);
+  color: var(--rr-color-signal);
 }
 
 .emptyStateIcon svg {
@@ -935,7 +935,7 @@
 }
 
 .emptyStateTitle {
-  color: var(--ink-primary);
+  color: var(--rr-color-text-primary);
   font-size: 1.02rem;
   font-weight: 720;
   margin-bottom: 7px;
@@ -957,7 +957,7 @@
   margin-top: 16px;
   padding: 9px 18px;
   border-radius: 10px;
-  background-color: var(--action-primary);
+  background-color: var(--rr-color-signal);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -976,15 +976,15 @@
 .errorState {
   text-align: center;
   padding: 40px 24px;
-  color: var(--c-text-muted);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-card-sm);
-  background-color: var(--c-bg-card);
+  color: var(--rr-color-text-tertiary);
+  border: 1px solid var(--rr-color-separator);
+  border-radius: var(--rr-radius-control);
+  background-color: var(--rr-color-surface-primary);
 }
 
 .errorStateTitle {
   font-weight: 500;
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
   margin-bottom: 6px;
 }
 
@@ -998,7 +998,7 @@
   margin-top: 16px;
   padding: 9px 18px;
   border-radius: 10px;
-  background-color: var(--action-primary);
+  background-color: var(--rr-color-signal);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -1015,7 +1015,7 @@
 
 .emptyStateAction:focus-visible,
 .errorStateAction:focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--rr-color-focus);
   outline-offset: 2px;
 }
 
@@ -1024,19 +1024,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--c-bg-page);
+  background-color: var(--rr-color-canvas);
 }
 
 .notFoundContent {
   text-align: center;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 /* ── Loading state ── */
 .loadingState {
   padding: 32px;
   text-align: center;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 /* Skeleton loading — an aria-busy block with placeholder bars so a Suspense
@@ -1052,7 +1052,7 @@
 .loadingSkeletonLine {
   height: 14px;
   border-radius: 7px;
-  background-color: var(--c-border);
+  background-color: var(--rr-color-separator);
   opacity: 0.55;
   /* Shimmer — subtle horizontal sweep. Pinned to the line, not the whole block,
      so it reads as content shaping, not a busy spinner. */
@@ -1096,9 +1096,9 @@
 
 /* ── Table card container ── */
 .tableCard {
-  background-color: var(--c-bg-card);
-  border-radius: var(--radius-card-sm);
-  border: 1px solid var(--c-border);
+  background-color: var(--rr-color-surface-primary);
+  border-radius: var(--rr-radius-control);
+  border: 1px solid var(--rr-color-separator);
   overflow: hidden;
 }
 
@@ -1116,8 +1116,8 @@
 .signalCardList {
   gap: 0;
   padding: 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--rr-color-separator);
+  border-bottom: 1px solid var(--rr-color-separator);
   background: transparent;
 }
 
@@ -1125,8 +1125,8 @@
   display: flex;
   align-items: stretch;
   gap: 0;
-  border-bottom: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
+  border-bottom: 1px solid var(--rr-color-separator);
+  background-color: var(--rr-color-surface-primary);
   transition: background-color 0.15s ease;
 }
 
@@ -1135,7 +1135,7 @@
 }
 
 .leadCard:hover {
-  background-color: var(--c-bg-page);
+  background-color: var(--rr-color-canvas);
 }
 
 .signalLeadCardLink {
@@ -1144,7 +1144,7 @@
   gap: 6px;
   min-height: 44px;
   padding: 6px 10px;
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
   font-size: 0.82rem;
   font-weight: 700;
   text-decoration: none;
@@ -1152,7 +1152,7 @@
 }
 
 .signalLeadCardLink:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--c-brand) 35%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--rr-color-signal) 35%, transparent);
   outline-offset: 3px;
 }
 
@@ -1163,7 +1163,7 @@
   overflow: hidden;
   padding: 20px 8px 20px 12px;
   border: 0;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--rr-color-separator);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -1217,7 +1217,7 @@
 }
 
 .signalLeadName {
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
   font-size: 1.15rem;
   font-weight: 780;
   letter-spacing: -0.02em;
@@ -1230,7 +1230,7 @@
   align-items: center;
   gap: 5px;
   margin-top: 5px;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   font-size: 0.78rem;
 }
 
@@ -1242,14 +1242,14 @@
 }
 
 .signalLeadScore strong {
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
   font-size: 1.8rem;
   line-height: 1;
   letter-spacing: -0.05em;
 }
 
 .signalLeadScore span {
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   font-size: 0.72rem;
 }
 
@@ -1257,7 +1257,7 @@
   height: 4px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--border-subtle);
+  background: var(--rr-color-separator);
 }
 
 .signalLeadScoreTrack > span {
@@ -1274,8 +1274,8 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--rr-color-separator);
+  border-bottom: 1px solid var(--rr-color-separator);
 }
 
 .signalLeadSection {
@@ -1285,7 +1285,7 @@
   min-width: 0;
   padding: 14px 16px;
   border: 0;
-  border-right: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--rr-color-separator);
   border-radius: 0;
   background: transparent;
 }
@@ -1297,14 +1297,14 @@
 }
 
 .signalLeadSection strong {
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
   font-size: 0.86rem;
   line-height: 1.42;
 }
 
 .signalLeadSection p {
   margin: 0;
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
   font-size: 0.78rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -1312,12 +1312,12 @@
 
 .signalLeadFooter {
   padding-top: 2px;
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
   font-size: 0.8rem;
 }
 
 .signalLeadFooter strong {
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
   font-size: 0.84rem;
 }
 
@@ -1325,7 +1325,7 @@
 .leadCardRail {
   flex: 0 0 4px;
   align-self: stretch;
-  background-color: var(--c-border);
+  background-color: var(--rr-color-separator);
 }
 
 .leadCardRail[data-tone="success"] { background-color: #10b981; }
@@ -1360,13 +1360,13 @@
 .leadCardOrg {
   font-weight: 700;
   font-size: 1rem;
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
 .leadLink:hover .leadCardOrg {
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
 }
 
 .leadCardTags {
@@ -1391,7 +1391,7 @@
 .leadCardTagGroup[data-chip-group="decision"] {
   margin-right: 4px;
   padding-right: 10px;
-  border-right: 1px solid var(--c-border);
+  border-right: 1px solid var(--rr-color-separator);
 }
 
 /* On narrow viewports the divider can crowd — drop it so the groups stack
@@ -1422,7 +1422,7 @@
   gap: 8px;
   font-size: 0.875rem;
   line-height: 1.45;
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
 }
 
 .leadFieldLabel {
@@ -1431,19 +1431,19 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   padding-top: 2px;
   width: 92px;
 }
 
 .leadFieldValue {
   min-width: 0;
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
   overflow-wrap: anywhere;
 }
 
 .leadFieldRow[data-kind="why"] .leadFieldValue {
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
   font-weight: 500;
 }
 
@@ -1452,7 +1452,7 @@
   color: #10b981;
 }
 .leadFieldRow[data-kind="fit"] .leadFieldValue {
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
 }
 
 /* ── Footer: safe contact + vacancies + sources + evidence ── */
@@ -1469,7 +1469,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 9px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.75rem;
   font-weight: 500;
   background-color: #ecfdf5;
@@ -1482,13 +1482,13 @@
   align-items: center;
   gap: 4px;
   font-size: 0.78rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 .leadMetaChip + .leadMetaChip::before {
   content: "·";
   margin-right: 4px;
-  color: var(--c-border);
+  color: var(--rr-color-separator);
 }
 
 .leadRiskRow {
@@ -1502,7 +1502,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 9px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.72rem;
   background-color: #fef2f2;
   color: #b91c1c;
@@ -1522,10 +1522,10 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--rr-radius-pill);
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
   background-color: rgba(35, 128, 111, 0.06);
   border: 1px solid transparent;
   text-decoration: none;
@@ -1539,7 +1539,7 @@
 }
 
 .leadOpenBtn:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
@@ -1550,17 +1550,17 @@
   align-items: center;
   gap: 12px;
   padding: 10px 18px;
-  border-bottom: 1px solid var(--c-border);
-  background-color: var(--c-bg-page);
+  border-bottom: 1px solid var(--rr-color-separator);
+  background-color: var(--rr-color-canvas);
 }
 
 .leadsListCount {
   font-size: 0.8rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 .leadsListCount strong {
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
   font-weight: 700;
 }
 
@@ -1569,7 +1569,7 @@
   flex-wrap: wrap;
   gap: 14px;
   font-size: 0.72rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 .leadsListLegendItem {
@@ -1610,7 +1610,7 @@
 }
 
 .signalLeadDisclosure {
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--rr-color-separator);
 }
 
 .signalLeadDisclosure > summary {
@@ -1619,7 +1619,7 @@
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
   cursor: pointer;
   list-style: none;
 }
@@ -1630,12 +1630,12 @@
 
 .signalLeadDisclosure > summary:focus-visible {
   border-radius: 6px;
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--rr-color-focus);
   outline-offset: 2px;
 }
 
 .signalLeadDisclosure > summary small {
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   font-size: 0.7rem;
 }
 
@@ -1679,13 +1679,13 @@
   gap: 6px;
   min-width: 0;
   padding: 10px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--rr-color-separator);
   border-radius: 10px;
-  background: var(--surface-panel);
+  background: var(--rr-color-surface-primary);
 }
 
 .signalLeadDisclosureInner section > span {
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   font-size: 0.67rem;
   font-weight: 750;
   letter-spacing: 0.06em;
@@ -1703,15 +1703,15 @@
 
 .signalLeadDisclosureInner li {
   padding: 3px 7px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  color: var(--c-text-secondary);
+  border: 1px solid var(--rr-color-separator);
+  border-radius: var(--rr-radius-pill);
+  color: var(--rr-color-text-secondary);
   font-size: 0.7rem;
 }
 
 .signalLeadDisclosureInner p {
   margin: 0;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   font-size: 0.72rem;
   line-height: 1.45;
 }
@@ -1885,24 +1885,24 @@
 }
 
 .bodyText {
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
   line-height: 1.6;
   margin: 0 0 16px;
 }
 
 .fieldRow {
   font-size: 0.85rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   margin-bottom: 8px;
 }
 
 .fieldRowStrong {
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
 }
 
 .bodyTextMutedBlock {
   font-size: 0.85rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   margin: 0 0 16px;
 }
 
@@ -1933,7 +1933,7 @@
 /* ── Feedback note (italic muted) ── */
 .feedbackNote {
   font-size: 0.8rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   margin-top: 4px;
   font-style: italic;
   margin-bottom: 12px;
@@ -1956,7 +1956,7 @@
   padding: 8px 0;
   font-size: 0.9rem;
   line-height: 1.5;
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
 }
 
 .fitItem + .fitItem {
@@ -1986,7 +1986,7 @@
   padding: 8px 0;
   font-size: 0.9rem;
   line-height: 1.5;
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
 }
 
 .contactItem + .contactItem {
@@ -1998,7 +1998,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
   font-size: 0.82rem;
   min-width: 140px;
 }
@@ -2016,7 +2016,7 @@
 
 .contactValue {
   font-weight: 500;
-  color: var(--c-brand, var(--action-primary));
+  color: var(--rr-color-signal);
   word-break: break-all;
 }
 
@@ -2030,18 +2030,18 @@
 .summaryLine {
   font-size: 0.9rem;
   line-height: 1.55;
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
   margin: 0;
 }
 
 .summaryLineLead {
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
   font-weight: 500;
 }
 
 .summaryStrength {
   font-size: 0.72rem;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   margin-top: 4px;
 }
 
@@ -2084,7 +2084,7 @@
 .leadVerdictChipGroup[data-chip-group="decision"] {
   margin-right: 4px;
   padding-right: 12px;
-  border-right: 1px solid var(--c-border);
+  border-right: 1px solid var(--rr-color-separator);
 }
 
 @media (max-width: 480px) {
@@ -2095,7 +2095,7 @@
   }
 }
 
-/* sr-only on mobile, visible on desktop. Used by ScoreGauge's level label so
+/* sr-only on mobile, visible on desktop. Used by ConfidenceMeter's level label so
    the "Высокий/Средний/Низкий" read doesn't duplicate the band chip on a narrow
    screen but stays visible + announced on desktop. Desktop ≥641px shows it. */
 .srOnlyMobile {
@@ -2134,7 +2134,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 @media (max-width: 640px) {
@@ -2161,7 +2161,7 @@
 .leadDetailContainer .detailMain > .contentCard {
   padding: 22px 0;
   border: 0;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--rr-color-separator);
   border-radius: 0;
   background: transparent;
 }
@@ -2170,7 +2170,7 @@
   margin-bottom: 10px;
   padding: 20px;
   border: 1px solid rgba(35, 128, 111, .24);
-  border-left: 3px solid var(--signal-primary);
+  border-left: 3px solid var(--rr-color-signal);
   border-radius: 14px;
   background: rgba(35, 128, 111, .035);
 }
@@ -2178,14 +2178,14 @@
 .leadDetailContainer .detailSidebar {
   align-self: start;
   gap: 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--rr-color-separator);
+  border-bottom: 1px solid var(--rr-color-separator);
 }
 
 .leadDetailContainer .detailSidebar > .contentCard {
   padding: 18px 0;
   border: 0;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--rr-color-separator);
   border-radius: 0;
   background: transparent;
 }
@@ -2206,7 +2206,7 @@
 @media (max-width: 640px) {
   .signalLeadSection {
     border-right: 0;
-    border-bottom: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--rr-color-separator);
   }
 
   .signalLeadSection:last-child { border-bottom: 0; }

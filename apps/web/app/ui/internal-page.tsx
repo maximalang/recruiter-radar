@@ -125,7 +125,7 @@ export function InternalPageFrame(props: {
   return (
     <main
       className={`${s.internalPageFrame}${props.className ? ` ${props.className}` : ""}`}
-      data-ui-system="recruiter-radar-v6"
+      data-ui-system="recruiter-radar"
     >
       <a href="#main-content" className={s.skipLink}>Перейти к содержанию</a>
       {props.navItems ? <TopNav items={props.navItems} /> : null}
@@ -350,7 +350,7 @@ export function getScoreTone(score: number): ScoreTone {
 
 /* ── Score gauge (large, for detail page) ── */
 
-export function ScoreGauge(props: { score: number }) {
+export function ConfidenceMeter(props: { score: number }) {
   const pct = scorePercent(props.score);
   const tone = scoreToneFromRaw(props.score);
   const points = formatScorePoints(props.score);
@@ -382,7 +382,7 @@ export function ScoreGauge(props: { score: number }) {
 
 /* ── Score bar (compact, for table rows) ── */
 
-export function ScoreBar(props: { score: number }) {
+export function ConfidenceTrack(props: { score: number }) {
   const pct = scorePercent(props.score);
   const tone = scoreToneFromRaw(props.score);
   const points = formatScorePoints(props.score);
@@ -401,10 +401,10 @@ export function ScoreBar(props: { score: number }) {
 
 /**
  * Compact temperature read for a lead, mirroring the Telegram/email card band.
- * Pairs with ScoreBar (which shows the numeric strength) so the list, detail,
+ * Pairs with ConfidenceTrack (which shows the numeric strength) so the list, detail,
  * and delivery channels all speak the same "горячий/тёплый/холодный" language.
  */
-export function ScoreBandChip(props: { score: number }) {
+export function ConfidenceBand(props: { score: number }) {
   const band = scoreBand(props.score);
   const Icon = band.tone === 'success' ? FlameIcon : band.tone === 'warning' ? DropIcon : DropIcon;
   return (
@@ -579,7 +579,7 @@ export function LeadVerdictChips(props: {
   return (
     <div className={s.leadVerdictChips}>
       <span className={s.leadVerdictChipGroup} data-chip-group="decision">
-        <ScoreBandChip score={props.score} />
+        <ConfidenceBand score={props.score} />
         <GateBadgeInline gate={props.confidenceGate} />
         <UrgencyCueChip level={props.urgencyLevel} label={props.urgencyLabel} />
       </span>

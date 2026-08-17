@@ -63,7 +63,7 @@ export default async function EvidenceRadarPage() {
         subtitle="По горизонтали — свежесть подтверждения, по вертикали — его сила. География остаётся контекстом и не определяет положение компании."
       />
       {leads ? (
-        <EvidenceRadarMap leads={leads} />
+        <EvidenceRadarMap leads={leads} referenceTimestamp={Date.now()} />
       ) : (
         <ErrorState
           title="Радар временно не загрузился"

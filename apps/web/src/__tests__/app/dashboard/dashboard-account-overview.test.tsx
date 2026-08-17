@@ -17,10 +17,10 @@ describe("DashboardAccountOverview", () => {
     );
 
     expect(screen.getByRole("heading", { name: /Тестовое агентство/ })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Открыть 4 компании/ })).toHaveAttribute("href", "/leads");
-    expect(screen.getByRole("link", { name: /Проверить 2/ })).toHaveAttribute("href", "/review");
-    expect(screen.getByRole("link", { name: /Уточнить ICP/ })).toHaveAttribute("href", "/settings/radar");
-    expect(screen.getByRole("link", { name: /Настроить доставку/ })).toHaveAttribute("href", "/settings/delivery");
+    expect(screen.getByRole("link", { name: /Компании 4/ })).toHaveAttribute("href", "/leads");
+    expect(screen.getByRole("link", { name: /На проверке 2/ })).toHaveAttribute("href", "/review");
+    expect(screen.getByRole("link", { name: /Профиль радара 71%/ })).toHaveAttribute("href", "/settings/radar");
+    expect(screen.getByRole("link", { name: /Доставка настроить/ })).toHaveAttribute("href", "/settings/delivery");
     expect(screen.getByText("71% готово")).toBeInTheDocument();
   });
 });

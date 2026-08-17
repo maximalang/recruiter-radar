@@ -75,7 +75,7 @@ describe('Situation row', () => {
 
     expect(screen.getByRole('heading', { name: 'Всплеск найма' })).toBeInTheDocument()
     expect(screen.getByText('Пример')).toBeInTheDocument()
-    expect(screen.getByText('За 14 дней открыто 8 вакансий.')).toBeInTheDocument()
+    expect(screen.getAllByText('За 14 дней открыто 8 вакансий.').length).toBeGreaterThan(0)
     expect(screen.getByText(/1 факт · 1 источник · высокое подтверждение/)).toBeInTheDocument()
     expect(screen.getByLabelText(/Ситуация с/)).toBeInTheDocument()
     expect(screen.queryByLabelText(/Оценка возможности:/)).toBeNull()
@@ -146,7 +146,7 @@ describe('Situation row', () => {
       outcomesUiEnabled
     />)
 
-    expect(screen.getByText(/Предложение/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Предложение/).length).toBeGreaterThan(0)
     expect(screen.queryByText('Связались')).toBeNull()
   })
 

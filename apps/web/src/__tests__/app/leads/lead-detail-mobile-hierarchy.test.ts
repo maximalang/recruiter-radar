@@ -1,26 +1,19 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-const pagePath = resolve(
-  process.cwd(),
-  'app',
-  'leads',
-  '[id]',
-  'page.tsx',
-)
+const pagePath = resolve(process.cwd(), 'app', 'leads', '[id]', 'page.tsx')
 
 describe('lead detail mobile hierarchy', () => {
-  it('keeps the decision and action layer before secondary context', async () => {
+  it('keeps decision, contact and action before secondary context in DOM order', async () => {
     const page = await readFile(pagePath, 'utf8')
     const orderedAnchors = [
-      '<ScoreGauge',
-      '<ContentCardTitle>Почему сейчас</ContentCardTitle>',
-      '<ContentCardTitle>Безопасный путь контакта</ContentCardTitle>',
-      '<ContentCardTitle>Найденные контакты</ContentCardTitle>',
+      '<section className={styles.decision}',
+      '<aside className={styles.aside}',
+      '<span className={styles.railTitle}>Контакт</span>',
       '<NextStepsBlock',
-      '<ContentCardTitle>Почему этот лид вам подходит</ContentCardTitle>',
-      '<ContentCardTitle>Кратко о компании и найме</ContentCardTitle>',
-      '<ContentCardTitle>Доказательства</ContentCardTitle>',
+      '<div className={styles.main}>',
+      '<h2>Контекст компании и найма</h2>',
+      '<h2>Evidence ledger</h2>',
     ]
 
     let previous = -1

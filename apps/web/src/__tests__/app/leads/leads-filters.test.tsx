@@ -25,7 +25,7 @@ afterEach(() => {
 describe('LeadsFilters (T3.1 — active filter state)', () => {
   it('marks the gate select data-active when a gate value is set', () => {
     const { container } = render(<LeadsFilters profiles={[]} />);
-    const gateSelect = container.querySelector('[aria-label="Фильтр по уровню подтверждения"]');
+    const gateSelect = container.querySelector('[aria-label="Уровень подтверждения"]');
     expect(gateSelect).not.toBeNull();
     expect(gateSelect?.getAttribute('data-active')).toBe('true');
     expect(screen.getByRole('option', { name: 'Подтверждение A' })).toBeInTheDocument();
@@ -34,7 +34,7 @@ describe('LeadsFilters (T3.1 — active filter state)', () => {
 
   it('does NOT mark the feedback select data-active when feedback is empty', () => {
     const { container } = render(<LeadsFilters profiles={[]} />);
-    const fbSelect = container.querySelector('[aria-label="Фильтр по обратной связи"]');
+    const fbSelect = container.querySelector('[aria-label="Статус работы"]');
     expect(fbSelect).not.toBeNull();
     expect(fbSelect?.getAttribute('data-active')).toBeNull();
   });
@@ -42,7 +42,7 @@ describe('LeadsFilters (T3.1 — active filter state)', () => {
   it('renders an XIcon SVG inside the reset button (only when a filter is active)', () => {
     // gate=A is active via the mock → reset button is rendered with an XIcon.
     const { container } = render(<LeadsFilters profiles={[]} />);
-    const resetBtn = screen.getByRole('button', { name: /сбросить фильтры/i });
+    const resetBtn = screen.getByRole('button', { name: /сбросить/i });
     expect(resetBtn.querySelector('svg')).not.toBeNull();
   });
 
@@ -56,7 +56,7 @@ describe('LeadsFilters (T3.1 — active filter state)', () => {
     const { container } = render(<LeadsFilters profiles={[]} />);
     const filterBar = container.querySelector('[aria-busy]');
     const todayBtn = screen.getByRole('button', { name: /сегодня в работе/i });
-    const resetBtn = screen.getByRole('button', { name: /сбросить фильтры/i });
+    const resetBtn = screen.getByRole('button', { name: /сбросить/i });
 
     expect(filterBar).toHaveAttribute('aria-busy', 'false');
     expect(screen.getByRole('status')).toBeEmptyDOMElement();

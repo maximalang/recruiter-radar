@@ -66,12 +66,12 @@ describe("cross-route visual layer contract", () => {
     expect(internalPage).not.toContain("footer={props.footer}");
   });
 
-  it("switches portrait tablets to the intentional bottom navigation", () => {
+  it("keeps compact top navigation at 768px and switches sub-768 widths to the five-destination bottom navigation", () => {
     const workspaceStyles = readAppFile("ui/product-workspace.module.css");
 
-    expect(workspaceStyles).toContain("@media (max-width: 800px)");
+    expect(workspaceStyles).toContain("@media (max-width: 767px)");
     expect(workspaceStyles).toMatch(/\.mobileNav \{[\s\S]*?position: fixed/);
-    expect(workspaceStyles).toContain("grid-template-columns: repeat(4, minmax(0, 1fr))");
+    expect(workspaceStyles).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
     expect(workspaceStyles).toContain("padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom))");
   });
 
@@ -86,7 +86,7 @@ describe("cross-route visual layer contract", () => {
     expect(internalPage).toMatch(/\.signalLeadSections \{[\s\S]*?gap: 0;/);
     expect(opportunities).toMatch(/\.cardList \{[\s\S]*?gap: 0;/);
     expect(opportunities).toMatch(/\.decisionGrid \{[\s\S]*?border-radius: 0;/);
-    expect(radar).toMatch(/\.layout \{[\s\S]*?gap: 0;[\s\S]*?background: #080d0c;/);
-    expect(radar).toContain("border-left: 1px solid rgba(255, 255, 255, .09)");
+    expect(radar).toMatch(/\.detailPanel \{[\s\S]*?border-left: 1px solid var\(--rr-color-separator-strong\);[\s\S]*?background: var\(--rr-color-surface-secondary\);/);
+    expect(radar).toMatch(/\.canvas \{[\s\S]*?background: var\(--radar-field\);/);
   });
 });

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import styles from "./settings-overview.module.css";
 
-export default function SettingsOverview(props: {
+export default function SettingsDocumentSummary(props: {
   agencyName: string;
   completionPercent: number;
   deliveryEnabled: boolean;

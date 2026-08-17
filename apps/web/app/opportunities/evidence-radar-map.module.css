@@ -176,7 +176,7 @@
   border: 1px solid color-mix(in srgb, var(--radar-signal) 42%, transparent);
   border-radius: 50%;
   content: "";
-  animation: selectedSignal 520ms var(--rr-motion-ease-signal, cubic-bezier(.2,.8,.2,1)) 1;
+  animation: selectedSignal 520ms var(--rr-motion-ease-signal) 1;
 }
 
 .markerLabel {
@@ -585,7 +585,7 @@
   padding-bottom: 8px;
 }
 
-.scoreGrid {
+.diagnosticMetrics {
   display: grid;
   gap: 0;
   border-top: 1px solid var(--rr-color-separator);

@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 };
 
 const ADMIN_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Дашборд" },
+  { href: "/dashboard", label: "Обзор" },
   { href: "/leads", label: "Лиды" },
   { href: "/admin", label: "Оператор", active: true },
 ];
@@ -212,13 +212,13 @@ export default async function AdminPage() {
           </div>
           {feedbackFunnel && feedbackFunnel.length > 0 ? (
             <div style={{ marginTop: "14px", display: "grid", gap: "6px" }}>
-              <div style={{ fontSize: "0.78rem", color: "var(--c-text-muted, #667085)", fontWeight: 700 }}>
+              <div style={{ fontSize: "0.78rem", color: "var(--rr-color-text-tertiary)", fontWeight: 700 }}>
                 Воронка обратной связи
               </div>
               {feedbackFunnel.map((row) => (
                 <div key={row.status} style={funnelRowStyle}>
-                  <span style={{ fontSize: "0.84rem", color: "var(--c-text-secondary, #475569)" }}>{row.label}</span>
-                  <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--c-text-primary, #0f172a)" }}>
+                  <span style={{ fontSize: "0.84rem", color: "var(--rr-color-text-secondary)" }}>{row.label}</span>
+                  <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--rr-color-text-primary)" }}>
                     {row.count}
                   </span>
                 </div>
@@ -246,7 +246,7 @@ export default async function AdminPage() {
                     <div style={{ flex: 1, height: "8px", borderRadius: "999px", background: "rgba(15,23,42,0.07)", overflow: "hidden" }}>
                       <div style={{ height: "100%", width: `${(g.count / max) * 100}%`, background: GATE_COLOR[g.gate] ?? "#64748b", borderRadius: "999px" }} />
                     </div>
-                    <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--c-text-secondary, #475569)", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--rr-color-text-secondary)", whiteSpace: "nowrap" }}>
                       {g.count} · {g.percentage}%
                     </span>
                   </div>
@@ -267,7 +267,7 @@ export default async function AdminPage() {
                 <div key={row.source} style={sourceRowStyle}>
                   <div style={{ minWidth: "120px" }}>
                     <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>{row.source}</div>
-                    <div style={{ fontSize: "0.74rem", color: "var(--c-text-muted, #667085)" }}>
+                    <div style={{ fontSize: "0.74rem", color: "var(--rr-color-text-tertiary)" }}>
                       {row.leads} лидов
                       {row.avgAgeDays != null ? ` · ср. свежесть ${row.avgAgeDays}д` : ""}
                     </div>
@@ -287,7 +287,7 @@ export default async function AdminPage() {
               {sourcePerformance.map((row) => (
                 <div key={row.source} style={sourceRowStyle}>
                   <span style={{ fontWeight: 700, fontSize: "0.88rem", minWidth: "120px" }}>{row.source}</span>
-                  <span style={{ fontSize: "0.82rem", color: "var(--c-text-secondary, #475569)" }}>
+                  <span style={{ fontSize: "0.82rem", color: "var(--rr-color-text-secondary)" }}>
                     {row.leads} лидов · ср. {row.avgScore?.toFixed(1) ?? "—"} / 4
                   </span>
                 </div>
@@ -338,19 +338,19 @@ export default async function AdminPage() {
                     gap: "12px",
                     alignItems: "center",
                     padding: "10px 12px",
-                    border: "1px solid var(--c-border, #e2e8f0)",
+                    border: "1px solid var(--rr-color-separator)",
                     borderRadius: "12px",
                   }}
                 >
                   <div>
                     <div style={{ fontWeight: 700, fontSize: "0.92rem" }}>{s.name}</div>
-                    <div style={{ fontSize: "0.76rem", color: "var(--c-text-muted, #667085)" }}>
+                    <div style={{ fontSize: "0.76rem", color: "var(--rr-color-text-tertiary)" }}>
                       {s.id} · {s.category}{s.isPrimary ? " · primary" : ""}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", fontSize: "0.8rem", color: "var(--c-text-secondary, #475569)" }}>
+                  <div style={{ textAlign: "right", fontSize: "0.8rem", color: "var(--rr-color-text-secondary)" }}>
                     <div>{s.recordsLast24h ?? 0} зап. / 24ч</div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--c-text-muted, #667085)" }}>
+                    <div style={{ fontSize: "0.72rem", color: "var(--rr-color-text-tertiary)" }}>
                       {s.lastRun ?? "нет запуска"}
                     </div>
                   </div>
@@ -441,8 +441,8 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 function Metric({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div style={{ padding: "12px", borderRadius: "12px", background: "rgba(241,245,249,0.6)" }}>
-      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: accent ?? "var(--c-text-primary, #0f172a)" }}>{value}</div>
-      <div style={{ fontSize: "0.76rem", color: "var(--c-text-muted, #667085)" }}>{label}</div>
+      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: accent ?? "var(--rr-color-text-primary)" }}>{value}</div>
+      <div style={{ fontSize: "0.76rem", color: "var(--rr-color-text-tertiary)" }}>{label}</div>
     </div>
   );
 }
@@ -460,7 +460,7 @@ const funnelRowStyle: CSSProperties = {
   alignItems: "center",
   gap: "12px",
   padding: "8px 12px",
-  border: "1px solid var(--c-border, #e2e8f0)",
+  border: "1px solid var(--rr-color-separator)",
   borderRadius: "10px",
 };
 
@@ -471,7 +471,7 @@ const sourceRowStyle: CSSProperties = {
   justifyContent: "space-between",
   flexWrap: "wrap",
   padding: "10px 12px",
-  border: "1px solid var(--c-border, #e2e8f0)",
+  border: "1px solid var(--rr-color-separator)",
   borderRadius: "12px",
 };
 
@@ -532,10 +532,10 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
                     })
                   : null}
               </div>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: d.total > 0 ? "var(--c-text-primary, #0f172a)" : "var(--c-text-muted, #667085)" }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: d.total > 0 ? "var(--rr-color-text-primary)" : "var(--rr-color-text-tertiary)" }}>
                 {d.total}
               </div>
-              <div style={{ fontSize: "0.7rem", color: "var(--c-text-muted, #667085)" }}>{dayLabel}</div>
+              <div style={{ fontSize: "0.7rem", color: "var(--rr-color-text-tertiary)" }}>{dayLabel}</div>
             </div>
           );
         })}
@@ -543,7 +543,7 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
       {orderedSources.length > 0 ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: "10px" }}>
           {orderedSources.map((s) => (
-            <span key={s} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.72rem", color: "var(--c-text-secondary, #475569)" }}>
+            <span key={s} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.72rem", color: "var(--rr-color-text-secondary)" }}>
               <span style={{ width: "9px", height: "9px", borderRadius: "2px", background: sourceColor(s), display: "inline-block" }} />
               {s}
             </span>

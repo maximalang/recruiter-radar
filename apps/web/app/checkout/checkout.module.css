@@ -94,13 +94,13 @@
   height: 9px;
   border: 3px solid rgba(26, 111, 96, 0.18);
   border-radius: 50%;
-  background: var(--c-brand, #1a6f60);
+  background: var(--rr-color-signal);
   content: "";
 }
 
 .trustItem strong {
   display: block;
-  color: var(--c-text-primary, #17211d);
+  color: var(--rr-color-text-primary);
   font-size: 0.82rem;
   font-weight: 720;
 }
@@ -108,7 +108,7 @@
 .trustItem span {
   display: block;
   margin-top: 5px;
-  color: var(--c-text-secondary, #4d5b54);
+  color: var(--rr-color-text-secondary);
   font-size: 0.76rem;
   line-height: 1.48;
 }
@@ -145,7 +145,7 @@
 
 .fieldsetLegend {
   padding: 0 7px;
-  color: var(--c-text-primary, #17211d);
+  color: var(--rr-color-text-primary);
   font-size: 0.82rem;
   font-weight: 730;
   letter-spacing: -0.005em;
@@ -199,18 +199,18 @@
   width: 18px;
   height: 18px;
   margin: 2px 0 0;
-  accent-color: var(--c-brand, #1a6f60);
+  accent-color: var(--rr-color-signal);
 }
 
 .radioOption span,
 .checkOption span {
-  color: var(--c-text-secondary, #4d5b54);
+  color: var(--rr-color-text-secondary);
   font-size: 0.87rem;
 }
 
 .radioOption strong {
   display: block;
-  color: var(--c-text-primary, #17211d);
+  color: var(--rr-color-text-primary);
   font-size: 0.85rem;
   font-weight: 710;
 }
@@ -218,7 +218,7 @@
 .radioOption small {
   display: block;
   margin-top: 3px;
-  color: var(--c-text-muted, #69756e);
+  color: var(--rr-color-text-tertiary);
   font-size: 0.74rem;
   line-height: 1.42;
 }
@@ -245,7 +245,7 @@
 }
 
 .checkOption a {
-  color: var(--c-accent, #0f594c);
+  color: var(--rr-color-signal-hover);
   font-weight: 650;
   text-decoration: underline;
   text-decoration-color: rgba(15, 89, 76, 0.3);
@@ -259,7 +259,7 @@
 .hint,
 .actionHint {
   margin: 0;
-  color: var(--c-text-muted, #69756e);
+  color: var(--rr-color-text-tertiary);
   font-size: 0.79rem;
   line-height: 1.58;
 }
@@ -271,7 +271,7 @@
 }
 
 .actionHint a {
-  color: var(--c-accent, #0f594c);
+  color: var(--rr-color-signal-hover);
   font-weight: 630;
   text-underline-offset: 3px;
 }
@@ -304,7 +304,7 @@
   border: 1px solid rgba(24, 35, 31, 0.08);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.62);
-  color: var(--c-text-secondary, #4d5b54);
+  color: var(--rr-color-text-secondary);
   font-weight: 620;
   text-decoration: none;
   transition:
@@ -316,14 +316,14 @@
 .documentLinks a:hover {
   border-color: rgba(26, 111, 96, 0.18);
   background: rgba(255, 255, 255, 0.94);
-  color: var(--c-accent, #0f594c);
+  color: var(--rr-color-signal-hover);
 }
 
 .radioOption input:focus-visible,
 .checkOption input:focus-visible,
 .checkOption a:focus-visible,
 .documentLinks a:focus-visible {
-  outline: 2px solid var(--c-brand, #1a6f60);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 3px;
 }
 
@@ -337,7 +337,7 @@
     min-height: auto;
     padding: 11px 8px 11px 30px;
     border: 0;
-    border-top: 1px solid var(--border-subtle);
+    border-top: 1px solid var(--rr-color-separator);
     border-radius: 0;
     background: transparent;
     box-shadow: none;

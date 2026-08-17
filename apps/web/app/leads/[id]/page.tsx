@@ -230,56 +230,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </section>
 
         <div className={styles.layout}>
-          <div className={styles.main}>
-            {summaryLines.length > 0 ? (
-              <section className={styles.section}>
-                <h2>Контекст компании и найма</h2>
-                <div className={styles.summary}>
-                  {summaryLines.map((line, index) => <p key={index}>{line}</p>)}
-                  {summary.isThin ? <p>Доказательств пока немного; вывод будет уточняться по мере новых сигналов.</p> : null}
-                </div>
-              </section>
-            ) : null}
-
-            <section className={styles.section}>
-              <h2>Evidence ledger</h2>
-              <div className={styles.stats}>
-                <span>{lead.vacanciesCount} вакансий</span>
-                <span>{lead.distinctVacancyNamesCount} разных ролей</span>
-                <span>{lead.sourceFamilies.length} источников</span>
-              </div>
-              {lead.evidenceTitles.length > 0 ? (
-                <ol className={styles.evidenceList}>
-                  {lead.evidenceTitles.map((title, index) => (
-                    <li key={`${title}:${index}`}>
-                      <span className={styles.evidenceIndex}>{String(index + 1).padStart(2, '0')}</span>
-                      <span>{title}</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : <p className={styles.body}>Фактические evidence items пока не сформированы.</p>}
-              {lead.sourceFamilies.length > 0 ? (
-                <div className={styles.provenance}>Provenance: {lead.sourceFamilies.join(' · ')}</div>
-              ) : null}
-            </section>
-
-            {fit && !fit.isEmpty ? (
-              <section className={styles.section}>
-                <h2>Соответствие вашему профилю</h2>
-                <ul className={styles.fitList}>{fit.lines.map((line, index) => <li key={index}>{line.text}</li>)}</ul>
-              </section>
-            ) : null}
-
-            <AiEnrichmentBlock enrichment={lead.aiEnrichment} />
-
-            {lead.negativeSignals.length > 0 ? (
-              <section className={styles.section}>
-                <h2>Риски и ограничения</h2>
-                <ul className={styles.riskList}>{lead.negativeSignals.map((signal, index) => <li key={index}>{signal}</li>)}</ul>
-              </section>
-            ) : null}
-          </div>
-
           <aside className={styles.aside} aria-label="Действия и контекст">
             <div className={styles.rail}>
               <section className={styles.railSection}>
@@ -334,6 +284,56 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </section>
             </div>
           </aside>
+
+          <div className={styles.main}>
+            {summaryLines.length > 0 ? (
+              <section className={styles.section}>
+                <h2>Контекст компании и найма</h2>
+                <div className={styles.summary}>
+                  {summaryLines.map((line, index) => <p key={index}>{line}</p>)}
+                  {summary.isThin ? <p>Доказательств пока немного; вывод будет уточняться по мере новых сигналов.</p> : null}
+                </div>
+              </section>
+            ) : null}
+
+            <section className={styles.section}>
+              <h2>Evidence ledger</h2>
+              <div className={styles.stats}>
+                <span>{lead.vacanciesCount} вакансий</span>
+                <span>{lead.distinctVacancyNamesCount} разных ролей</span>
+                <span>{lead.sourceFamilies.length} источников</span>
+              </div>
+              {lead.evidenceTitles.length > 0 ? (
+                <ol className={styles.evidenceList}>
+                  {lead.evidenceTitles.map((title, index) => (
+                    <li key={`${title}:${index}`}>
+                      <span className={styles.evidenceIndex}>{String(index + 1).padStart(2, '0')}</span>
+                      <span>{title}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p className={styles.body}>Фактические evidence items пока не сформированы.</p>}
+              {lead.sourceFamilies.length > 0 ? (
+                <div className={styles.provenance}>Provenance: {lead.sourceFamilies.join(' · ')}</div>
+              ) : null}
+            </section>
+
+            {fit && !fit.isEmpty ? (
+              <section className={styles.section}>
+                <h2>Соответствие вашему профилю</h2>
+                <ul className={styles.fitList}>{fit.lines.map((line, index) => <li key={index}>{line.text}</li>)}</ul>
+              </section>
+            ) : null}
+
+            <AiEnrichmentBlock enrichment={lead.aiEnrichment} />
+
+            {lead.negativeSignals.length > 0 ? (
+              <section className={styles.section}>
+                <h2>Риски и ограничения</h2>
+                <ul className={styles.riskList}>{lead.negativeSignals.map((signal, index) => <li key={index}>{signal}</li>)}</ul>
+              </section>
+            ) : null}
+          </div>
         </div>
       </div>
     </InternalPageFrame>

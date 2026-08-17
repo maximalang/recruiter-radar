@@ -45,7 +45,7 @@
   align-items: center;
   gap: .75rem;
   color: rgba(242, 239, 231, .52);
-  font-family: var(--mono);
+  font-family: var(--rr-font-mono);
   font-size: .61rem;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -100,7 +100,7 @@
 .primaryButton:hover :global(svg), .primaryButton:focus-visible :global(svg) { transform: translateX(3px); }
 .primaryButton:active { transform: translateY(0); }
 
-.actionHint { max-width: 13rem; color: rgba(242,239,231,.46); font-family: var(--mono); font-size: .56rem; line-height: 1.4; text-transform: uppercase; }
+.actionHint { max-width: 13rem; color: rgba(242,239,231,.46); font-family: var(--rr-font-mono); font-size: .56rem; line-height: 1.4; text-transform: uppercase; }
 .microcopy { max-width: 31rem; margin: .65rem 0 0; color: rgba(242, 241, 235, .44); font-size: .67rem; line-height: 1.45; animation-delay: .4s; }
 
 .fieldFigure {

@@ -148,7 +148,7 @@
   border: 1px solid rgba(35, 128, 111, 0.12);
   border-radius: 14px;
   background: rgba(35, 128, 111, 0.06);
-  color: var(--action-primary);
+  color: var(--rr-color-signal);
   line-height: 1.5;
 }
 
@@ -223,8 +223,8 @@
 }
 
 .primaryButton {
-  border: 1px solid var(--action-primary);
-  background: var(--action-primary);
+  border: 1px solid var(--rr-color-signal);
+  background: var(--rr-color-signal);
   color: #fff;
   box-shadow: 0 12px 24px rgba(35, 128, 111, 0.2);
 }

@@ -158,8 +158,8 @@ describe("polished unified landing visual contract", () => {
     const productCss = source("app/product-visual-system.css");
     const landingCss = source("app/landing/landing-visual-system.module.css");
 
-    expect(productCss).toContain('[data-ui-system="recruiter-radar-v6"]');
-    expect(productCss).toContain('[data-ui-system="recruiter-radar-v7"]');
+    expect(productCss).toContain('[data-ui-system="recruiter-radar"]');
+    expect(productCss).not.toMatch(/recruiter-radar-v\d+/);
     expect(productCss).toContain('[data-product-workspace="true"]');
     expect(productCss).not.toContain('[class*=');
     expect(productCss).not.toContain("!important");

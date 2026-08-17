@@ -6,8 +6,8 @@
 
 .aiCard {
   border-style: dashed;
-  border-color: var(--c-border);
-  background: var(--c-bg-page);
+  border-color: var(--rr-color-separator);
+  background: var(--rr-color-canvas);
 }
 
 .aiBadge {
@@ -18,7 +18,7 @@
   padding: 1px 8px;
   border-radius: 999px;
   background: rgba(99, 102, 241, 0.12);
-  color: var(--c-brand);
+  color: var(--rr-color-signal);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -35,14 +35,14 @@
   margin: 0 0 12px;
   font-size: 0.78rem;
   line-height: 1.45;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 .aiSummary {
   margin: 0 0 14px;
   font-size: 0.9rem;
   line-height: 1.55;
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
 }
 
 .aiSection {
@@ -53,7 +53,7 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   margin-bottom: 6px;
 }
 
@@ -69,7 +69,7 @@
 .aiRoleItem {
   font-size: 0.9rem;
   line-height: 1.5;
-  color: var(--c-text-primary);
+  color: var(--rr-color-text-primary);
 }
 
 .aiRoleTitle {
@@ -78,7 +78,7 @@
 
 .aiRoleDept {
   margin-left: 4px;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 .aiMetaGrid {
@@ -99,12 +99,12 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
 }
 
 .aiMetaValue {
   font-size: 0.88rem;
-  color: var(--c-text-secondary);
+  color: var(--rr-color-text-secondary);
 }
 
 /* On narrow screens the meta items stack to one column for readability. */

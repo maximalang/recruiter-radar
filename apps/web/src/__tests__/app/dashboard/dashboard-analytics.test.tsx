@@ -219,12 +219,12 @@ describe('DashboardTodayRadar — T5.3 empty-state icon', () => {
     const emptySvg = container.querySelector('svg');
     expect(emptySvg).not.toBeNull();
     // Honest copy is preserved.
-    expect(screen.getByText(/первый запуск Radar ещё не завершён/i)).toBeTruthy();
+    expect(screen.getByText(/первое сканирование ещё не завершено/i)).toBeTruthy();
   });
 
   it('links the first-run state to unified Radar settings', () => {
     render(<DashboardTodayRadar topLeads={[]} pendingReview={0} lastRunAt={null} />);
-    const link = screen.getByText(/проверить настройки Radar/i).closest('a');
+    const link = screen.getByText(/проверить профиль радара/i).closest('a');
     expect(link).not.toBeNull();
     expect(link?.getAttribute('href')).toBe('/settings/radar');
   });

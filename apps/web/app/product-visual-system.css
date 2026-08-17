@@ -3,103 +3,6 @@
  * Visual hierarchy follows Signal → Why now → Evidence → Confidence → Action.
  */
 
-:root {
-  /* Transitional names used by existing modules while they are migrated in this branch.
-   * Every alias resolves to a semantic role; no independent palette exists here. */
-  --surface-app: var(--rr-color-canvas);
-  --surface-panel: var(--rr-color-surface-primary);
-  --surface-raised: var(--rr-color-surface-elevated);
-  --ink-primary: var(--rr-color-text-primary);
-  --ink-secondary: var(--rr-color-text-secondary);
-  --ink-muted: var(--rr-color-text-tertiary);
-  --border-subtle: var(--rr-color-separator);
-  --signal-primary: var(--rr-color-signal);
-  --signal-support: var(--rr-color-signal);
-  --action-primary: var(--rr-color-signal);
-  --status-success: var(--rr-color-positive);
-  --status-warning: var(--rr-color-warning);
-  --status-danger: var(--rr-color-destructive);
-  --focus-ring: var(--rr-color-focus);
-
-  --rr-paper: var(--rr-color-canvas);
-  --rr-paper-soft: var(--rr-color-canvas);
-  --rr-surface: var(--rr-color-surface-primary);
-  --rr-surface-soft: var(--rr-color-surface-secondary);
-  --rr-text: var(--rr-color-text-primary);
-  --rr-muted: var(--rr-color-text-tertiary);
-  --rr-line: var(--rr-color-separator);
-  --rr-line-strong: var(--rr-color-separator-strong);
-  --rr-signal: var(--rr-color-signal);
-  --rr-signal-strong: var(--rr-color-signal-hover);
-  --rr-signal-ink: var(--rr-color-signal-hover);
-  --rr-signal-soft: var(--rr-color-signal-soft);
-  --rr-copper: var(--rr-color-copper);
-  --rr-ink: var(--rr-color-text-primary);
-  --rr-page: var(--rr-color-canvas);
-  --rr-surface-strong: var(--rr-color-surface-elevated);
-  --rr-brand: var(--rr-color-signal);
-  --rr-brand-dark: var(--rr-color-signal-hover);
-  --rr-shadow-sm: var(--rr-shadow-float);
-  --rr-shadow-md: var(--rr-shadow-overlay);
-  --rr-radius-sm: var(--rr-radius-control);
-  --rr-radius-md: var(--rr-radius-surface);
-  --rr-radius-lg: var(--rr-radius-overlay);
-  --rr-ease: cubic-bezier(.22, 1, .36, 1);
-
-  --c-text-primary: var(--rr-color-text-primary);
-  --c-text-secondary: var(--rr-color-text-secondary);
-  --c-text-muted: var(--rr-color-text-tertiary);
-  --c-bg-page: var(--rr-color-canvas);
-  --c-bg-card: var(--rr-color-surface-primary);
-  --c-border: var(--rr-color-separator);
-  --c-brand: var(--rr-color-signal);
-  --c-accent: var(--rr-color-signal-hover);
-  --radius-card: var(--rr-radius-surface);
-  --radius-card-sm: var(--rr-radius-control);
-  --radius-pill: var(--rr-radius-pill);
-
-  --font-sans: var(--rr-font-sans);
-  --mono: var(--rr-font-mono);
-  --fs-display: var(--rr-type-display-size);
-  --lh-display: .98;
-  --ls-display: -.055em;
-  --fw-display: 520;
-  --fs-title: var(--rr-type-page-size);
-  --lh-title: 1.1;
-  --ls-title: -.04em;
-  --fw-title: 590;
-  --fs-h3: var(--rr-type-object-size);
-  --lh-h3: 1.35;
-  --ls-h3: -.012em;
-  --fw-h3: 650;
-  --fs-body: var(--rr-type-body-size);
-  --lh-body: 1.53;
-  --ls-body: -.002em;
-  --fw-body: 400;
-  --fs-small: var(--rr-type-metadata-size);
-  --lh-small: 1.38;
-  --ls-small: 0;
-  --fw-small: 450;
-  --fs-lg: var(--rr-type-subsection-size);
-  --lh-lg: 1.3;
-  --ls-lg: -.018em;
-  --fw-lg: 620;
-
-  --space-section: var(--rr-space-6);
-  --space-section-lg: var(--rr-space-12);
-  --space-card-padding: var(--rr-space-6);
-  --space-card-padding-lg: var(--rr-space-8);
-
-  --gate-a-color: var(--rr-color-confidence-high);
-  --gate-a-bg: transparent;
-  --gate-b-color: var(--rr-color-confidence-high);
-  --gate-b-bg: transparent;
-  --gate-c-color: var(--rr-color-confidence-medium);
-  --gate-c-bg: transparent;
-  --gate-d-color: var(--rr-color-confidence-low);
-  --gate-d-bg: transparent;
-}
-
 html,
 body {
   background: var(--rr-color-canvas);
@@ -136,11 +39,6 @@ body {
   --rr-color-focus: #a6d5c9;
 }
 
-[data-product-workspace="true"] {
-  --workspace-accent: var(--rr-color-signal);
-  --workspace-ink: var(--rr-color-text-inverse);
-  --workspace-muted: color-mix(in srgb, var(--rr-color-text-inverse) 62%, transparent);
-}
 
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea) {
   min-height: 44px;
@@ -150,8 +48,8 @@ body {
   color: var(--rr-color-text-primary);
   box-shadow: none;
   transition:
-    border-color var(--rr-motion-duration-control, 140ms) var(--rr-motion-ease-standard, ease),
-    background-color var(--rr-motion-duration-control, 140ms) var(--rr-motion-ease-standard, ease);
+    border-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
+    background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
 }
 
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea):focus-visible {
@@ -216,7 +114,7 @@ body {
 }
 
 [data-product-workspace="true"] tbody tr {
-  transition: background-color var(--rr-motion-duration-control, 140ms) var(--rr-motion-ease-standard, ease);
+  transition: background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
 }
 
 [data-product-workspace="true"] tbody tr:hover {

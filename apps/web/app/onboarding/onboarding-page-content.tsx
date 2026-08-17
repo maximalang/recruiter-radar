@@ -361,7 +361,7 @@ export function OnboardingView(props: {
     : STEP_LABELS.findIndex((step) => step.key === props.snapshot.step);
 
   return (
-    <main className={styles.shell} data-ui-system="recruiter-radar-v7">
+    <main className={styles.shell} data-ui-system="recruiter-radar">
       <header className={styles.header}>
         <Link href="/" className={styles.brand} aria-label="Recruiter Radar">
           <BrandLogo size="small" tone="dark" />

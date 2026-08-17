@@ -13,7 +13,7 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   margin-bottom: 4px;
 }
 
@@ -31,9 +31,9 @@
   border-radius: 8px;
   font-size: 0.82rem;
   font-weight: 500;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-secondary);
+  border: 1px solid var(--rr-color-separator);
+  background-color: var(--rr-color-surface-primary);
+  color: var(--rr-color-text-secondary);
   cursor: pointer;
   transition:
     color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
@@ -55,7 +55,7 @@
 }
 
 .feedbackBtn:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
@@ -86,10 +86,10 @@
 }
 
 .feedbackBtn[data-active="true"][data-tone="info"] {
-  border-color: var(--signal-support);
-  box-shadow: inset 0 0 0 1px var(--signal-support);
+  border-color: var(--rr-color-signal);
+  box-shadow: inset 0 0 0 1px var(--rr-color-signal);
   background-color: rgba(35, 128, 111, 0.1);
-  color: var(--signal-support);
+  color: var(--rr-color-signal);
 }
 
 .feedbackBtn[data-active="true"][data-tone="danger"] {
@@ -113,13 +113,13 @@
   padding: 6px 10px;
   font-size: 0.78rem;
   border-radius: 6px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text);
+  border: 1px solid var(--rr-color-separator);
+  background-color: var(--rr-color-surface-primary);
+  color: var(--rr-color-text-primary);
 }
 
 .noteInput:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 1px;
 }
 
@@ -128,14 +128,14 @@
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 600;
-  border: 1px solid var(--c-brand);
-  background-color: var(--c-brand);
+  border: 1px solid var(--rr-color-signal);
+  background-color: var(--rr-color-signal);
   color: #fff;
   cursor: pointer;
 }
 
 .noteSave:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
@@ -148,14 +148,14 @@
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 0.75rem;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-muted);
+  border: 1px solid var(--rr-color-separator);
+  background-color: var(--rr-color-surface-primary);
+  color: var(--rr-color-text-tertiary);
   cursor: pointer;
 }
 
 .noteSkip:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--rr-color-signal);
   outline-offset: 2px;
 }
 
@@ -173,7 +173,7 @@
 .statusText {
   min-height: 1.05rem;
   margin: 6px 0 0;
-  color: var(--c-text-muted);
+  color: var(--rr-color-text-tertiary);
   font-size: 0.75rem;
 }
 

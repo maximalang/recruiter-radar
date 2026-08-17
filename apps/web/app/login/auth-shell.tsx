@@ -20,14 +20,9 @@ export function AuthShell(props: { children: ReactNode }) {
             <span className={styles.signalCluster} data-signal-cluster="secondary" />
           </div>
           <div className={styles.storyCopy}>
-            <p className={styles.storyEyebrow}>Рабочий контекст агентства</p>
-            <h2 className={styles.storyTitle}>Signal → evidence → action</h2>
-            <p className={styles.storyLead}>Hiring signals, доказательства и история работы остаются в одном спокойном workspace.</p>
-            <ul className={styles.valueList}>
-              <li>Почему сейчас — до агрегированного score</li>
-              <li>Доказательства рядом с рекомендацией</li>
-              <li>Безопасный вход без паролей</li>
-            </ul>
+            <p className={styles.storyEyebrow}>Recruiter Radar</p>
+            <h2 className={styles.storyTitle}>Сигнал → доказательство → действие</h2>
+            <p className={styles.storyLead}>Рабочий контекст агентства остаётся рядом с подтверждённым следующим ходом.</p>
           </div>
         </aside>
         <section className={styles.card}>{props.children}</section>
