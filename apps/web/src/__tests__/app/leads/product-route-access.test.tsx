@@ -83,8 +83,8 @@ describe("premium product route access states", () => {
 
     render(await LeadDetailPage({ params: Promise.resolve({ id: "99" }) }));
 
-    expect(screen.getByText("Не удалось загрузить возможность")).toBeInTheDocument();
-    expect(screen.queryByText("Лид не найден")).not.toBeInTheDocument();
+    expect(screen.getByText("Не удалось загрузить компанию")).toBeInTheDocument();
+    expect(screen.queryByText("Компания не найдена")).not.toBeInTheDocument();
   });
 
   test("review asks an unauthenticated visitor to sign in instead of showing no profiles", async () => {
@@ -120,7 +120,7 @@ describe("premium product route access states", () => {
 
     render(await ReviewPage({ searchParams: Promise.resolve({}) }));
 
-    expect(screen.getByText("Не удалось загрузить профили Radar")).toBeInTheDocument();
+    expect(screen.getByText("Не удалось загрузить профили радара")).toBeInTheDocument();
     expect(screen.queryByText("Нет клиентских профилей")).not.toBeInTheDocument();
   });
 });

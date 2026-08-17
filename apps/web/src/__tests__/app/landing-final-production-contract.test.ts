@@ -94,7 +94,7 @@ describe("landing final production contract", () => {
     expect(delivery).toContain("PRIMARY_ROUTES.map");
     expect(delivery).toContain("EXTRA_ROUTES.map");
     expect(delivery).toContain('data-manual-outreach-boundary="true"');
-    expect(evidence).toContain("Почему сейчас");
+    expect(evidence).toContain("почему сейчас");
     expect(evidence).toContain('data-evidence-conclusion="source-fact-conclusion"');
     expect(evidence).toContain("Источник</span><i aria-hidden=\"true\">→</i><span>Факт");
     expect(evidence).not.toContain("открыть факт");

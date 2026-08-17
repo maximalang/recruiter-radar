@@ -44,7 +44,8 @@ describe("polished unified landing visual contract", () => {
 
     expect(heroScene).toContain("data-mobile-hero-signal");
     expect(heroScene).toContain('className={sceneStyles.signalSpine}');
-    expect(sceneStyles).toMatch(/@media \(max-width:\s*760px\)[\s\S]*?\.signalSpine\s*\{/);
+    expect(sceneStyles).toContain("@media(max-width:600px)");
+    expect(sceneStyles).toContain(".signalStep{padding-bottom:24px}");
     expect(sceneStyles).not.toContain("HeroRadar");
   });
 
@@ -173,7 +174,7 @@ describe("polished unified landing visual contract", () => {
     expect(responsiveAudit).toContain("'/payment-and-refund'");
     expect(productionAudit).toContain('LANDING_REQUIRE_ANALYTICS_CONSENT === "true"');
     expect(productionAudit).toContain("analytics consent control is required for this audit");
-    expect(productionAudit).toContain('name: "mobile-320x700"');
+    expect(productionAudit).toContain('name: "mobile-320x568"');
     expect(productionAudit).toContain('async function revealAllMotionSections');
     expect(productionAudit).toContain('[data-motion-reveal="section"]');
     expect(productionAudit).toContain('data-motion-state');

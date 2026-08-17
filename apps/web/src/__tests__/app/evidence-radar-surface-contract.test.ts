@@ -7,7 +7,8 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
   const map = readFileSync(resolve(opportunitiesRoot, 'evidence-radar-map.tsx'), 'utf8')
   const mapCss = readFileSync(resolve(opportunitiesRoot, 'evidence-radar-map.module.css'), 'utf8')
   const radarPage = readFileSync(resolve(opportunitiesRoot, 'radar', 'page.tsx'), 'utf8')
-  const sourcePage = readFileSync(resolve(opportunitiesRoot, 'sources', 'page.tsx'), 'utf8')
+  const sourcePage = readFileSync(resolve(process.cwd(), 'app', 'settings', 'diagnostics', 'sources', 'page.tsx'), 'utf8')
+  const legacySourcePage = readFileSync(resolve(opportunitiesRoot, 'sources', 'page.tsx'), 'utf8')
   const repository = readFileSync(resolve(intelligenceRoot, 'evidence-radar-repository.ts'), 'utf8')
   const governance = readFileSync(resolve(intelligenceRoot, 'evidence-source-governance-repository.ts'), 'utf8')
   const navigation = readFileSync(resolve(opportunitiesRoot, 'navigation.ts'), 'utf8')
@@ -73,7 +74,8 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
   it('keeps Sources outside primary product navigation and labels it as diagnostics', () => {
     expect(navigation).toContain("buildAccountNavigation('opportunities')")
     expect(navigation).not.toContain("label: 'Возможности'")
-    expect(navigation).toContain("label: 'Диагностика источников'")
+    expect(navigation).not.toContain('Диагностика источников')
+    expect(legacySourcePage).toContain("redirect('/settings/diagnostics/sources')")
   })
 
   it('reads source automation state from the live append-only review ledger', () => {

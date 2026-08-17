@@ -12,17 +12,17 @@ const requireAnalyticsConsent = process.env.LANDING_REQUIRE_ANALYTICS_CONSENT ==
 
 const viewportMatrix = [
   { width: 1920, height: 1080, name: "desktop-1920x1080" },
+  { width: 1536, height: 960, name: "desktop-1536x960" },
   { width: 1440, height: 900, name: "desktop-1440x900" },
   { width: 1366, height: 768, name: "desktop-1366x768" },
   { width: 1280, height: 800, name: "desktop-1280x800" },
-  { width: 1180, height: 820, name: "tablet-1180x820" },
-  { width: 1152, height: 800, name: "tablet-1152x800" },
   { width: 1024, height: 768, name: "tablet-1024x768" },
-  { width: 900, height: 900, name: "tablet-900x900" },
   { width: 768, height: 1024, name: "tablet-768x1024" },
+  { width: 430, height: 932, name: "mobile-430x932" },
   { width: 390, height: 844, name: "mobile-390x844" },
+  { width: 375, height: 812, name: "mobile-375x812" },
   { width: 360, height: 800, name: "mobile-360x800" },
-  { width: 320, height: 700, name: "mobile-320x700" },
+  { width: 320, height: 568, name: "mobile-320x568" },
 ];
 
 const requiredSelectors = [
@@ -292,7 +292,7 @@ async function assertHeroGeometry(page, label) {
 
   if (viewport.width >= 1024) {
     const primary = await page.locator('#scene-detection [data-analytics-context="hero_primary"]').boundingBox();
-    const login = await page.getByRole("link", { name: "Уже есть доступ? Войти" }).boundingBox();
+    const login = await page.getByRole("link", { name: "Войти", exact: true }).boundingBox();
     const trust = await page.locator("#scene-detection [data-hero-trust-line]").boundingBox();
     assert.ok(primary && login && trust, `${label}: missing hero fold surfaces`);
     assert.ok(primary.y + primary.height <= viewport.height, `${label}: primary CTA is below fold`);

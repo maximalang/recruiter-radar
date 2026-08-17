@@ -73,7 +73,7 @@ describe("landing runtime truth contract", () => {
       ]),
     );
 
-    expect(evidence).toContain("Почему сейчас");
+    expect(evidence).toContain("почему сейчас");
     expect(evidence).toContain("Карьерная страница");
     expect(evidence).toContain("Публичные вакансии");
     expect(evidence).toContain("Прямой источник");

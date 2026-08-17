@@ -46,7 +46,7 @@ describe("auth v2 onboarding view", () => {
       data: { fullName: "Анна", agencyName: "North Star", teamRole: "leader" },
     }} />);
 
-    expect(screen.getByRole("heading", { level: 2, name: "Как получать новые возможности" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Как получать новые компании" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Telegram/ })).toBeInTheDocument();
     expect(screen.getByLabelText(/Email для дайджеста/)).toHaveAttribute("type", "email");
     expect(screen.getByText(/доставка останется выключенной/i)).toBeInTheDocument();

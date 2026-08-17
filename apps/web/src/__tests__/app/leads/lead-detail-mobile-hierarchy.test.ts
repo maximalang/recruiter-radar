@@ -2,18 +2,16 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 const pagePath = resolve(process.cwd(), 'app', 'leads', '[id]', 'page.tsx')
+const stylesPath = resolve(process.cwd(), 'app', 'leads', '[id]', 'lead-brief.module.css')
 
-describe('lead detail mobile hierarchy', () => {
-  it('keeps decision, contact and action before secondary context in DOM order', async () => {
+describe('company brief mobile hierarchy', () => {
+  it('keeps Decision -> Evidence -> Action before secondary context in DOM order', async () => {
     const page = await readFile(pagePath, 'utf8')
     const orderedAnchors = [
-      '<section className={styles.decision}',
-      '<aside className={styles.aside}',
-      '<span className={styles.railTitle}>Контакт</span>',
-      '<NextStepsBlock',
-      '<div className={styles.main}>',
-      '<h2>Контекст компании и найма</h2>',
-      '<h2>Evidence ledger</h2>',
+      'data-company-brief-decision',
+      'data-company-brief-evidence',
+      'data-company-brief-action',
+      'data-company-brief-context',
     ]
 
     let previous = -1
@@ -23,5 +21,12 @@ describe('lead detail mobile hierarchy', () => {
       previous = current
     }
     expect(page.match(/<NextStepsBlock/g)).toHaveLength(1)
+  })
+
+  it('uses semantic grid areas rather than CSS order to preserve mobile meaning', async () => {
+    const styles = await readFile(stylesPath, 'utf8')
+    expect(styles).toContain('grid-template-areas:"evidence action" "main action"')
+    expect(styles).toContain('grid-template-areas:"evidence" "action" "main"')
+    expect(styles).not.toMatch(/(?:^|[;{])\s*order\s*:/)
   })
 })

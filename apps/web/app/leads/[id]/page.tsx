@@ -215,7 +215,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           </div>
         </div>
 
-        <section className={styles.decision} aria-label="Решение">
+        <section className={styles.decision} aria-label="Решение" data-company-brief-decision>
           <div className={styles.decisionSection}>
             <span className={styles.label}>Почему сейчас</span>
             <p className={styles.whyNow}>{lead.whyNow?.trim() || urgency.label}</p>
@@ -230,18 +230,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </section>
 
         <div className={styles.layout}>
-          <div className={styles.main}>
-            {summaryLines.length > 0 ? (
-              <section className={styles.section}>
-                <h2>Контекст компании и найма</h2>
-                <div className={styles.summary}>
-                  {summaryLines.map((line, index) => <p key={index}>{line}</p>)}
-                  {summary.isThin ? <p>Доказательств пока немного; вывод будет уточняться по мере новых сигналов.</p> : null}
-                </div>
-              </section>
-            ) : null}
 
-            <section className={styles.section}>
+          <section className={`${styles.section} ${styles.evidenceSection}`} data-company-brief-evidence>
               <h2>Подтверждения</h2>
               <div className={styles.stats}>
                 <span>{lead.vacanciesCount} вакансий</span>
@@ -263,23 +253,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               ) : null}
             </section>
 
-            {fit && !fit.isEmpty ? (
-              <section className={styles.section}>
-                <h2>Соответствие вашему профилю</h2>
-                <ul className={styles.fitList}>{fit.lines.map((line, index) => <li key={index}>{line.text}</li>)}</ul>
-              </section>
-            ) : null}
-
-            <AiEnrichmentBlock enrichment={lead.aiEnrichment} />
-
-            {lead.negativeSignals.length > 0 ? (
-              <section className={styles.section}>
-                <h2>Риски и ограничения</h2>
-                <ul className={styles.riskList}>{lead.negativeSignals.map((signal, index) => <li key={index}>{signal}</li>)}</ul>
-              </section>
-            ) : null}
-          </div>
-          <aside className={styles.aside} aria-label="Действия и контекст">
+          <aside className={styles.aside} aria-label="Действия и контекст" data-company-brief-action>
             <div className={styles.rail}>
               <section className={styles.railSection}>
                 <span className={styles.railTitle}>Контакт</span>
@@ -333,6 +307,34 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </section>
             </div>
           </aside>
+          <div className={styles.main} data-company-brief-context>
+            {summaryLines.length > 0 ? (
+              <section className={styles.section}>
+                <h2>Контекст компании и найма</h2>
+                <div className={styles.summary}>
+                  {summaryLines.map((line, index) => <p key={index}>{line}</p>)}
+                  {summary.isThin ? <p>Доказательств пока немного; вывод будет уточняться по мере новых сигналов.</p> : null}
+                </div>
+              </section>
+            ) : null}
+
+
+            {fit && !fit.isEmpty ? (
+              <section className={styles.section}>
+                <h2>Соответствие вашему профилю</h2>
+                <ul className={styles.fitList}>{fit.lines.map((line, index) => <li key={index}>{line.text}</li>)}</ul>
+              </section>
+            ) : null}
+
+            <AiEnrichmentBlock enrichment={lead.aiEnrichment} />
+
+            {lead.negativeSignals.length > 0 ? (
+              <section className={styles.section}>
+                <h2>Риски и ограничения</h2>
+                <ul className={styles.riskList}>{lead.negativeSignals.map((signal, index) => <li key={index}>{signal}</li>)}</ul>
+              </section>
+            ) : null}
+          </div>
 
         </div>
       </div>

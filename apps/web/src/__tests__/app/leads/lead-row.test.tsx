@@ -45,7 +45,7 @@ describe('LeadRow V1-V6 decision-row contract', () => {
     expect(screen.getByText('Hiring burst across 3 roles')).toBeInTheDocument();
     expect(row?.textContent).toContain('4 вакансии');
     expect(row?.textContent).toContain('1 источник');
-    expect(container.querySelector('[aria-label="Сила сигнала 80 из 100"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Сила сигнала 80"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Уверенность: высокая"]')).not.toBeNull();
     expect(screen.getByRole('link', { name: 'Открыть анализ компании Ромашка' })).toHaveAttribute('href', '/leads/lead-1');
 
@@ -56,7 +56,7 @@ describe('LeadRow V1-V6 decision-row contract', () => {
     expect(container.querySelector('[data-legend]')).toBeNull();
   });
 
-  it('keeps primary proof scan-friendly and provenance behind a disclosure', () => {
+  it('keeps primary proof scan-friendly without a per-row evidence accordion', () => {
     const { container } = render(
       <LeadRow
         lead={{ ...baseLead, reasons: ['Карьерная страница обновлена'] } as unknown as LeadItem}
@@ -67,18 +67,11 @@ describe('LeadRow V1-V6 decision-row contract', () => {
     );
 
     expect(screen.getByText('Hiring burst across 3 roles')).toBeInTheDocument();
+    expect(container.textContent).toContain('4 вакансии · 2 подтвержд.');
+    expect(container.textContent).toContain('1 источник');
     expect(container.textContent).toContain('Совпадает отрасль');
-
-    const disclosure = container.querySelector('details[data-motion-disclosure]');
-    const summary = disclosure?.querySelector('summary');
-    expect(disclosure).not.toBeNull();
-    expect(summary?.textContent).toMatch(/Подтверждения и происхождение/i);
-
-    fireEvent.click(summary as HTMLElement);
-    expect(disclosure).toHaveAttribute('open');
-    expect(screen.getByText('Backend')).toBeInTheDocument();
-    expect(screen.getByText(/Источник: career-pages/)).toBeInTheDocument();
-    expect(screen.getByText('Карьерная страница обновлена')).toBeInTheDocument();
+    expect(container.querySelector('details')).toBeNull();
+    expect(container.querySelector('[data-legend]')).toBeNull();
   });
 
   it('keeps workflow status subordinate to the decision hierarchy', () => {
@@ -86,7 +79,7 @@ describe('LeadRow V1-V6 decision-row contract', () => {
       <LeadRow lead={baseLead} fitPreview={null} hiringMode="specialist" rank={3} />,
     );
     expect(container.textContent).toMatch(/В работе/i);
-    expect(container.querySelector('[aria-label="Сила сигнала 80 из 100"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Сила сигнала 80"]')).not.toBeNull();
   });
 
   it('renders foreign-employer and AI context as quiet metadata rather than score semantics', () => {
@@ -95,7 +88,7 @@ describe('LeadRow V1-V6 decision-row contract', () => {
       <LeadRow lead={foreignLead} fitPreview={null} hiringMode="specialist" rank={4} />,
     );
     expect(container.textContent).toContain('иностранный работодатель');
-    expect(container.textContent).toContain('AI-подсказка доступна');
-    expect(container.querySelector('[aria-label="Сила сигнала 80 из 100"]')).not.toBeNull();
+    expect(container.textContent).toContain('ИИ-подсказка доступна');
+    expect(container.querySelector('[aria-label="Сила сигнала 80"]')).not.toBeNull();
   });
 });

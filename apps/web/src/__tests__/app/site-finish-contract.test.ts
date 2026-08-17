@@ -77,10 +77,13 @@ describe("cross-route visual layer contract", () => {
     const internalPage = readAppFile("ui/internal-page.module.css");
     const opportunities = readAppFile("opportunities/opportunities.module.css");
     const radar = readAppFile("opportunities/evidence-radar-map.module.css");
+    const leads = readAppFile("leads/leads-workspace.module.css");
 
     expect(internalPage).toContain(".leadDetailContainer .detailMain > .contentCard");
     expect(internalPage).toContain(".leadDetailContainer .detailSidebar > .contentCard");
-    expect(internalPage).toMatch(/\.signalCardList \{[\s\S]*?gap: 0;[\s\S]*?background: transparent;/);
+    expect(leads).toContain(".list{display:grid}");
+    expect(leads).toMatch(/\.row\{[\s\S]*?border-bottom:1px solid var\(--rr-color-separator\)/);
+    expect(leads).not.toContain(".disclosure");
     expect(internalPage).not.toContain("signalLeadSections");
     expect(internalPage).not.toContain("scoreGauge");
     expect(internalPage).not.toContain("scoreBar");

@@ -69,7 +69,7 @@ describe('OpportunityFunnel', () => {
     expect(screen.getAllByText('Незрелая когорта', { exact: false }))
       .toHaveLength(2)
     expect(screen.getByText(
-      'Показано 7 раз · 4 возможности',
+      'Показано 7 раз · 4 ситуации',
       { exact: false },
     )).toBeInTheDocument()
     expect(screen.queryByText('75%')).toBeNull()

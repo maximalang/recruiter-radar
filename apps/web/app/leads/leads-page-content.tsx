@@ -109,7 +109,8 @@ export function LeadRow({
     (lead.feedbackStatus && lead.feedbackStatus !== 'none')
   );
   const secondarySignals = [
-    lead.isForeignEmployer ? 'зарубежный ATS' : null,
+    lead.isForeignEmployer ? 'иностранный работодатель' : null,
+    lead.hasAiHint ? 'ИИ-подсказка доступна' : null,
     fitPreview?.text ?? null,
   ].filter(Boolean).join(' · ');
 

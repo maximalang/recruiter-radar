@@ -1255,12 +1255,12 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
     '/leads',
     screenshots.leads,
   )
-  const leadDisclosure = page.locator('details[data-motion-disclosure]').first()
-  await leadDisclosure.waitFor({ state: 'visible' })
-  await leadDisclosure.locator('summary').click()
+  const leadRows = page.locator('article[data-lead-row="true"]')
+  await leadRows.first().waitFor({ state: 'visible' })
+  assert(await leadRows.count() >= 1, 'Authenticated company rows are missing.')
   assert(
-    await leadDisclosure.getAttribute('open') === '',
-    'Authenticated lead disclosure did not open.',
+    await leadRows.first().locator('details').count() === 0,
+    'Company rows must stay scan-first without per-row evidence accordions.',
   )
   const todayFilter = page.locator('button[data-motion-interactive]').filter({
     hasText: 'Сегодня в работе',
@@ -1278,10 +1278,17 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
     `/leads/${owner.productSurfaces.candidateId}`,
     screenshots.leadDetail,
   )
-  assert(
-    await page.locator('[data-motion-disclosure]').count() >= 1,
-    'Authenticated lead detail disclosure is missing.',
-  )
+  const companyBriefOrder = await page.evaluate(() => {
+    const decision = document.querySelector('[data-company-brief-decision]')
+    const evidence = document.querySelector('[data-company-brief-evidence]')
+    const action = document.querySelector('[data-company-brief-action]')
+    if (!decision || !evidence || !action) return false
+    return Boolean(
+      decision.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING
+      && evidence.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING
+    )
+  })
+  assert(companyBriefOrder, 'Company Brief must keep Decision -> Evidence -> Action in DOM order.')
 
   await inspectSurface(
     page,
@@ -1339,7 +1346,7 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
     mobile390: true,
     leadsWithData: true,
     leadDetail: true,
-    filterDisclosureStatusInteractions: true,
+    filterAndDecisionFlowInteractions: true,
     opportunities: true,
     commercialSignalCard: true,
     evidenceRadarMarkerSelection: true,
