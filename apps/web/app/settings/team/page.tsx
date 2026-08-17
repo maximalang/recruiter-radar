@@ -5,7 +5,6 @@ import { readCurrentAuthSession } from "@/lib/auth-v2/current-session";
 import { getWorkspaceTeam } from "@/lib/auth-v2/workspace-team";
 import { buildAccountNavigation } from "../../ui/account-navigation";
 import {
-  ContentCard,
   EmptyState,
   InternalPageFrame,
   InternalPageHeader,
@@ -51,13 +50,11 @@ export default async function TeamSettingsPage(props: {
           title="Команда"
           subtitle="Управление участниками доступно владельцу и администраторам."
         />
-        <ContentCard>
-          <EmptyState
-            title="Недостаточно прав"
-            text="Ваш доступ к рабочему пространству не позволяет управлять командой."
-            action={{ href: "/settings/security", label: "Открыть безопасность" }}
-          />
-        </ContentCard>
+        <EmptyState
+          title="Недостаточно прав"
+          text="Ваш доступ к рабочему пространству не позволяет управлять командой."
+          action={{ href: "/settings/security", label: "Открыть безопасность" }}
+        />
       </InternalPageFrame>
     );
   }
