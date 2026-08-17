@@ -9,6 +9,7 @@ import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/l
 import { toContactPathViews } from '@/lib/leads/contact-display';
 import { filterContactPathsByPolicy } from '@/lib/contact-policy-filter';
 import { leadToCrmBlock } from '@/lib/leads-csv';
+import { formatVacanciesCount, pluralForm } from '@/lib/format/plural';
 import { formatScorePoints } from '@/lib/scoring/score-display';
 import FeedbackButtons from './feedback-buttons';
 import AiEnrichmentBlock from './ai-enrichment-block';
@@ -51,6 +52,14 @@ function ConfidenceIndicator({ gate }: { gate: string }) {
       <span className={styles.confidenceLabel}>{view.label}</span>
     </div>
   );
+}
+
+function formatRoleCount(count: number): string {
+  return `${count} ${pluralForm(count, ['роль', 'роли', 'ролей'])}`;
+}
+
+function formatSourceCount(count: number): string {
+  return `${count} ${pluralForm(count, ['источник', 'источника', 'источников'])}`;
 }
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -151,7 +160,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const lawfulPath = formatLawfulContactPath(lead.lawfulContactPath);
 
   const nextMove = contactViews.length > 0
-    ? `Начать с найденного корпоративного контакта и сослаться на текущий hiring signal.`
+    ? `Начать с найденного корпоративного контакта и сослаться на текущий сигнал найма.`
     : lawfulPath
       ? `Использовать безопасный путь контакта: ${lawfulPath}.`
       : lead.careerPageUrl
@@ -204,8 +213,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
         <div className={styles.identityLine}>
           <div className={styles.identityMeta}>
-            <span>{lead.vacanciesCount} вакансий</span>
-            <span>{lead.distinctVacancyNamesCount} ролей</span>
+            <span>{formatVacanciesCount(lead.vacanciesCount)}</span>
+            <span>{formatRoleCount(lead.distinctVacancyNamesCount)}</span>
             {latestSignal ? <span>последний сигнал {latestSignal}</span> : null}
             {lead.reviewStatus && lead.reviewStatus !== 'auto_approved' ? <span>на проверке</span> : null}
           </div>
@@ -234,9 +243,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <section className={`${styles.section} ${styles.evidenceSection}`} data-company-brief-evidence>
               <h2>Подтверждения</h2>
               <div className={styles.stats}>
-                <span>{lead.vacanciesCount} вакансий</span>
-                <span>{lead.distinctVacancyNamesCount} разных ролей</span>
-                <span>{lead.sourceFamilies.length} источников</span>
+                <span>{formatVacanciesCount(lead.vacanciesCount)}</span>
+                <span>{formatRoleCount(lead.distinctVacancyNamesCount)}</span>
+                <span>{formatSourceCount(lead.sourceFamilies.length)}</span>
               </div>
               {lead.evidenceTitles.length > 0 ? (
                 <ol className={styles.evidenceList}>
@@ -281,7 +290,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </section>
 
               <section className={styles.railSection}>
-                <span className={styles.railTitle}>Workflow</span>
+                <span className={styles.railTitle}>Статус</span>
                 <div className={styles.railValue}>{feedback ? feedback.label : 'Обратной связи ещё нет'}</div>
                 {lead.feedbackNote ? <p className={styles.body}>{lead.feedbackNote}</p> : null}
                 <FeedbackButtons orgId={lead.orgId} clientProfileId={lead.clientProfileId} currentStatus={lead.feedbackStatus ?? 'none'} />
