@@ -1,0 +1,56 @@
+name: Responsive audit consent remediation
+
+on:
+  push:
+    branches:
+      - chatgpt/full-v1-v6-implementation
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: chatgpt/full-v1-v6-implementation
+          fetch-depth: 0
+      - name: Resolve analytics consent before responsive interactions
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/verify-responsive-surfaces.mjs')
+          text = path.read_text()
+          needle = "      await page.waitForLoadState('networkidle', { timeout: 30_000 });\n\n      const status = response?.status() ?? 0;"
+          replacement = """      await page.waitForLoadState('networkidle', { timeout: 30_000 });
+
+      const analyticsConsent = page.locator('[data-analytics-consent=\"true\"]');
+      if (await analyticsConsent.isVisible().catch(() => false)) {
+        const allowAnalytics = analyticsConsent.getByRole('button', { name: 'Разрешить' });
+        if (await allowAnalytics.count() > 0) {
+          await allowAnalytics.click();
+          await analyticsConsent.waitFor({ state: 'hidden', timeout: 5_000 });
+        }
+      }
+
+      const status = response?.status() ?? 0;"""
+          count = text.count(needle)
+          if count != 1:
+              raise SystemExit(f'expected one responsive navigation setup marker, found {count}')
+          path.write_text(text.replace(needle, replacement))
+          PY
+          node --check scripts/verify-responsive-surfaces.mjs
+      - name: Commit remediation
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/chatgpt-responsive-consent-remediation.yml
+          git add scripts/verify-responsive-surfaces.mjs
+          git commit -m 'fix(ci): resolve consent before responsive interactions'
+          git push origin HEAD:chatgpt/full-v1-v6-implementation
