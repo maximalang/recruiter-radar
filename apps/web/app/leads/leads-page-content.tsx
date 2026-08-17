@@ -13,7 +13,7 @@ import { getSession } from '@/lib/auth-v2/authorization';
 import { getEffectiveEntitlement } from '@/lib/entitlements';
 import { buildFitExplanation } from '@/lib/leads/fit-explanation';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
-import { formatVacanciesCount } from '@/lib/format/plural';
+import { formatVacanciesCount, pluralForm } from '@/lib/format/plural';
 import { formatScorePoints } from '@/lib/scoring/score-display';
 import LeadsFilters from './leads-filters';
 import { pluralizeLeads } from './page-helpers';
@@ -134,7 +134,7 @@ export function LeadRow({
         <strong>{vacancies} · {lead.evidenceTitles.length} подтвержд.</strong>
         <div className={styles.evidenceMeta}>
           {lead.sourceFamilies.length > 0
-            ? `${lead.sourceFamilies.length} ${lead.sourceFamilies.length === 1 ? 'источник' : 'источника'}`
+            ? `${lead.sourceFamilies.length} ${pluralForm(lead.sourceFamilies.length, ['источник', 'источника', 'источников'])}`
             : 'источник не подтверждён'}
         </div>
       </div>
