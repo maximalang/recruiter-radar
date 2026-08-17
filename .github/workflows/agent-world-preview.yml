@@ -1,0 +1,49 @@
+name: Agent World Preview
+
+on:
+  push:
+    branches: ['temp/agent-world-preview']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-world-preview
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${{ secrets.RR_SSH_PORT }}" -t ed25519 "${{ secrets.RR_SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Read-only VDS capacity preflight
+        run: |
+          set -euo pipefail
+          ssh -p "${{ secrets.RR_SSH_PORT }}" -o LogLevel=ERROR \
+            "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" <<'SSH_EOF'
+          set -euo pipefail
+          echo '=== AGENT_WORLD_PREFLIGHT_SYSTEM ==='
+          uname -a
+          echo "cpus=$(nproc)"
+          echo '=== AGENT_WORLD_PREFLIGHT_MEMORY ==='
+          free -m
+          echo '=== AGENT_WORLD_PREFLIGHT_DISK ==='
+          df -h / /opt /var/lib/docker 2>/dev/null || df -h /
+          echo '=== AGENT_WORLD_PREFLIGHT_DOCKER_DF ==='
+          docker system df
+          echo '=== AGENT_WORLD_PREFLIGHT_RUNNING_CONTAINERS ==='
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+          echo '=== AGENT_WORLD_PREFLIGHT_PORTS ==='
+          ss -lnt | awk 'NR==1 || $4 ~ /:(80|443|3000|3001|3002|3100|3200|8080|8443)$/'
+          echo '=== AGENT_WORLD_PREFLIGHT_LOAD ==='
+          uptime
+          echo '=== AGENT_WORLD_PREFLIGHT_DONE ==='
+          SSH_EOF
