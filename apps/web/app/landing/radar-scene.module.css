@@ -24,7 +24,7 @@
 }
 .heading{
   margin:0;
-  max-width:12ch;
+  max-width:16ch;
   color:var(--rr-color-text-primary);
   font-size:clamp(2.2rem,4.5vw,4.5rem);
   font-weight:590;
