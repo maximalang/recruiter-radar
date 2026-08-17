@@ -1,0 +1,62 @@
+name: Agent World Preview Status
+
+on:
+  push:
+    branches: ['temp/agent-world-status']
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${{ secrets.RR_SSH_PORT }}" -t ed25519 "${{ secrets.RR_SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Verify isolated runtime and Radar health
+        run: |
+          set -euo pipefail
+          ssh -p "${{ secrets.RR_SSH_PORT }}" -o LogLevel=ERROR \
+            "${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}" <<'SSH_EOF'
+          set -euo pipefail
+          for container in agent-world-preview-db agent-world-preview-web; do
+            status="$(docker inspect --format '{{.State.Status}}' "$container")"
+            health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container")"
+            restarts="$(docker inspect --format '{{.RestartCount}}' "$container")"
+            oom="$(docker inspect --format '{{.State.OOMKilled}}' "$container")"
+            echo "$container status=$status health=$health restarts=$restarts oom=$oom"
+            test "$status" = running
+            test "$health" = healthy
+            test "$restarts" = 0
+            test "$oom" = false
+          done
+          test "$(grep -Fc '# BEGIN Agent World Preview (managed)' /etc/caddy/Caddyfile)" = 1
+          test "$(grep -Fc '# END Agent World Preview (managed)' /etc/caddy/Caddyfile)" = 1
+          curl -fsS http://127.0.0.1:3100/api/health/ready
+          session_status="$(curl -sS -o /tmp/agent-world-session.json -w '%{http_code}' http://127.0.0.1:3100/api/auth/session)"
+          test "$session_status" = 401
+          grep -F 'AUTHENTICATION_REQUIRED' /tmp/agent-world-session.json >/dev/null
+          rm -f /tmp/agent-world-session.json
+          curl -fsS http://127.0.0.1:3000/api/health >/dev/null
+          ss -lnt | grep -E '(:8443[[:space:]]|:3100[[:space:]])'
+          free -m
+          df -h /
+          SSH_EOF
+
+      - name: Verify both public HTTPS endpoints
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 15 https://recruiter-radar.ru:8443/api/health/ready >/tmp/agent-world-ready.json
+          status="$(curl -sS -o /tmp/agent-world-session.json -w '%{http_code}' --max-time 15 https://recruiter-radar.ru:8443/api/auth/session)"
+          test "$status" = 401
+          grep -F 'AUTHENTICATION_REQUIRED' /tmp/agent-world-session.json >/dev/null
+          curl -fsS --max-time 15 https://recruiter-radar.ru/api/health >/tmp/radar-ready.json
+          curl -fsSI --max-time 15 https://recruiter-radar.ru:8443/ | grep -E '^HTTP/|^strict-transport-security:|^content-security-policy:'
+          rm -f /tmp/agent-world-ready.json /tmp/agent-world-session.json /tmp/radar-ready.json
