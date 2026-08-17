@@ -30,23 +30,44 @@ jobs:
 
           workspace = Path('apps/web/app/landing/workspace-scene.tsx')
           text = workspace.read_text()
-          needle = '            href={props.checkoutHref}\n'
-          count = text.count(needle)
-          if count != 2:
-              raise SystemExit(f'expected 2 workspace checkout links, found {count}')
-          text = text.replace(needle, '            prefetch={false}\n' + needle)
+          replacements = [
+              (
+                  '            href={props.checkoutHref}\n',
+                  '            prefetch={false}\n            href={props.checkoutHref}\n',
+                  1,
+              ),
+              (
+                  '          href={checkoutHref}\n',
+                  '          prefetch={false}\n          href={checkoutHref}\n',
+                  1,
+              ),
+          ]
+          for old, new, expected in replacements:
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f'workspace checkout replacement mismatch: {old!r}: {count} != {expected}')
+              text = text.replace(old, new)
           workspace.write_text(text)
 
           conversion = Path('apps/web/app/landing/conversion-panel.tsx')
           text = conversion.read_text()
-          needle_a = '            href={buildCheckoutHref('
-          needle_b = '                  href={buildCheckoutHref('
-          count_a = text.count(needle_a)
-          count_b = text.count(needle_b)
-          if count_a != 2 or count_b != 1:
-              raise SystemExit(f'expected checkout links 2+1, found {count_a}+{count_b}')
-          text = text.replace(needle_a, '            prefetch={false}\n' + needle_a)
-          text = text.replace(needle_b, '                  prefetch={false}\n' + needle_b)
+          replacements = [
+              (
+                  '            href={buildCheckoutHref(',
+                  '            prefetch={false}\n            href={buildCheckoutHref(',
+                  2,
+              ),
+              (
+                  '                  href={buildCheckoutHref(',
+                  '                  prefetch={false}\n                  href={buildCheckoutHref(',
+                  1,
+              ),
+          ]
+          for old, new, expected in replacements:
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f'conversion checkout replacement mismatch: {old!r}: {count} != {expected}')
+              text = text.replace(old, new)
           conversion.write_text(text)
           PY
       - name: Install dependencies
