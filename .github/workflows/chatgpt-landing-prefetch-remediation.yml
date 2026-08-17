@@ -28,47 +28,31 @@ jobs:
           python <<'PY'
           from pathlib import Path
 
-          workspace = Path('apps/web/app/landing/workspace-scene.tsx')
-          text = workspace.read_text()
-          replacements = [
-              (
-                  '            href={props.checkoutHref}\n',
-                  '            prefetch={false}\n            href={props.checkoutHref}\n',
-                  1,
-              ),
-              (
-                  '          href={checkoutHref}\n',
-                  '          prefetch={false}\n          href={checkoutHref}\n',
-                  1,
-              ),
-          ]
-          for old, new, expected in replacements:
-              count = text.count(old)
+          def insert_prefetch(path, predicate, expected):
+              source = Path(path)
+              lines = source.read_text().splitlines(keepends=True)
+              result = []
+              count = 0
+              for line in lines:
+                  if predicate(line):
+                      indent = line[:len(line) - len(line.lstrip())]
+                      result.append(f'{indent}prefetch={{false}}\n')
+                      count += 1
+                  result.append(line)
               if count != expected:
-                  raise SystemExit(f'workspace checkout replacement mismatch: {old!r}: {count} != {expected}')
-              text = text.replace(old, new)
-          workspace.write_text(text)
+                  raise SystemExit(f'{path}: expected {expected} checkout links, found {count}')
+              source.write_text(''.join(result))
 
-          conversion = Path('apps/web/app/landing/conversion-panel.tsx')
-          text = conversion.read_text()
-          replacements = [
-              (
-                  '            href={buildCheckoutHref(',
-                  '            prefetch={false}\n            href={buildCheckoutHref(',
-                  2,
-              ),
-              (
-                  '                  href={buildCheckoutHref(',
-                  '                  prefetch={false}\n                  href={buildCheckoutHref(',
-                  1,
-              ),
-          ]
-          for old, new, expected in replacements:
-              count = text.count(old)
-              if count != expected:
-                  raise SystemExit(f'conversion checkout replacement mismatch: {old!r}: {count} != {expected}')
-              text = text.replace(old, new)
-          conversion.write_text(text)
+          insert_prefetch(
+              'apps/web/app/landing/workspace-scene.tsx',
+              lambda line: line.lstrip().startswith('href={props.checkoutHref}') or line.lstrip().startswith('href={checkoutHref}'),
+              2,
+          )
+          insert_prefetch(
+              'apps/web/app/landing/conversion-panel.tsx',
+              lambda line: line.lstrip().startswith('href={buildCheckoutHref('),
+              3,
+          )
           PY
       - name: Install dependencies
         run: npm ci
