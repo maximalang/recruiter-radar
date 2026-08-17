@@ -506,13 +506,14 @@ async function assertKeyboardSkipLink(browser) {
 async function assertActiveNavigationAndTone(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const { page, assertCleanConsole } = await preparePage(context, "active-navigation-tone");
+  const brandHeader = page.locator('header[data-brand-header="recruiter-radar"]');
   await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
   await page.waitForTimeout(180);
-  assert.match(await page.locator("header a[aria-current='location']").first().innerText(), /Как работает/);
-  assert.equal(await page.locator("header").getAttribute("data-tone"), "dark");
+  assert.match(await brandHeader.locator("a[aria-current='location']").first().innerText(), /Как работает/);
+  assert.equal(await brandHeader.getAttribute("data-tone"), "dark");
   await page.locator("#scene-delivery").scrollIntoViewIfNeeded();
   await page.waitForTimeout(180);
-  assert.equal(await page.locator("header").getAttribute("data-tone"), "light");
+  assert.equal(await brandHeader.getAttribute("data-tone"), "light");
   assertCleanConsole();
   await context.close();
 }
