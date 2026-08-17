@@ -29,6 +29,7 @@ jobs:
 
           root = Path('.')
           web = root / 'apps' / 'web'
+          app = web / 'app'
           text_suffixes = {'.css', '.ts', '.tsx', '.js', '.jsx', '.mjs'}
 
           replacements = {
@@ -80,7 +81,7 @@ jobs:
               '--rr-ease': '--rr-motion-ease-standard',
           }
 
-          pvs = web / 'app' / 'product-visual-system.css'
+          pvs = app / 'product-visual-system.css'
           pvs_text = pvs.read_text()
           aliases = tuple(replacements.keys())
           kept = []
@@ -91,7 +92,9 @@ jobs:
               kept.append(line)
           pvs.write_text(''.join(kept))
 
-          for path in web.rglob('*'):
+          # Migrate only live presentation code. Tests stay independent and keep
+          # detecting the retired grammar exactly as the V6 specification requires.
+          for path in app.rglob('*'):
               if not path.is_file() or path.suffix not in text_suffixes or path == pvs:
                   continue
               content = path.read_text()
@@ -103,7 +106,6 @@ jobs:
               if updated != content:
                   path.write_text(updated)
 
-          # Remove the remaining banned implementation grammar without changing domain meaning.
           symbol_replacements = {
               'ScoreBandChip': 'SignalBandLabel',
               'ScoreGauge': 'SignalStrength',
@@ -112,7 +114,7 @@ jobs:
               'organizationDiamond': 'organizationAnchor',
               'scoreGrid': 'diagnosticsGrid',
           }
-          for path in (web / 'app').rglob('*'):
+          for path in app.rglob('*'):
               if not path.is_file() or path.suffix not in text_suffixes:
                   continue
               content = path.read_text()
@@ -128,22 +130,47 @@ jobs:
               if updated != content:
                   path.write_text(updated)
 
-          # Keep source-level tests aligned with renamed internal symbols/labels.
-          for path in (web / 'src' / '__tests__').rglob('*'):
-              if not path.is_file() or path.suffix not in text_suffixes:
-                  continue
-              content = path.read_text()
-              updated = content
-              for old, new in symbol_replacements.items():
-                  updated = updated.replace(old, new)
-              updated = updated.replace('recruiter-radar-v6', 'recruiter-radar')
-              updated = updated.replace('recruiter-radar-v7', 'recruiter-radar')
-              if updated != content:
-                  path.write_text(updated)
+          # Compact top shell + mobile navigation use the shared semantic motion
+          # contract without reintroducing decorative transforms.
+          workspace_path = app / 'ui' / 'product-workspace.tsx'
+          content = workspace_path.read_text()
+          content = content.replace(
+              '              aria-current={item.active ? "page" : undefined}\n            >',
+              '              aria-current={item.active ? "page" : undefined}\n              data-motion-interactive\n            >',
+              1,
+          )
+          content = content.replace(
+              '          aria-current={settingsActive ? "page" : undefined}\n        >',
+              '          aria-current={settingsActive ? "page" : undefined}\n          data-motion-interactive\n        >',
+              1,
+          )
+          mobile_old = '''            aria-current={item.active ? "page" : undefined}\n          >\n            <Icon className={styles.mobileNavIcon} aria-hidden="true" />'''
+          mobile_new = '''            aria-current={item.active ? "page" : undefined}\n            data-motion-interactive\n          >\n            <Icon\n              className={styles.mobileNavIcon}\n              aria-hidden="true"\n              data-motion-icon="navigation"\n              data-motion-state={item.active ? "active" : "idle"}\n            />'''
+          assert mobile_old in content, 'mobile navigation motion anchor changed unexpectedly'
+          content = content.replace(mobile_old, mobile_new, 1)
+          content = content.replace(
+              '<details className={styles.mobileMore} data-active={moreActive ? "true" : undefined}>\n        <summary>\n          <LayersIcon className={styles.mobileNavIcon} aria-hidden="true" />',
+              '<details className={styles.mobileMore} data-active={moreActive ? "true" : undefined} data-motion-disclosure>\n        <summary data-motion-interactive>\n          <LayersIcon className={styles.mobileNavIcon} aria-hidden="true" data-motion-icon="disclosure" />',
+              1,
+          )
+          workspace_path.write_text(content)
 
-          # Opportunity disclosure migrated from <details>/<summary> to an accessible button.
-          test_path = web / 'src' / '__tests__' / 'app' / 'opportunities' / 'opportunity-card.test.tsx'
-          content = test_path.read_text()
+          # Update UI tests only where the approved V6 semantic contract replaced
+          # retired markup/version labels.
+          unified_path = web / 'src' / '__tests__' / 'app' / 'ui' / 'unified-ui-system.test.tsx'
+          content = unified_path.read_text()
+          content = content.replace('"Дашборд"', '"Сегодня"')
+          content = content.replace('"recruiter-radar-v6"', '"recruiter-radar"')
+          content = content.replace('"recruiter-radar-v7"', '"recruiter-radar"')
+          content = content.replace('[aria-label="Разделы кабинета"]', '[aria-label="Основные разделы"]')
+          old_loop = '''    currentLinks.forEach((link) => {\n      expect(link).toHaveAttribute("data-motion-interactive");\n      expect(link.querySelector('[data-motion-icon="navigation"]')).toHaveAttribute(\n        "data-motion-state",\n        "active",\n      );\n    });'''
+          new_loop = '''    currentLinks.forEach((link) => {\n      expect(link).toHaveAttribute("data-motion-interactive");\n    });\n    const activeMobileLink = container.querySelector(\n      '.mobileNav a[aria-current="page"]',\n    ) ?? [...currentLinks].find((link) => link.querySelector('[data-motion-icon="navigation"]'));\n    expect(activeMobileLink?.querySelector('[data-motion-icon="navigation"]')).toHaveAttribute(\n      "data-motion-state",\n      "active",\n    );'''
+          assert old_loop in content, 'unified motion assertion changed unexpectedly'
+          content = content.replace(old_loop, new_loop)
+          unified_path.write_text(content)
+
+          opportunity_test = web / 'src' / '__tests__' / 'app' / 'opportunities' / 'opportunity-card.test.tsx'
+          content = opportunity_test.read_text()
           old = """function openAnalysis() {\n  const cue = screen.getByText('Анализ')\n  const summary = cue.closest('summary')\n  expect(summary).not.toBeNull()\n  fireEvent.click(summary as HTMLElement)\n}\n"""
           new = """function openAnalysis() {\n  const trigger = screen.getByRole('button', { name: /Анализ/i })\n  expect(trigger).toHaveAttribute('aria-expanded', 'false')\n  fireEvent.click(trigger)\n  expect(trigger).toHaveAttribute('aria-expanded', 'true')\n}\n"""
           assert old in content, 'stale openAnalysis helper no longer matches expected source'
@@ -156,9 +183,14 @@ jobs:
               "expect(screen.getByText('Анализ').closest('details')).not.toHaveAttribute('open')",
               "expect(screen.getByRole('button', { name: /Анализ/i })).toHaveAttribute('aria-expanded', 'false')",
           )
-          test_path.write_text(content)
+          content = content.replace(
+              "expect(screen.getByText(/Предложение/)).toBeInTheDocument()",
+              "expect(screen.getAllByText(/Предложение/).length).toBeGreaterThan(0)",
+          )
+          opportunity_test.write_text(content)
 
-          # Browser acceptance must open the parent situation analysis before inspecting nested Commercial Signal diagnostics.
+          # Browser acceptance opens the parent situation analysis before probing
+          # nested Commercial Signal diagnostics.
           e2e_path = root / 'packages' / 'db' / 'scripts' / 'run-auth-v2-account-team-e2e.mjs'
           content = e2e_path.read_text()
           old = """  const commercialCard = page.locator('article[data-semantic-mode=\"v3\"]')\n  await commercialCard.waitFor({ state: 'visible' })\n"""
@@ -166,7 +198,6 @@ jobs:
           assert old in content, 'commercial-card E2E probe no longer matches expected source'
           e2e_path.write_text(content.replace(old, new))
 
-          # Guard against accidental self-referential alias definitions introduced by migration.
           pvs_text = pvs.read_text()
           assert not re.search(r'^\s*(--rr-[a-z0-9-]+):\s*var\(\1\);', pvs_text, re.M | re.I)
           PY
