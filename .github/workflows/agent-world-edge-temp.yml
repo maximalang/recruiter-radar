@@ -17,11 +17,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  inspect:
+  edge:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+
+      - name: Validate requested state
+        id: state
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream="$(tr -d '\r\n[:space:]' < ops/agent-world-edge-upstream.txt)"
+          if [ "$upstream" != "DISABLED" ] && ! printf '%s' "$upstream" | grep -Eq '^https://[a-z0-9-]+\.trycloudflare\.com$'; then
+            echo "Only DISABLED or one HTTPS trycloudflare.com Quick Tunnel origin is accepted." >&2
+            exit 1
+          fi
+          echo "upstream=$upstream" >> "$GITHUB_OUTPUT"
 
       - name: Setup SSH
         shell: bash
@@ -32,22 +44,154 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p '${{ secrets.RR_SSH_PORT }}' -t ed25519 '${{ secrets.RR_SSH_HOST }}' >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Inspect Caddy edge without mutation
+      - name: Preflight AI World tunnel
+        if: steps.state.outputs.upstream != 'DISABLED'
         shell: bash
+        env:
+          UPSTREAM: ${{ steps.state.outputs.upstream }}
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --max-time 20 "$UPSTREAM/.well-known/oauth-authorization-server/oauth")"
+          printf '%s' "$body" | grep -F 'https://recruiter-radar.ru/oauth' >/dev/null
+          curl --fail --silent --show-error --max-time 20 "$UPSTREAM/api/health/ready" >/dev/null
+          echo "Quick Tunnel reaches the AI World OAuth issuer and readiness endpoint."
+
+      - name: Apply or remove managed Caddy route
+        shell: bash
+        env:
+          UPSTREAM: ${{ steps.state.outputs.upstream }}
         run: |
           set -euo pipefail
           ssh -p '${{ secrets.RR_SSH_PORT }}' -o LogLevel=ERROR \
-            '${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}' <<'SSH_EOF'
+            '${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}' \
+            "UPSTREAM='$UPSTREAM' bash -s" <<'SSH_EOF'
           set -euo pipefail
-          caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-          echo '=== recruiter-radar.ru site block ==='
-          awk '
-            $0 == "recruiter-radar.ru {" { in_site=1 }
-            in_site { print }
-            in_site && $0 == "}" { exit }
-          ' /etc/caddy/Caddyfile
-          echo '=== runtime ==='
-          systemctl is-active caddy
+
+          config=/etc/caddy/Caddyfile
+          original_backup=/etc/caddy/Caddyfile.pre-agent-world-temp
+          begin='    # BEGIN AI World temporary laptop edge (managed)'
+          end='    # END AI World temporary laptop edge (managed)'
+          target='recruiter-radar.ru {'
+
+          reload_caddy() {
+            can_reload="$(systemctl show caddy.service --property=CanReload --value 2>/dev/null || true)"
+            if [ "$can_reload" = yes ]; then
+              systemctl reload caddy.service
+            else
+              caddy reload --config "$config" --adapter caddyfile
+            fi
+          }
+
+          [ -f "$config" ] || { echo "Caddyfile missing" >&2; exit 1; }
+          [ "$(grep -Fxc "$target" "$config" || true)" -eq 1 ] || {
+            echo "Expected exactly one recruiter-radar.ru site block." >&2
+            exit 1
+          }
+
+          begin_count="$(grep -Fxc "$begin" "$config" || true)"
+          end_count="$(grep -Fxc "$end" "$config" || true)"
+          if [ "$begin_count" -ne "$end_count" ] || [ "$begin_count" -gt 1 ]; then
+            echo "Malformed existing AI World managed block; refusing mutation." >&2
+            exit 1
+          fi
+
+          work="$(mktemp /etc/caddy/Caddyfile.agent-world.XXXXXX)"
+          rollback="$(mktemp /etc/caddy/Caddyfile.agent-world.rollback.XXXXXX)"
+          cleanup() { rm -f "$work" "$rollback"; }
+          trap cleanup EXIT
+          cp -p "$config" "$rollback"
+
+          awk -v begin="$begin" -v end="$end" '
+            $0 == begin { skip=1; next }
+            $0 == end { skip=0; next }
+            !skip { print }
+            END { if (skip) exit 42 }
+          ' "$config" > "$work"
+
+          if [ "$UPSTREAM" != DISABLED ]; then
+            upstream_host="${UPSTREAM#https://}"
+            staged="$(mktemp /etc/caddy/Caddyfile.agent-world.insert.XXXXXX)"
+            trap 'rm -f "$work" "$rollback" "$staged"' EXIT
+            awk \
+              -v target="$target" \
+              -v begin="$begin" \
+              -v end="$end" \
+              -v upstream="$UPSTREAM" \
+              -v upstream_host="$upstream_host" '
+              $0 == target {
+                print
+                print begin
+                print "    @agent_world_temp path \\"
+                print "        /api/mcp \\"
+                print "        /api/mcp/* \\"
+                print "        /.well-known/oauth-protected-resource/api/mcp \\"
+                print "        /oauth* \\"
+                print "        /.well-known/oauth-authorization-server/oauth \\"
+                print "        /api/native-chat-launcher \\"
+                print "        /api/native-chat-launcher/* \\"
+                print "        /api/chat-actions/*"
+                print "    handle @agent_world_temp {"
+                print "        header Cache-Control \"no-store\""
+                print "        reverse_proxy " upstream " {"
+                print "            header_up Host " upstream_host
+                print "            header_up X-Real-IP {remote_host}"
+                print "            header_up X-Forwarded-Host recruiter-radar.ru"
+                print "            header_up X-Forwarded-Proto https"
+                print "        }"
+                print "    }"
+                print end
+                next
+              }
+              { print }
+            ' "$work" > "$staged"
+            mv "$staged" "$work"
+
+            if [ ! -e "$original_backup" ]; then
+              cp -p "$config" "$original_backup"
+            fi
+          fi
+
+          caddy validate --config "$work" --adapter caddyfile
+          chmod --reference="$config" "$work"
+          chown --reference="$config" "$work"
+          mv "$work" "$config"
+          work=''
+
+          set +e
+          reload_caddy
+          reload_status=$?
+          set -e
+          if [ "$reload_status" -ne 0 ]; then
+            mv "$rollback" "$config"
+            rollback=''
+            reload_caddy || true
+            echo "Caddy reload failed; previous config restored." >&2
+            exit "$reload_status"
+          fi
+
+          rm -f "$rollback"
+          rollback=''
+          if [ "$UPSTREAM" = DISABLED ]; then
+            rm -f "$original_backup"
+          fi
+
+          systemctl is-active --quiet caddy
           curl -fsS http://127.0.0.1:3000/api/health >/dev/null
-          echo 'Radar local health: ok'
+          echo "Radar local health: ok"
           SSH_EOF
+
+      - name: Verify public routing
+        shell: bash
+        env:
+          UPSTREAM: ${{ steps.state.outputs.upstream }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 https://recruiter-radar.ru/api/health >/dev/null
+          if [ "$UPSTREAM" = DISABLED ]; then
+            echo "AI World temporary route removed; Recruiter Radar remains healthy."
+            exit 0
+          fi
+          metadata="$(curl --fail --silent --show-error --max-time 20 https://recruiter-radar.ru/.well-known/oauth-authorization-server/oauth)"
+          printf '%s' "$metadata" | grep -F 'https://recruiter-radar.ru/oauth' >/dev/null
+          curl --fail --silent --show-error --max-time 20 https://recruiter-radar.ru/api/health >/dev/null
+          echo "AI World OAuth discovery is public through Recruiter Radar; Radar health remains green."
