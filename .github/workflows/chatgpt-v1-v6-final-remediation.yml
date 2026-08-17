@@ -49,7 +49,20 @@ jobs:
           )
           css, count = pattern.subn('', css, count=1)
           if count != 1:
-              raise SystemExit(f'expected one dead lead-detail CSS block, removed {count}')
+              raise SystemExit(f'expected one dead lead-detail decision block, removed {count}')
+
+          standalone_pattern = re.compile(
+              r'/\* ── Lead detail layout ── \*/\n'
+              r'\.leadDetailContainer \{\n'
+              r'  max-width: 960px;\n'
+              r'  margin: 0 auto;\n'
+              r'\}\n\n'
+          )
+          css, standalone_count = standalone_pattern.subn('', css, count=1)
+          if standalone_count != 1:
+              raise SystemExit(f'expected one standalone dead lead-detail rule, removed {standalone_count}')
+          if '.leadDetailContainer' in css:
+              raise SystemExit('leadDetailContainer still present in stylesheet after cleanup')
           css_path.write_text(css, encoding='utf-8')
 
           test_path = Path('apps/web/src/__tests__/app/site-finish-contract.test.ts')
