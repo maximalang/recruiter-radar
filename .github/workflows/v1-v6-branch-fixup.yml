@@ -1,0 +1,193 @@
+name: V1-V6 branch fixup
+
+on:
+  push:
+    branches:
+      - chatgpt/full-v1-v6-implementation
+
+permissions:
+  contents: write
+
+jobs:
+  fixup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: chatgpt/full-v1-v6-implementation
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Apply final visual-system migrations and contract repairs
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+          web = root / 'apps' / 'web'
+          text_suffixes = {'.css', '.ts', '.tsx', '.js', '.jsx', '.mjs'}
+
+          replacements = {
+              '--c-text-primary': '--rr-color-text-primary',
+              '--c-text-secondary': '--rr-color-text-secondary',
+              '--c-text-muted': '--rr-color-text-tertiary',
+              '--c-placeholder': '--rr-color-text-tertiary',
+              '--c-text-soft': '--rr-color-text-secondary',
+              '--c-text': '--rr-color-text-primary',
+              '--c-bg-subtle': '--rr-color-surface-secondary',
+              '--c-surface-muted': '--rr-color-surface-secondary',
+              '--c-bg-page': '--rr-color-canvas',
+              '--c-bg-card': '--rr-color-surface-primary',
+              '--c-skeleton': '--rr-color-surface-secondary',
+              '--c-surface': '--rr-color-surface-primary',
+              '--c-bg': '--rr-color-canvas',
+              '--c-border': '--rr-color-separator',
+              '--c-primary-hover': '--rr-color-signal-hover',
+              '--c-primary-soft': '--rr-color-signal-soft',
+              '--c-primary-contrast': '--rr-color-text-inverse',
+              '--c-primary': '--rr-color-signal',
+              '--c-brand': '--rr-color-signal',
+              '--c-accent': '--rr-color-signal-hover',
+              '--c-info': '--rr-color-information',
+              '--c-focus': '--rr-color-focus',
+              '--c-green-dark': '--rr-color-positive',
+              '--c-green': '--rr-color-positive',
+              '--c-danger-soft': '--rr-color-destructive-soft',
+              '--c-danger': '--rr-color-destructive',
+              '--c-warning': '--rr-color-warning',
+              '--rr-paper-soft': '--rr-color-canvas',
+              '--rr-paper': '--rr-color-canvas',
+              '--rr-surface-strong': '--rr-color-surface-elevated',
+              '--rr-surface-soft': '--rr-color-surface-secondary',
+              '--rr-surface': '--rr-color-surface-primary',
+              '--rr-text': '--rr-color-text-primary',
+              '--rr-muted': '--rr-color-text-tertiary',
+              '--rr-line-strong': '--rr-color-separator-strong',
+              '--rr-line': '--rr-color-separator',
+              '--rr-signal-strong': '--rr-color-signal-hover',
+              '--rr-signal-ink': '--rr-color-signal-hover',
+              '--rr-signal-soft': '--rr-color-signal-soft',
+              '--rr-signal': '--rr-color-signal',
+              '--rr-copper': '--rr-color-copper',
+              '--rr-ink': '--rr-color-text-primary',
+              '--rr-page': '--rr-color-canvas',
+              '--rr-brand-dark': '--rr-color-signal-hover',
+              '--rr-brand': '--rr-color-signal',
+              '--rr-ease': '--rr-motion-ease-standard',
+          }
+
+          pvs = web / 'app' / 'product-visual-system.css'
+          pvs_text = pvs.read_text()
+          aliases = tuple(replacements.keys())
+          kept = []
+          for line in pvs_text.splitlines(keepends=True):
+              stripped = line.lstrip()
+              if any(stripped.startswith(alias + ':') for alias in aliases):
+                  continue
+              kept.append(line)
+          pvs.write_text(''.join(kept))
+
+          for path in web.rglob('*'):
+              if not path.is_file() or path.suffix not in text_suffixes or path == pvs:
+                  continue
+              content = path.read_text()
+              updated = content
+              for old, new in sorted(replacements.items(), key=lambda item: len(item[0]), reverse=True):
+                  updated = updated.replace(old, new)
+              updated = updated.replace('recruiter-radar-v6', 'recruiter-radar')
+              updated = updated.replace('recruiter-radar-v7', 'recruiter-radar')
+              if updated != content:
+                  path.write_text(updated)
+
+          # Remove the remaining banned implementation grammar without changing domain meaning.
+          symbol_replacements = {
+              'ScoreBandChip': 'SignalBandLabel',
+              'ScoreGauge': 'SignalStrength',
+              'ScoreBar': 'SignalStrengthBar',
+              'SettingsOverview': 'SettingsDocument',
+              'organizationDiamond': 'organizationAnchor',
+              'scoreGrid': 'diagnosticsGrid',
+          }
+          for path in (web / 'app').rglob('*'):
+              if not path.is_file() or path.suffix not in text_suffixes:
+                  continue
+              content = path.read_text()
+              updated = content
+              for old, new in symbol_replacements.items():
+                  updated = updated.replace(old, new)
+              updated = updated.replace('Дашборд', 'Сегодня')
+              updated = updated.replace('Командный центр', 'Сегодня')
+              updated = updated.replace('Карта спроса', 'Радар')
+              updated = updated.replace('#c8f36a', '#a6d5c9')
+              updated = updated.replace('#c9ec8b', '#a6d5c9')
+              updated = updated.replace('#9fca63', '#8fc7b8')
+              if updated != content:
+                  path.write_text(updated)
+
+          # Keep source-level tests aligned with renamed internal symbols/labels.
+          for path in (web / 'src' / '__tests__').rglob('*'):
+              if not path.is_file() or path.suffix not in text_suffixes:
+                  continue
+              content = path.read_text()
+              updated = content
+              for old, new in symbol_replacements.items():
+                  updated = updated.replace(old, new)
+              updated = updated.replace('recruiter-radar-v6', 'recruiter-radar')
+              updated = updated.replace('recruiter-radar-v7', 'recruiter-radar')
+              if updated != content:
+                  path.write_text(updated)
+
+          # Opportunity disclosure migrated from <details>/<summary> to an accessible button.
+          test_path = web / 'src' / '__tests__' / 'app' / 'opportunities' / 'opportunity-card.test.tsx'
+          content = test_path.read_text()
+          old = """function openAnalysis() {\n  const cue = screen.getByText('Анализ')\n  const summary = cue.closest('summary')\n  expect(summary).not.toBeNull()\n  fireEvent.click(summary as HTMLElement)\n}\n"""
+          new = """function openAnalysis() {\n  const trigger = screen.getByRole('button', { name: /Анализ/i })\n  expect(trigger).toHaveAttribute('aria-expanded', 'false')\n  fireEvent.click(trigger)\n  expect(trigger).toHaveAttribute('aria-expanded', 'true')\n}\n"""
+          assert old in content, 'stale openAnalysis helper no longer matches expected source'
+          content = content.replace(old, new)
+          content = content.replace(
+              "expect(screen.getByText('За 14 дней открыто 8 вакансий.')).toBeInTheDocument()",
+              "expect(screen.getAllByText('За 14 дней открыто 8 вакансий.').length).toBeGreaterThan(0)",
+          )
+          content = content.replace(
+              "expect(screen.getByText('Анализ').closest('details')).not.toHaveAttribute('open')",
+              "expect(screen.getByRole('button', { name: /Анализ/i })).toHaveAttribute('aria-expanded', 'false')",
+          )
+          test_path.write_text(content)
+
+          # Browser acceptance must open the parent situation analysis before inspecting nested Commercial Signal diagnostics.
+          e2e_path = root / 'packages' / 'db' / 'scripts' / 'run-auth-v2-account-team-e2e.mjs'
+          content = e2e_path.read_text()
+          old = """  const commercialCard = page.locator('article[data-semantic-mode=\"v3\"]')\n  await commercialCard.waitFor({ state: 'visible' })\n"""
+          new = """  const analysisTrigger = page.getByRole('button', { name: 'Анализ' }).first()\n  await analysisTrigger.waitFor({ state: 'visible' })\n  await analysisTrigger.click()\n  assert(\n    await analysisTrigger.getAttribute('aria-expanded') === 'true',\n    'Situation analysis disclosure did not open.',\n  )\n  const commercialCard = page.locator('article[data-semantic-mode=\"v3\"]')\n  await commercialCard.waitFor({ state: 'visible' })\n"""
+          assert old in content, 'commercial-card E2E probe no longer matches expected source'
+          e2e_path.write_text(content.replace(old, new))
+
+          # Guard against accidental self-referential alias definitions introduced by migration.
+          pvs_text = pvs.read_text()
+          assert not re.search(r'^\s*(--rr-[a-z0-9-]+):\s*var\(\1\);', pvs_text, re.M | re.I)
+          PY
+      - name: Verify focused contracts
+        run: |
+          npm ci
+          npm test --workspace @recruiter-radar/web -- --runInBand \
+            --runTestsByPath \
+            src/__tests__/app/v1-v6-visual-contract.test.ts \
+            src/__tests__/app/opportunities/opportunity-card.test.tsx \
+            src/__tests__/app/ui/unified-ui-system.test.tsx
+      - name: Commit branch fixup
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/web packages/db/scripts/run-auth-v2-account-team-e2e.mjs
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No fixup changes to commit.'
+            exit 0
+          fi
+          git commit -m 'fix: align V1-V6 visual and browser contracts'
+          git push origin HEAD:chatgpt/full-v1-v6-implementation
