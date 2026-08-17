@@ -1,0 +1,158 @@
+name: ChatGPT V1-V6 PASS 10 dashboard cleanup
+
+on:
+  push:
+    branches:
+      - chatgpt/full-v1-v6-implementation
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: chatgpt/full-v1-v6-implementation
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Remove account-status grammar from Today
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          page = Path('apps/web/app/dashboard/page.tsx')
+          text = page.read_text()
+          for old in [
+              'import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";\n',
+              'import { computeProfileCompletion } from "@/lib/profileCompletion";\n',
+              'import DashboardAccountOverview from "./dashboard-account-overview";\n',
+          ]:
+              if text.count(old) != 1:
+                  raise SystemExit(f'dashboard/page import mismatch for {old!r}: {text.count(old)}')
+              text = text.replace(old, '')
+
+          old_fetch = '''  const [profileResult, todayRadarResult, deliveryPreferencesResult] = await Promise.allSettled([\n    getClientProfileByOwnerId(authorization.dataOwnerId),\n    getDashboardTodayRadar(authorization.dataOwnerId),\n    getDeliveryPreferencesByOwnerId(authorization.dataOwnerId),\n  ]);'''
+          new_fetch = '''  const [profileResult, todayRadarResult] = await Promise.allSettled([\n    getClientProfileByOwnerId(authorization.dataOwnerId),\n    getDashboardTodayRadar(authorization.dataOwnerId),\n  ]);'''
+          if text.count(old_fetch) != 1:
+              raise SystemExit(f'dashboard/page fetch block mismatch: {text.count(old_fetch)}')
+          text = text.replace(old_fetch, new_fetch)
+
+          old_vars = '''  const profile = profileResult.value;\n  const todayRadar = todayRadarResult.status === "fulfilled" ? todayRadarResult.value : null;\n  const deliveryPreferences = deliveryPreferencesResult.status === "fulfilled" ? deliveryPreferencesResult.value : null;\n  const deliveryPreferencesUnavailable = deliveryPreferencesResult.status === "rejected";'''
+          new_vars = '''  const profile = profileResult.value;\n  const todayRadar = todayRadarResult.status === "fulfilled" ? todayRadarResult.value : null;'''
+          if text.count(old_vars) != 1:
+              raise SystemExit(f'dashboard/page result vars mismatch: {text.count(old_vars)}')
+          text = text.replace(old_vars, new_vars)
+
+          text, count = re.subn(
+              r'\n  const completion = deliveryPreferencesUnavailable \? null : computeProfileCompletion\(profile, deliveryPreferences\);\n  const deliveryReady = completion\?\.groups\.find\(\(group\) => group\.key === "delivery"\)\?\.filled \?\? false;\n  const completionPercent = completion \? Math\.round\(completion\.ratio \* 100\) : 0;\n',
+              '\n',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'dashboard/page completion block mismatch: {count}')
+
+          text, count = re.subn(
+              r'''\n        \{deliveryPreferencesUnavailable \? \(\n          <ErrorState\n            title="Не удалось проверить готовность доставки"\n            description="Компании и подтверждения доступны ниже, но статус каналов доставки сейчас не подтверждён\."\n            action=\{\{ href: "/settings/delivery", label: "Открыть настройки доставки" \}\}\n          />\n        \) : \(\n          <DashboardAccountOverview\n            agencyName=\{profile\.agencyName\}\n            todayLeads=\{todayRadar\?\.topLeads\.length \?\? 0\}\n            pendingReview=\{todayRadar\?\.pendingReview \?\? 0\}\n            completionPercent=\{completionPercent\}\n            deliveryReady=\{deliveryReady\}\n          />\n        \)\}\n''',
+              '\n',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'dashboard/page account overview render mismatch: {count}')
+          page.write_text(text)
+
+          radar = Path('apps/web/app/dashboard/dashboard-today-radar.tsx')
+          text = radar.read_text()
+          old_link = '        <Link href="/review" className={styles.reviewLink}>На проверке {pendingReview}</Link>\n'
+          if text.count(old_link) != 1:
+              raise SystemExit(f'dashboard today review link mismatch: {text.count(old_link)}')
+          text = text.replace(old_link, '')
+          old_end = '''      )}\n    </section>\n  );\n}'''
+          new_end = '''      )}\n\n      <div className={styles.todayWorkflow} aria-labelledby="today-workflow-heading">\n        <h3 id="today-workflow-heading">Рабочий контур</h3>\n        <Link href="/review" className={styles.todayWorkflowRow}>\n          <span>На проверке</span>\n          <strong>{pendingReview}</strong>\n          <i aria-hidden="true">→</i>\n        </Link>\n      </div>\n    </section>\n  );\n}'''
+          if text.count(old_end) != 1:
+              raise SystemExit(f'dashboard today final block mismatch: {text.count(old_end)}')
+          radar.write_text(text.replace(old_end, new_end))
+
+          css = Path('apps/web/app/dashboard/dashboard-workspace.module.css')
+          text = css.read_text()
+          start = text.find('.accountOverview{')
+          end = text.find('.todayRadarSection{')
+          if start < 0 or end <= start:
+              raise SystemExit('dashboard CSS account overview block bounds not found')
+          section_eyebrow = '.sectionEyebrow{display:block;margin-bottom:8px;color:var(--rr-color-text-tertiary);font-size:var(--rr-type-label-size);font-weight:600}\n'
+          text = text[:start] + section_eyebrow + text[end:]
+          text = re.sub(r'\.reviewLink\{.*?\}\.reviewLink:hover\{.*?\}', '', text, count=1)
+          workflow_css = '''\n.todayWorkflow{display:grid;gap:10px;padding-top:28px}.todayWorkflow h3{margin:0;color:var(--rr-color-text-primary);font-size:var(--rr-type-subsection-size);font-weight:620;letter-spacing:-.018em}.todayWorkflowRow{min-height:48px;display:grid;grid-template-columns:minmax(0,1fr) auto 20px;align-items:center;gap:14px;padding:0 10px;border-top:1px solid var(--rr-color-separator);border-bottom:1px solid var(--rr-color-separator);color:var(--rr-color-text-secondary);text-decoration:none}.todayWorkflowRow:hover{background:var(--rr-color-surface-secondary)}.todayWorkflowRow:focus-visible{outline:2px solid var(--rr-color-focus);outline-offset:-2px}.todayWorkflowRow span{font-size:var(--rr-type-metadata-size);font-weight:600}.todayWorkflowRow strong{color:var(--rr-color-text-primary);font-size:var(--rr-type-data-size);font-weight:600;font-variant-numeric:tabular-nums}.todayWorkflowRow i{color:var(--rr-color-text-tertiary);font-style:normal}\n'''
+          marker = '@media(max-width:1160px)'
+          if text.count(marker) != 1:
+              raise SystemExit(f'dashboard CSS responsive marker mismatch: {text.count(marker)}')
+          text = text.replace(marker, workflow_css + marker)
+          text = re.sub(r'\.accountOverview\{grid-template-columns:1fr\}', '', text)
+          text = re.sub(r'\.accountStatusStrip\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\.statusFact:nth-child\(2\)\{border-right:0\}\.statusFact:nth-child\(-n\+2\)\{border-bottom:1px solid var\(--rr-color-separator\)\}', '', text)
+          css.write_text(text)
+
+          access_test = Path('apps/web/src/__tests__/app/dashboard/dashboard-access.test.tsx')
+          text = access_test.read_text()
+          text = text.replace('jest.mock("@/lib/deliveryPreferences", () => ({ getDeliveryPreferencesByOwnerId: jest.fn() }));\n', '')
+          text = re.sub(r'jest\.mock\("@/app/dashboard/dashboard-account-overview", \(\) => \(\{\n  __esModule: true,\n  default: \(\) => <section>account overview</section>,\n\}\)\);\n', '', text, count=1)
+          text = text.replace('import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";\n', '')
+          text = text.replace('    jest.mocked(getDeliveryPreferencesByOwnerId).mockResolvedValue(null);\n', '')
+          text, count = re.subn(
+              r'''\n  test\("surfaces unavailable delivery settings without hiding available radar results", async \(\) => \{.*?\n  \}\);\n''',
+              '\n',
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f'dashboard access delivery test mismatch: {count}')
+          access_test.write_text(text)
+
+          icon_test = Path('apps/web/src/__tests__/app/dashboard/dashboard-today-radar-icon.test.tsx')
+          text = icon_test.read_text()
+          needle = '''    expect(link?.getAttribute("href")).toBe("/settings/radar");\n'''
+          addition = '''    expect(link?.getAttribute("href")).toBe("/settings/radar");\n    expect(screen.getByRole("heading", { name: "Рабочий контур" })).toBeInTheDocument();\n    expect(screen.getByRole("link", { name: /На проверке 0/ })).toHaveAttribute("href", "/review");\n'''
+          if text.count(needle) != 1:
+              raise SystemExit(f'dashboard today test insertion mismatch: {text.count(needle)}')
+          icon_test.write_text(text.replace(needle, addition))
+          PY
+          rm -f apps/web/app/dashboard/dashboard-account-overview.tsx
+          rm -f apps/web/src/__tests__/app/dashboard/dashboard-account-overview.test.tsx
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify Today and V1-V6 contracts
+        run: >-
+          npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath
+          src/__tests__/app/dashboard/dashboard-access.test.tsx
+          src/__tests__/app/dashboard/dashboard-today-radar-icon.test.tsx
+          src/__tests__/app/v1-v6-visual-contract.test.ts
+      - name: Type check application and tests
+        shell: bash
+        run: |
+          npm run web:check
+          npm run test:types --workspace @recruiter-radar/web
+      - name: Verify no retired Today dependencies
+        shell: bash
+        run: |
+          ! rg -n 'DashboardAccountOverview|dashboard-account-overview|getDeliveryPreferencesByOwnerId|computeProfileCompletion|accountOverview|accountStatusStrip|statusFact' apps/web/app/dashboard apps/web/src/__tests__/app/dashboard
+          git diff --check
+      - name: Commit verified PASS 10 cleanup and remove temporary workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/chatgpt-v1-v6-pass10-dashboard.yml
+          git config user.name "chatgpt-remediation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "refactor(ui): align Today with decision workflow"
+          git push origin HEAD:chatgpt/full-v1-v6-implementation
