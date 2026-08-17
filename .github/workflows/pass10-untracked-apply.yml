@@ -1,0 +1,48 @@
+name: PASS 10 untracked restore
+
+on:
+  push:
+    branches:
+      - chatgpt/pass10-untracked-stage
+    paths:
+      - .github/workflows/pass10-untracked-apply.yml
+      - .pass10-untracked.tar.xz.b64
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Verify staging parent
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "73c38f4ae943d5d2346b7a6ab430190a127fa947"
+      - name: Restore verified untracked V1-V6 files
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .pass10-untracked.tar.xz.b64 > /tmp/pass10-untracked.tar.xz
+          echo "8eeb66311f34c07f2398b51834266553053ad09f31b51d5ad3f35d323c82e9ad  /tmp/pass10-untracked.tar.xz" | sha256sum -c -
+          mkdir -p /tmp/pass10-untracked
+          tar -xJf /tmp/pass10-untracked.tar.xz -C /tmp/pass10-untracked
+          cp -a /tmp/pass10-untracked/apps/. apps/
+          rm .pass10-untracked.tar.xz.b64 .github/workflows/pass10-untracked-apply.yml
+          git add -A
+          git diff --cached --check
+          test -f apps/web/app/opportunities/situation-row.tsx
+          test -f apps/web/app/settings/settings-document-summary.tsx
+          test -f apps/web/app/settings/diagnostics/sources/page.tsx
+      - name: Commit restored files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "fix(ui): restore PASS 10 semantic primitives"
+          git push origin HEAD:chatgpt/pass10-untracked-stage
