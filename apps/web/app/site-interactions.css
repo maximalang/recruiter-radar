@@ -13,6 +13,12 @@
   cursor: not-allowed;
 }
 
+/* Loading placeholders describe structure; they are never ambient motion. */
+[data-skeleton="true"] {
+  animation: none !important;
+  background-image: none !important;
+}
+
 /* Text links that behave as product controls need a real, forgiving hit area. */
 :where(
   a[class*="footerBrand"],
