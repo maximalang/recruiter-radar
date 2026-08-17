@@ -201,8 +201,8 @@ test('two concurrent refreshes of one ChatGPT token do not revoke the OAuth gran
       refresh(httpClient, clientId, tokens.refresh_token),
       refresh(httpClient, clientId, tokens.refresh_token),
     ])
-    assert.equal(responseA.status, 200, `concurrent refresh A failed: ${await responseA.text()}`)
-    assert.equal(responseB.status, 200, `concurrent refresh B failed: ${await responseB.text()}`)
+    assert.equal(responseA.status, 200, 'concurrent refresh A must succeed inside the bounded grace window')
+    assert.equal(responseB.status, 200, 'concurrent refresh B must succeed inside the bounded grace window')
 
     const rotatedA = await responseA.json()
     const rotatedB = await responseB.json()
