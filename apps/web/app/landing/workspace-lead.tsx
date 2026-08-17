@@ -72,7 +72,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
 
         <div className={sceneStyles.sideProof}>
           <div className={`${styles.workspaceEvidence} ${sceneStyles.evidenceBlock}`}>
-            <span>Evidence</span>
+            <span>Факты и источники</span>
             <ul>{evidence.map((fact) => <li key={fact}><RouteGlyph size={14} />{fact}</li>)}</ul>
           </div>
           <div className={sceneStyles.proofBlock}>
