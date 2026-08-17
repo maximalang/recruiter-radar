@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import argon2 from 'argon2'
 import pg from 'pg'
+import { REFRESH_TOKEN_REUSE_GRACE_MS } from '../src/postgres-adapter.js'
 
 const { Pool } = pg
 const ADMIN_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:5432/postgres'
@@ -229,10 +230,11 @@ test('Timeweb OAuth is DCR + S256 PKCE + exact-resource bound with replay-safe r
     const firstRefresh = await refresh(httpClient, clientId, tokens.refresh_token)
     assert.equal(firstRefresh.status, 200)
     const rotated = await firstRefresh.json(); assert.ok(rotated.refresh_token); assert.notEqual(rotated.refresh_token, tokens.refresh_token)
+    await new Promise((resolve) => setTimeout(resolve, REFRESH_TOKEN_REUSE_GRACE_MS + 100))
     const replay = await refresh(httpClient, clientId, tokens.refresh_token)
     assert.equal(replay.status, 400)
     const familyRevoked = await refresh(httpClient, clientId, rotated.refresh_token)
-    assert.equal(familyRevoked.status, 400, 'refresh-token replay must revoke its grant family')
+    assert.equal(familyRevoked.status, 400, 'refresh-token replay outside the bounded concurrency grace must revoke its grant family')
   } finally {
     if (runtime.server.listening) await stop(runtime.server)
     await rm(fixture.dir, { recursive: true, force: true })

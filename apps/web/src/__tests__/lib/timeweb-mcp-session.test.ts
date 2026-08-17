@@ -7,20 +7,18 @@ import {
 } from '@/lib/timeweb-mcp-session'
 
 class MemoryPersistentStore implements TimewebMcpSessionStore {
-  private readonly rows = new Map<string, TimewebMcpSession>()
+  readonly rows = new Map<string, TimewebMcpSession>()
 
-  async findById(id: string) {
-    const row = [...this.rows.values()].find((item) => item.id === id)
-    return row ? clone(row) : null
-  }
-
-  async findBySubject(subject: string) {
-    const row = this.rows.get(subject)
-    return row ? clone(row) : null
+  async findOwned(id: string, subject: string) {
+    const row = this.rows.get(id)
+    return row && row.subject === subject ? clone(row) : null
   }
 
   async save(session: TimewebMcpSession) {
-    const existing = this.rows.get(session.subject)
+    const existing = this.rows.get(session.id)
+    if (existing && existing.subject !== session.subject) {
+      throw new Error('session owner mismatch')
+    }
     const persisted = existing
       ? {
           ...clone(existing),
@@ -29,26 +27,32 @@ class MemoryPersistentStore implements TimewebMcpSessionStore {
           expiresAt: new Date(session.expiresAt),
         }
       : clone(session)
-    this.rows.set(session.subject, persisted)
+    this.rows.set(session.id, persisted)
     return clone(persisted)
   }
 
-  async setUpstreamSession(subject: string, upstreamSessionId: string | null, lastSeenAt: Date, expiresAt: Date) {
-    const existing = this.rows.get(subject)
-    if (!existing) throw new Error('missing session')
+  async setUpstreamSession(
+    id: string,
+    subject: string,
+    upstreamSessionId: string | null,
+    lastSeenAt: Date,
+    expiresAt: Date,
+  ) {
+    const existing = this.rows.get(id)
+    if (!existing || existing.subject !== subject) throw new Error('missing owned session')
     const persisted = {
       ...clone(existing),
       upstreamSessionId,
       lastSeenAt: new Date(lastSeenAt),
       expiresAt: new Date(expiresAt),
     }
-    this.rows.set(subject, persisted)
+    this.rows.set(id, persisted)
     return clone(persisted)
   }
 
-  async markRecovered(subject: string, lastSeenAt: Date, expiresAt: Date) {
-    const existing = this.rows.get(subject)
-    if (!existing) throw new Error('missing session')
+  async markRecovered(id: string, subject: string, lastSeenAt: Date, expiresAt: Date) {
+    const existing = this.rows.get(id)
+    if (!existing || existing.subject !== subject) throw new Error('missing owned session')
     const persisted = {
       ...clone(existing),
       upstreamSessionId: null,
@@ -56,14 +60,13 @@ class MemoryPersistentStore implements TimewebMcpSessionStore {
       lastSeenAt: new Date(lastSeenAt),
       expiresAt: new Date(expiresAt),
     }
-    this.rows.set(subject, persisted)
+    this.rows.set(id, persisted)
     return clone(persisted)
   }
 
-  async delete(id: string) {
-    for (const [subject, session] of this.rows) {
-      if (session.id === id) this.rows.delete(subject)
-    }
+  async delete(id: string, subject: string) {
+    const existing = this.rows.get(id)
+    if (existing?.subject === subject) this.rows.delete(id)
   }
 }
 
@@ -76,94 +79,109 @@ function clone(session: TimewebMcpSession): TimewebMcpSession {
   }
 }
 
-describe('Timeweb MCP persistent session lifecycle', () => {
-  it('recovers the same subject session across manager restarts and chats', async () => {
+describe('Timeweb MCP persistent multi-session lifecycle', () => {
+  it('creates independent local sessions for the same subject', async () => {
+    const store = new MemoryPersistentStore()
+    const manager = new TimewebMcpSessionManager(store, 60_000)
+    const now = new Date('2026-08-17T10:00:00.000Z')
+
+    const first = await manager.createSession('rr_owner', '2025-06-18', now)
+    const second = await manager.createSession('rr_owner', '2025-06-18', now)
+
+    expect(first.id).not.toBe(second.id)
+    expect((await manager.findOwnedSession(first.id, 'rr_owner', now))?.id).toBe(first.id)
+    expect((await manager.findOwnedSession(second.id, 'rr_owner', now))?.id).toBe(second.id)
+    expect(store.rows.size).toBe(2)
+  })
+
+  it('restores an exact persistent session after a manager/runtime restart', async () => {
     const store = new MemoryPersistentStore()
     const firstManager = new TimewebMcpSessionManager(store, 60_000)
-    const now = new Date('2026-08-16T10:00:00.000Z')
-    const first = await firstManager.getOrCreate('rr_owner', null, '2025-03-26', now)
-    await firstManager.setUpstreamSession(first.session, 'upstream-session-1', now)
+    const now = new Date('2026-08-17T10:00:00.000Z')
+    const session = await firstManager.createSession('rr_owner', '2025-06-18', now)
+    await firstManager.setUpstreamSession(session, 'upstream-session-1', now)
 
     const restartedManager = new TimewebMcpSessionManager(store, 60_000)
-    const recovered = await restartedManager.getOrCreate(
+    const restored = await restartedManager.findOwnedSession(
+      session.id,
       'rr_owner',
-      null,
-      '2025-03-26',
       new Date(now.getTime() + 10_000),
     )
 
-    expect(recovered.created).toBe(false)
-    expect(recovered.session.id).toBe(first.session.id)
-    expect(recovered.session.upstreamSessionId).toBe('upstream-session-1')
+    expect(restored?.id).toBe(session.id)
+    expect(restored?.upstreamSessionId).toBe('upstream-session-1')
   })
 
-  it('fences concurrent session creation for one subject to a single canonical id', async () => {
+  it('rejects cross-subject access instead of falling back by subject', async () => {
     const store = new MemoryPersistentStore()
     const manager = new TimewebMcpSessionManager(store, 60_000)
-    const now = new Date('2026-08-16T10:00:00.000Z')
+    const now = new Date('2026-08-17T10:00:00.000Z')
+    const owner = await manager.createSession('rr_owner', '2025-06-18', now)
 
-    const [first, second] = await Promise.all([
-      manager.getOrCreate('rr_owner', null, '2025-03-26', now),
-      manager.getOrCreate('rr_owner', null, '2025-03-26', now),
-    ])
-
-    expect(first.session.id).toBe(second.session.id)
-    expect([first.created, second.created].filter(Boolean)).toHaveLength(1)
-    expect((await store.findBySubject('rr_owner'))?.id).toBe(first.session.id)
+    await expect(manager.findOwnedSession(owner.id, 'rr_other', now)).resolves.toBeNull()
+    expect(await manager.findOwnedSession(owner.id, 'rr_owner', now)).not.toBeNull()
   })
 
-  it('does not let a stale request restore an expired upstream session after recovery', async () => {
+  it('recovers only the requested session and leaves a sibling session unchanged', async () => {
     const store = new MemoryPersistentStore()
     const manager = new TimewebMcpSessionManager(store, 60_000)
-    const now = new Date('2026-08-16T10:00:00.000Z')
-    const first = await manager.getOrCreate('rr_owner', null, '2025-03-26', now)
-    await manager.setUpstreamSession(first.session, 'upstream-session-old', now)
+    const now = new Date('2026-08-17T10:00:00.000Z')
+    const first = await manager.createSession('rr_owner', '2025-06-18', now)
+    const second = await manager.createSession('rr_owner', '2025-06-18', now)
+    await manager.setUpstreamSession(first, 'upstream-a', now)
+    await manager.setUpstreamSession(second, 'upstream-b', now)
 
-    const stale = clone(first.session)
-    await manager.markRecovered(first.session, new Date(now.getTime() + 100))
-    await manager.setUpstreamSession(first.session, 'upstream-session-new', new Date(now.getTime() + 200))
+    await manager.markRecovered(first, new Date(now.getTime() + 500))
+
+    const persistedFirst = await manager.findOwnedSession(first.id, 'rr_owner', now)
+    const persistedSecond = await manager.findOwnedSession(second.id, 'rr_owner', now)
+    expect(persistedFirst?.recoveryCount).toBe(1)
+    expect(persistedFirst?.upstreamSessionId).toBeNull()
+    expect(persistedSecond?.recoveryCount).toBe(0)
+    expect(persistedSecond?.upstreamSessionId).toBe('upstream-b')
+  })
+
+  it('deletes only the selected local session', async () => {
+    const store = new MemoryPersistentStore()
+    const manager = new TimewebMcpSessionManager(store, 60_000)
+    const now = new Date('2026-08-17T10:00:00.000Z')
+    const first = await manager.createSession('rr_owner', '2025-06-18', now)
+    const second = await manager.createSession('rr_owner', '2025-06-18', now)
+
+    await manager.clear(first)
+
+    await expect(manager.findOwnedSession(first.id, 'rr_owner', now)).resolves.toBeNull()
+    expect((await manager.findOwnedSession(second.id, 'rr_owner', now))?.id).toBe(second.id)
+  })
+
+  it('does not let a stale touch overwrite recovered upstream state', async () => {
+    const store = new MemoryPersistentStore()
+    const manager = new TimewebMcpSessionManager(store, 60_000)
+    const now = new Date('2026-08-17T10:00:00.000Z')
+    const session = await manager.createSession('rr_owner', '2025-06-18', now)
+    await manager.setUpstreamSession(session, 'upstream-old', now)
+
+    const stale = clone(session)
+    await manager.markRecovered(session, new Date(now.getTime() + 100))
+    await manager.setUpstreamSession(session, 'upstream-new', new Date(now.getTime() + 200))
     await manager.touch(stale, new Date(now.getTime() + 300))
 
-    expect(stale.upstreamSessionId).toBe('upstream-session-new')
+    expect(stale.upstreamSessionId).toBe('upstream-new')
     expect(stale.recoveryCount).toBe(1)
-    const persisted = await store.findBySubject('rr_owner')
-    expect(persisted?.upstreamSessionId).toBe('upstream-session-new')
-    expect(persisted?.recoveryCount).toBe(1)
   })
 
-  it('expires stale sessions and creates a fresh fenced local session', async () => {
+  it('expires and deletes only the exact session', async () => {
     const store = new MemoryPersistentStore()
     const manager = new TimewebMcpSessionManager(store, 1_000)
-    const now = new Date('2026-08-16T10:00:00.000Z')
-    const first = await manager.getOrCreate('rr_owner', null, '2025-03-26', now)
-    const next = await manager.getOrCreate('rr_owner', first.session.id, '2025-03-26', new Date(now.getTime() + 1_001))
+    const now = new Date('2026-08-17T10:00:00.000Z')
+    const first = await manager.createSession('rr_owner', '2025-06-18', now)
+    const second = await manager.createSession('rr_owner', '2025-06-18', new Date(now.getTime() + 500))
 
-    expect(next.created).toBe(true)
-    expect(next.session.id).not.toBe(first.session.id)
-    expect(next.session.upstreamSessionId).toBeNull()
-  })
-
-  it('clears an expired upstream session and records one recovery', async () => {
-    const store = new MemoryPersistentStore()
-    const manager = new TimewebMcpSessionManager(store, 60_000)
-    const now = new Date('2026-08-16T10:00:00.000Z')
-    const { session } = await manager.getOrCreate('rr_owner', null, '2025-03-26', now)
-    await manager.setUpstreamSession(session, 'upstream-session-1', now)
-    await manager.markRecovered(session, new Date(now.getTime() + 500))
-
-    expect(session.upstreamSessionId).toBeNull()
-    expect(session.recoveryCount).toBe(1)
-    const persisted = await store.findBySubject('rr_owner')
-    expect(persisted?.recoveryCount).toBe(1)
-  })
-
-  it('refuses to reuse another subject session id', async () => {
-    const store = new MemoryPersistentStore()
-    const manager = new TimewebMcpSessionManager(store, 60_000)
-    const now = new Date('2026-08-16T10:00:00.000Z')
-    const owner = await manager.getOrCreate('rr_owner', null, '2025-03-26', now)
-    const other = await manager.getOrCreate('other_subject', owner.session.id, '2025-03-26', now)
-    expect(other.session.subject).toBe('other_subject')
-    expect(other.session.id).not.toBe(owner.session.id)
+    await expect(
+      manager.findOwnedSession(first.id, 'rr_owner', new Date(now.getTime() + 1_001)),
+    ).resolves.toBeNull()
+    expect(
+      (await manager.findOwnedSession(second.id, 'rr_owner', new Date(now.getTime() + 1_001)))?.id,
+    ).toBe(second.id)
   })
 })

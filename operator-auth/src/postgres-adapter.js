@@ -3,6 +3,7 @@ import pg from 'pg'
 const { Pool } = pg
 
 const SCHEMA = 'operator_auth'
+export const REFRESH_TOKEN_REUSE_GRACE_MS = 3_000
 
 function assertDatabaseUrl(value) {
   if (!value) throw new Error('RR_MCP_AUTH_DATABASE_URL is required')
@@ -23,11 +24,27 @@ export function createAuthPool(connectionString = process.env.RR_MCP_AUTH_DATABA
   })
 }
 
-function rowPayload(row) {
+function rowPayload(model, row) {
   if (!row) return undefined
   if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return undefined
-  const payload = row.payload
-  if (row.consumed_at) payload.consumed = Math.floor(new Date(row.consumed_at).getTime() / 1000)
+
+  const payload = { ...row.payload }
+  if (row.consumed_at) {
+    const consumedAt = new Date(row.consumed_at).getTime()
+    const isBoundedConcurrentRefresh = model === 'RefreshToken'
+      && Number.isFinite(consumedAt)
+      && Date.now() - consumedAt <= REFRESH_TOKEN_REUSE_GRACE_MS
+
+    // oidc-provider 9.11.x revokes the whole grant family when an already-consumed
+    // refresh token is returned by the adapter. ChatGPT can legitimately race two
+    // refresh requests from parallel transports. Hide the consumed marker only for
+    // a short, non-extendable window. consume() uses COALESCE, so repeated requests
+    // cannot move consumed_at forward and an old-token replay outside this window
+    // keeps the provider's normal grant-family revocation semantics.
+    if (!isBoundedConcurrentRefresh) {
+      payload.consumed = Math.floor(consumedAt / 1000)
+    }
+  }
   return payload
 }
 
@@ -71,7 +88,7 @@ export function createPostgresAdapter(pool) {
           WHERE model = $1 AND id = $2`,
         [this.name, id],
       )
-      return rowPayload(rows[0])
+      return rowPayload(this.name, rows[0])
     }
 
     async findByUserCode(userCode) {
@@ -83,7 +100,7 @@ export function createPostgresAdapter(pool) {
           LIMIT 1`,
         [this.name, userCode],
       )
-      return rowPayload(rows[0])
+      return rowPayload(this.name, rows[0])
     }
 
     async findByUid(uid) {
@@ -95,7 +112,7 @@ export function createPostgresAdapter(pool) {
           LIMIT 1`,
         [this.name, uid],
       )
-      return rowPayload(rows[0])
+      return rowPayload(this.name, rows[0])
     }
 
     async consume(id) {
