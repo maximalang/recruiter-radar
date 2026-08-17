@@ -53,6 +53,17 @@ describe("cross-route visual layer contract", () => {
     }
   });
 
+  it("keeps pending auth actions on the paper/ink semantic foundation without a floating SaaS card", () => {
+    const pendingAuth = readAppFile("auth/pending-auth-action.module.css");
+
+    expect(pendingAuth).toContain("background: var(--rr-color-canvas)");
+    expect(pendingAuth).toContain("outline: 2px solid var(--rr-color-focus)");
+    expect(pendingAuth).toContain("color: var(--rr-color-text-inverse)");
+    expect(pendingAuth).toMatch(/\.card \{[\s\S]*?border-radius: 0;[\s\S]*?background: transparent;[\s\S]*?box-shadow: none;/);
+    expect(pendingAuth).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
+    expect(pendingAuth).not.toMatch(/rgba\(/gi);
+  });
+
   it("keeps the authenticated shell addressable after the frame migration", () => {
     const workspace = readAppFile("ui/product-workspace.tsx");
     const internalPage = readAppFile("ui/internal-page.tsx");
