@@ -1,5 +1,7 @@
 /** @jest-environment jsdom */
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 
 import {
@@ -109,5 +111,17 @@ describe("auth v2 onboarding view", () => {
     expect(screen.getByText(/Доставка работает только при активном доступе/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Перейти в кабинет" }))
       .toBeInTheDocument();
+  });
+
+  test("keeps onboarding on semantic tokens without a local inverse palette or micro metadata", () => {
+    const styles = readFileSync(
+      resolve(process.cwd(), "app", "onboarding", "onboarding.module.css"),
+      "utf8",
+    );
+
+    expect(styles).toContain("background:var(--rr-color-text-primary)");
+    expect(styles).toContain("font-size:var(--rr-type-metadata-size)");
+    expect(styles).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
+    expect(styles).not.toMatch(/font-size:\.(?:6|7)\d*rem/gi);
   });
 });
