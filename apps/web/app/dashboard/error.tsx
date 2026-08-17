@@ -25,11 +25,11 @@ export default function DashboardError({
   return (
     <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
       <ProductWorkspaceHeader
-        title="Не удалось открыть командный центр"
+        title="Не удалось открыть раздел «Сегодня»"
         subtitle="Сессия и сохранённые настройки не изменились."
       />
       <ErrorState
-        title="Dashboard временно недоступен"
+        title="Раздел «Сегодня» временно недоступен"
         description="Повторите загрузку. Если ошибка сохранится, откройте настройки аккаунта."
         retryAction={{ label: "Повторить", onClick: reset }}
       />
