@@ -46,8 +46,6 @@ const ROLE_LABELS: Record<SourceRole, string> = {
 
 export default async function DiagnosticsSourcesPage() {
   const authorization = await getOpportunityAuthorizationContext('opportunities:read')
-  const featureContext = authorization ?? { dataOwnerId: null, workspaceId: null }
-  if (!isOpportunityEngineV1EnabledForContext(featureContext)) notFound()
 
   if (!authorization) {
     return (
@@ -64,6 +62,7 @@ export default async function DiagnosticsSourcesPage() {
     )
   }
 
+  if (!isOpportunityEngineV1EnabledForContext(authorization)) notFound()
   if (!isEvidenceRadarV1EnabledForContext(authorization)) notFound()
   const sources = await listEvidenceSourceGovernance().catch(() => null)
 
