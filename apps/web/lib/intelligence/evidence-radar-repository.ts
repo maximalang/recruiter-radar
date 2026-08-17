@@ -138,8 +138,7 @@ export async function listEvidenceRadarLeads(
        score.contributions,
        card.staffing_need AS "staffingNeed",
        card.specialization,
-       CARDINALITY(score.independent_source_families)::INTEGER
-         AS "independentSourceCount",
+       COALESCE(evidence.source_count, 0)::INTEGER AS "independentSourceCount",
        COALESCE(evidence.items, '[]'::JSONB) AS evidence,
        COALESCE(contacts.items, '[]'::JSONB) AS "contactPaths",
        COALESCE(card.risk_reasons, ARRAY[]::TEXT[]) AS "riskReasons",
@@ -160,19 +159,21 @@ export async function listEvidenceRadarLeads(
       AND score.workspace_id = card.workspace_id
       AND score.organization_id = card.organization_id
      LEFT JOIN LATERAL (
-       SELECT JSONB_AGG(
-         JSONB_BUILD_OBJECT(
-           'id', event.id::TEXT,
-           'eventType', event.event_type,
-           'sourceRegistryId', event.source_registry_id,
-           'sourceFamily', event.source_family,
-           'occurredAt', event.occurred_at::TEXT,
-           'detectedAt', event.detected_at::TEXT,
-           'canonicalUrl', event.canonical_url,
-           'confidence', event.confidence,
-           'primarySource', event.primary_source
-         ) ORDER BY event.occurred_at DESC, event.id DESC
-       ) AS items
+       SELECT
+         JSONB_AGG(
+           JSONB_BUILD_OBJECT(
+             'id', event.id::TEXT,
+             'eventType', event.event_type,
+             'sourceRegistryId', event.source_registry_id,
+             'sourceFamily', event.source_family,
+             'occurredAt', event.occurred_at::TEXT,
+             'detectedAt', event.detected_at::TEXT,
+             'canonicalUrl', event.canonical_url,
+             'confidence', event.confidence,
+             'primarySource', event.primary_source
+           ) ORDER BY event.occurred_at DESC, event.id DESC
+         ) AS items,
+         COUNT(DISTINCT event.source_family)::INTEGER AS source_count
        FROM evidence_events_v1 AS event
        WHERE event.workspace_id = card.workspace_id
          AND event.organization_id = card.organization_id
