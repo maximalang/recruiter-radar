@@ -121,6 +121,25 @@ describe('EvidenceRadarMap V1-V6 contract', () => {
     expect(container.querySelector('[data-region-code]')).toBeNull()
   })
 
+  it('selects the first Radar-priority company rather than the repository input order', () => {
+    const alphaLead = lead('77', 'Альфа', 'Москва')
+    alphaLead.score.leadScore = 99
+    alphaLead.score.opportunityScore = 40
+    alphaLead.evidence = [evidence('alpha-evidence', '2026-08-16T00:00:00.000Z')]
+
+    const betaLead = lead('78', 'Бета', 'Казань')
+    betaLead.score.leadScore = 70
+    betaLead.score.opportunityScore = 95
+    betaLead.evidence = [evidence('beta-evidence', '2026-08-15T00:00:00.000Z')]
+
+    render(<EvidenceRadarMap leads={[alphaLead, betaLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
+
+    expect(screen.getByRole('button', { name: 'Альфа, Москва' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Бета, Казань' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent('Выбрано: Бета, Казань')
+    expect(screen.getByRole('heading', { name: 'Бета' })).toBeInTheDocument()
+  })
+
   it('keeps 44px semantic markers and updates live detail without losing focus', () => {
     const { container } = render(
       <EvidenceRadarMap
@@ -157,5 +176,16 @@ describe('EvidenceRadarMap V1-V6 contract', () => {
 
     const { container } = render(<EvidenceRadarMap leads={[radarLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
     expect(container.querySelectorAll('[data-evidence-source]')).toHaveLength(2)
+  })
+
+  it('uses the shared Russian plural rules for Radar company and evidence counts', () => {
+    const radarLead = lead('77', 'Альфа', 'Москва')
+    radarLead.independentSourceCount = 1
+    radarLead.evidence = [evidence('evidence-1', '2026-08-15T00:00:00.000Z')]
+
+    render(<EvidenceRadarMap leads={[radarLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
+
+    expect(screen.getByText('1 компания')).toBeInTheDocument()
+    expect(screen.getByText('1 независимый источник')).toBeInTheDocument()
   })
 })
