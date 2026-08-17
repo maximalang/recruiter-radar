@@ -92,8 +92,6 @@ jobs:
               kept.append(line)
           pvs.write_text(''.join(kept))
 
-          # Migrate only live presentation code. Tests stay independent and keep
-          # detecting the retired grammar exactly as the V6 specification requires.
           for path in app.rglob('*'):
               if not path.is_file() or path.suffix not in text_suffixes or path == pvs:
                   continue
@@ -130,8 +128,6 @@ jobs:
               if updated != content:
                   path.write_text(updated)
 
-          # Compact top shell + mobile navigation use the shared semantic motion
-          # contract without reintroducing decorative transforms.
           workspace_path = app / 'ui' / 'product-workspace.tsx'
           content = workspace_path.read_text()
           content = content.replace(
@@ -155,8 +151,6 @@ jobs:
           )
           workspace_path.write_text(content)
 
-          # Update UI tests only where the approved V6 semantic contract replaced
-          # retired markup/version labels.
           unified_path = web / 'src' / '__tests__' / 'app' / 'ui' / 'unified-ui-system.test.tsx'
           content = unified_path.read_text()
           content = content.replace('"Дашборд"', '"Сегодня"')
@@ -164,9 +158,13 @@ jobs:
           content = content.replace('"recruiter-radar-v7"', '"recruiter-radar"')
           content = content.replace('[aria-label="Разделы кабинета"]', '[aria-label="Основные разделы"]')
           old_loop = '''    currentLinks.forEach((link) => {\n      expect(link).toHaveAttribute("data-motion-interactive");\n      expect(link.querySelector('[data-motion-icon="navigation"]')).toHaveAttribute(\n        "data-motion-state",\n        "active",\n      );\n    });'''
-          new_loop = '''    currentLinks.forEach((link) => {\n      expect(link).toHaveAttribute("data-motion-interactive");\n    });\n    const activeMobileLink = container.querySelector(\n      '.mobileNav a[aria-current="page"]',\n    ) ?? [...currentLinks].find((link) => link.querySelector('[data-motion-icon="navigation"]'));\n    expect(activeMobileLink?.querySelector('[data-motion-icon="navigation"]')).toHaveAttribute(\n      "data-motion-state",\n      "active",\n    );'''
-          assert old_loop in content, 'unified motion assertion changed unexpectedly'
+          new_loop = '''    currentLinks.forEach((link) => {\n      expect(link).toHaveAttribute("data-motion-interactive");\n    });\n    const activeMobileLink = [...currentLinks].find((link) =>\n      link.querySelector('[data-motion-icon="navigation"]'),\n    );\n    expect(activeMobileLink?.querySelector('[data-motion-icon="navigation"]')).toHaveAttribute(\n      "data-motion-state",\n      "active",\n    );'''
+          assert old_loop in content, 'unified active motion assertion changed unexpectedly'
           content = content.replace(old_loop, new_loop)
+          old_idle = '''    const idleLinks = container.querySelectorAll('a[href="/leads"]');\n    expect(idleLinks).toHaveLength(2);\n    idleLinks.forEach((link) => {\n      expect(link.querySelector('[data-motion-icon="navigation"]')).toHaveAttribute(\n        "data-motion-state",\n        "idle",\n      );\n    });'''
+          new_idle = '''    const idleLinks = container.querySelectorAll('a[href="/leads"]');\n    expect(idleLinks).toHaveLength(2);\n    idleLinks.forEach((link) => {\n      expect(link).toHaveAttribute("data-motion-interactive");\n    });\n    const idleMobileLink = [...idleLinks].find((link) =>\n      link.querySelector('[data-motion-icon="navigation"]'),\n    );\n    expect(idleMobileLink?.querySelector('[data-motion-icon="navigation"]')).toHaveAttribute(\n      "data-motion-state",\n      "idle",\n    );'''
+          assert old_idle in content, 'unified idle motion assertion changed unexpectedly'
+          content = content.replace(old_idle, new_idle)
           unified_path.write_text(content)
 
           opportunity_test = web / 'src' / '__tests__' / 'app' / 'opportunities' / 'opportunity-card.test.tsx'
@@ -189,8 +187,6 @@ jobs:
           )
           opportunity_test.write_text(content)
 
-          # Browser acceptance opens the parent situation analysis before probing
-          # nested Commercial Signal diagnostics.
           e2e_path = root / 'packages' / 'db' / 'scripts' / 'run-auth-v2-account-team-e2e.mjs'
           content = e2e_path.read_text()
           old = """  const commercialCard = page.locator('article[data-semantic-mode=\"v3\"]')\n  await commercialCard.waitFor({ state: 'visible' })\n"""
