@@ -29,4 +29,18 @@ describe('company brief mobile hierarchy', () => {
     expect(styles).toContain('grid-template-areas:"evidence" "action" "main"')
     expect(styles).not.toMatch(/(?:^|[;{])\s*order\s*:/)
   })
+
+  it('uses shared Russian count grammar and final user-facing terminology', async () => {
+    const page = await readFile(pagePath, 'utf8')
+
+    expect(page).toContain("formatVacanciesCount(lead.vacanciesCount)")
+    expect(page).toContain("pluralForm(count, ['роль', 'роли', 'ролей'])")
+    expect(page).toContain("pluralForm(count, ['источник', 'источника', 'источников'])")
+    expect(page).toContain('<span className={styles.railTitle}>Статус</span>')
+    expect(page).toContain('текущий сигнал найма')
+    expect(page).not.toContain('текущий hiring signal')
+    expect(page).not.toContain('<span className={styles.railTitle}>Workflow</span>')
+    expect(page).not.toContain('{lead.vacanciesCount} вакансий')
+    expect(page).not.toContain('{lead.sourceFamilies.length} источников')
+  })
 })
