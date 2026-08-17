@@ -681,10 +681,6 @@
     display: none;
   }
 
-  .semanticListWrap {
-    order: -1;
-  }
-
   .semanticList button {
     grid-template-columns: 30px minmax(0, 1fr) auto;
     grid-template-areas:
