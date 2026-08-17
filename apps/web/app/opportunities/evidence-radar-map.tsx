@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type CSSProperties } from 'react'
 
+import { pluralCompanies, pluralForm } from '@/lib/format/plural'
 import type { EvidenceRadarRegionBoundary } from '@/lib/intelligence/evidence-radar-boundaries'
 import type { EvidenceRadarLead } from '@/lib/intelligence/evidence-radar-repository'
 import styles from './evidence-radar-map.module.css'
@@ -14,11 +15,11 @@ export function EvidenceRadarMap(props: {
   boundaries?: readonly EvidenceRadarRegionBoundary[]
   referenceTimestamp: number
 }) {
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(
-    props.leads[0]?.cardId ?? null,
-  )
-  const selected = props.leads.find((lead) => lead.cardId === selectedCardId) ?? props.leads[0] ?? null
   const rankedLeads = useMemo(() => rankRadarLeads(props.leads), [props.leads])
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(
+    () => rankedLeads[0]?.cardId ?? null,
+  )
+  const selected = props.leads.find((lead) => lead.cardId === selectedCardId) ?? rankedLeads[0] ?? null
   const labelledIds = useMemo(
     () => new Set(rankedLeads.slice(0, MAX_PERSISTENT_LABELS).map((lead) => lead.cardId)),
     [rankedLeads],
@@ -82,7 +83,7 @@ export function EvidenceRadarMap(props: {
         <div className={styles.semanticListWrap}>
           <div className={styles.semanticListHeader}>
             <h3>Сигналы по приоритету</h3>
-            <span>{rankedLeads.length} компаний</span>
+            <span>{rankedLeads.length} {pluralCompanies(rankedLeads.length)}</span>
           </div>
           <ol className={styles.semanticList} aria-label="Компании на Радаре">
             {rankedLeads.map((lead, index) => {
@@ -201,7 +202,7 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
 
       <div className={styles.locationLine}>
         <span>{lead.location.city}</span>
-        <span>{lead.location.federalSubjectName}</span>
+        {lead.location.federalSubjectName ? <span>{lead.location.federalSubjectName}</span> : null}
         {lead.location.address ? <span>{lead.location.address}</span> : null}
       </div>
 
@@ -210,7 +211,7 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
         <p>{lead.whyNow}</p>
         {acceleration && acceleration.change > 0 ? (
           <p className={styles.delta}>
-            Активные вакансии: {acceleration.previous} → {acceleration.current} за {acceleration.windowDays} дней (+{acceleration.change}).
+            Активные вакансии: {acceleration.previous} → {acceleration.current} за {acceleration.windowDays} {pluralForm(acceleration.windowDays, ['день', 'дня', 'дней'])} (+{acceleration.change}).
           </p>
         ) : null}
       </section>
@@ -218,7 +219,7 @@ function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
       <section className={styles.leadSection}>
         <div className={styles.sectionHeading}>
           <h3>Подтверждения</h3>
-          <span>{lead.independentSourceCount} независимых источника</span>
+          <span>{formatIndependentSourcesCount(lead.independentSourceCount)}</span>
         </div>
         {lead.evidence.length > 0 ? (
           <ol className={styles.timeline}>
@@ -364,6 +365,10 @@ function staffingModeLabel(mode: string | null): string {
   if (mode === 'targeted') return 'точечный найм'
   if (mode === 'volume') return 'массовый найм'
   return 'режим не указан'
+}
+
+function formatIndependentSourcesCount(count: number): string {
+  return `${count} ${pluralForm(count, ['независимый источник', 'независимых источника', 'независимых источников'])}`
 }
 
 function rankRadarLeads(leads: readonly EvidenceRadarLead[]): EvidenceRadarLead[] {
