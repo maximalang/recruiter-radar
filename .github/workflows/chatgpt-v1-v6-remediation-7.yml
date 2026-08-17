@@ -1,0 +1,64 @@
+name: ChatGPT V1-V6 remediation 7
+
+on:
+  push:
+    branches:
+      - chatgpt/full-v1-v6-implementation
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: chatgpt/full-v1-v6-implementation
+          fetch-depth: 0
+      - name: Align final V1-V6 QA selectors
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          replacements = [
+              (
+                  Path('packages/db/scripts/run-auth-v2-account-team-e2e.mjs'),
+                  "await page.locator('[data-evidence-lead-card]').waitFor({ state: 'visible' })",
+                  "await page.locator('[data-evidence-lead-detail]').waitFor({ state: 'visible' })",
+              ),
+              (
+                  Path('apps/web/scripts/verify-landing-production.mjs'),
+                  'const login = await page.getByRole("link", { name: "Войти", exact: true }).boundingBox();',
+                  'const login = await page.locator("#scene-detection").getByRole("link", { name: "Войти", exact: true }).boundingBox();',
+              ),
+          ]
+
+          for path, old, new in replacements:
+              text = path.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected exactly one selector contract, found {count}')
+              path.write_text(text.replace(old, new))
+          PY
+      - name: Verify selector contracts and syntax
+        shell: bash
+        run: |
+          grep -Fq "[data-evidence-lead-detail]" packages/db/scripts/run-auth-v2-account-team-e2e.mjs
+          ! grep -Fq "[data-evidence-lead-card]" packages/db/scripts/run-auth-v2-account-team-e2e.mjs
+          grep -Fq 'page.locator("#scene-detection").getByRole("link", { name: "Войти", exact: true })' apps/web/scripts/verify-landing-production.mjs
+          node --check packages/db/scripts/run-auth-v2-account-team-e2e.mjs
+          node --check apps/web/scripts/verify-landing-production.mjs
+      - name: Commit selector fixes and remove temporary workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/chatgpt-v1-v6-remediation-7.yml
+          git config user.name "chatgpt-remediation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "test: align V1-V6 browser QA selectors"
+          git push origin HEAD:chatgpt/full-v1-v6-implementation
