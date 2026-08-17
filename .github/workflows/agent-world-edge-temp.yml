@@ -1,0 +1,53 @@
+name: Agent World temporary edge
+
+on:
+  push:
+    branches:
+      - codex/agent-world-edge-temp
+    paths:
+      - .github/workflows/agent-world-edge-temp.yml
+      - ops/agent-world-edge-upstream.txt
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-world-edge-temp
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' '${{ secrets.RR_SSH_PRIVATE_KEY }}' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p '${{ secrets.RR_SSH_PORT }}' -t ed25519 '${{ secrets.RR_SSH_HOST }}' >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Inspect Caddy edge without mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -p '${{ secrets.RR_SSH_PORT }}' -o LogLevel=ERROR \
+            '${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}' <<'SSH_EOF'
+          set -euo pipefail
+          caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          echo '=== recruiter-radar.ru site block ==='
+          awk '
+            $0 == "recruiter-radar.ru {" { in_site=1 }
+            in_site { print }
+            in_site && $0 == "}" { exit }
+          ' /etc/caddy/Caddyfile
+          echo '=== runtime ==='
+          systemctl is-active caddy
+          curl -fsS http://127.0.0.1:3000/api/health >/dev/null
+          echo 'Radar local health: ok'
+          SSH_EOF
