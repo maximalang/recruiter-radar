@@ -19,6 +19,16 @@ caddy_end='# END Agent World Preview (managed)'
 owner_password_hash='scrypt-v1$32768$8$1$VY98vE1S4yVPhSkLVvhb7g$ioPyf_XxtntzCAHBqc1c4gZ_gmqduAT4q5_hTvXOg4U'
 mutation_started=false
 
+reload_caddy() {
+  local can_systemd_reload
+  can_systemd_reload="$(systemctl show caddy.service --property=CanReload --value 2>/dev/null || true)"
+  if [ "$can_systemd_reload" = yes ]; then
+    systemctl reload caddy.service
+    return
+  fi
+  caddy reload --config "$caddy_config" --adapter caddyfile
+}
+
 remove_managed_caddy_block() {
   if [ ! -f "$caddy_config" ]; then
     return 0
@@ -34,7 +44,7 @@ remove_managed_caddy_block() {
   chown --reference="$caddy_config" "$temporary"
   if caddy validate --config "$temporary" --adapter caddyfile >/dev/null 2>&1; then
     mv "$temporary" "$caddy_config"
-    systemctl reload caddy.service >/dev/null 2>&1 || true
+    reload_caddy >/dev/null 2>&1 || true
   else
     rm -f "$temporary"
   fi
@@ -208,7 +218,7 @@ chmod --reference="$caddy_config" "$caddy_tmp"
 chown --reference="$caddy_config" "$caddy_tmp"
 caddy validate --config "$caddy_tmp" --adapter caddyfile
 mv "$caddy_tmp" "$caddy_config"
-systemctl reload caddy.service
+reload_caddy
 
 curl -fsS http://127.0.0.1:3100/api/health/ready >/dev/null
 for attempt in $(seq 1 20); do
