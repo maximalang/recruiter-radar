@@ -28,6 +28,8 @@ describe("SettingsDocumentSummary", () => {
     expect(screen.getAllByRole("link", { name: /^Доступ и оплата/ }).some((link) => link.getAttribute("href") === "/settings/access")).toBe(true);
     expect(screen.getAllByRole("link", { name: /^Команда/ }).some((link) => link.getAttribute("href") === "/settings/team")).toBe(true);
     expect(screen.getAllByRole("link", { name: /^Безопасность/ }).some((link) => link.getAttribute("href") === "/settings/security")).toBe(true);
+    expect(screen.getByText("Рабочее пространство")).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("Workspace");
   });
 
   it("does not claim delivery is ready when no channel is connected", () => {
