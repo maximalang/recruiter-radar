@@ -18,6 +18,7 @@ const STATUS_LABELS: Record<CommercialSignalCardStatus, string> = {
 export function OpportunityCommercialSignalCard(props: {
   opportunityId: string
   card: CommercialSignalCard
+  showDiagnostics?: boolean
 }) {
   return (
     <div className={styles.commercialSignalBrief}>
@@ -83,7 +84,7 @@ export function OpportunityCommercialSignalCard(props: {
             metric={props.card.metrics.actionability}
           />
         </div>
-        <SignalDiagnostics card={props.card} />
+        {props.showDiagnostics === false ? null : <OpportunitySignalDiagnostics card={props.card} />}
       </section>
 
       <div className={styles.decisionGrid}>
@@ -180,7 +181,7 @@ function Metric(props: {
   )
 }
 
-function SignalDiagnostics({ card }: { card: CommercialSignalCard }) {
+export function OpportunitySignalDiagnostics({ card }: { card: CommercialSignalCard }) {
   const diagnostics = [
     ['Вероятность внешнего подбора', card.metrics.externalAgencyPropensity.reasonCodes],
     ['Соответствие вашему профилю', card.metrics.agencyFit.reasonCodes],
