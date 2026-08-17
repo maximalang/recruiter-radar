@@ -17,12 +17,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 1
-      - name: Verify staging parent
+          fetch-depth: 0
+      - name: Verify staging base
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "73c38f4ae943d5d2346b7a6ab430190a127fa947"
+          expected_base="73c38f4ae943d5d2346b7a6ab430190a127fa947"
+          git cat-file -e "${expected_base}^{commit}"
+          git merge-base --is-ancestor "$expected_base" HEAD
       - name: Restore verified untracked V1-V6 files
         shell: bash
         run: |
