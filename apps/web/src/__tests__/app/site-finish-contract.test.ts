@@ -79,8 +79,9 @@ describe("cross-route visual layer contract", () => {
     const radar = readAppFile("opportunities/evidence-radar-map.module.css");
     const leads = readAppFile("leads/leads-workspace.module.css");
 
-    expect(internalPage).toContain(".leadDetailContainer .detailMain > .contentCard");
-    expect(internalPage).toContain(".leadDetailContainer .detailSidebar > .contentCard");
+    expect(internalPage).not.toContain(".leadDetailContainer");
+    expect(internalPage).not.toContain(".detailMain > .contentCard");
+    expect(internalPage).not.toContain(".detailSidebar > .contentCard");
     expect(leads).toContain(".list{display:grid}");
     expect(leads).toMatch(/\.row\{[\s\S]*?border-bottom:1px solid var\(--rr-color-separator\)/);
     expect(leads).not.toContain(".disclosure");

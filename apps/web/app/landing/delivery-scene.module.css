@@ -28,7 +28,7 @@
 .channelHierarchy { position: relative; display: grid; grid-template-columns: minmax(16rem,.68fr) minmax(28rem,1.32fr); gap: clamp(1.25rem,3vw,2.4rem); }
 .channelHierarchy::before { position: absolute; top: 4.3rem; left: calc(34% - .2rem); width: clamp(1.5rem,3vw,2.5rem); height: 1px; background: linear-gradient(90deg, rgba(78,142,124,.52), rgba(78,142,124,.08)); content: ""; transform: scaleX(.35); transform-origin: left; transition: transform .35s ease; }
 .section:global([data-motion-state="visible"]) .channelHierarchy::before { animation: none; }
-.channelHierarchy:has(.channelRoute:hover)::before, .channelHierarchy:has(.channelRoute:focus-visible)::before, .channelHierarchy:has(.moreRoutes[open])::before { transform: scaleX(1); }
+.channelHierarchy:has(.moreRoutes[open])::before { transform: scaleX(1); }
 
 .coreChannel { position: relative; display: grid; align-content: start; min-height: 100%; padding: 1.4rem; border: 0; border-top: 1px solid rgba(191,220,145,.34); background: linear-gradient(145deg, #111b17, var(--slate-900)); color: var(--paper); box-shadow: 0 16px 36px rgba(8,12,10,.055); }
 .groupLabel { color: #397966; font-family: var(--rr-font-mono); font-size: .58rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
@@ -40,14 +40,9 @@
 .deliveryRoutes { display: grid; grid-template-columns: 1fr; align-content: start; border-top: 1px solid var(--line-light); }
 .deliveryRoutes > .groupLabel { padding: .8rem 0; border-bottom: 1px solid var(--line-light); }
 .channelRoute { position: relative; display: grid; grid-template-columns: auto minmax(0,1fr) minmax(8rem,auto); align-items: center; gap: .7rem 1rem; padding: .95rem 0; border-bottom: 1px solid var(--line-light); transition: opacity .18s ease, background-color .18s ease, color .18s ease; }
-.channelRoute::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 1px; background: linear-gradient(90deg, #4e8e7c, transparent 66%); content: ""; opacity: 0; transform: scaleX(.2); transform-origin: left; transition: opacity .18s ease, transform .22s ease; }
-.channelRoute:hover, .channelRoute:focus-visible { background: linear-gradient(90deg, rgba(78,142,124,.055), transparent 72%); outline: none; }
-.channelRoute:hover::after, .channelRoute:focus-visible::after { opacity: 1; transform: scaleX(1); }
-.deliveryRoutes:has(.channelRoute:hover) .channelRoute:not(:hover), .deliveryRoutes:has(.channelRoute:focus-visible) .channelRoute:not(:focus-visible) { opacity: .68; }
 
 .channelTopline { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1.15rem; }
-.channelIcon { display: grid; width: 2.35rem; height: 2.35rem; flex: 0 0 2.35rem; place-items: center; border: 0; border-radius: 50%; background: rgba(127,216,189,.07); color: #397966; transition: background-color .18s ease, transform .18s ease; }
-.channelRoute:hover .channelIcon, .channelRoute:focus-visible .channelIcon { background: rgba(78,142,124,.12); transform: scale(1.04); }
+.channelIcon { display: grid; width: 2.35rem; height: 2.35rem; flex: 0 0 2.35rem; place-items: center; border: 0; border-radius: 50%; background: rgba(127,216,189,.07); color: #397966; }
 .channelIcon svg { display: block; width: 1.18rem; height: 1.18rem; overflow: visible; }
 .channelStatus { display: inline-flex; align-items: center; gap: .35rem; color: #397966; }
 .channelStatus::before { width: .32rem; height: .32rem; border-radius: 50%; background: currentColor; content: ""; }

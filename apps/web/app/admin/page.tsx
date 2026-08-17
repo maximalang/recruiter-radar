@@ -93,7 +93,7 @@ export default async function AdminPage() {
             <p className={internalPageClasses.bodyTextMutedBlock}>
               Панель оператора предназначена для администратора сервиса (запуск инжеста,
               мониторинг источников, метрики качества). Обычные пользователи работают
-              в <Link href="/dashboard" style={{ color: "inherit", textDecoration: "underline" }}>дашборде</Link>.
+              в <Link href="/dashboard" style={{ color: "inherit", textDecoration: "underline" }}>разделе «Сегодня»</Link>.
             </p>
           </ContentCard>
         </div>

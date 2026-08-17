@@ -793,12 +793,6 @@
   margin: 0 0 16px;
 }
 
-/* ── Lead detail layout ── */
-.leadDetailContainer {
-  max-width: 960px;
-  margin: 0 auto;
-}
-
 /* ── Chip / tag wrapping ── */
 .chipWrap {
   display: flex;
@@ -930,65 +924,6 @@
   font-size: 0.72rem;
   color: var(--rr-color-text-tertiary);
   margin-top: 4px;
-}
-
-/* Core decision surfaces read as one workspace, not a stack of nested cards. */
-.leadDetailContainer {
-  max-width: 1180px;
-}
-
-.leadDetailContainer .detailLayout {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
-  gap: clamp(28px, 4vw, 52px);
-}
-
-.leadDetailContainer .detailMain {
-  gap: 0;
-}
-
-.leadDetailContainer .detailMain > .contentCard {
-  padding: 22px 0;
-  border: 0;
-  border-top: 1px solid var(--rr-color-separator);
-  border-radius: 0;
-  background: transparent;
-}
-
-.leadDetailContainer .detailMain > .contentCard:first-child {
-  margin-bottom: 10px;
-  padding: 20px;
-  border: 1px solid rgba(35, 128, 111, .24);
-  border-left: 3px solid var(--rr-color-signal);
-  border-radius: 14px;
-  background: rgba(35, 128, 111, .035);
-}
-
-.leadDetailContainer .detailSidebar {
-  align-self: start;
-  gap: 0;
-  border-top: 1px solid var(--rr-color-separator);
-  border-bottom: 1px solid var(--rr-color-separator);
-}
-
-.leadDetailContainer .detailSidebar > .contentCard {
-  padding: 18px 0;
-  border: 0;
-  border-bottom: 1px solid var(--rr-color-separator);
-  border-radius: 0;
-  background: transparent;
-}
-
-.leadDetailContainer .detailSidebar > .contentCard:last-child {
-  border-bottom: 0;
-}
-
-@media (max-width: 768px) {
-  .leadDetailContainer .detailLayout {
-    grid-template-columns: 1fr;
-    gap: 26px;
-  }
-
-  .leadDetailContainer .detailSidebar { margin-top: 4px; }
 }
 
 @media (max-width: 640px) {
