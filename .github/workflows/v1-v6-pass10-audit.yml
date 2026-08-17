@@ -1,0 +1,41 @@
+name: V1-V6 PASS 10 audit
+
+on:
+  push:
+    branches:
+      - chatgpt/v1-v6-pass10-audit
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Production legacy grammar audit
+        shell: bash
+        run: |
+          set -u
+          pattern='LeadCard|OpportunityCard|ScoreGauge|ScoreBar|ScoreBandChip|SettingsOverview|radioCard|modeBadge|metricCard|signalLeadCard|signalLeadSections|signalLeadScoreTrack|ContentCard|recruiter-radar-v6|recruiter-radar-v7|#9fca63|#9FCA63|#c8f36a|#C8F36A|#c9ec8b|#C9EC8B|Возможности|Дашборд|Командный центр|Карта спроса|Source Registry|translateY\(-1px\)|translateY\(\s*-1px\s*\)'
+          echo '=== PRODUCTION UI / APP ==='
+          rg -n --hidden --glob '!**/__tests__/**' --glob '!**/*.test.*' --glob '!**/*.spec.*' --glob '!**/node_modules/**' --glob '!**/.next/**' "$pattern" apps/web/app apps/web/lib 2>/dev/null || true
+          echo '=== TESTS ==='
+          rg -n --hidden "$pattern" apps/web/src/__tests__ 2>/dev/null || true
+          echo '=== OTHER SOURCE / SCRIPTS ==='
+          rg -n --hidden --glob '!**/node_modules/**' --glob '!**/.next/**' "$pattern" scripts packages .github 2>/dev/null || true
+          echo '=== LEGACY TOKEN ALIASES IN PRODUCT FOUNDATION ==='
+          rg -n --hidden -- '--c-[a-zA-Z0-9_-]+|--rr-(paper|ink|surface|signal|accent|muted|line|border|radius|shadow)[a-zA-Z0-9_-]*' apps/web/app/product-visual-system.css apps/web/app/globals.css apps/web/app 2>/dev/null || true
+          echo '=== ANIMATION LOOPS / AMBIENT MOTION CANDIDATES ==='
+          rg -n --hidden --glob '*.css' --glob '*.tsx' --glob '*.ts' 'animation[^;]*(infinite|linear infinite)|animation-iteration-count\s*:\s*infinite|requestAnimationFrame|setInterval\(' apps/web/app 2>/dev/null || true
+          echo '=== CARD/LEGACY FILENAMES STILL PRESENT ==='
+          find apps/web/app -type f \( -iname '*card*' -o -iname '*gauge*' -o -iname '*overview*' \) | sort
+      - name: Dead import candidates
+        shell: bash
+        run: |
+          echo '=== COMPONENT DEFINITIONS / IMPORT REFERENCES ==='
+          for term in LeadCard OpportunityCard ScoreGauge ScoreBar ScoreBandChip SettingsOverview ContentCard; do
+            echo "--- $term ---"
+            rg -n --hidden --glob '!**/node_modules/**' --glob '!**/.next/**' "$term" apps/web 2>/dev/null || true
+          done
