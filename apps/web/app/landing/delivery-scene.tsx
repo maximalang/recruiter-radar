@@ -89,7 +89,7 @@ function DeliveryChannelGlyph({ channel }: { channel: DeliveryChannelKey }) {
 
 function ChannelRoute({ channel }: { channel: DeliveryChannel }) {
   return (
-    <article className={sceneStyles.channelRoute} data-channel={channel.key} tabIndex={0}>
+    <article className={sceneStyles.channelRoute} data-channel={channel.key}>
       <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel={channel.key} /></span>
       <div>
         <div className={sceneStyles.routeHeading}>
