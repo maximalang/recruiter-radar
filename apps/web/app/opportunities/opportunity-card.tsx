@@ -8,6 +8,7 @@ import { OpportunityEvidenceSection } from './opportunity-evidence'
 import { OpportunityOutcomeImpression, OpportunityOutcomePanel } from './opportunity-outcome-panel'
 import { OpportunityWorkflowPanel } from './opportunity-workflow-panel'
 import { OpportunityCommercialSignalCard } from './opportunity-commercial-signal-card'
+import { SituationDisclosure } from './situation-disclosure'
 import styles from './opportunities.module.css'
 import rowStyles from './situation-row.module.css'
 import { pluralForm } from '@/lib/format/plural'
@@ -64,86 +65,84 @@ export function OpportunityCard(props: {
         <OpportunityOutcomeImpression opportunityId={opportunity.id} cycleId={props.trackingCycleId} />
       ) : null}
 
-      <details className={rowStyles.disclosure}>
-        <summary className={rowStyles.summary}>
-          <div className={rowStyles.identity}>
-            <span className={rowStyles.company}>{opportunity.organizationName}</span>
-            <h2 className={rowStyles.episodeTitle}>{episodeLabel}</h2>
-            <span className={rowStyles.episodeMeta}>
-              {STATUS_LABELS[displayStatus] ?? displayStatus}
-              {opportunity.organizationDomain ? ` · ${opportunity.organizationDomain}` : ''}
-            </span>
-          </div>
+      <SituationDisclosure
+        header={(
+          <>
+            <div className={rowStyles.identity}>
+              <span className={rowStyles.company}>{opportunity.organizationName}</span>
+              <h2 className={rowStyles.episodeTitle}>{episodeLabel}</h2>
+              <span className={rowStyles.episodeMeta}>
+                {STATUS_LABELS[displayStatus] ?? displayStatus}
+                {opportunity.organizationDomain ? ` · ${opportunity.organizationDomain}` : ''}
+              </span>
+            </div>
 
-          <p className={rowStyles.change}>{opportunity.whyNow || opportunity.title}</p>
+            <p className={rowStyles.change}>{opportunity.whyNow || opportunity.title}</p>
 
-          <div className={rowStyles.proof}>
-            {formatCount(opportunity.factCount, ['факт', 'факта', 'фактов'])}
-            {' · '}
-            {formatCount(opportunity.sourceFamilyCount, ['источник', 'источника', 'источников'])}
-            {' · '}
-            {confidence}
-            {opportunity.validUntil ? ` · актуально до ${formatDate(opportunity.validUntil)}` : ''}
-          </div>
+            <div className={rowStyles.proof}>
+              {formatCount(opportunity.factCount, ['факт', 'факта', 'фактов'])}
+              {' · '}
+              {formatCount(opportunity.sourceFamilyCount, ['источник', 'источника', 'источников'])}
+              {' · '}
+              {confidence}
+              {opportunity.validUntil ? ` · актуально до ${formatDate(opportunity.validUntil)}` : ''}
+            </div>
 
-          <div className={rowStyles.temporal} aria-label={`Ситуация с ${formatDate(opportunity.episodeStartedAt)} по ${formatDate(opportunity.episodeLastSeenAt)}`}>
-            <time dateTime={opportunity.episodeStartedAt}>{formatShortDate(opportunity.episodeStartedAt)}</time>
-            <span className={rowStyles.temporalLine} aria-hidden="true" />
-            <time dateTime={opportunity.episodeLastSeenAt}>{formatShortDate(opportunity.episodeLastSeenAt)}</time>
-          </div>
+            <div className={rowStyles.temporal} aria-label={`Ситуация с ${formatDate(opportunity.episodeStartedAt)} по ${formatDate(opportunity.episodeLastSeenAt)}`}>
+              <time dateTime={opportunity.episodeStartedAt}>{formatShortDate(opportunity.episodeStartedAt)}</time>
+              <span className={rowStyles.temporalLine} aria-hidden="true" />
+              <time dateTime={opportunity.episodeLastSeenAt}>{formatShortDate(opportunity.episodeLastSeenAt)}</time>
+            </div>
+          </>
+        )}
+      >
+        {props.commercialSignalUiEnabled && !commercialSignalCard ? (
+          <p className={rowStyles.state} data-state="insufficient" role="status">
+            Данных для новой оценки ситуации пока недостаточно. Предыдущая оценка не подставляется вместо неё.
+          </p>
+        ) : contentState === 'insufficient' ? (
+          <p className={rowStyles.state} data-state="insufficient" role="status">
+            Для части выводов пока недостаточно подтверждённых данных.
+          </p>
+        ) : null}
+        {freshness === 'stale' ? (
+          <p className={rowStyles.state} data-state="stale" role="status">
+            Срок актуальности закончился {formatDate(opportunity.validUntil)}. Проверьте подтверждения перед действием.
+          </p>
+        ) : null}
 
-          <span className={rowStyles.cue}>Анализ</span>
-        </summary>
+        {commercialSignalCard ? (
+          <OpportunityCommercialSignalCard opportunityId={opportunity.id} card={commercialSignalCard} />
+        ) : !props.commercialSignalUiEnabled ? (
+          <OpportunityDecisionContext opportunity={opportunity} />
+        ) : null}
 
-        <div className={rowStyles.detail}>
-          {props.commercialSignalUiEnabled && !commercialSignalCard ? (
-            <p className={rowStyles.state} data-state="insufficient" role="status">
-              Данных для новой оценки ситуации пока недостаточно. Предыдущая оценка не подставляется вместо неё.
-            </p>
-          ) : contentState === 'insufficient' ? (
-            <p className={rowStyles.state} data-state="insufficient" role="status">
-              Для части выводов пока недостаточно подтверждённых данных.
-            </p>
-          ) : null}
-          {freshness === 'stale' ? (
-            <p className={rowStyles.state} data-state="stale" role="status">
-              Срок актуальности закончился {formatDate(opportunity.validUntil)}. Проверьте подтверждения перед действием.
-            </p>
-          ) : null}
+        <OpportunityEvidenceSection opportunity={opportunity} />
 
-          {commercialSignalCard ? (
-            <OpportunityCommercialSignalCard opportunityId={opportunity.id} card={commercialSignalCard} />
-          ) : !props.commercialSignalUiEnabled ? (
-            <OpportunityDecisionContext opportunity={opportunity} />
-          ) : null}
+        {!props.commercialSignalUiEnabled ? <OpportunityDecisionPlan opportunity={opportunity} /> : null}
 
-          <OpportunityEvidenceSection opportunity={opportunity} />
+        {props.workflowEnabled && props.actorUserId ? (
+          <OpportunityWorkflowPanel
+            opportunityId={opportunity.id}
+            workflow={opportunity.workflow}
+            assignees={props.workflowAssignees ?? []}
+            actorUserId={props.actorUserId}
+            actorRole={props.actorRole ?? null}
+          />
+        ) : null}
 
-          {!props.commercialSignalUiEnabled ? <OpportunityDecisionPlan opportunity={opportunity} /> : null}
-
-          {props.workflowEnabled && props.actorUserId ? (
-            <OpportunityWorkflowPanel
-              opportunityId={opportunity.id}
-              workflow={opportunity.workflow}
-              assignees={props.workflowAssignees ?? []}
-              actorUserId={props.actorUserId}
-              actorRole={props.actorRole ?? null}
-            />
-          ) : null}
-
-          <section className={`${styles.decisionSection} ${styles.commercialHistory}`} aria-labelledby={`commercial-history-${opportunity.id}`}>
-            <h3 id={`commercial-history-${opportunity.id}`}>Коммерческая история</h3>
-            {props.outcomesUiEnabled ? (
-              <OpportunityOutcomePanel opportunityId={opportunity.id} fallbackStage={opportunity.commercialStage} />
-            ) : (
-              <>
-                <p className={styles.insufficientValue}>История недоступна в текущем режиме.</p>
-                <OpportunityActions opportunityId={opportunity.id} currentStatus={opportunity.status} detailHref={`#evidence-${opportunity.id}`} />
-              </>
-            )}
-          </section>
-        </div>
-      </details>
+        <section className={`${styles.decisionSection} ${styles.commercialHistory}`} aria-labelledby={`commercial-history-${opportunity.id}`}>
+          <h3 id={`commercial-history-${opportunity.id}`}>Коммерческая история</h3>
+          {props.outcomesUiEnabled ? (
+            <OpportunityOutcomePanel opportunityId={opportunity.id} fallbackStage={opportunity.commercialStage} />
+          ) : (
+            <>
+              <p className={styles.insufficientValue}>История недоступна в текущем режиме.</p>
+              <OpportunityActions opportunityId={opportunity.id} currentStatus={opportunity.status} detailHref={`#evidence-${opportunity.id}`} />
+            </>
+          )}
+        </section>
+      </SituationDisclosure>
     </article>
   )
 }
