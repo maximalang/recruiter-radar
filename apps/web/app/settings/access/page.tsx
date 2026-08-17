@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth-v2/authorization";
 import { getEffectiveEntitlement } from "@/lib/entitlements";
+import { pluralForm } from "@/lib/format/plural";
 import { listCheckoutOrdersForAccess } from "@/lib/paymentsRepo";
+import type { CheckoutOrderStatus } from "@/lib/paymentsTypes";
 import { buildAccountNavigation } from "../../ui/account-navigation";
 import {
   InternalPageFrame,
@@ -54,7 +56,7 @@ export default async function AccessSettingsPage() {
         <section className={styles.section} aria-labelledby="current-access-title">
           <div className={styles.sectionHeader}>
             <h2 id="current-access-title">Текущий доступ</h2>
-            <p>Показываем только фактическое состояние entitlement, без предположений о подписке или будущих списаниях.</p>
+            <p>Показываем только фактическое состояние доступа, без предположений о подписке или будущих списаниях.</p>
           </div>
 
           {access.status === "active" ? (
@@ -64,7 +66,7 @@ export default async function AccessSettingsPage() {
               <div><dt>Источник</dt><dd>{accessSourceLabel(access.source)}</dd></div>
               <div><dt>Начало</dt><dd>{formatDate(access.startsAt)}</dd></div>
               <div><dt>Доступ до</dt><dd>{access.expiresAt ? formatDate(access.expiresAt) : "Без даты окончания"}</dd></div>
-              {remainingDays !== null ? <div><dt>Осталось</dt><dd>{remainingDays} дн.</dd></div> : null}
+              {remainingDays !== null ? <div><dt>Осталось</dt><dd>{formatDays(remainingDays)}</dd></div> : null}
               <div><dt>Доступно</dt><dd>{access.features.map(featureLabel).join(", ")}</dd></div>
             </dl>
           ) : (
@@ -103,7 +105,7 @@ export default async function AccessSettingsPage() {
                   <span className={styles.orderAmount}>
                     {(order.amountMinor / 100).toLocaleString("ru-RU")} {order.currency}
                   </span>
-                  <span className={styles.orderStatus}>{order.status}</span>
+                  <span className={styles.orderStatus}>{orderStatusLabel(order.status)}</span>
                   <span className={styles.orderMeta}>
                     {order.provider ? `${order.provider} · ` : ""}{formatDate(order.createdAt)}
                   </span>
@@ -122,6 +124,10 @@ function formatDate(value: string): string {
     .format(new Date(value));
 }
 
+function formatDays(count: number): string {
+  return `${count} ${pluralForm(count, ["день", "дня", "дней"])}`;
+}
+
 const ACCESS_SOURCE_LABELS = {
   subscription: "Подписка",
   payment: "Оплаченный доступ",
@@ -138,10 +144,24 @@ const FEATURE_LABELS = {
   delivery: "Каналы доставки",
 } as const;
 
+const ORDER_STATUS_LABELS: Record<CheckoutOrderStatus, string> = {
+  created: "Создан",
+  pending: "Ожидает оплаты",
+  paid: "Оплачен",
+  refunded: "Возвращён",
+  canceled: "Отменён",
+  failed: "Ошибка оплаты",
+  unavailable: "Оплата недоступна",
+};
+
 function accessSourceLabel(source: keyof typeof ACCESS_SOURCE_LABELS): string {
   return ACCESS_SOURCE_LABELS[source];
 }
 
 function featureLabel(feature: keyof typeof FEATURE_LABELS): string {
   return FEATURE_LABELS[feature];
+}
+
+function orderStatusLabel(status: CheckoutOrderStatus): string {
+  return ORDER_STATUS_LABELS[status];
 }
