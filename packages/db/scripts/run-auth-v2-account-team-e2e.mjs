@@ -1320,7 +1320,7 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
     await marker.getAttribute('aria-pressed') === 'true',
     'Evidence Radar marker selection did not become active.',
   )
-  await page.locator('[data-evidence-lead-card]').waitFor({ state: 'visible' })
+  await page.locator('[data-evidence-lead-detail]').waitFor({ state: 'visible' })
   assert(
     await page.locator('[data-motion-status]').filter({ hasText: 'Выбрано:' }).count() === 1,
     'Evidence Radar selected-marker status is missing.',

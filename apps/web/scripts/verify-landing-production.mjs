@@ -292,7 +292,7 @@ async function assertHeroGeometry(page, label) {
 
   if (viewport.width >= 1024) {
     const primary = await page.locator('#scene-detection [data-analytics-context="hero_primary"]').boundingBox();
-    const login = await page.getByRole("link", { name: "Войти", exact: true }).boundingBox();
+    const login = await page.locator("#scene-detection").getByRole("link", { name: "Войти", exact: true }).boundingBox();
     const trust = await page.locator("#scene-detection [data-hero-trust-line]").boundingBox();
     assert.ok(primary && login && trust, `${label}: missing hero fold surfaces`);
     assert.ok(primary.y + primary.height <= viewport.height, `${label}: primary CTA is below fold`);
