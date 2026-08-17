@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: agent-world-edge-temp
@@ -29,8 +29,8 @@ jobs:
         run: |
           set -euo pipefail
           upstream="$(tr -d '\r\n[:space:]' < ops/agent-world-edge-upstream.txt)"
-          if [ "$upstream" != "DISABLED" ] && ! printf '%s' "$upstream" | grep -Eq '^https://[a-z0-9-]+\.trycloudflare\.com$'; then
-            echo "Only DISABLED or one HTTPS trycloudflare.com Quick Tunnel origin is accepted." >&2
+          if [ "$upstream" != "DISABLED" ] && ! printf '%s' "$upstream" | grep -Eq '^https://[a-z0-9-]+\.trycloudflare\.com$|^https://[a-z0-9-]+\.run\.pinggy-free\.link$|^https://[a-z0-9-]+\.free\.pinggy\.net$'; then
+            echo "Only DISABLED or one exact HTTPS Cloudflare/Pinggy temporary tunnel origin is accepted." >&2
             exit 1
           fi
           echo "upstream=$upstream" >> "$GITHUB_OUTPUT"
@@ -51,10 +51,15 @@ jobs:
           UPSTREAM: ${{ steps.state.outputs.upstream }}
         run: |
           set -euo pipefail
-          body="$(curl --fail --silent --show-error --max-time 20 "$UPSTREAM/.well-known/oauth-authorization-server/oauth")"
-          printf '%s' "$body" | grep -F 'https://recruiter-radar.ru/oauth' >/dev/null
+          oauth="$(curl --fail --silent --show-error --max-time 20 "$UPSTREAM/.well-known/oauth-authorization-server/oauth")"
+          printf '%s' "$oauth" | grep -F 'https://recruiter-radar.ru/oauth' >/dev/null
+
+          protected="$(curl --fail --silent --show-error --max-time 20 "$UPSTREAM/.well-known/oauth-protected-resource/api/mcp")"
+          printf '%s' "$protected" | grep -F 'https://recruiter-radar.ru/api/mcp' >/dev/null
+          printf '%s' "$protected" | grep -F 'https://recruiter-radar.ru/oauth' >/dev/null
+
           curl --fail --silent --show-error --max-time 20 "$UPSTREAM/api/health/ready" >/dev/null
-          echo "Quick Tunnel reaches the AI World OAuth issuer and readiness endpoint."
+          echo "Temporary tunnel reaches AI World OAuth, MCP metadata, and readiness endpoints."
 
       - name: Apply or remove managed Caddy route
         shell: bash
@@ -187,11 +192,46 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --max-time 20 https://recruiter-radar.ru/api/health >/dev/null
+
           if [ "$UPSTREAM" = DISABLED ]; then
             echo "AI World temporary route removed; Recruiter Radar remains healthy."
             exit 0
           fi
-          metadata="$(curl --fail --silent --show-error --max-time 20 https://recruiter-radar.ru/.well-known/oauth-authorization-server/oauth)"
-          printf '%s' "$metadata" | grep -F 'https://recruiter-radar.ru/oauth' >/dev/null
-          curl --fail --silent --show-error --max-time 20 https://recruiter-radar.ru/api/health >/dev/null
-          echo "AI World OAuth discovery is public through Recruiter Radar; Radar health remains green."
+
+          oauth="$(curl --fail --silent --show-error --max-time 20 https://recruiter-radar.ru/.well-known/oauth-authorization-server/oauth)"
+          printf '%s' "$oauth" | grep -F 'https://recruiter-radar.ru/oauth' >/dev/null
+
+          protected="$(curl --fail --silent --show-error --max-time 20 https://recruiter-radar.ru/.well-known/oauth-protected-resource/api/mcp)"
+          printf '%s' "$protected" | grep -F 'https://recruiter-radar.ru/api/mcp' >/dev/null
+          printf '%s' "$protected" | grep -F 'https://recruiter-radar.ru/oauth' >/dev/null
+
+          jwks="$(curl --fail --silent --show-error --max-time 20 https://recruiter-radar.ru/oauth/jwks)"
+          if printf '%s' "$jwks" | grep -Eq '"d"[[:space:]]*:'; then
+            echo "JWKS unexpectedly contains a private key parameter." >&2
+            exit 1
+          fi
+
+          echo "AI World OAuth/MCP metadata is public through Recruiter Radar; Radar health remains green."
+
+      - name: Record workflow result
+        if: always()
+        env:
+          RESULT: ${{ job.status }}
+          RUN_ID: ${{ github.run_id }}
+          HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "conclusion=$RESULT"
+            echo "run_id=$RUN_ID"
+            echo "head_sha=$HEAD_SHA"
+          } > ops/agent-world-edge-result.txt
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ops/agent-world-edge-result.txt
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git push origin HEAD:codex/agent-world-edge-temp
