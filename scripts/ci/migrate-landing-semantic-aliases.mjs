@@ -26,7 +26,7 @@ const replacements = new Map([
   ['var(--warning)', 'var(--color-warning)'],
 ]);
 
-const obsoleteDeclaration = /^\s*--(?:slate-(?:950|900|850|800)|paper(?:-soft|-strong)?|ink|muted-(?:dark|light)|line-(?:dark|light)|signal(?:-strong|-deep|-soft)?|copper|warning)\s*:[^;]+;\s*\n?/gim;
+const obsoleteDeclaration = /^[ \t]*--(?:slate-(?:950|900|850|800)|paper(?:-soft|-strong)?|ink|muted-(?:dark|light)|line-(?:dark|light)|signal(?:-strong|-deep|-soft)?|copper|warning)[ \t]*:[^;]+;[ \t]*\r?\n?/gim;
 
 let changed = 0;
 for (const entry of readdirSync(landingRoot, { withFileTypes: true })) {
