@@ -81,6 +81,7 @@
   color: var(--color-text-primary);
   cursor: pointer;
   font-size: var(--type-body-size);
+  transition: background-color var(--motion-duration-control) var(--motion-ease-standard);
   user-select: none;
 }
 
@@ -88,9 +89,11 @@
   grid-template-columns: 20px minmax(0, 1fr);
 }
 
-.chip:hover,
-.radioOption:hover {
-  background: color-mix(in srgb, var(--color-surface-secondary) 56%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover,
+  .radioOption:hover {
+    background: var(--color-surface-secondary);
+  }
 }
 
 .chip:has(input:focus-visible),
@@ -101,6 +104,7 @@
 
 .chip:has(input:checked),
 .radioOption:has(input:checked) {
+  background: var(--color-surface-selected);
   color: var(--color-text-primary);
   box-shadow: none;
 }
