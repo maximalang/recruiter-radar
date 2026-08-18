@@ -8,7 +8,7 @@ import { buildOpportunityNavigation } from './navigation'
 
 export default function OpportunitiesError(props: { error?: Error & { digest?: string }; reset: () => void }) {
   const correlationId = useMemo(
-    () => props.error?.digest ?? crypto.randomUUID(),
+    () => props.error?.digest ?? createCorrelationId(),
     [props.error],
   )
 
@@ -30,4 +30,14 @@ export default function OpportunitiesError(props: { error?: Error & { digest?: s
       />
     </InternalPageFrame>
   )
+}
+
+function createCorrelationId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const entropy = new Uint32Array(4)
+  crypto.getRandomValues(entropy)
+  return Array.from(
+    entropy,
+    (value) => value.toString(16).padStart(8, '0'),
+  ).join('')
 }
