@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import { getSession } from '@/lib/auth-v2/authorization';
 import { getEffectiveEntitlement } from '@/lib/entitlements';
+import { createSignalContract, type SignalConfidence } from '@/lib/intelligence/signal-contract';
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -14,6 +15,7 @@ import {
 import { ProductErrorState } from '../ui/product-error-state';
 import { StaticEmptyState } from '../ui/static-empty-state';
 import { buildAccountNavigation } from '../ui/account-navigation';
+import { CheckIcon, TargetIcon } from '../ui/icons';
 import ReviewActions from './review-actions';
 import { deriveReviewReason } from './review-reason';
 import { pluralizeLeads } from '../leads/page-helpers';
@@ -90,6 +92,12 @@ function confidenceLabel(gate: string): string {
   return 'недостаточно';
 }
 
+function confidenceGate(gate: string): SignalConfidence['gate'] {
+  return gate === 'A' || gate === 'B' || gate === 'C' || gate === 'D'
+    ? gate
+    : undefined;
+}
+
 function ReviewRow({ candidate, clientProfileId }: { candidate: ReviewCandidate; clientProfileId: string }) {
   const reason = deriveReviewReason({
     confidenceGate: candidate.confidenceGate,
@@ -98,6 +106,17 @@ function ReviewRow({ candidate, clientProfileId }: { candidate: ReviewCandidate;
   });
   const freshness = formatSignalFreshness(candidate.latestPublishedAt)?.label ?? 'дата сигнала не определена';
   const reasonLabel = reason ? (REVIEW_REASON_LABEL[reason.key] ?? reason.key) : 'Требует ручной проверки';
+  const signal = createSignalContract({
+    signal: String(candidate.score),
+    whyNow: candidate.reasons.slice(0, 2).join('; ') || reasonLabel,
+    evidence: candidate.evidenceTitles.map((proof) => ({ proof })),
+    confidence: {
+      gate: confidenceGate(candidate.confidenceGate),
+      label: confidenceLabel(candidate.confidenceGate),
+    },
+    action: 'Проверить подтверждения',
+    timestamp: candidate.latestPublishedAt ?? candidate.createdAt,
+  });
 
   return (
     <article className={styles.row} data-review-row>
@@ -107,18 +126,18 @@ function ReviewRow({ candidate, clientProfileId }: { candidate: ReviewCandidate;
       </div>
       <div className={styles.reason}>
         <strong>{reasonLabel}</strong>
-        {candidate.reasons.length > 0 ? <span>{candidate.reasons.slice(0, 2).join('; ')}</span> : null}
+        {candidate.reasons.length > 0 ? <span>{signal.whyNow}</span> : null}
       </div>
       <div className={styles.proof}>
         <strong>{candidate.vacanciesCount} вакансий · {candidate.sourceFamilies.length} источн.</strong>
         <span>{freshness}</span>
       </div>
       <div className={styles.signal}>
-        <strong aria-label={`Сила сигнала ${candidate.score}`}>{candidate.score}</strong>
-        <span>{confidenceLabel(candidate.confidenceGate)}</span>
+        <strong aria-label={`Сила сигнала ${signal.signal}`}>{signal.signal}</strong>
+        <span>{signal.confidence.label}</span>
       </div>
       <div className={styles.actions}>
-        <Link href={`/leads/${candidate.id}`}>Проверить подтверждения</Link>
+        <Link href={`/leads/${candidate.id}`}>{signal.action}</Link>
         <ReviewActions candidateId={candidate.id} clientProfileId={clientProfileId} />
       </div>
     </article>
@@ -223,12 +242,14 @@ export default async function ReviewPage({
 
       {profiles.length === 0 && allProfiles.length > 0 ? (
         <StaticEmptyState
+          icon={TargetIcon}
           title="Профиль радара приостановлен"
           description="Настройки и решения сохранены, но очередь не обновляется. Включите профиль, чтобы продолжить проверку новых кандидатов."
           action={<StateLink href="/settings/radar" label="Включить профиль радара" />}
         />
       ) : profiles.length === 0 ? (
         <StaticEmptyState
+          icon={TargetIcon}
           title="Нет клиентских профилей"
           description="Создайте профиль в онбординге, чтобы увидеть очередь проверки."
           action={<StateLink href="/onboarding" label="Настроить радар" />}
@@ -259,6 +280,7 @@ export default async function ReviewPage({
             <Suspense fallback={<LoadingState variant="skeleton" />}>
               {reviewData.items.length === 0 ? (
                 <StaticEmptyState
+                  icon={CheckIcon}
                   title="Очередь пуста"
                   description="Нет кандидатов, требующих проверки. Новые карьерные страницы и платформенные сигналы появляются ежедневно — кандидаты с уровнем подтверждения C или одиночным источником появятся здесь автоматически."
                 />
