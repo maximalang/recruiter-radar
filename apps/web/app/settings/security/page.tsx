@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getAccountSecurityProfile } from "@/lib/auth-v2/account-security";
@@ -8,10 +9,10 @@ import { listUserPasskeys } from "@/lib/auth-v2/passkeys";
 import { listAuthSessions } from "@/lib/auth-v2/sessions";
 import { buildAccountNavigation } from "../../ui/account-navigation";
 import {
-  EmptyState,
   InternalPageFrame,
   InternalPageHeader,
 } from "../../ui/internal-page";
+import { StaticEmptyState } from "../../ui/static-empty-state";
 import {
   SecuritySettingsView,
   type SecuritySettingsStatus,
@@ -59,10 +60,14 @@ export default async function SecuritySettingsPage(props: {
           title="Безопасность аккаунта"
           subtitle="Управление доступом временно недоступно."
         />
-        <EmptyState
+        <StaticEmptyState
           title="Не удалось открыть профиль"
-          text="Обновите страницу. Если проблема повторится, войдите в аккаунт заново."
-          action={{ href: "/login?returnTo=/settings/security", label: "Войти заново" }}
+          description="Обновите страницу. Если проблема повторится, войдите в аккаунт заново."
+          action={(
+            <Link href="/login?returnTo=/settings/security">
+              Войти заново
+            </Link>
+          )}
         />
       </InternalPageFrame>
     );
