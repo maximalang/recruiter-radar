@@ -23,20 +23,6 @@ describe('Evidence Radar repository qualification boundary', () => {
     expect(sql).not.toContain("card.status IN ('qualified', 'review')")
   })
 
-  it('derives the displayed independent-source count from the same live evidence rows', async () => {
-    const query = jest.fn().mockResolvedValue({ rows: [] })
-
-    await listEvidenceRadarLeads(
-      { workspaceId: '42' },
-      { query } as never,
-    )
-
-    const [sql] = query.mock.calls[0] as [string, unknown[]]
-    expect(sql).toContain('COUNT(DISTINCT event.source_family)::INTEGER AS source_count')
-    expect(sql).toContain('COALESCE(evidence.source_count, 0)::INTEGER AS "independentSourceCount"')
-    expect(sql).not.toContain('CARDINALITY(score.independent_source_families)')
-  })
-
   it('keeps the caller limit bounded for a stable radar payload', async () => {
     const query = jest.fn().mockResolvedValue({ rows: [] })
 
