@@ -34,6 +34,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Reject hardcoded visual values
+        run: node scripts/ci/no-hardcoded-visual-values.mjs
       - run: npm ci
       - name: Apply migrations
         env:
