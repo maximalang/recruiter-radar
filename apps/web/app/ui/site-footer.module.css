@@ -7,9 +7,9 @@
 
 .siteFooter[data-tone="dark"] {
   margin-top: 0;
-  border-top-color: color-mix(in srgb, var(--color-warning) 10%, transparent);
-  background: var(--color-signal);
-  color: color-mix(in srgb, var(--color-warning) 66%, transparent);
+  border-top-color: color-mix(in srgb, var(--color-canvas) 10%, transparent);
+  background: var(--color-text-primary);
+  color: color-mix(in srgb, var(--color-canvas) 68%, transparent);
 }
 
 .footerInner {
@@ -57,7 +57,7 @@
 .footerLine {
   margin: 0;
   max-width: 34ch;
-  color: color-mix(in srgb, var(--color-warning) 68%, transparent);
+  color: color-mix(in srgb, var(--color-canvas) 68%, transparent);
   font-size: .92rem;
   line-height: 1.65;
 }
@@ -78,10 +78,10 @@
 
 .footerNav strong {
   margin-bottom: .72rem;
-  color: color-mix(in srgb, var(--color-warning) 92%, transparent);
+  color: color-mix(in srgb, var(--color-canvas) 90%, transparent);
   font-size: .7rem;
   font-weight: 650;
-  letter-spacing: .09em;
+  letter-spacing: .04em;
   text-transform: uppercase;
 }
 
@@ -93,11 +93,11 @@
   min-height: 44px;
   align-items: center;
   overflow-wrap: anywhere;
-  color: color-mix(in srgb, var(--color-warning) 68%, transparent);
+  color: color-mix(in srgb, var(--color-canvas) 68%, transparent);
   font-size: .82rem;
   line-height: 1.35;
   text-decoration: none;
-  transition: color .16s ease;
+  transition: color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .footerButton {
@@ -117,7 +117,7 @@
 .footerBrand:focus-visible,
 .footerLink:focus-visible,
 .footerOperatorEmail:focus-visible {
-  outline: 2px solid var(--color-signal);
+  outline: 2px solid var(--color-focus);
   outline-offset: 4px;
   border-radius: var(--radius-detail);
 }
@@ -128,7 +128,7 @@
   align-items: baseline;
   gap: 1.5rem;
   padding-top: 1.25rem;
-  border-top: 1px solid color-mix(in srgb, var(--color-warning) 9%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--color-canvas) 10%, transparent);
 }
 
 .footerOperator {
@@ -136,13 +136,13 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: .38rem .55rem;
-  color: color-mix(in srgb, var(--color-warning) 56%, transparent);
+  color: color-mix(in srgb, var(--color-canvas) 56%, transparent);
   font-size: .7rem;
   line-height: 1.55;
 }
 
 .footerOperatorName {
-  color: color-mix(in srgb, var(--color-warning) 70%, transparent);
+  color: color-mix(in srgb, var(--color-canvas) 72%, transparent);
   font-weight: 600;
 }
 
@@ -165,7 +165,7 @@
 
 .footerCopy {
   flex: 0 0 auto;
-  color: color-mix(in srgb, var(--color-warning) 50%, transparent);
+  color: color-mix(in srgb, var(--color-canvas) 50%, transparent);
   font-size: .66rem;
   letter-spacing: .045em;
   text-transform: uppercase;
