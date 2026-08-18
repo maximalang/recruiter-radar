@@ -271,7 +271,7 @@
 
 .semanticList li[data-selected="true"] {
   background: var(--color-surface-selected);
-  box-shadow: inset 2px 0 0 var(--color-signal);
+  box-shadow: none;
 }
 
 .semanticList button {

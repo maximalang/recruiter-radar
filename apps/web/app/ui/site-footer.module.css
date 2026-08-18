@@ -119,7 +119,7 @@
 .footerOperatorEmail:focus-visible {
   outline: 2px solid var(--color-signal);
   outline-offset: 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-detail);
 }
 
 .footerBottom {

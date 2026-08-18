@@ -29,14 +29,14 @@ export default function AdminLoginForm() {
             fontSize: "var(--type-body-size)",
             padding: "12px 16px",
             border: "1px solid var(--color-separator)",
-            borderRadius: "12px",
+            borderRadius: "var(--radius-surface)",
             width: "100%",
           }}
         />
       </label>
 
       {state.error ? (
-        <div style={{ padding: "10px 12px", borderRadius: "10px", background: "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))", color: "var(--color-destructive)", fontSize: "0.86rem" }}>
+        <div style={{ padding: "10px 12px", borderRadius: "var(--radius-surface)", background: "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))", color: "var(--color-destructive)", fontSize: "0.86rem" }}>
           {state.error}
         </div>
       ) : null}
@@ -48,7 +48,7 @@ export default function AdminLoginForm() {
           background: "var(--color-signal)",
           color: "var(--color-surface-elevated)",
           padding: "12px 22px",
-          borderRadius: "12px",
+          borderRadius: "var(--radius-surface)",
           fontWeight: 600,
           fontSize: "var(--type-body-size)",
           border: "none",

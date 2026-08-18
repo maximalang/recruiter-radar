@@ -20,7 +20,7 @@
   font-size: 0.85rem;
   font-weight: 600;
   text-decoration: none;
-  border-radius: 0 0 6px 0;
+  border-radius: 0 0 var(--radius-control) 0;
   transform: translateY(-100%);
 }
 
@@ -81,7 +81,7 @@
   font-weight: 500;
   color: var(--color-text-tertiary);
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   transition: background-color 0.15s, color 0.15s;
 }
 
@@ -223,7 +223,7 @@
   color: var(--color-text-tertiary);
   text-decoration: none;
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--color-separator);
 }
 
@@ -240,7 +240,7 @@
 /* ── Content card (detail sections, sidebar blocks) ── */
 .contentCard {
   background-color: var(--color-surface-primary);
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
   padding: 18px;
   border: 1px solid var(--color-separator);
 }
@@ -408,7 +408,7 @@
 .leadLink:focus-visible {
   outline: 2px solid var(--color-signal);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-detail);
 }
 
 .leadOrgName {
@@ -590,7 +590,7 @@
   min-height: 44px;
   margin-top: 16px;
   padding: 9px 18px;
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
   background-color: var(--color-signal);
   color: var(--color-surface-elevated);
   font-size: 0.85rem;
@@ -631,7 +631,7 @@
   display: inline-block;
   margin-top: 16px;
   padding: 9px 18px;
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
   background-color: var(--color-signal);
   color: var(--color-surface-elevated);
   font-size: 0.85rem;
@@ -685,7 +685,7 @@
 
 .loadingSkeletonLine {
   height: 14px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background-color: var(--color-separator);
   opacity: 0.55;
   /* Shimmer — subtle horizontal sweep. Pinned to the line, not the whole block,
@@ -887,7 +887,7 @@
 .contactHiringTag {
   display: inline-block;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-signal) 12%, transparent);
   color: var(--color-signal);
   font-size: 0.68rem;

@@ -243,8 +243,8 @@ export default async function AdminPage() {
                     <span style={{ fontSize: "0.84rem", color: GATE_COLOR[g.gate] ?? "var(--color-text-tertiary)", fontWeight: 700, minWidth: "180px" }}>
                       {GATE_LABELS[g.gate] ?? g.gate}
                     </span>
-                    <div style={{ flex: 1, height: "8px", borderRadius: "999px", background: "color-mix(in srgb, var(--color-information) 7%, transparent)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${(g.count / max) * 100}%`, background: GATE_COLOR[g.gate] ?? "var(--color-text-tertiary)", borderRadius: "999px" }} />
+                    <div style={{ flex: 1, height: "8px", borderRadius: "var(--radius-pill)", background: "color-mix(in srgb, var(--color-information) 7%, transparent)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${(g.count / max) * 100}%`, background: GATE_COLOR[g.gate] ?? "var(--color-text-tertiary)", borderRadius: "var(--radius-pill)" }} />
                     </div>
                     <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--color-text-secondary)", whiteSpace: "nowrap" }}>
                       {g.count} · {g.percentage}%
@@ -339,7 +339,7 @@ export default async function AdminPage() {
                     alignItems: "center",
                     padding: "10px 12px",
                     border: "1px solid var(--color-separator)",
-                    borderRadius: "12px",
+                    borderRadius: "var(--radius-surface)",
                   }}
                 >
                   <div>
@@ -357,7 +357,7 @@ export default async function AdminPage() {
                   <span
                     style={{
                       padding: "3px 9px",
-                      borderRadius: "999px",
+                      borderRadius: "var(--radius-pill)",
                       fontSize: "0.72rem",
                       fontWeight: 700,
                       color: tone.color,
@@ -440,7 +440,7 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 
 function Metric({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
-    <div style={{ padding: "12px", borderRadius: "12px", background: "color-mix(in srgb, var(--color-information) 60%, transparent)" }}>
+    <div style={{ padding: "12px", borderRadius: "var(--radius-surface)", background: "color-mix(in srgb, var(--color-information) 60%, transparent)" }}>
       <div style={{ fontSize: "1.1rem", fontWeight: 800, color: accent ?? "var(--color-text-primary)" }}>{value}</div>
       <div style={{ fontSize: "0.76rem", color: "var(--color-text-tertiary)" }}>{label}</div>
     </div>
@@ -449,7 +449,7 @@ function Metric({ label, value, accent }: { label: string; value: string; accent
 
 function Tag({ children, color, bg }: { children: ReactNode; color: string; bg: string }) {
   return (
-    <span style={{ padding: "3px 8px", borderRadius: "999px", fontSize: "0.72rem", fontWeight: 700, color, background: bg, whiteSpace: "nowrap" }}>
+    <span style={{ padding: "3px 8px", borderRadius: "var(--radius-pill)", fontSize: "0.72rem", fontWeight: 700, color, background: bg, whiteSpace: "nowrap" }}>
       {children}
     </span>
   );
@@ -461,7 +461,7 @@ const funnelRowStyle: CSSProperties = {
   gap: "12px",
   padding: "8px 12px",
   border: "1px solid var(--color-separator)",
-  borderRadius: "10px",
+  borderRadius: "var(--radius-surface)",
 };
 
 const sourceRowStyle: CSSProperties = {
@@ -472,7 +472,7 @@ const sourceRowStyle: CSSProperties = {
   flexWrap: "wrap",
   padding: "10px 12px",
   border: "1px solid var(--color-separator)",
-  borderRadius: "12px",
+  borderRadius: "var(--radius-surface)",
 };
 
 /**
@@ -544,7 +544,7 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: "10px" }}>
           {orderedSources.map((s) => (
             <span key={s} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.72rem", color: "var(--color-text-secondary)" }}>
-              <span style={{ width: "9px", height: "9px", borderRadius: "2px", background: sourceColor(s), display: "inline-block" }} />
+              <span style={{ width: "9px", height: "9px", borderRadius: "var(--radius-detail)", background: sourceColor(s), display: "inline-block" }} />
               {s}
             </span>
           ))}

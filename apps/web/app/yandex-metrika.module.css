@@ -13,9 +13,9 @@
   justify-content: space-between;
   gap: 18px;
   border: 1px solid color-mix(in srgb, var(--color-warning) 14%, transparent);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--color-signal) 97%, transparent);
-  box-shadow: 0 18px 60px color-mix(in srgb, var(--color-text-primary) 34%, transparent);
+  box-shadow: var(--shadow-overlay);
   color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
   backdrop-filter: blur(10px);
 }
@@ -58,7 +58,7 @@
 .secondaryButton {
   min-height: 44px;
   padding: 0 16px;
-  border-radius: 11px;
+  border-radius: var(--radius-surface);
   font: inherit;
   font-size: .82rem;
   font-weight: 700;

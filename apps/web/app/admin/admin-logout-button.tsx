@@ -16,7 +16,7 @@ export default function AdminLogoutButton() {
         background: "transparent",
         color: "var(--color-text-secondary)",
         padding: "8px 16px",
-        borderRadius: "10px",
+        borderRadius: "var(--radius-surface)",
         fontWeight: 600,
         fontSize: "var(--type-metadata-size)",
         border: "1px solid var(--color-separator)",

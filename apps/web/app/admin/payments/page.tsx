@@ -152,7 +152,7 @@ export default async function AdminPaymentsPage() {
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
               {refunds.map((refund) => (
-                <div key={refund.id} style={{ padding: 14, border: "1px solid color-mix(in srgb, var(--color-information) 10%, transparent)", borderRadius: 12 }}>
+                <div key={refund.id} style={{ padding: 14, border: "1px solid color-mix(in srgb, var(--color-information) 10%, transparent)", borderRadius: "var(--radius-surface)" }}>
                   <div><strong>Возврат №{refund.id}</strong> · заказ №{refund.orderId}</div>
                   <div style={{ marginTop: 6, fontSize: ".84rem" }}>
                     {formatRub(refund.amountMinor)} · {refund.status} · {formatDate(refund.createdAt)}
@@ -223,7 +223,7 @@ function formatDate(value: string | null): string {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ padding: 14, border: "1px solid color-mix(in srgb, var(--color-information) 10%, transparent)", borderRadius: 12 }}>
+    <div style={{ padding: 14, border: "1px solid color-mix(in srgb, var(--color-information) 10%, transparent)", borderRadius: "var(--radius-surface)" }}>
       <div style={{ color: "var(--color-text-tertiary)", fontSize: ".75rem" }}>{label}</div>
       <strong style={{ display: "block", marginTop: 5, fontSize: "1.05rem" }}>{value}</strong>
     </div>

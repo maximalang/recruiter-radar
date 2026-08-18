@@ -291,7 +291,7 @@
 .workspaceIntro .sceneHeading em { color: var(--color-signal); }
 .workspaceIntro .sceneLead { grid-area: lead; align-self: end; margin: 0; }
 
-.workspaceProductFrame { overflow: hidden; border: 1px solid color-mix(in srgb, var(--color-information) 16%, transparent); background: var(--paper-strong); box-shadow: 0 28px 70px color-mix(in srgb, var(--color-information) 8%, transparent); }
+.workspaceProductFrame { overflow: hidden; border: 1px solid color-mix(in srgb, var(--color-information) 16%, transparent); background: var(--paper-strong); box-shadow: var(--shadow-float); }
 .workspaceControls { display: grid; gap: 1rem; padding: 1.2rem; border-bottom: 1px solid var(--line-light); }
 .presetStrip { display: flex; align-items: center; gap: .55rem; overflow-x: auto; padding-bottom: .15rem; scrollbar-width: thin; }
 .presetStrip > span { flex: 0 0 auto; margin-right: .3rem; color: var(--muted-light); font-family: var(--font-mono); font-size: .58rem; text-transform: uppercase; }
@@ -492,7 +492,7 @@
 .faqList details[open] summary i { transform: rotate(45deg); }
 .faqList details p { margin: 0; padding: 0 2.5rem 1.2rem 3rem; color: var(--muted-dark); font-size: .78rem; line-height: 1.58; }
 .finalCall { position: relative; overflow: hidden; padding: clamp(2rem, 6vw, 5rem); border: 1px solid var(--line-dark); background: var(--slate-850); }
-.finalCall::after { position: absolute; top: -12rem; right: -8rem; width: 28rem; height: 28rem; border: 1px solid color-mix(in srgb, var(--color-signal) 16%, transparent); border-radius: 50%; box-shadow: 0 0 0 5rem color-mix(in srgb, var(--color-signal) 2.5%, transparent), 0 0 0 10rem color-mix(in srgb, var(--color-signal) 1.8%, transparent); content: ""; pointer-events: none; }
+.finalCall::after { position: absolute; top: -12rem; right: -8rem; width: 28rem; height: 28rem; border: 1px solid color-mix(in srgb, var(--color-signal) 16%, transparent); border-radius: 50%; box-shadow: none; content: ""; pointer-events: none; }
 .finalCall h2 { position: relative; z-index: 1; max-width: 12ch; margin: 1rem 0 0; font-size: clamp(3rem, 7vw, 6.6rem); font-weight: 470; letter-spacing: -.07em; line-height: .92; }
 .finalCall p { position: relative; z-index: 1; max-width: 36rem; margin: 1.4rem 0 0; color: var(--muted-dark); font-size: .95rem; line-height: 1.55; }
 .finalActions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 1.1rem; margin-top: 1.8rem; }
@@ -546,7 +546,7 @@
   .mobileMenu summary span { display: block; width: 20px; height: 1px; background: currentColor; transition: transform .18s ease; }
   .mobileMenu[open] summary span:first-child { transform: translateY(3.5px) rotate(45deg); }
   .mobileMenu[open] summary span:last-child { transform: translateY(-3.5px) rotate(-45deg); }
-  .mobileMenuPanel { position: fixed; top: 4rem; right: .75rem; left: .75rem; display: none; padding: .9rem; border: 1px solid color-mix(in srgb, var(--color-signal) 15%, transparent); background: color-mix(in srgb, var(--color-information) 97%, transparent); color: var(--paper); box-shadow: 0 24px 60px color-mix(in srgb, var(--color-text-primary) 24%, transparent); }
+  .mobileMenuPanel { position: fixed; top: 4rem; right: .75rem; left: .75rem; display: none; padding: .9rem; border: 1px solid color-mix(in srgb, var(--color-signal) 15%, transparent); background: color-mix(in srgb, var(--color-information) 97%, transparent); color: var(--paper); box-shadow: var(--shadow-float); }
   .mobileMenu[open] .mobileMenuPanel { display: grid; gap: .8rem; }
   .mobileMenuPanel nav { display: grid; }
   .mobileMenuPanel .sceneNavLink { justify-content: space-between; border-bottom: 1px solid var(--line-dark); }

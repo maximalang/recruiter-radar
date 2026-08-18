@@ -193,7 +193,7 @@
   border-left: 1px solid color-mix(in srgb, var(--color-warning) 10%, transparent);
   background: var(--color-text-primary);
   color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
-  box-shadow: -1.5rem 2rem 4rem color-mix(in srgb, var(--color-text-primary) 34%, transparent);
+  box-shadow: var(--shadow-overlay);
 }
 
 .panel[hidden],

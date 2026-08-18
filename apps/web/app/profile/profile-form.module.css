@@ -102,7 +102,7 @@
 .chip:has(input:checked),
 .radioOption:has(input:checked) {
   color: var(--color-text-primary);
-  box-shadow: inset 2px 0 0 var(--color-signal);
+  box-shadow: none;
 }
 
 .chip input,

@@ -86,7 +86,7 @@ function ProfileEditForm({ userId, workspaceId, profile }: { userId: string; wor
 }
 
 function OptionChecks({ legend, name, options, selected }: { legend: string; name: string; options: readonly { key: string; label: string }[]; selected: string[] }) {
-  return <fieldset style={{ border: '1px solid var(--color-separator)', borderRadius: 8 }}><legend>{legend}</legend><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+  return <fieldset style={{ border: '1px solid var(--color-separator)', borderRadius: "var(--radius-control)" }}><legend>{legend}</legend><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
     {options.map((option) => <label key={option.key} style={{ fontSize: '0.78rem' }}><input type="checkbox" name={name} value={option.key} defaultChecked={selected.includes(option.key)} /> {option.label}</label>)}
   </div></fieldset>;
 }
@@ -107,5 +107,5 @@ function ActionForm({ userId, workspaceId, action, label, danger = false }: { us
 
 function Result({ state }: { state: State }) { return <span role="status" style={{ color: state.ok ? "var(--color-signal)" : "var(--color-destructive)", fontSize: "0.8rem" }}>{state.message}</span>; }
 const labelStyle = { display: "grid", gap: 4, fontSize: "0.78rem", color: "var(--color-text-secondary)" };
-const controlStyle = { minHeight: 40, border: "1px solid var(--color-separator-strong)", borderRadius: 8, padding: "6px 8px", background: "var(--color-surface-elevated)" };
-const buttonStyle = (background: string) => ({ minHeight: 40, border: 0, borderRadius: 8, padding: "8px 12px", background, color: "var(--color-surface-elevated)", fontWeight: 700, cursor: "pointer" });
+const controlStyle = { minHeight: 40, border: "1px solid var(--color-separator-strong)", borderRadius: "var(--radius-control)", padding: "6px 8px", background: "var(--color-surface-elevated)" };
+const buttonStyle = (background: string) => ({ minHeight: 40, border: 0, borderRadius: "var(--radius-control)", padding: "8px 12px", background, color: "var(--color-surface-elevated)", fontWeight: 700, cursor: "pointer" });

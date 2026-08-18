@@ -80,7 +80,7 @@
 .event::before { position: absolute; top: .65rem; bottom: .65rem; left: 0; width: 2px; background: var(--color-signal); content: ""; opacity: 0; transform: scaleY(.25); transition: opacity .18s ease, transform .22s ease; }
 .event time { color: color-mix(in srgb, var(--color-information) 50%, transparent); font-family: var(--font-mono); font-size: .55rem; text-align: right; text-transform: uppercase; }
 .node { position: relative; z-index: 2; display: grid; width: 1.9rem; height: 1.9rem; place-items: center; }
-.node::before { width: .42rem; height: .42rem; border-radius: 50%; background: var(--color-destructive); content: ""; box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary)); transition: background-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.node::before { width: .42rem; height: .42rem; border-radius: 50%; background: var(--color-destructive); content: ""; box-shadow: none; transition: background-color .18s ease, box-shadow .18s ease, transform .18s ease; }
 .event:nth-child(n+3) .node::before { background: var(--color-signal); }
 .eventCopy { display: grid; gap: .24rem; min-width: 0; }
 .eventCopy strong { font-size: clamp(.92rem, 1.15vw, 1.04rem); font-weight: 600; line-height: 1.3; }
@@ -90,7 +90,7 @@
 .event:hover, .event:focus-visible { background: linear-gradient(90deg, color-mix(in srgb, var(--color-signal) 5%, transparent), transparent 72%); }
 .event:hover::before, .event:focus-visible::before { opacity: 1; transform: scaleY(1); }
 .event:hover .node::before,
-.event:focus-visible .node::before { background: var(--color-signal); box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-signal) 10%, transparent); transform: scale(1.08); }
+.event:focus-visible .node::before { background: var(--color-signal); box-shadow: none; transform: scale(1.08); }
 .events:has(.event:hover) .event:not(:hover),
 .events:has(.event:focus-visible) .event:not(:focus-visible) { opacity: .62 !important; }
 
@@ -117,7 +117,7 @@
 @keyframes lineDrawY { to { transform: scaleY(1); } }
 @keyframes lineDrawX { to { transform: scaleX(1); } }
 @keyframes eventResolve { to { opacity: 1; transform: translate3d(0,0,0); } }
-@keyframes lockResolve { from { opacity: 0; transform: translate3d(0,4px,0); box-shadow: 0 0 0 transparent; } to { opacity: 1; transform: translate3d(0,0,0); box-shadow: 0 12px 28px color-mix(in srgb, var(--color-information) 3.5%, transparent); } }
+@keyframes lockResolve { from { opacity: 0; transform: translate3d(0,4px,0); box-shadow: none; } to { opacity: 1; transform: translate3d(0,0,0); box-shadow: none; } }
 
 @media (max-width: 1040px) {
   .layout { grid-template-columns: 1fr; gap: 2.2rem; }

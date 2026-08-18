@@ -52,7 +52,7 @@ function Row({ setting }: { setting: LlmSettingView }) {
         gap: "8px",
         padding: "12px",
         border: "1px solid var(--color-separator)",
-        borderRadius: "12px",
+        borderRadius: "var(--radius-surface)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
@@ -72,7 +72,7 @@ function Row({ setting }: { setting: LlmSettingView }) {
                 background: "transparent",
                 color: "var(--color-text-tertiary)",
                 border: "1px solid var(--color-separator)",
-                borderRadius: "8px",
+                borderRadius: "var(--radius-control)",
                 padding: "6px 12px",
                 fontSize: "0.8rem",
                 cursor: clearPending ? "wait" : "pointer",
@@ -97,7 +97,7 @@ function Row({ setting }: { setting: LlmSettingView }) {
             fontSize: "var(--type-body-size)",
             padding: "8px 12px",
             border: "1px solid var(--color-separator)",
-            borderRadius: "10px",
+            borderRadius: "var(--radius-surface)",
             fontFamily: setting.isSecret ? "monospace" : undefined,
           }}
         />
@@ -108,7 +108,7 @@ function Row({ setting }: { setting: LlmSettingView }) {
             background: "var(--color-signal)",
             color: "var(--color-surface-elevated)",
             padding: "8px 16px",
-            borderRadius: "10px",
+            borderRadius: "var(--radius-surface)",
             fontWeight: 600,
             fontSize: "var(--type-body-size)",
             border: "none",
@@ -125,7 +125,7 @@ function Row({ setting }: { setting: LlmSettingView }) {
           style={{
             fontSize: "0.8rem",
             padding: "8px 10px",
-            borderRadius: "8px",
+            borderRadius: "var(--radius-control)",
             background: (saveState.ok || clearState.ok) ? "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))" : "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))",
             color: (saveState.ok || clearState.ok) ? "var(--color-signal)" : "var(--color-destructive)",
           }}

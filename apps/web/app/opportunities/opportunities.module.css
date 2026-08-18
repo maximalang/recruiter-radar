@@ -104,7 +104,7 @@
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--color-separator-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   font: inherit;
@@ -124,7 +124,7 @@
   justify-content: center;
   padding: 0 14px;
   border: 1px solid var(--color-separator-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   cursor: pointer;
@@ -146,7 +146,7 @@
   align-items: center;
   padding: 0 14px;
   border: 1px solid color-mix(in srgb, var(--color-signal) 20%, transparent);
-  border-radius: 11px;
+  border-radius: var(--radius-surface);
   color: var(--color-signal);
   font-size: 0.82rem;
   font-weight: 720;
@@ -165,7 +165,7 @@
   align-items: center;
   padding: 0 14px;
   border: 1px solid color-mix(in srgb, var(--color-information) 35%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-surface-elevated) 75%, transparent);
   color: var(--color-text-secondary);
   font-size: 0.8rem;
@@ -446,7 +446,7 @@
   min-width: 0;
   padding: 13px;
   border: 1px solid var(--color-separator);
-  border-radius: 12px;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-primary);
 }
 
@@ -474,7 +474,7 @@
   display: block;
   overflow: hidden;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-separator);
 }
 
@@ -658,7 +658,7 @@
   margin-top: 20px;
   padding: 16px;
   border: 1px solid var(--color-separator-strong);
-  border-radius: 14px;
+  border-radius: var(--radius-overlay);
   background: var(--color-surface-elevated);
 }
 
@@ -691,7 +691,7 @@
 
 .workflowHeading > strong {
   padding: 5px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
   font-size: 0.7rem;
@@ -713,7 +713,7 @@
   display: grid;
   gap: 4px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-primary);
 }
 
@@ -773,7 +773,7 @@
   min-height: 44px;
   padding: 8px 10px;
   border: 1px solid var(--color-separator-strong);
-  border-radius: 9px;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   font: inherit;
@@ -799,7 +799,7 @@
   margin-top: 20px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--color-information) 16%, var(--color-surface-primary));
-  border-radius: 14px;
+  border-radius: var(--radius-overlay);
   background: var(--color-surface-primary);
 }
 
@@ -879,7 +879,7 @@
   gap: 2px 12px;
   padding: 10px 12px;
   border: 1px solid var(--color-separator);
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-elevated);
 }
 
@@ -912,7 +912,7 @@
   margin-top: 14px;
   padding: 14px;
   border: 1px solid color-mix(in srgb, var(--color-signal) 24%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-surface);
   background: color-mix(in srgb, var(--color-signal) 8%, transparent);
 }
 
@@ -931,7 +931,7 @@
   min-height: 44px;
   padding: 8px 10px;
   border: 1px solid var(--color-separator-strong);
-  border-radius: 9px;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   font: inherit;
@@ -941,9 +941,9 @@
 .funnel {
   padding: 20px;
   border: 1px solid color-mix(in srgb, var(--color-information) 16%, var(--color-surface-primary));
-  border-radius: 18px;
+  border-radius: var(--radius-overlay);
   background: var(--color-surface-elevated);
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-information) 5%, transparent);
+  box-shadow: none;
 }
 
 .funnelHeading {
@@ -979,7 +979,7 @@
   overflow: hidden;
   margin-top: 16px;
   border: 1px solid var(--color-separator);
-  border-radius: 12px;
+  border-radius: var(--radius-surface);
   background: var(--color-separator);
 }
 
@@ -1014,7 +1014,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 3px 12px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-primary);
 }
 
@@ -1045,7 +1045,7 @@
   justify-content: center;
   padding: 0 14px;
   border: 1px solid var(--color-separator-strong);
-  border-radius: 11px;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   cursor: pointer;

@@ -26,14 +26,14 @@
 
 .barTrack {
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary));
   overflow: hidden;
 }
 
 .barFill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-signal);
   transition: width 0.3s ease;
 }

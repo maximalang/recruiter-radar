@@ -75,7 +75,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
               fontSize: "var(--type-body-size)",
               padding: "8px 12px",
               border: "1px solid var(--color-separator)",
-              borderRadius: "10px",
+              borderRadius: "var(--radius-surface)",
             }}
           >
             {sources.map((s) => (
@@ -101,7 +101,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
           background: "var(--color-signal)",
           color: "var(--color-surface-elevated)",
           padding: "12px 22px",
-          borderRadius: "12px",
+          borderRadius: "var(--radius-surface)",
           fontWeight: 600,
           fontSize: "var(--type-body-size)",
           border: "none",
@@ -119,7 +119,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
           aria-live="polite"
           style={{
             padding: "10px 12px",
-            borderRadius: "10px",
+            borderRadius: "var(--radius-surface)",
             background: state.ok ? "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))" : "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))",
             color: state.ok ? "var(--color-signal)" : "var(--color-destructive)",
             fontSize: "0.86rem",
@@ -141,7 +141,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
                 alignItems: "center",
                 padding: "8px 12px",
                 border: "1px solid var(--color-separator)",
-                borderRadius: "10px",
+                borderRadius: "var(--radius-surface)",
                 fontSize: "0.82rem",
               }}
             >

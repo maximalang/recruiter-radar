@@ -237,7 +237,7 @@ function WorkspaceSelector({ userId, memberships, selectedId }: {
             aria-current={membership.id === selectedId ? "page" : undefined}
             style={{
               border: "1px solid var(--color-separator-strong)",
-              borderRadius: 8,
+              borderRadius: "var(--radius-control)",
               padding: "8px 10px",
               background: membership.id === selectedId ? "color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary))" : "var(--color-surface-elevated)",
             }}
@@ -262,7 +262,7 @@ function Facts({ rows }: { rows: Array<[string, string]> }) {
 
 function StatusBadge({ status }: { status: DiagnosticStatus }) {
   const tone = status === "PASS" ? ["var(--color-signal)", "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))"] : status === "WARNING" ? ["var(--color-copper)", "color-mix(in srgb, var(--color-copper) 16%, var(--color-surface-primary))"] : ["var(--color-destructive)", "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))"];
-  return <span style={{ color: tone[0], background: tone[1], padding: "3px 8px", borderRadius: 999, fontWeight: 800, fontSize: "0.72rem", textAlign: "center" }}>{status}</span>;
+  return <span style={{ color: tone[0], background: tone[1], padding: "3px 8px", borderRadius: "var(--radius-pill)", fontWeight: 800, fontSize: "0.72rem", textAlign: "center" }}>{status}</span>;
 }
 
 const cellStyle = { borderBottom: "1px solid var(--color-separator)", padding: "8px", textAlign: "left" as const, whiteSpace: "nowrap" as const };

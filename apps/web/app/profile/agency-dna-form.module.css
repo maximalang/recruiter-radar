@@ -110,7 +110,7 @@
   align-items: center;
   padding: 7px 11px;
   border: 1px solid var(--color-separator);
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-primary);
   font-size: 0.84rem;
   transition: border-color 120ms ease, background 120ms ease;
@@ -159,7 +159,7 @@
 .case {
   padding: 10px 12px;
   border: 1px solid var(--color-separator);
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
 }
 
 .case summary {
@@ -228,7 +228,7 @@
   gap: 12px;
   padding: 8px 10px;
   border: 1px solid var(--color-separator);
-  border-radius: 10px;
+  border-radius: var(--radius-surface);
 }
 
 .restrictionList li span {

@@ -49,7 +49,7 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
         alignItems: "start",
         padding: "12px 14px",
         border: "1px solid var(--color-separator)",
-        borderRadius: "12px",
+        borderRadius: "var(--radius-surface)",
       }}
     >
       <div>
@@ -97,7 +97,7 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
             href={`/admin/users/${user.id}${user.workspace ? `?workspaceId=${user.workspace.id}` : ""}`}
             style={{
               padding: "6px 12px",
-              borderRadius: "8px",
+              borderRadius: "var(--radius-control)",
               fontWeight: 600,
               fontSize: "0.76rem",
               border: "1px solid var(--color-separator)",
@@ -138,7 +138,7 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
 function tagStyle(color: string): React.CSSProperties {
   return {
     padding: "3px 8px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-pill)",
     fontSize: "0.72rem",
     fontWeight: 700,
     color,

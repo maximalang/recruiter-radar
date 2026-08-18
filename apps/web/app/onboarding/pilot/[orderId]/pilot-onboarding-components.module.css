@@ -15,7 +15,7 @@
 /* Instruction card */
 .instructionCard {
   padding: 14px 16px;
-  border-radius: 16px;
+  border-radius: var(--radius-overlay);
   border: 1px solid color-mix(in srgb, var(--color-information) 8%, transparent);
   background-color: color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary));
 }
@@ -75,7 +75,7 @@
   display: grid;
   gap: 12px;
   padding: 16px;
-  border-radius: 18px;
+  border-radius: var(--radius-overlay);
   border: 1px solid color-mix(in srgb, var(--color-information) 8%, transparent);
   background-color: var(--color-surface-elevated);
 }
@@ -84,7 +84,7 @@
 .previewChip {
   display: inline-flex;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background-color: var(--color-surface-primary);
   border: 1px solid color-mix(in srgb, var(--color-information) 8%, transparent);
 }
@@ -107,7 +107,7 @@
 .scorePill {
   display: inline-flex;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background-color: color-mix(in srgb, var(--color-signal) 8%, transparent);
   color: var(--color-signal);
   font-size: 0.82rem;
@@ -133,7 +133,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid color-mix(in srgb, var(--color-information) 8%, transparent);
   background-color: var(--color-surface-elevated);
   color: var(--color-text-primary);
@@ -182,7 +182,7 @@
   align-items: center;
   justify-content: center;
   padding: 12px 18px;
-  border-radius: 14px;
+  border-radius: var(--radius-overlay);
   border: 1px solid var(--color-signal);
   background: var(--color-signal);
   color: var(--color-surface-elevated);

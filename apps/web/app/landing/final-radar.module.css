@@ -14,7 +14,7 @@
 .glyph {
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 0 28px color-mix(in srgb, var(--color-signal) 8%, transparent));
+  filter: none;
   transform: scale(.94);
   transition: opacity .24s ease, transform .28s ease, filter .28s ease;
 }
@@ -22,7 +22,7 @@
 :global(#conversion-final):has(:global([data-analytics-context="closing"]:hover)) .glyph,
 :global(#conversion-final):has(:global([data-analytics-context="closing"]:focus-visible)) .glyph {
   opacity: .96;
-  filter: drop-shadow(0 0 34px color-mix(in srgb, var(--color-signal) 14%, transparent));
+  filter: none;
   transform: scale(1);
 }
 

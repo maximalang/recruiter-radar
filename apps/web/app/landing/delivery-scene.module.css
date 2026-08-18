@@ -30,7 +30,7 @@
 .section:global([data-motion-state="visible"]) .channelHierarchy::before { animation: none; }
 .channelHierarchy:has(.moreRoutes[open])::before { transform: scaleX(1); }
 
-.coreChannel { position: relative; display: grid; align-content: start; min-height: 100%; padding: 1.4rem; border: 0; border-top: 1px solid color-mix(in srgb, var(--color-signal) 34%, transparent); background: linear-gradient(145deg, var(--color-signal), var(--slate-900)); color: var(--paper); box-shadow: 0 16px 36px color-mix(in srgb, var(--color-signal) 5.5%, transparent); }
+.coreChannel { position: relative; display: grid; align-content: start; min-height: 100%; padding: 1.4rem; border: 0; border-top: 1px solid color-mix(in srgb, var(--color-signal) 34%, transparent); background: linear-gradient(145deg, var(--color-signal), var(--slate-900)); color: var(--paper); box-shadow: var(--shadow-float); }
 .groupLabel { color: var(--color-signal); font-family: var(--font-mono); font-size: .58rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
 .coreChannel .groupLabel { margin-top: 1.4rem; color: var(--signal-strong); }
 .coreChannel h3 { margin: .55rem 0 .7rem; color: var(--paper); font-size: clamp(1.45rem,2.5vw,2.15rem); font-weight: 590; letter-spacing: -.045em; }
