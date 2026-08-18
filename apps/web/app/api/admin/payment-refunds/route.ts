@@ -11,6 +11,19 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const HEADERS = { "Cache-Control": "no-store" };
+const SAFE_REFUND_MESSAGES = new Set([
+  "Идентификатор обязателен.",
+  "Некорректный идентификатор.",
+  "Сумма возврата должна быть указана в целых копейках.",
+  "Заказ не найден.",
+  "Возврат доступен только для оплаченного заказа.",
+  "Заказ оплачен не через Robokassa.",
+  "Некорректная сумма заказа.",
+  "У платежа отсутствует Robokassa OpKey. Сначала выполните live-сверку операции.",
+  "Сумма возврата должна быть положительным целым числом копеек.",
+  "Возврат не найден.",
+  "У возврата отсутствует requestId Robokassa.",
+]);
 
 export async function GET() {
   const access = await checkOperatorAccess();
@@ -75,7 +88,7 @@ export async function POST(request: NextRequest) {
       {
         ok: false,
         error: "refund_operation_failed",
-        message: error instanceof Error ? error.message : "Операция возврата не выполнена.",
+        message: safeRefundErrorMessage(error),
       },
       { status: 409, headers: HEADERS },
     );
@@ -87,6 +100,13 @@ function denied() {
     { ok: false, error: "operator_access_required" },
     { status: 401, headers: HEADERS },
   );
+}
+
+function safeRefundErrorMessage(error: unknown): string {
+  if (error instanceof Error && SAFE_REFUND_MESSAGES.has(error.message)) {
+    return error.message;
+  }
+  return "Операция возврата не выполнена.";
 }
 
 function readId(value: unknown): string {
