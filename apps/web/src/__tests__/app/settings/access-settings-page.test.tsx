@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 jest.mock("@/lib/auth-v2/authorization", () => ({ getSession: jest.fn() }));
@@ -103,6 +104,6 @@ describe("access settings page", () => {
   });
 });
 
-function collectRenderedText(node: React.ReactNode): string {
+function collectRenderedText(node: ReactNode): string {
   return renderToStaticMarkup(node).replace(/<[^>]+>/g, " ");
 }
