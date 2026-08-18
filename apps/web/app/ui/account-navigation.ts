@@ -1,3 +1,4 @@
+import { NavigationRegistry } from "../lib/navigation/navigation-registry";
 import type { NavItem } from "./internal-page";
 
 export type AccountNavigationKey =
@@ -9,12 +10,18 @@ export type AccountNavigationKey =
   | "profile"
   | "settings";
 
+function registeredRoute(id: string): string {
+  const entry = NavigationRegistry.find((item) => item.id === id);
+  if (!entry) throw new Error(`Navigation registry is missing route: ${id}`);
+  return entry.route;
+}
+
 const ACCOUNT_ROUTES = [
-  { key: "dashboard", href: "/dashboard", label: "Сегодня" },
-  { key: "leads", href: "/leads", label: "Компании" },
-  { key: "opportunities", href: "/opportunities", label: "Ситуации" },
+  { key: "dashboard", href: registeredRoute("dashboard"), label: "Сегодня" },
+  { key: "leads", href: registeredRoute("leads"), label: "Компании" },
+  { key: "opportunities", href: registeredRoute("opportunities"), label: "Ситуации" },
   { key: "radar", href: "/opportunities/radar", label: "Радар" },
-  { key: "settings", href: "/settings", label: "Настройки" },
+  { key: "settings", href: registeredRoute("settings"), label: "Настройки" },
 ] as const;
 
 function routeIsActive(routeKey: (typeof ACCOUNT_ROUTES)[number]["key"], active: AccountNavigationKey) {
