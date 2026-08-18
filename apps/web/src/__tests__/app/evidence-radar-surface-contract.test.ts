@@ -38,6 +38,11 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
     expect(map).not.toContain('Array.from({ length: sourceCount')
   })
 
+  it('keeps score subordinate to Why now, Evidence and Confidence in the detail pane', () => {
+    expect(mapCss).toMatch(/\.leadScore strong\s*\{[^}]*font-size:\s*var\(--type-metadata-size\)/)
+    expect(mapCss).not.toMatch(/\.leadScore strong\s*\{[^}]*font-size:\s*var\(--type-data-large-size\)/)
+  })
+
   it('keeps selection operable for pointer, keyboard, touch and reduced motion', () => {
     expect(map).toContain('semanticList')
     expect(map).toContain('aria-pressed={props.selected}')
