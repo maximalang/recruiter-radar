@@ -52,4 +52,25 @@ describe('NextStepsBlock (T4.4 — CheckIcon on copied)', () => {
     expect(copyBtn.querySelector('svg')).not.toBeNull();
     expect(copyBtn.textContent).not.toContain('✓');
   });
+
+  it('renders only http(s) company surfaces and rejects executable or malformed hrefs', () => {
+    render(
+      <NextStepsBlock
+        crmBlock="CRM text"
+        links={[
+          { href: 'https://safe.example/careers', label: 'Безопасная ссылка' },
+          { href: 'javascript:alert(1)', label: 'Опасная ссылка' },
+          { href: 'data:text/html,boom', label: 'Data URL' },
+          { href: 'not a url', label: 'Некорректная ссылка' },
+        ]}
+        singleExportHref="/api/leads/x/export"
+      />,
+    );
+
+    const safeLink = screen.getByRole('link', { name: /безопасная ссылка/i });
+    expect(safeLink).toHaveAttribute('href', 'https://safe.example/careers');
+    expect(screen.queryByRole('link', { name: /опасная ссылка/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /data url/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /некорректная ссылка/i })).toBeNull();
+  });
 });
