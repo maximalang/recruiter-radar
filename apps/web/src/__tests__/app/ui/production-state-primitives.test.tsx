@@ -10,16 +10,23 @@ function TestIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 describe('production state primitives', () => {
-  it('keeps static empty states out of live regions', () => {
+  it('keeps static empty states out of live regions and labels each region by its title', () => {
     const { container } = render(
-      <StaticEmptyState
-        icon={TestIcon}
-        title="Очередь пуста"
-        description="Новых кандидатов для проверки нет."
-      />,
+      <>
+        <StaticEmptyState
+          icon={TestIcon}
+          title="Очередь пуста"
+          description="Новых кандидатов для проверки нет."
+        />
+        <StaticEmptyState title="Нет сигналов" description="Новые сигналы пока не найдены." />
+      </>,
     );
 
     expect(screen.getByRole('heading', { name: 'Очередь пуста' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Очередь пуста' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Нет сигналов' })).toBeTruthy();
+    const regions = screen.getAllByRole('region');
+    expect(regions[0]?.getAttribute('aria-labelledby')).not.toBe(regions[1]?.getAttribute('aria-labelledby'));
     expect(container.querySelector('[aria-live]')).toBeNull();
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.getByTestId('empty-icon')).toHaveAttribute('aria-hidden', 'true');
