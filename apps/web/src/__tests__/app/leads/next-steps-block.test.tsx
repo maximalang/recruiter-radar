@@ -69,7 +69,7 @@ describe('NextStepsBlock (T4.4 — CheckIcon on copied)', () => {
 
     const safeLink = screen.getByRole('link', { name: /безопасная ссылка/i });
     expect(safeLink).toHaveAttribute('href', 'https://safe.example/careers');
-    expect(screen.queryByRole('link', { name: /опасная ссылка/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^опасная ссылка/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /data url/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /некорректная ссылка/i })).toBeNull();
   });
