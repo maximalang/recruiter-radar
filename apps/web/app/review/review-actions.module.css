@@ -33,23 +33,23 @@
 }
 
 .btn[data-tone="success"] {
-  color: #047857;
-  border-color: #a7f3d0;
-  background-color: #ecfdf5;
+  color: var(--color-signal);
+  border-color: var(--color-signal);
+  background-color: color-mix(in srgb, var(--color-signal) 10%, var(--color-surface-primary));
 }
 
 .btn[data-tone="success"]:hover {
-  background-color: #d1fae5;
+  background-color: color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary));
 }
 
 .btn[data-tone="danger"] {
   color: var(--color-destructive);
-  border-color: #fecaca;
-  background-color: #fef2f2;
+  border-color: color-mix(in srgb, var(--color-destructive) 16%, var(--color-surface-primary));
+  background-color: color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary));
 }
 
 .btn[data-tone="danger"]:hover {
-  background-color: #fee2e2;
+  background-color: color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary));
 }
 
 .btnIcon {
@@ -71,15 +71,15 @@
 }
 
 .verdict[data-tone="success"] {
-  color: #047857;
-  background-color: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  color: var(--color-signal);
+  background-color: color-mix(in srgb, var(--color-signal) 10%, var(--color-surface-primary));
+  border: 1px solid var(--color-signal);
 }
 
 .verdict[data-tone="danger"] {
   color: var(--color-destructive);
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
+  background-color: color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary));
+  border: 1px solid color-mix(in srgb, var(--color-destructive) 16%, var(--color-surface-primary));
 }
 
 .error {

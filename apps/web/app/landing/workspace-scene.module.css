@@ -22,7 +22,7 @@
 
 .intro :global(h2 em) {
   display: block;
-  color: #397966;
+  color: var(--color-signal);
 }
 
 .productFrame { overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
@@ -70,7 +70,7 @@
   border-radius: 50%;
   background: var(--color-signal);
   content: "";
-  box-shadow: 0 0 0 0 rgba(141,217,193,0);
+  box-shadow: 0 0 0 0 transparent;
 }
 
 
@@ -79,8 +79,8 @@
   display: grid;
   gap: .7rem;
   padding: .9rem .95rem 1rem;
-  border-bottom: 1px solid rgba(23, 35, 45, .12);
-  background: linear-gradient(180deg, #f5f2ea, #f7f4ed);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-information) 12%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary)), color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary)));
 }
 
 .controlHint {
@@ -88,11 +88,11 @@
   flex-wrap: wrap;
   gap: .25rem .38rem;
   margin: 0;
-  color: rgba(23,35,45,.58);
+  color: color-mix(in srgb, var(--color-information) 58%, transparent);
   font-size: .66rem;
   line-height: 1.45;
 }
-.controlHint strong { color: #315f52; font-weight: 650; }
+.controlHint strong { color: var(--color-signal); font-weight: 650; }
 
 .presets {
   display: flex;
@@ -104,7 +104,7 @@
 }
 
 .presets::-webkit-scrollbar { display: none; }
-.presets > span { margin-right: .15rem; color: rgba(23,35,45,.52); font-family: var(--font-mono); font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; }
+.presets > span { margin-right: .15rem; color: color-mix(in srgb, var(--color-information) 52%, transparent); font-family: var(--font-mono); font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; }
 .presets a {
   min-height: 44px;
   padding: .42rem .58rem;
@@ -116,15 +116,15 @@
 }
 
 .presets a[data-selected] {
-  border-bottom-color: #4e8e7c;
-  background: rgba(78,142,124,.035);
-  color: #315f52;
+  border-bottom-color: var(--color-signal);
+  background: color-mix(in srgb, var(--color-signal) 3.5%, transparent);
+  color: var(--color-signal);
 }
 
 .presets a:hover,
 .presets a:focus-visible {
-  border-bottom-color: rgba(78, 142, 124, .44);
-  color: #315f52;
+  border-bottom-color: color-mix(in srgb, var(--color-signal) 44%, transparent);
+  color: var(--color-signal);
 }
 
 .commandForm {
@@ -137,18 +137,18 @@
 .commandForm label { gap: .34rem; }
 .commandForm input {
   height: 2.75rem;
-  border-color: rgba(23, 35, 45, .14);
+  border-color: color-mix(in srgb, var(--color-information) 14%, transparent);
   border-radius: 8px;
-  background: #fffefa;
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
   font-size: .82rem;
   transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
 }
 
-.commandForm input:hover { border-color: rgba(78,142,124,.3); }
+.commandForm input:hover { border-color: color-mix(in srgb, var(--color-signal) 30%, transparent); }
 .commandForm input:focus {
-  border-color: rgba(78, 142, 124, .7);
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(78, 142, 124, .07);
+  border-color: color-mix(in srgb, var(--color-signal) 70%, transparent);
+  background: var(--color-surface-elevated);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-signal) 7%, transparent);
 }
 
 .commandForm button {
@@ -157,11 +157,11 @@
   overflow: hidden;
   border-radius: 8px;
   background: var(--slate-900);
-  color: #f7f4ed;
+  color: color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary));
   transition: transform .16s ease, background-color .18s ease, box-shadow .18s ease;
 }
 
-.commandForm button:hover { background: #1e3028; box-shadow: 0 7px 18px rgba(23,35,45,.1); }
+.commandForm button:hover { background: var(--color-signal); box-shadow: 0 7px 18px color-mix(in srgb, var(--color-information) 10%, transparent); }
 .commandForm button:active { transform: translateY(1px); }
 
 .commandForm button::after {
@@ -170,7 +170,7 @@
   bottom: 0;
   left: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #8dd9c1 32%, #b5ead8 50%, #8dd9c1 68%, transparent);
+  background: linear-gradient(90deg, transparent, var(--color-signal) 32%, var(--color-signal) 50%, var(--color-signal) 68%, transparent);
   content: "";
   opacity: 0;
   transform: translateX(-90%);
@@ -204,10 +204,10 @@
 .results :global([data-primary-lead]) {
   margin: .2rem 0 0;
   padding: 0 .35rem;
-  border-top: 1px solid rgba(78, 142, 124, .32);
-  border-bottom: 1px solid rgba(23, 35, 45, .17);
-  background: linear-gradient(90deg, rgba(120, 183, 165, .08), rgba(255, 253, 247, .86) 34%, #fffdf7 100%);
-  box-shadow: inset 3px 0 0 rgba(78,142,124,.26);
+  border-top: 1px solid color-mix(in srgb, var(--color-signal) 32%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-information) 17%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-signal) 8%, transparent), color-mix(in srgb, var(--color-copper) 86%, transparent) 34%, color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary)) 100%);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-signal) 26%, transparent);
 }
 
 .lead {
@@ -220,7 +220,7 @@
 }
 
 .lead:not(.leadPrimary) .leadRow:hover {
-  background: rgba(78, 142, 124, .035);
+  background: color-mix(in srgb, var(--color-signal) 3.5%, transparent);
 }
 
 .leadPrimary .leadRow {
@@ -239,7 +239,7 @@
 }
 
 .leadPrimary :global([data-lead-score] strong) {
-  color: var(--signal-deep, #315f52);
+  color: var(--signal-deep, var(--color-signal));
   font-size: 1.25rem;
   font-weight: 520;
   line-height: 1;
@@ -247,18 +247,18 @@
 }
 
 .leadPrimary :global([data-lead-score] small) {
-  color: rgba(23, 35, 45, .62);
+  color: color-mix(in srgb, var(--color-information) 62%, transparent);
   font-size: .56rem;
 }
 
 .confidence {
-  color: #315f52;
+  color: var(--color-signal);
   font-size: var(--type-label-size);
   font-weight: 600;
   letter-spacing: 0;
 }
 
-.leadSignal { color: rgba(23, 35, 45, .78); }
+.leadSignal { color: color-mix(in srgb, var(--color-information) 78%, transparent); }
 
 .leadBody {
   display: grid;
@@ -275,11 +275,11 @@
 
 .proofBlock {
   padding-top: .7rem;
-  border-top: 1px solid rgba(23, 35, 45, .12);
+  border-top: 1px solid color-mix(in srgb, var(--color-information) 12%, transparent);
 }
 
 .proofBlock[data-primary-proof] {
-  border-top-color: rgba(78, 142, 124, .45);
+  border-top-color: color-mix(in srgb, var(--color-signal) 45%, transparent);
   border-left: 0;
   padding-left: 0;
 }
@@ -287,7 +287,7 @@
 .proofBlock span,
 .evidenceBlock > span,
 .factors > span {
-  color: rgba(23, 35, 45, .62);
+  color: color-mix(in srgb, var(--color-information) 62%, transparent);
   font-family: var(--font-mono);
   font-size: .58rem;
   letter-spacing: .045em;
@@ -296,7 +296,7 @@
 
 .proofBlock p {
   margin: .35rem 0 0;
-  color: rgba(23, 35, 45, .8);
+  color: color-mix(in srgb, var(--color-information) 80%, transparent);
   font-size: .78rem;
   line-height: 1.5;
 }
@@ -338,8 +338,8 @@
 .evidenceBlock li {
   padding: .4rem 0;
   border: 0;
-  border-bottom: 1px solid rgba(23, 35, 45, .1);
-  color: rgba(23, 35, 45, .78);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-information) 10%, transparent);
+  color: color-mix(in srgb, var(--color-information) 78%, transparent);
   font-size: .68rem;
   line-height: 1.42;
 }
@@ -356,8 +356,8 @@
   gap: 1rem;
   margin: .95rem -.95rem -.95rem;
   padding: .72rem .95rem;
-  border-top: 1px solid rgba(23, 35, 45, .12);
-  background: #f5f2ea;
+  border-top: 1px solid color-mix(in srgb, var(--color-information) 12%, transparent);
+  background: color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary));
 }
 
 .checkout {
@@ -366,18 +366,18 @@
   padding: .55rem 0;
   border: 0;
   background: transparent;
-  color: #17232d;
+  color: var(--color-information);
   font-size: .7rem;
 }
 
 .checkout:hover {
   background: transparent;
-  color: #315f52;
+  color: var(--color-signal);
   box-shadow: none;
 }
 
 .footerRail small {
-  color: rgba(23, 35, 45, .6);
+  color: color-mix(in srgb, var(--color-information) 60%, transparent);
   font-family: var(--font-mono);
   font-size: .56rem;
   text-transform: uppercase;

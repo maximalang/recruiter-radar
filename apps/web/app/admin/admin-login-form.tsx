@@ -36,7 +36,7 @@ export default function AdminLoginForm() {
       </label>
 
       {state.error ? (
-        <div style={{ padding: "10px 12px", borderRadius: "10px", background: "#fee4e2", color: "#b42318", fontSize: "0.86rem" }}>
+        <div style={{ padding: "10px 12px", borderRadius: "10px", background: "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))", color: "var(--color-destructive)", fontSize: "0.86rem" }}>
           {state.error}
         </div>
       ) : null}
@@ -46,7 +46,7 @@ export default function AdminLoginForm() {
         disabled={pending}
         style={{
           background: "var(--color-signal)",
-          color: "#fff",
+          color: "var(--color-surface-elevated)",
           padding: "12px 22px",
           borderRadius: "12px",
           fontWeight: 600,

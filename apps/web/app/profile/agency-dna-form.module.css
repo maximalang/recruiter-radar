@@ -123,7 +123,7 @@
 
 .chips input:checked + span {
   border-color: var(--color-signal);
-  background: rgba(35, 128, 111, 0.08);
+  background: color-mix(in srgb, var(--color-signal) 8%, transparent);
 }
 
 .scopeNote,

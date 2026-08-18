@@ -110,8 +110,8 @@ export function RadarField() {
     >
       <defs>
         <radialGradient id="compat-instrument-wash" cx="57%" cy="42%" r="58%">
-          <stop offset="0" stopColor="#7fd8bd" stopOpacity=".12" />
-          <stop offset="1" stopColor="#101817" stopOpacity="0" />
+          <stop offset="0" stopColor="var(--color-signal)" stopOpacity=".12" />
+          <stop offset="1" stopColor="var(--color-signal)" stopOpacity="0" />
         </radialGradient>
       </defs>
       <rect width="760" height="760" fill="url(#compat-instrument-wash)" />

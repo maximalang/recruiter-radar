@@ -16,7 +16,7 @@
   z-index: 100;
   padding: 8px 16px;
   background-color: var(--color-signal);
-  color: #ffffff;
+  color: var(--color-surface-elevated);
   font-size: 0.85rem;
   font-weight: 600;
   text-decoration: none;
@@ -26,7 +26,7 @@
 
 .skipLink:focus {
   transform: translateY(0);
-  outline: 2px solid #ffffff;
+  outline: 2px solid var(--color-surface-elevated);
   outline-offset: 2px;
 }
 
@@ -97,7 +97,7 @@
 
 .topNavLink[data-active="true"] {
   color: var(--color-signal);
-  background-color: rgba(35, 128, 111, 0.06);
+  background-color: color-mix(in srgb, var(--color-signal) 6%, transparent);
   font-weight: 600;
 }
 
@@ -169,7 +169,7 @@
   max-width: 760px;
   font-size: clamp(2.35rem, 3.4vw, 3.25rem);
   font-weight: 735;
-  color: #14201c;
+  color: var(--color-signal);
   letter-spacing: -0.058em;
   line-height: 1.02;
   margin: 0;
@@ -180,14 +180,14 @@
   width: 22px;
   height: 1px;
   margin-bottom: 14px;
-  background: #23806f;
+  background: var(--color-signal);
   content: "";
 }
 
 .internalPageSubtitle {
   max-width: 680px;
   font-size: 0.94rem;
-  color: #65706a;
+  color: var(--color-text-secondary);
   line-height: 1.62;
   margin-top: 16px;
 }
@@ -246,16 +246,16 @@
 }
 
 .contentCard[data-tone="danger"] {
-  border-color: #fecaca;
+  border-color: color-mix(in srgb, var(--color-destructive) 16%, var(--color-surface-primary));
 }
 
 /* Hero: the decision-driver cards (why now, why it fits) carry visual weight —
    a tinted left accent and brand-tinted surface lift them above the supporting
    evidence/action cards without shouting. */
 .contentCard[data-variant="hero"] {
-  border-color: rgba(35, 128, 111, 0.24);
+  border-color: color-mix(in srgb, var(--color-signal) 24%, transparent);
   border-left: 3px solid var(--color-signal);
-  background-color: rgba(35, 128, 111, 0.035);
+  background-color: color-mix(in srgb, var(--color-signal) 3.5%, transparent);
 }
 
 .contentCard[data-variant="hero"] .contentCardTitle {
@@ -390,9 +390,9 @@
   border-radius: var(--radius-pill);
   font-size: 0.75rem;
   font-weight: 500;
-  background-color: #f0fdf4;
+  background-color: color-mix(in srgb, var(--color-signal) 10%, var(--color-surface-primary));
   color: var(--color-positive);
-  border: 1px solid #bbf7d0;
+  border: 1px solid color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary));
 }
 
 /* ── Lead row specifics ── */
@@ -464,7 +464,7 @@
 }
 
 .signalItem + .signalItem {
-  border-top: 1px solid #fee2e2;
+  border-top: 1px solid color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary));
 }
 
 /* ── Gate description ── */
@@ -592,7 +592,7 @@
   padding: 9px 18px;
   border-radius: 10px;
   background-color: var(--color-signal);
-  color: #fff;
+  color: var(--color-surface-elevated);
   font-size: 0.85rem;
   font-weight: 600;
   text-decoration: none;
@@ -633,7 +633,7 @@
   padding: 9px 18px;
   border-radius: 10px;
   background-color: var(--color-signal);
-  color: #fff;
+  color: var(--color-surface-elevated);
   font-size: 0.85rem;
   font-weight: 600;
   text-decoration: none;
@@ -693,7 +693,7 @@
   background-image: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.6) 50%,
+    color-mix(in srgb, var(--color-surface-elevated) 60%, transparent) 50%,
     transparent 100%
   );
   background-size: 200% 100%;
@@ -888,8 +888,8 @@
   display: inline-block;
   padding: 1px 6px;
   border-radius: 999px;
-  background: rgba(16, 185, 129, 0.12);
-  color: rgb(5, 122, 85);
+  background: color-mix(in srgb, var(--color-signal) 12%, transparent);
+  color: var(--color-signal);
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.02em;

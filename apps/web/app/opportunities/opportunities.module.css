@@ -7,8 +7,8 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.32);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.32);
+  border-top: 1px solid color-mix(in srgb, var(--color-information) 32%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-information) 32%, transparent);
 }
 
 .todayLane {
@@ -18,9 +18,9 @@
   gap: 14px;
   padding: 15px;
   border: 0;
-  border-right: 1px solid rgba(148, 163, 184, 0.28);
+  border-right: 1px solid color-mix(in srgb, var(--color-information) 28%, transparent);
   border-radius: 0;
-  background: rgba(255, 254, 249, .46);
+  background: color-mix(in srgb, var(--color-warning) 46%, transparent);
   color: var(--color-text-primary);
   text-decoration: none;
 }
@@ -40,22 +40,22 @@
 }
 
 .todayLane[data-tone="attention"] {
-  border-color: rgba(37, 99, 235, 0.34);
+  border-color: color-mix(in srgb, var(--color-information) 34%, transparent);
 }
 
 .todayLane[data-tone="danger"] {
-  border-color: rgba(185, 28, 28, 0.32);
+  border-color: color-mix(in srgb, var(--color-destructive) 32%, transparent);
 }
 
 .todayLane[data-active="true"] {
   border-color: var(--color-signal);
-  background: rgba(35, 128, 111, 0.08);
+  background: color-mix(in srgb, var(--color-signal) 8%, transparent);
 }
 
 .researchMode {
   border: 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.3);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  border-top: 1px solid color-mix(in srgb, var(--color-information) 30%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-information) 30%, transparent);
   border-radius: 0;
   background: transparent;
 }
@@ -75,7 +75,7 @@
   display: grid;
   gap: 16px;
   padding: 0 15px 15px;
-  border-top: 1px solid rgba(148, 163, 184, 0.24);
+  border-top: 1px solid color-mix(in srgb, var(--color-information) 24%, transparent);
 }
 
 .researchForm {
@@ -105,7 +105,7 @@
   padding: 0 12px;
   border: 1px solid var(--color-separator-strong);
   border-radius: 10px;
-  background: #fff;
+  background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   font: inherit;
   font-size: 0.8rem;
@@ -125,7 +125,7 @@
   padding: 0 14px;
   border: 1px solid var(--color-separator-strong);
   border-radius: 10px;
-  background: #fff;
+  background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   cursor: pointer;
   font: inherit;
@@ -137,7 +137,7 @@
 .researchActions button {
   border-color: var(--color-signal);
   background: var(--color-signal);
-  color: #fff;
+  color: var(--color-surface-elevated);
 }
 
 .headerLink {
@@ -145,7 +145,7 @@
   min-height: 44px;
   align-items: center;
   padding: 0 14px;
-  border: 1px solid rgba(35, 128, 111, 0.2);
+  border: 1px solid color-mix(in srgb, var(--color-signal) 20%, transparent);
   border-radius: 11px;
   color: var(--color-signal);
   font-size: 0.82rem;
@@ -164,9 +164,9 @@
   min-height: 44px;
   align-items: center;
   padding: 0 14px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid color-mix(in srgb, var(--color-information) 35%, transparent);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.75);
+  background: color-mix(in srgb, var(--color-surface-elevated) 75%, transparent);
   color: var(--color-text-secondary);
   font-size: 0.8rem;
   font-weight: 680;
@@ -175,30 +175,30 @@
 
 .filterLink[data-active="true"] {
   border-color: var(--color-signal);
-  background: #eaf2ff;
+  background: color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary));
   color: var(--color-signal);
 }
 
 .cardList {
   display: grid;
   gap: 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.3);
+  border-top: 1px solid color-mix(in srgb, var(--color-information) 30%, transparent);
 }
 
 .card {
   overflow: hidden;
   padding: clamp(20px, 3.4vw, 30px);
   border: 0;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-information) 30%, transparent);
   border-radius: 0;
   background:
-    radial-gradient(circle at 96% 0, rgba(35, 128, 111, 0.09), transparent 30%),
-    rgba(255, 254, 249, .52);
+    radial-gradient(circle at 96% 0, color-mix(in srgb, var(--color-signal) 9%, transparent), transparent 30%),
+    color-mix(in srgb, var(--color-warning) 52%, transparent);
   box-shadow: none;
 }
 
 .card[data-status="review"] {
-  border-color: rgba(245, 158, 11, 0.34);
+  border-color: color-mix(in srgb, var(--color-copper) 34%, transparent);
 }
 
 .cardHeader {
@@ -271,9 +271,9 @@
 }
 
 .cardState[data-state="stale"] {
-  border-color: #fed7aa;
-  background: #fff7ed;
-  color: #9a3412;
+  border-color: color-mix(in srgb, var(--color-copper) 16%, var(--color-surface-primary));
+  background: color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary));
+  color: var(--color-destructive);
 }
 
 .decisionGrid {
@@ -314,13 +314,13 @@
 .decisionSection > p,
 .decisionList p {
   margin: 6px 0 0;
-  color: #1e293b;
+  color: var(--color-information);
   font-size: 0.84rem;
   line-height: 1.55;
 }
 
 .decisionSection[data-state="insufficient"] {
-  background: #fff;
+  background: var(--color-surface-elevated);
 }
 
 .decisionSection .insufficientValue {
@@ -333,7 +333,7 @@
 }
 
 .decisionList > span {
-  color: #9a3412;
+  color: var(--color-destructive);
   font-size: 0.68rem;
   font-weight: 720;
 }
@@ -459,7 +459,7 @@
 }
 
 .signalMetric strong {
-  color: #1e293b;
+  color: var(--color-information);
   font-size: 0.84rem;
 }
 
@@ -527,7 +527,7 @@
 
 .signalMetric[data-level="medium"] .signalMetricBar::after {
   width: 66%;
-  background: #b45309;
+  background: var(--color-copper);
 }
 
 .signalMetric[data-level="high"] .signalMetricBar::after {
@@ -544,7 +544,7 @@
 
 .signalConstraints p {
   margin: 0;
-  color: #1e293b;
+  color: var(--color-information);
   font-size: 0.84rem;
   line-height: 1.55;
 }
@@ -593,7 +593,7 @@
   bottom: -3px;
   left: 4px;
   width: 1px;
-  background: rgba(35, 128, 111, 0.12);
+  background: color-mix(in srgb, var(--color-signal) 12%, transparent);
   content: "";
 }
 
@@ -607,7 +607,7 @@
   width: 9px;
   height: 9px;
   margin-top: 4px;
-  border: 2px solid rgba(35, 128, 111, 0.24);
+  border: 2px solid color-mix(in srgb, var(--color-signal) 24%, transparent);
   border-radius: 50%;
   background: var(--color-signal);
 }
@@ -625,7 +625,7 @@
 
 .timelineItem a,
 .timelineItem strong {
-  color: #1e293b;
+  color: var(--color-information);
   font-size: 0.8rem;
   font-weight: 680;
 }
@@ -659,7 +659,7 @@
   padding: 16px;
   border: 1px solid var(--color-separator-strong);
   border-radius: 14px;
-  background: #fff;
+  background: var(--color-surface-elevated);
 }
 
 .workflowHeading {
@@ -698,8 +698,8 @@
 }
 
 .workflowHeading > strong[data-priority="high"] {
-  background: #fff7ed;
-  color: #9a3412;
+  background: color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary));
+  color: var(--color-destructive);
 }
 
 .workflowSummary {
@@ -719,7 +719,7 @@
 
 .workflowSummary dd {
   margin: 0;
-  color: #1e293b;
+  color: var(--color-information);
   font-size: 0.78rem;
   font-weight: 680;
 }
@@ -774,7 +774,7 @@
   padding: 8px 10px;
   border: 1px solid var(--color-separator-strong);
   border-radius: 9px;
-  background: #fff;
+  background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   font: inherit;
   font-size: 0.78rem;
@@ -798,7 +798,7 @@
 .outcomePanel {
   margin-top: 20px;
   overflow: hidden;
-  border: 1px solid #dbe3ed;
+  border: 1px solid color-mix(in srgb, var(--color-information) 16%, var(--color-surface-primary));
   border-radius: 14px;
   background: var(--color-surface-primary);
 }
@@ -880,7 +880,7 @@
   padding: 10px 12px;
   border: 1px solid var(--color-separator);
   border-radius: 10px;
-  background: #fff;
+  background: var(--color-surface-elevated);
 }
 
 .outcomeTimeline span,
@@ -890,7 +890,7 @@
 }
 
 .outcomeTimeline strong {
-  color: #1e293b;
+  color: var(--color-information);
   font-size: 0.78rem;
 }
 
@@ -911,9 +911,9 @@
   gap: 12px;
   margin-top: 14px;
   padding: 14px;
-  border: 1px solid rgba(35, 128, 111, 0.24);
+  border: 1px solid color-mix(in srgb, var(--color-signal) 24%, transparent);
   border-radius: 12px;
-  background: rgba(35, 128, 111, 0.08);
+  background: color-mix(in srgb, var(--color-signal) 8%, transparent);
 }
 
 .outcomeForm label {
@@ -932,7 +932,7 @@
   padding: 8px 10px;
   border: 1px solid var(--color-separator-strong);
   border-radius: 9px;
-  background: #fff;
+  background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   font: inherit;
   font-size: 0.78rem;
@@ -940,10 +940,10 @@
 
 .funnel {
   padding: 20px;
-  border: 1px solid #dbe3ed;
+  border: 1px solid color-mix(in srgb, var(--color-information) 16%, var(--color-surface-primary));
   border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+  background: var(--color-surface-elevated);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-information) 5%, transparent);
 }
 
 .funnelHeading {
@@ -1046,7 +1046,7 @@
   padding: 0 14px;
   border: 1px solid var(--color-separator-strong);
   border-radius: 11px;
-  background: #fff;
+  background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   cursor: pointer;
   font: inherit;
@@ -1058,7 +1058,7 @@
 .actionButton[data-tone="primary"] {
   border-color: var(--color-signal);
   background: var(--color-signal);
-  color: #fff;
+  color: var(--color-surface-elevated);
 }
 
 .actionButton:disabled {
@@ -1081,12 +1081,12 @@
 .workflowForm input:focus-visible,
 .workflowForm textarea:focus-visible,
 .timelineItem a:focus-visible {
-  outline: 3px solid rgba(35, 128, 111, 0.34);
+  outline: 3px solid color-mix(in srgb, var(--color-signal) 34%, transparent);
   outline-offset: 2px;
 }
 
 .conclusionBasis a:focus-visible {
-  outline: 3px solid rgba(35, 128, 111, 0.34);
+  outline: 3px solid color-mix(in srgb, var(--color-signal) 34%, transparent);
   outline-offset: 2px;
 }
 
@@ -1221,8 +1221,8 @@
   }
 
   .card:hover {
-    border-color: rgba(35, 128, 111, 0.28);
-    background-color: rgba(255, 254, 249, .8);
+    border-color: color-mix(in srgb, var(--color-signal) 28%, transparent);
+    background-color: color-mix(in srgb, var(--color-warning) 80%, transparent);
     box-shadow: none;
     transform: none;
   }

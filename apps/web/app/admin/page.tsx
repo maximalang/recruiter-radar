@@ -51,28 +51,28 @@ const ADMIN_NAV: NavItem[] = [
 function statusTone(status: string | undefined): { color: string; bg: string; label: string } {
   switch (status) {
     case "excellent":
-      return { color: "#065f46", bg: "#d1fae5", label: "excellent" };
+      return { color: "var(--color-signal)", bg: "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))", label: "excellent" };
     case "good":
-      return { color: "#1e40af", bg: "#dbeafe", label: "good" };
+      return { color: "var(--color-information)", bg: "color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary))", label: "good" };
     case "warning":
-      return { color: "#92400e", bg: "#fef3c7", label: "warning" };
+      return { color: "var(--color-copper)", bg: "color-mix(in srgb, var(--color-copper) 16%, var(--color-surface-primary))", label: "warning" };
     case "critical":
-      return { color: "#b42318", bg: "#fee4e2", label: "critical" };
+      return { color: "var(--color-destructive)", bg: "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))", label: "critical" };
     default:
-      return { color: "#4b5563", bg: "var(--color-surface-secondary)", label: "нет данных" };
+      return { color: "var(--color-text-secondary)", bg: "var(--color-surface-secondary)", label: "нет данных" };
   }
 }
 
 // Tone helpers for the analytics cards — kept local to the operator console.
 const GATE_COLOR: Record<string, string> = {
-  A: "#047857",
-  B: "#1d4ed8",
-  C: "#b45309",
+  A: "var(--color-signal)",
+  B: "var(--color-information)",
+  C: "var(--color-copper)",
   D: "var(--color-text-tertiary)",
 };
 
 function rateColor(r: number): string {
-  return r >= 30 ? "#047857" : r >= 15 ? "#b45309" : "#b42318";
+  return r >= 30 ? "var(--color-signal)" : r >= 15 ? "var(--color-copper)" : "var(--color-destructive)";
 }
 
 export default async function AdminPage() {
@@ -243,7 +243,7 @@ export default async function AdminPage() {
                     <span style={{ fontSize: "0.84rem", color: GATE_COLOR[g.gate] ?? "var(--color-text-tertiary)", fontWeight: 700, minWidth: "180px" }}>
                       {GATE_LABELS[g.gate] ?? g.gate}
                     </span>
-                    <div style={{ flex: 1, height: "8px", borderRadius: "999px", background: "rgba(15,23,42,0.07)", overflow: "hidden" }}>
+                    <div style={{ flex: 1, height: "8px", borderRadius: "999px", background: "color-mix(in srgb, var(--color-information) 7%, transparent)", overflow: "hidden" }}>
                       <div style={{ height: "100%", width: `${(g.count / max) * 100}%`, background: GATE_COLOR[g.gate] ?? "var(--color-text-tertiary)", borderRadius: "999px" }} />
                     </div>
                     <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--color-text-secondary)", whiteSpace: "nowrap" }}>
@@ -273,11 +273,11 @@ export default async function AdminPage() {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    <Tag color="#047857" bg="#d1fae5">A {row.gateA}</Tag>
-                    <Tag color="#1d4ed8" bg="#dbeafe">B {row.gateB}</Tag>
-                    <Tag color="#b45309" bg="#fef3c7">C {row.gateC}</Tag>
-                    <Tag color="#4b5563" bg="var(--color-surface-secondary)">прям. {row.directHiringProof}</Tag>
-                    <Tag color="#4b5563" bg="var(--color-surface-secondary)">агр. {row.platformAggregation}</Tag>
+                    <Tag color="var(--color-signal)" bg="color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))">A {row.gateA}</Tag>
+                    <Tag color="var(--color-information)" bg="color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary))">B {row.gateB}</Tag>
+                    <Tag color="var(--color-copper)" bg="color-mix(in srgb, var(--color-copper) 16%, var(--color-surface-primary))">C {row.gateC}</Tag>
+                    <Tag color="var(--color-text-secondary)" bg="var(--color-surface-secondary)">прям. {row.directHiringProof}</Tag>
+                    <Tag color="var(--color-text-secondary)" bg="var(--color-surface-secondary)">агр. {row.platformAggregation}</Tag>
                   </div>
                 </div>
               ))}
@@ -440,7 +440,7 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 
 function Metric({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
-    <div style={{ padding: "12px", borderRadius: "12px", background: "rgba(241,245,249,0.6)" }}>
+    <div style={{ padding: "12px", borderRadius: "12px", background: "color-mix(in srgb, var(--color-information) 60%, transparent)" }}>
       <div style={{ fontSize: "1.1rem", fontWeight: 800, color: accent ?? "var(--color-text-primary)" }}>{value}</div>
       <div style={{ fontSize: "0.76rem", color: "var(--color-text-tertiary)" }}>{label}</div>
     </div>
@@ -513,7 +513,7 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
                   flexDirection: "column-reverse",
                   borderRadius: "6px 6px 0 0",
                   overflow: "hidden",
-                  background: d.total > 0 ? "transparent" : "rgba(15,23,42,0.08)",
+                  background: d.total > 0 ? "transparent" : "color-mix(in srgb, var(--color-information) 8%, transparent)",
                   transition: "height 0.2s ease",
                 }}
                 title={`${d.day}: ${d.total} сигналов\n${presentSources

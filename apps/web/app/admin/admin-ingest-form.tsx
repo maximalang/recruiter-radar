@@ -99,7 +99,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
         disabled={pending}
         style={{
           background: "var(--color-signal)",
-          color: "#fff",
+          color: "var(--color-surface-elevated)",
           padding: "12px 22px",
           borderRadius: "12px",
           fontWeight: 600,
@@ -120,8 +120,8 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
           style={{
             padding: "10px 12px",
             borderRadius: "10px",
-            background: state.ok ? "#d1fae5" : "#fee4e2",
-            color: state.ok ? "#065f46" : "#b42318",
+            background: state.ok ? "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))" : "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))",
+            color: state.ok ? "var(--color-signal)" : "var(--color-destructive)",
             fontSize: "0.86rem",
           }}
         >
@@ -148,7 +148,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
               <strong>{r.source}</strong>
               <span>{r.fetched ?? 0} fetched</span>
               <span>{r.upserted ?? 0} upserted</span>
-              <span style={{ color: r.success ? "#065f46" : "#b42318", fontWeight: 700 }}>
+              <span style={{ color: r.success ? "var(--color-signal)" : "var(--color-destructive)", fontWeight: 700 }}>
                 {r.success ? "ok" : r.error ?? "fail"}
               </span>
             </div>

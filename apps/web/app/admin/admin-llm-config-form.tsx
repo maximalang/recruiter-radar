@@ -106,7 +106,7 @@ function Row({ setting }: { setting: LlmSettingView }) {
           disabled={savePending || value.trim() === ""}
           style={{
             background: "var(--color-signal)",
-            color: "#fff",
+            color: "var(--color-surface-elevated)",
             padding: "8px 16px",
             borderRadius: "10px",
             fontWeight: 600,
@@ -126,8 +126,8 @@ function Row({ setting }: { setting: LlmSettingView }) {
             fontSize: "0.8rem",
             padding: "8px 10px",
             borderRadius: "8px",
-            background: (saveState.ok || clearState.ok) ? "#d1fae5" : "#fee4e2",
-            color: (saveState.ok || clearState.ok) ? "#065f46" : "#b42318",
+            background: (saveState.ok || clearState.ok) ? "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))" : "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))",
+            color: (saveState.ok || clearState.ok) ? "var(--color-signal)" : "var(--color-destructive)",
           }}
         >
           {saveState.message || clearState.message}

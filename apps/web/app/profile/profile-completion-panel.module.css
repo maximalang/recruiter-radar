@@ -27,7 +27,7 @@
 .barTrack {
   height: 8px;
   border-radius: 999px;
-  background: #eef0f4;
+  background: color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary));
   overflow: hidden;
 }
 
@@ -39,7 +39,7 @@
 }
 
 .barFill[data-complete] {
-  background: #16a34a;
+  background: var(--color-signal);
 }
 
 .checklist {
@@ -72,7 +72,7 @@
   flex: 0 0 auto;
   width: 0.95em;
   height: 0.95em;
-  color: #c0c4cc;
+  color: var(--color-separator-strong);
 }
 
 .checkIcon svg {
@@ -81,7 +81,7 @@
 }
 
 .checkItem[data-filled] .checkIcon {
-  color: #16a34a;
+  color: var(--color-signal);
 }
 
 /* Match-count preview leading icon — semantic SearchIcon ("проверка радара"),
@@ -97,7 +97,7 @@
 
 .preview {
   padding-top: 10px;
-  border-top: 1px solid #f0f1f4;
+  border-top: 1px solid var(--color-surface-primary);
 }
 
 .previewText {

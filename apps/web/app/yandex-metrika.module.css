@@ -12,11 +12,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  border: 1px solid rgba(242, 241, 235, .14);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 14%, transparent);
   border-radius: 8px;
-  background: rgba(8, 12, 10, .97);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, .34);
-  color: #f2f1eb;
+  background: color-mix(in srgb, var(--color-signal) 97%, transparent);
+  box-shadow: 0 18px 60px color-mix(in srgb, var(--color-text-primary) 34%, transparent);
+  color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
   backdrop-filter: blur(10px);
 }
 
@@ -31,7 +31,7 @@
 }
 
 .text {
-  color: rgba(242, 241, 235, .72);
+  color: color-mix(in srgb, var(--color-warning) 72%, transparent);
   font-size: .82rem;
   line-height: 1.55;
 }
@@ -66,33 +66,33 @@
 }
 
 .primaryButton {
-  border: 1px solid #bfdc91;
-  background: #bfdc91;
-  color: #10150e;
+  border: 1px solid var(--color-signal);
+  background: var(--color-signal);
+  color: var(--color-signal);
 }
 
 .secondaryButton {
-  border: 1px solid rgba(242, 241, 235, .2);
-  background: rgba(242, 241, 235, .06);
-  color: #f2f1eb;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 20%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 6%, transparent);
+  color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
 }
 
 .primaryButton:hover,
 .primaryButton:focus-visible {
-  background: #d0e7ad;
+  background: var(--color-signal);
 }
 
 .secondaryButton:hover,
 .secondaryButton:focus-visible {
-  border-color: rgba(191, 220, 145, .62);
-  color: #f2f1eb;
+  border-color: color-mix(in srgb, var(--color-signal) 62%, transparent);
+  color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
   opacity: 1;
 }
 
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible,
 .link:focus-visible {
-  outline: 2px solid #bfdc91;
+  outline: 2px solid var(--color-signal);
   outline-offset: 3px;
 }
 

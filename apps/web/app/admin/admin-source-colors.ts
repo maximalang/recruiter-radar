@@ -1,19 +1,19 @@
 const SOURCE_COLORS: Record<string, string> = {
-  'career-pages': '#1d4ed8',
-  'habr-career': '#7c3aed',
-  'rabota-rossii': '#047857',
-  superjob: '#b45309',
+  'career-pages': 'var(--color-information)',
+  'habr-career': 'var(--color-information)',
+  'rabota-rossii': 'var(--color-signal)',
+  superjob: 'var(--color-copper)',
   hh: 'var(--color-text-tertiary)',
 }
 
 const FALLBACK_PALETTE = [
-  '#0f766e',
-  '#be123c',
-  '#0369a1',
-  '#a16207',
-  '#6d28d9',
+  'var(--color-information)',
+  'var(--color-destructive)',
+  'var(--color-information)',
+  'var(--color-copper)',
+  'var(--color-information)',
   'var(--color-positive)',
-  '#c2410c',
+  'var(--color-destructive)',
 ] as const
 
 function stableIndex(value: string): number {

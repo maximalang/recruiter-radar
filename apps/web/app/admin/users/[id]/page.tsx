@@ -239,7 +239,7 @@ function WorkspaceSelector({ userId, memberships, selectedId }: {
               border: "1px solid var(--color-separator-strong)",
               borderRadius: 8,
               padding: "8px 10px",
-              background: membership.id === selectedId ? "#e0e7ff" : "#fff",
+              background: membership.id === selectedId ? "color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary))" : "var(--color-surface-elevated)",
             }}
           >
             {membership.name} В· {membership.role}
@@ -261,7 +261,7 @@ function Facts({ rows }: { rows: Array<[string, string]> }) {
 }
 
 function StatusBadge({ status }: { status: DiagnosticStatus }) {
-  const tone = status === "PASS" ? ["#065f46", "#d1fae5"] : status === "WARNING" ? ["#92400e", "#fef3c7"] : ["#b42318", "#fee4e2"];
+  const tone = status === "PASS" ? ["var(--color-signal)", "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))"] : status === "WARNING" ? ["var(--color-copper)", "color-mix(in srgb, var(--color-copper) 16%, var(--color-surface-primary))"] : ["var(--color-destructive)", "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))"];
   return <span style={{ color: tone[0], background: tone[1], padding: "3px 8px", borderRadius: 999, fontWeight: 800, fontSize: "0.72rem", textAlign: "center" }}>{status}</span>;
 }
 

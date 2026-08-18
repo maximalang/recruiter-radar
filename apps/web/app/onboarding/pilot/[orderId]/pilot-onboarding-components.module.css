@@ -16,8 +16,8 @@
 .instructionCard {
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background-color: #fbfcfd;
+  border: 1px solid color-mix(in srgb, var(--color-information) 8%, transparent);
+  background-color: color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary));
 }
 
 /* Numbered instruction card — circle badge + body, aligned with step-rail */
@@ -37,7 +37,7 @@
   height: 26px;
   border-radius: 50%;
   background-color: var(--color-signal);
-  color: #fff;
+  color: var(--color-surface-elevated);
   font-size: 0.82rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -76,8 +76,8 @@
   gap: 12px;
   padding: 16px;
   border-radius: 18px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background-color: #fff;
+  border: 1px solid color-mix(in srgb, var(--color-information) 8%, transparent);
+  background-color: var(--color-surface-elevated);
 }
 
 /* Preview chip */
@@ -86,7 +86,7 @@
   padding: 4px 8px;
   border-radius: 999px;
   background-color: var(--color-surface-primary);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid color-mix(in srgb, var(--color-information) 8%, transparent);
 }
 
 /* Preview header */
@@ -108,7 +108,7 @@
   display: inline-flex;
   padding: 4px 8px;
   border-radius: 999px;
-  background-color: rgba(35, 128, 111, 0.08);
+  background-color: color-mix(in srgb, var(--color-signal) 8%, transparent);
   color: var(--color-signal);
   font-size: 0.82rem;
   font-weight: 700;
@@ -134,18 +134,18 @@
   gap: 8px;
   padding: 10px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background-color: #fff;
+  border: 1px solid color-mix(in srgb, var(--color-information) 8%, transparent);
+  background-color: var(--color-surface-elevated);
   color: var(--color-text-primary);
 }
 
 .stepPill[data-current="true"] {
   background-color: var(--color-signal);
-  color: #fff;
+  color: var(--color-surface-elevated);
 }
 
 .stepPill[data-complete="true"] {
-  background-color: #eefbf3;
+  background-color: color-mix(in srgb, var(--color-signal) 10%, var(--color-surface-primary));
   color: var(--color-text-primary);
 }
 
@@ -153,8 +153,8 @@
    eye lands on the current step first. */
 .stepPill[data-future="true"] {
   color: var(--color-text-tertiary);
-  border-color: rgba(15, 23, 42, 0.06);
-  background-color: rgba(255, 255, 255, 0.6);
+  border-color: color-mix(in srgb, var(--color-information) 6%, transparent);
+  background-color: color-mix(in srgb, var(--color-surface-elevated) 60%, transparent);
 }
 
 /* Step rail */
@@ -185,7 +185,7 @@
   border-radius: 14px;
   border: 1px solid var(--color-signal);
   background: var(--color-signal);
-  color: #fff;
+  color: var(--color-surface-elevated);
   text-decoration: none;
   font-weight: 700;
 }

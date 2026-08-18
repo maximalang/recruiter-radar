@@ -5,7 +5,7 @@
   right: clamp(-3.5rem, -1vw, 1rem);
   width: clamp(18rem, 30vw, 30rem);
   aspect-ratio: 1;
-  color: #b5ead8;
+  color: var(--color-signal);
   opacity: .28;
   transform: translateY(-50%);
   pointer-events: none;
@@ -14,7 +14,7 @@
 .glyph {
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 0 28px rgba(141, 217, 193, .08));
+  filter: drop-shadow(0 0 28px color-mix(in srgb, var(--color-signal) 8%, transparent));
   transform: scale(.94);
   transition: opacity .24s ease, transform .28s ease, filter .28s ease;
 }
@@ -22,7 +22,7 @@
 :global(#conversion-final):has(:global([data-analytics-context="closing"]:hover)) .glyph,
 :global(#conversion-final):has(:global([data-analytics-context="closing"]:focus-visible)) .glyph {
   opacity: .96;
-  filter: drop-shadow(0 0 34px rgba(141, 217, 193, .14));
+  filter: drop-shadow(0 0 34px color-mix(in srgb, var(--color-signal) 14%, transparent));
   transform: scale(1);
 }
 
