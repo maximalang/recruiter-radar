@@ -19,11 +19,11 @@ import {
   InternalPageHeader,
   InternalBackLink,
   NotFoundState,
-  EmptyState,
-  ErrorState,
   GATE_DESC,
   FEEDBACK_LABELS,
 } from '../../ui/internal-page';
+import { ProductErrorState } from '../../ui/product-error-state';
+import { StaticEmptyState } from '../../ui/static-empty-state';
 import { buildAccountNavigation } from '../../ui/account-navigation';
 import { SearchIcon } from '../../ui/icons';
 import styles from './lead-brief.module.css';
@@ -62,6 +62,10 @@ function formatSourceCount(count: number): string {
   return `${count} ${pluralForm(count, ['источник', 'источника', 'источников'])}`;
 }
 
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>;
+}
+
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const authorization = await getSession({ permission: 'leads:read' });
@@ -69,7 +73,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
         <InternalPageHeader title="Компания" subtitle="Защищённое рабочее пространство" />
-        <EmptyState title="Нужен вход в аккаунт" text="Войдите, чтобы открыть эту компанию в своём workspace." action={{ href: `/login?returnTo=/leads/${encodeURIComponent(id)}`, label: 'Войти' }} />
+        <StaticEmptyState
+          title="Нужен вход в аккаунт"
+          description="Войдите, чтобы открыть эту компанию в своём workspace."
+          action={<StateLink href={`/login?returnTo=/leads/${encodeURIComponent(id)}`} label="Войти" />}
+        />
       </InternalPageFrame>
     );
   }
@@ -82,7 +90,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
         <InternalPageHeader title="Компания" subtitle="Проверка доступа" />
-        <ErrorState title="Не удалось проверить доступ" description="Данные не показываются, пока сервер не подтвердит права аккаунта." action={{ href: '/settings/access', label: 'Доступ и оплата' }} />
+        <ProductErrorState
+          title="Не удалось проверить доступ"
+          description="Данные не показываются, пока сервер не подтвердит права аккаунта."
+        >
+          <StateLink href="/settings/access" label="Доступ и оплата" />
+        </ProductErrorState>
       </InternalPageFrame>
     );
   }
@@ -90,7 +103,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
         <InternalPageHeader title="Компания" subtitle="Доступ не активен" />
-        <EmptyState title="Нужен активный доступ" text="Профиль и история сохранены. После активации компания снова станет доступна." action={{ href: '/settings/access', label: 'Проверить доступ' }} />
+        <StaticEmptyState
+          title="Нужен активный доступ"
+          description="Профиль и история сохранены. После активации компания снова станет доступна."
+          action={<StateLink href="/settings/access" label="Проверить доступ" />}
+        />
       </InternalPageFrame>
     );
   }
@@ -102,7 +119,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
         <InternalPageHeader title="Компания" subtitle="Радар" />
-        <ErrorState title="Не удалось загрузить компанию" description="Это временная ошибка данных, а не признак удаления компании." action={{ href: '/leads', label: 'Вернуться к компаниям' }} />
+        <ProductErrorState
+          title="Не удалось загрузить компанию"
+          description="Это временная ошибка данных, а не признак удаления компании."
+        >
+          <StateLink href="/leads" label="Вернуться к компаниям" />
+        </ProductErrorState>
       </InternalPageFrame>
     );
   }
@@ -239,28 +261,27 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </section>
 
         <div className={styles.layout}>
-
           <section className={`${styles.section} ${styles.evidenceSection}`} data-company-brief-evidence>
-              <h2>Подтверждения</h2>
-              <div className={styles.stats}>
-                <span>{formatVacanciesCount(lead.vacanciesCount)}</span>
-                <span>{formatRoleCount(lead.distinctVacancyNamesCount)}</span>
-                <span>{formatSourceCount(lead.sourceFamilies.length)}</span>
-              </div>
-              {lead.evidenceTitles.length > 0 ? (
-                <ol className={styles.evidenceList}>
-                  {lead.evidenceTitles.map((title, index) => (
-                    <li key={`${title}:${index}`}>
-                      <span className={styles.evidenceIndex}>{String(index + 1).padStart(2, '0')}</span>
-                      <span>{title}</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : <p className={styles.body}>Подтверждённые факты пока не сформированы.</p>}
-              {lead.sourceFamilies.length > 0 ? (
-                <div className={styles.provenance}>Источники: {lead.sourceFamilies.join(' · ')}</div>
-              ) : null}
-            </section>
+            <h2>Подтверждения</h2>
+            <div className={styles.stats}>
+              <span>{formatVacanciesCount(lead.vacanciesCount)}</span>
+              <span>{formatRoleCount(lead.distinctVacancyNamesCount)}</span>
+              <span>{formatSourceCount(lead.sourceFamilies.length)}</span>
+            </div>
+            {lead.evidenceTitles.length > 0 ? (
+              <ol className={styles.evidenceList}>
+                {lead.evidenceTitles.map((title, index) => (
+                  <li key={`${title}:${index}`}>
+                    <span className={styles.evidenceIndex}>{String(index + 1).padStart(2, '0')}</span>
+                    <span>{title}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : <p className={styles.body}>Подтверждённые факты пока не сформированы.</p>}
+            {lead.sourceFamilies.length > 0 ? (
+              <div className={styles.provenance}>Источники: {lead.sourceFamilies.join(' · ')}</div>
+            ) : null}
+          </section>
 
           <aside className={styles.aside} aria-label="Действия и контекст" data-company-brief-action>
             <div className={styles.rail}>
@@ -316,6 +337,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </section>
             </div>
           </aside>
+
           <div className={styles.main} data-company-brief-context>
             {summaryLines.length > 0 ? (
               <section className={styles.section}>
@@ -326,7 +348,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </div>
               </section>
             ) : null}
-
 
             {fit && !fit.isEmpty ? (
               <section className={styles.section}>
@@ -344,7 +365,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </section>
             ) : null}
           </div>
-
         </div>
       </div>
     </InternalPageFrame>
