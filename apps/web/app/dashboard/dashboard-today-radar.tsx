@@ -29,7 +29,21 @@ function formatSourceCount(count: number) {
   return `${count} ${pluralForm(count, ["источник", "источника", "источников"])}`;
 }
 
+function formatRunTime(value: string | null) {
+  if (!value) return "время последнего сканирования ещё не зафиксировано";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "время последнего сканирования уточняется";
+  return `сканирование ${new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date)}`;
+}
+
 export default function DashboardTodayRadar({ topLeads, pendingReview, hiringModeByProfileId, lastRunAt }: DashboardTodayRadarProps) {
+  const recentSignals = topLeads.filter((lead) => Boolean(lead.latestPublishedAt)).slice(0, 3);
+
   return (
     <section className={styles.todayRadarSection} aria-labelledby="today-radar-heading">
       <div className={styles.todayRadarHeader}>
@@ -79,7 +93,31 @@ export default function DashboardTodayRadar({ topLeads, pendingReview, hiringMod
         </div>
       )}
 
+      <div className={styles.todayChanges} aria-labelledby="today-changes-heading">
+        <div className={styles.todayChangesHeader}>
+          <span className={styles.sectionEyebrow}>Изменения</span>
+          <h3 id="today-changes-heading">Последние сигналы</h3>
+        </div>
+        {recentSignals.length > 0 ? (
+          <div className={styles.todayChangesList}>
+            {recentSignals.map((lead) => (
+              <Link key={lead.id} href={`/leads/${lead.id}`} className={styles.todayChangeRow}>
+                <span>
+                  <strong>{lead.orgName}</strong>
+                  <small>{formatSignalFreshness(lead.latestPublishedAt)?.label ?? "свежесть уточняется"}</small>
+                </span>
+                <span className={styles.todayChangeEvidence}>{formatEvidenceCount(lead.evidenceTitles.length)}</span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.todayChangesEmpty}>Свежие подтверждения появятся здесь после следующего наблюдаемого сигнала.</p>
+        )}
+        <p className={styles.todayChangesMeta}>{formatRunTime(lastRunAt)}</p>
+      </div>
+
       <div className={styles.todayWorkflow} aria-labelledby="today-workflow-heading">
+        <span className={styles.sectionEyebrow}>Workflow</span>
         <h3 id="today-workflow-heading">Рабочий контур</h3>
         <Link href="/review" className={styles.todayWorkflowRow}>
           <span>На проверке</span>
