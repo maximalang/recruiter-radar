@@ -1,10 +1,11 @@
 /** @jest-environment jsdom */
+import type { SVGProps } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { ProductErrorState } from '@/app/ui/product-error-state';
 import { DynamicStatusMessage, StaticEmptyState } from '@/app/ui/static-empty-state';
 
-function TestIcon(props: React.SVGProps<SVGSVGElement>) {
+function TestIcon(props: SVGProps<SVGSVGElement>) {
   return <svg data-testid="empty-icon" {...props} />;
 }
 
