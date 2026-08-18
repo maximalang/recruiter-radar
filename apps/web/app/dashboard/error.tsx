@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { ProductErrorState } from "../ui/product-error-state";
@@ -15,7 +15,10 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const correlationId = error.digest ?? crypto.randomUUID();
+  const correlationId = useMemo(
+    () => error.digest ?? crypto.randomUUID(),
+    [error],
+  );
 
   useEffect(() => {
     console.error("[dashboard] route render failed", {
