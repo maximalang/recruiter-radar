@@ -143,13 +143,16 @@ export function EmptyState({
   title,
   description,
   action,
+  leading,
 }: {
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
+  leading?: ReactNode;
 }) {
   return (
     <section className={styles.emptyState} data-ui="empty-state">
+      {leading}
       <h2>{title}</h2>
       {description ? <p>{description}</p> : null}
       {action}
