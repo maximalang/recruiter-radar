@@ -1,76 +1,46 @@
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 
+const appRoot = path.resolve('apps/web/app');
 const extensions = new Set(['.css', '.tsx', '.ts']);
-const tokenSource = /(?:^|\/)(?:globals|product-visual-system)\.css$|tokens?/;
+const tokenSources = new Set([
+  path.resolve('apps/web/app/globals.css'),
+  path.resolve('apps/web/app/product-visual-system.css'),
+]);
 const rawColorLiteral = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)|\bhwb\([^)]*\)/g;
+const bannedTokenNamespace = /--(?:c|rr)-[a-z0-9-]+/gi;
 
-function git(args, options = {}) {
-  return execFileSync('git', args, {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    ...options,
-  }).trim();
+function sourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory()) return sourceFiles(absolute);
+    return extensions.has(path.extname(entry.name)) ? [absolute] : [];
+  });
 }
 
-function extension(path) {
-  return path.slice(path.lastIndexOf('.'));
+function relative(file) {
+  return path.relative(process.cwd(), file).replaceAll(path.sep, '/');
 }
-
-function literals(text) {
-  return text.match(rawColorLiteral) ?? [];
-}
-
-function counts(values) {
-  const result = new Map();
-  for (const value of values) result.set(value, (result.get(value) ?? 0) + 1);
-  return result;
-}
-
-function readBaseFile(baseRef, path) {
-  try {
-    return git(['show', `${baseRef}:${path}`]);
-  } catch {
-    return '';
-  }
-}
-
-const baseBranch = process.env.GITHUB_BASE_REF?.trim() || 'main';
-const baseRef = `origin/${baseBranch}`;
-
-try {
-  git(['rev-parse', '--verify', baseRef]);
-} catch {
-  console.error(`Unable to resolve visual-contract base ref: ${baseRef}`);
-  process.exit(1);
-}
-
-const changed = git(['diff', '--name-only', '--diff-filter=ACMR', `${baseRef}...HEAD`, '--', 'apps/web/app'])
-  .split('\n')
-  .map((path) => path.trim())
-  .filter(Boolean)
-  .filter((path) => extensions.has(extension(path)))
-  .filter((path) => !tokenSource.test(path));
 
 const failures = [];
-for (const file of changed) {
-  const currentCounts = counts(literals(readFileSync(file, 'utf8')));
-  const baseCounts = counts(literals(readBaseFile(baseRef, file)));
+for (const file of sourceFiles(appRoot)) {
+  const content = readFileSync(file, 'utf8');
 
-  for (const [literal, count] of currentCounts) {
-    const baselineCount = baseCounts.get(literal) ?? 0;
-    if (count > baselineCount) {
-      failures.push({ file, literal, added: count - baselineCount });
-    }
+  for (const token of new Set(content.match(bannedTokenNamespace) ?? [])) {
+    failures.push(`${relative(file)}: banned token namespace ${token}`);
+  }
+
+  if (tokenSources.has(file)) continue;
+
+  for (const literal of new Set(content.match(rawColorLiteral) ?? [])) {
+    failures.push(`${relative(file)}: hardcoded color ${literal}`);
   }
 }
 
 if (failures.length) {
-  console.error('New hardcoded color literals detected outside semantic token sources:');
-  for (const failure of failures) {
-    console.error(`- ${failure.file}: ${failure.literal} (+${failure.added})`);
-  }
+  console.error('Semantic visual contract failed. Components must use canonical tokens; palette literals belong only in token sources.');
+  for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log(`Visual color contract passed for ${changed.length} changed UI source files.`);
+console.log('Semantic visual contract passed: no --c-*/--rr-* tokens and no component-level color literals.');
