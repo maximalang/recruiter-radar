@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 type RetryAction = {
   label: string;
@@ -25,9 +25,11 @@ export function ProductErrorState({
   retryAction,
   children,
 }: ProductErrorStateProps) {
+  const titleId = useId();
+
   return (
-    <section role="alert" aria-labelledby="product-error-title">
-      <h2 id="product-error-title">{title}</h2>
+    <section role="alert" aria-labelledby={titleId}>
+      <h2 id={titleId}>{title}</h2>
       <p>{description}</p>
       {correlationId ? <small>Код обращения: {correlationId}</small> : null}
       {retryAction ? (
