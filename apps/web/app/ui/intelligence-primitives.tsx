@@ -8,6 +8,9 @@ import styles from "./intelligence-primitives.module.css";
 
 type ConfidenceLevel = "high" | "medium" | "low";
 
+type SectionProps = HTMLAttributes<HTMLElement>;
+type DecisionBriefProps = Omit<SectionProps, "title"> & { title?: ReactNode };
+
 function classes(base: string, custom?: string) {
   return custom ? `${base} ${custom}` : base;
 }
@@ -58,15 +61,16 @@ export function WorkspaceHeader({
 export function Zone({
   className,
   children,
+  label,
   "aria-label": ariaLabel,
   ...props
-}: HTMLAttributes<HTMLElement>) {
+}: SectionProps & { label?: string }) {
   return (
     <section
       {...props}
       className={classes(styles.zone, className)}
       data-ui="zone"
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? label}
     >
       {children}
     </section>
@@ -85,7 +89,7 @@ export function DataRow({ className, children, ...props }: HTMLAttributes<HTMLDi
   );
 }
 
-export function LeadRow({ className, children, ...props }: HTMLAttributes<HTMLElement>) {
+export function LeadRow({ className, children, ...props }: SectionProps) {
   return (
     <article {...props} className={classes(styles.leadRow, className)} data-ui="lead-row">
       {children}
@@ -93,12 +97,7 @@ export function LeadRow({ className, children, ...props }: HTMLAttributes<HTMLEl
   );
 }
 
-export function DecisionBrief({
-  className,
-  children,
-  title,
-  ...props
-}: HTMLAttributes<HTMLElement> & { title?: ReactNode }) {
+export function DecisionBrief({ className, children, title, ...props }: DecisionBriefProps) {
   return (
     <section {...props} className={classes(styles.decisionBrief, className)} data-ui="decision-brief">
       {title ? <h2 className={styles.decisionBriefTitle}>{title}</h2> : null}
@@ -123,7 +122,7 @@ export function EvidenceTimeline({ className, children, ...props }: HTMLAttribut
   );
 }
 
-export function Provenance({ className, children, ...props }: HTMLAttributes<HTMLElement>) {
+export function Provenance({ className, children, ...props }: SectionProps) {
   return (
     <footer {...props} className={classes(styles.provenance, className)} data-ui="provenance">
       {children}
@@ -161,16 +160,17 @@ export function ConfidenceIndicator({
 export function FilterBar({
   className,
   children,
-  "aria-label": ariaLabel = "Фильтры",
+  label = "Фильтры",
+  "aria-label": ariaLabel,
   ...props
-}: HTMLAttributes<HTMLDivElement>) {
+}: HTMLAttributes<HTMLDivElement> & { label?: string }) {
   return (
     <div
       {...props}
       className={classes(styles.filterBar, className)}
       data-ui="filter-bar"
       role="group"
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? label}
     >
       {children}
     </div>
@@ -192,15 +192,16 @@ export function SearchField({
 export function ContextPane({
   className,
   children,
+  label,
   "aria-label": ariaLabel,
   ...props
-}: HTMLAttributes<HTMLElement>) {
+}: SectionProps & { label?: string }) {
   return (
     <aside
       {...props}
       className={classes(styles.contextPane, className)}
       data-ui="context-pane"
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? label}
     >
       {children}
     </aside>
