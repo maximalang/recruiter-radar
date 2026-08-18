@@ -30,11 +30,11 @@ import {
   getOpportunityDataAccessContext,
 } from '@/lib/opportunities/authorization'
 import {
-  EmptyState,
-  ErrorState,
   InternalPageFrame,
   InternalPageHeader,
 } from '../ui/internal-page'
+import { ProductErrorState } from '../ui/product-error-state'
+import { StaticEmptyState } from '../ui/static-empty-state'
 import { SituationRow } from './situation-row'
 import { OpportunityFunnel } from './opportunity-funnel'
 import { OpportunityResearchMode } from './opportunity-research-mode'
@@ -51,6 +51,10 @@ export const metadata: Metadata = {
 }
 
 const NAVIGATION = buildOpportunityNavigation()
+
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>
+}
 
 export default async function OpportunitiesPage(props: {
   searchParams: Promise<{
@@ -78,10 +82,10 @@ export default async function OpportunitiesPage(props: {
           title="Ситуации"
           subtitle="Изменяющиеся hiring-эпизоды и подтверждения, которые создают окно для контакта."
         />
-        <EmptyState
+        <StaticEmptyState
           title="Нет доступа к ситуациям"
-          text="Войдите в аккаунт с доступом к рабочему пространству или запросите подходящую роль."
-          action={{ href: '/login', label: 'Войти' }}
+          description="Войдите в аккаунт с доступом к рабочему пространству или запросите подходящую роль."
+          action={<StateLink href="/login" label="Войти" />}
         />
       </InternalPageFrame>
     )
@@ -156,11 +160,12 @@ export default async function OpportunitiesPage(props: {
     return (
       <InternalPageFrame navItems={NAVIGATION}>
         <InternalPageHeader title="Ситуации" />
-        <ErrorState
+        <ProductErrorState
           title="Ситуации временно не загрузились"
           description="Данные других аккаунтов не показываются. Обновите страницу через минуту."
-          action={{ href: '/opportunities', label: 'Обновить' }}
-        />
+        >
+          <StateLink href="/opportunities" label="Обновить" />
+        </ProductErrorState>
       </InternalPageFrame>
     )
   }
@@ -230,16 +235,16 @@ export default async function OpportunitiesPage(props: {
             ))}
           </div>
         ) : isNarrowedResult(view, workflowEnabled, query, confidenceGate) ? (
-          <EmptyState
+          <StaticEmptyState
             title="В выбранном срезе пока нет ситуаций"
-            text="Выберите другой рабочий контур или сбросьте условия режима исследования."
-            action={{ href: '/opportunities', label: 'Показать активные ситуации' }}
+            description="Выберите другой рабочий контур или сбросьте условия режима исследования."
+            action={<StateLink href="/opportunities" label="Показать активные ситуации" />}
           />
         ) : (
-          <EmptyState
+          <StaticEmptyState
             title="Подтверждённых ситуаций пока нет"
-            text="Новая ситуация появится, когда сигналы сложатся в достаточно подтверждённое коммерческое окно."
-            action={{ href: '/leads', label: 'Открыть компании' }}
+            description="Новая ситуация появится, когда сигналы сложатся в достаточно подтверждённое коммерческое окно."
+            action={<StateLink href="/leads" label="Открыть компании" />}
           />
         )}
       </div>
