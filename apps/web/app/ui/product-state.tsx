@@ -7,8 +7,8 @@ export function StaticEmptyState(props: {
   action?: { href: string; label: string };
 }) {
   return (
-    <section aria-labelledby="empty-state-title">
-      <h2 id="empty-state-title">{props.title}</h2>
+    <section aria-label={props.title}>
+      <h2>{props.title}</h2>
       {props.text ? <p>{props.text}</p> : null}
       {props.action ? (
         <Link href={props.action.href}>{props.action.label}</Link>
@@ -24,8 +24,8 @@ export function ProductErrorState(props: {
   retryAction?: { label: string; onClick: () => void };
 }) {
   return (
-    <section role="alert" aria-labelledby="product-error-title">
-      <h2 id="product-error-title">{props.title}</h2>
+    <section role="alert" aria-label={props.title}>
+      <h2>{props.title}</h2>
       {props.description ? <p>{props.description}</p> : null}
       {props.action ? (
         <Link href={props.action.href}>{props.action.label}</Link>
