@@ -39,8 +39,10 @@ describe('Recruiter Radar V1-V6 visual contract', () => {
       { label: 'Radar organizationDiamond', regex: /\borganizationDiamond\b/g },
       { label: 'Radar scoreGrid', regex: /\bscoreGrid\b/g },
       { label: 'old Dashboard label', regex: /Дашборд/g },
+      { label: 'old Opportunities entity label', regex: /\bВозможности\b/g },
       { label: 'old Command Center label', regex: /Командный центр/g },
       { label: 'old Demand Map label', regex: /Карта спроса/g },
+      { label: 'old confidence gate copy', regex: /уверенност(?:ь|ью)\s+[ABCD]\b/gi },
     ]
     const failures: string[] = []
 
