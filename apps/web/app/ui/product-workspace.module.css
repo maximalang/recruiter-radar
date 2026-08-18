@@ -1,8 +1,8 @@
 .workspace {
   --workspace-shell-height: 56px;
   min-height: 100vh;
-  background: var(--rr-color-canvas);
-  color: var(--rr-color-text-primary);
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
 }
 
 .skipLink {
@@ -14,10 +14,10 @@
   display: inline-flex;
   align-items: center;
   padding: 0 12px;
-  border-radius: var(--rr-radius-control);
-  background: var(--rr-color-text-primary);
-  color: var(--rr-color-text-inverse);
-  font-size: var(--rr-type-metadata-size);
+  border-radius: var(--radius-control);
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--type-metadata-size);
   font-weight: 600;
   text-decoration: none;
   transform: translateY(calc(-100% - 16px));
@@ -37,8 +37,8 @@
   align-items: center;
   gap: clamp(20px, 3vw, 44px);
   padding: 0 clamp(20px, 3vw, 48px);
-  border-bottom: 1px solid var(--rr-color-separator);
-  background: color-mix(in srgb, var(--rr-color-canvas) 94%, transparent);
+  border-bottom: 1px solid var(--color-separator);
+  background: color-mix(in srgb, var(--color-canvas) 94%, transparent);
   backdrop-filter: blur(12px);
 }
 
@@ -65,25 +65,25 @@
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
-  border-radius: var(--rr-radius-control);
-  color: var(--rr-color-text-tertiary);
-  font-size: var(--rr-type-metadata-size);
+  border-radius: var(--radius-control);
+  color: var(--color-text-tertiary);
+  font-size: var(--type-metadata-size);
   font-weight: 560;
   text-decoration: none;
   transition:
-    color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .primaryNavItem:hover,
 .accountLink:hover {
-  background: var(--rr-color-surface-secondary);
-  color: var(--rr-color-text-primary);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
 }
 
 .primaryNavItem[data-active="true"],
 .accountLink[data-active="true"] {
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
   font-weight: 650;
 }
 
@@ -94,7 +94,7 @@
   bottom: 0;
   left: 10px;
   height: 2px;
-  background: var(--rr-color-signal);
+  background: var(--color-signal);
   content: "";
 }
 
@@ -104,7 +104,7 @@
 .mobileNavItem:focus-visible,
 .mobileMore summary:focus-visible,
 .mobileMoreMenu a:focus-visible {
-  outline: 2px solid var(--rr-color-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
   transition: none;
 }
@@ -134,7 +134,7 @@
   gap: 32px;
   margin-bottom: 32px;
   padding-bottom: 24px;
-  border-bottom: 1px solid var(--rr-color-separator);
+  border-bottom: 1px solid var(--color-separator);
 }
 
 .pageHeaderCopy {
@@ -144,8 +144,8 @@
 .pageEyebrow {
   display: block;
   margin-bottom: 8px;
-  color: var(--rr-color-text-tertiary);
-  font-size: var(--rr-type-label-size);
+  color: var(--color-text-tertiary);
+  font-size: var(--type-label-size);
   font-weight: 600;
   letter-spacing: .01em;
 }
@@ -153,8 +153,8 @@
 .pageHeader h1 {
   max-width: 760px;
   margin: 0;
-  color: var(--rr-color-text-primary);
-  font-size: var(--rr-type-page-size);
+  color: var(--color-text-primary);
+  font-size: var(--type-page-size);
   font-weight: 590;
   letter-spacing: -.04em;
   line-height: 1.1;
@@ -163,8 +163,8 @@
 .pageHeader p {
   max-width: 650px;
   margin: 10px 0 0;
-  color: var(--rr-color-text-secondary);
-  font-size: var(--rr-type-body-size);
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.53;
 }
 
@@ -178,8 +178,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--rr-color-text-secondary);
-  font-size: var(--rr-type-metadata-size);
+  color: var(--color-text-secondary);
+  font-size: var(--type-metadata-size);
   font-weight: 550;
 }
 
@@ -187,7 +187,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--rr-color-signal);
+  background: var(--color-signal);
   content: "";
 }
 
@@ -207,9 +207,9 @@
   justify-content: space-between;
   gap: 20px;
   padding: 12px clamp(20px, 3vw, 48px);
-  border-top: 1px solid var(--rr-color-separator);
-  color: var(--rr-color-text-tertiary);
-  font-size: var(--rr-type-metadata-size);
+  border-top: 1px solid var(--color-separator);
+  color: var(--color-text-tertiary);
+  font-size: var(--type-metadata-size);
 }
 
 .productFooterBrand,
@@ -222,7 +222,7 @@
 }
 
 .productFooterBrand {
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
   font-weight: 650;
 }
 
@@ -234,7 +234,7 @@
 }
 
 .productFooter a:hover {
-  color: var(--rr-color-signal-hover);
+  color: var(--color-signal-hover);
 }
 
 .mobileNav {
@@ -290,8 +290,8 @@
     display: flex;
     align-items: center;
     padding: 8px 16px;
-    border-bottom: 1px solid var(--rr-color-separator);
-    background: color-mix(in srgb, var(--rr-color-canvas) 95%, transparent);
+    border-bottom: 1px solid var(--color-separator);
+    background: color-mix(in srgb, var(--color-canvas) 95%, transparent);
     backdrop-filter: blur(10px);
   }
 
@@ -327,8 +327,8 @@
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     padding: 5px max(4px, env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
-    border-top: 1px solid var(--rr-color-separator-strong);
-    background: color-mix(in srgb, var(--rr-color-canvas) 97%, transparent);
+    border-top: 1px solid var(--color-separator-strong);
+    background: color-mix(in srgb, var(--color-canvas) 97%, transparent);
     backdrop-filter: blur(12px);
   }
 
@@ -346,7 +346,7 @@
     border: 0;
     border-radius: 0;
     background: transparent;
-    color: var(--rr-color-text-tertiary);
+    color: var(--color-text-tertiary);
     font-size: clamp(.58rem, 2.7vw, .68rem);
     font-weight: 600;
     line-height: 1.1;
@@ -357,7 +357,7 @@
   .mobileNavItem[data-active="true"],
   .mobileMore[data-active="true"] summary,
   .mobileMore[open] summary {
-    color: var(--rr-color-text-primary);
+    color: var(--color-text-primary);
   }
 
   .mobileNavItem[data-active="true"]::before,
@@ -367,7 +367,7 @@
     right: 20%;
     left: 20%;
     height: 2px;
-    background: var(--rr-color-signal);
+    background: var(--color-signal);
     content: "";
   }
 
@@ -379,7 +379,7 @@
 
   .mobileNavItem[data-active="true"] .mobileNavIcon,
   .mobileMore[data-active="true"] .mobileNavIcon {
-    color: var(--rr-color-signal);
+    color: var(--color-signal);
   }
 
   .mobileMore summary::-webkit-details-marker {
@@ -393,10 +393,10 @@
     width: min(250px, calc(100vw - 16px));
     display: grid;
     padding: 8px;
-    border: 1px solid var(--rr-color-separator-strong);
-    border-radius: var(--rr-radius-overlay);
-    background: var(--rr-color-surface-elevated);
-    box-shadow: var(--rr-shadow-float);
+    border: 1px solid var(--color-separator-strong);
+    border-radius: var(--radius-overlay);
+    background: var(--color-surface-elevated);
+    box-shadow: var(--shadow-float);
   }
 
   .mobileMoreMenu a {
@@ -404,14 +404,14 @@
     display: flex;
     align-items: center;
     padding: 0 12px;
-    border-radius: var(--rr-radius-control);
-    color: var(--rr-color-text-primary);
+    border-radius: var(--radius-control);
+    color: var(--color-text-primary);
     font-size: .82rem;
     text-decoration: none;
   }
 
   .mobileMoreMenu a:hover {
-    background: var(--rr-color-surface-secondary);
+    background: var(--color-surface-secondary);
   }
 
   .pageHeader {

@@ -51,14 +51,14 @@ function Row({ setting }: { setting: LlmSettingView }) {
         display: "grid",
         gap: "8px",
         padding: "12px",
-        border: "1px solid var(--rr-color-separator)",
+        border: "1px solid var(--color-separator)",
         borderRadius: "12px",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>{label}</div>
-          <div style={{ fontSize: "0.74rem", color: "var(--rr-color-text-tertiary)" }}>
+          <div style={{ fontSize: "0.74rem", color: "var(--color-text-tertiary)" }}>
             <code>{setting.key}</code> · {setting.isSet ? `сохранено${setting.isSecret ? `: ${setting.value}` : `: ${setting.value}`}` : "не задано (env по умолчанию)"}
           </div>
         </div>
@@ -70,8 +70,8 @@ function Row({ setting }: { setting: LlmSettingView }) {
               disabled={clearPending}
               style={{
                 background: "transparent",
-                color: "var(--rr-color-text-tertiary)",
-                border: "1px solid var(--rr-color-separator)",
+                color: "var(--color-text-tertiary)",
+                border: "1px solid var(--color-separator)",
                 borderRadius: "8px",
                 padding: "6px 12px",
                 fontSize: "0.8rem",
@@ -94,9 +94,9 @@ function Row({ setting }: { setting: LlmSettingView }) {
           style={{
             flex: 1,
             minWidth: "220px",
-            fontSize: "var(--rr-type-body-size)",
+            fontSize: "var(--type-body-size)",
             padding: "8px 12px",
-            border: "1px solid var(--rr-color-separator)",
+            border: "1px solid var(--color-separator)",
             borderRadius: "10px",
             fontFamily: setting.isSecret ? "monospace" : undefined,
           }}
@@ -105,12 +105,12 @@ function Row({ setting }: { setting: LlmSettingView }) {
           type="submit"
           disabled={savePending || value.trim() === ""}
           style={{
-            background: "var(--rr-color-signal)",
+            background: "var(--color-signal)",
             color: "#fff",
             padding: "8px 16px",
             borderRadius: "10px",
             fontWeight: 600,
-            fontSize: "var(--rr-type-body-size)",
+            fontSize: "var(--type-body-size)",
             border: "none",
             cursor: savePending ? "wait" : "pointer",
             opacity: savePending || value.trim() === "" ? 0.6 : 1,
@@ -143,7 +143,7 @@ export default function AdminLlmConfigForm({ settings }: { settings: LlmSettingV
       {settings.map((s) => (
         <Row key={s.key} setting={s} />
       ))}
-      <p style={{ fontSize: "0.76rem", color: "var(--rr-color-text-tertiary)", margin: 0 }}>
+      <p style={{ fontSize: "0.76rem", color: "var(--color-text-tertiary)", margin: 0 }}>
         Приоритет: значение из панели → env (OPENAI_API_KEY / OPENAI_BASE_URL /
         CODEXOID_MODEL). Изменения вступают в силу сразу, без редеплоя. API-ключ
         хранится маскированно и не попадает в логи.

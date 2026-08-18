@@ -62,7 +62,7 @@ export default function AdminUserActions({ userId, workspaceId, profileActive, t
 
 function ProfileEditForm({ userId, workspaceId, profile }: { userId: string; workspaceId: string | null; profile: NonNullable<Parameters<typeof AdminUserActions>[0]['profile']> }) {
   const [state, formAction, pending] = useActionState(adminUpdateClientProfile, initial);
-  return <details style={{ borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
+  return <details style={{ borderTop: '1px solid var(--color-separator)', paddingTop: 12 }}>
     <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Изменить настройки клиента</summary>
     <form action={formAction} style={{ display: 'grid', gap: 10, marginTop: 12 }}>
       <input type="hidden" name="userId" value={userId} />
@@ -86,7 +86,7 @@ function ProfileEditForm({ userId, workspaceId, profile }: { userId: string; wor
 }
 
 function OptionChecks({ legend, name, options, selected }: { legend: string; name: string; options: readonly { key: string; label: string }[]; selected: string[] }) {
-  return <fieldset style={{ border: '1px solid #e2e8f0', borderRadius: 8 }}><legend>{legend}</legend><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+  return <fieldset style={{ border: '1px solid var(--color-separator)', borderRadius: 8 }}><legend>{legend}</legend><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
     {options.map((option) => <label key={option.key} style={{ fontSize: '0.78rem' }}><input type="checkbox" name={name} value={option.key} defaultChecked={selected.includes(option.key)} /> {option.label}</label>)}
   </div></fieldset>;
 }
@@ -100,12 +100,12 @@ function ActionForm({ userId, workspaceId, action, label, danger = false }: { us
   return <form action={formAction} onSubmit={(event) => { if (danger && !window.confirm(`Подтвердите действие: ${label}`)) event.preventDefault(); }} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
     <input type="hidden" name="userId" value={userId} />
     {workspaceId ? <input type="hidden" name="workspaceId" value={workspaceId} /> : null}
-    <button disabled={pending} style={buttonStyle(danger ? "#b42318" : "#475569")}>{pending ? "Выполняем…" : label}</button>
+    <button disabled={pending} style={buttonStyle(danger ? "#b42318" : "var(--color-text-secondary)")}>{pending ? "Выполняем…" : label}</button>
     {state.message ? <Result state={state} /> : null}
   </form>;
 }
 
 function Result({ state }: { state: State }) { return <span role="status" style={{ color: state.ok ? "#065f46" : "#b42318", fontSize: "0.8rem" }}>{state.message}</span>; }
-const labelStyle = { display: "grid", gap: 4, fontSize: "0.78rem", color: "#475569" };
-const controlStyle = { minHeight: 40, border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 8px", background: "#fff" };
+const labelStyle = { display: "grid", gap: 4, fontSize: "0.78rem", color: "var(--color-text-secondary)" };
+const controlStyle = { minHeight: 40, border: "1px solid var(--color-separator-strong)", borderRadius: 8, padding: "6px 8px", background: "#fff" };
 const buttonStyle = (background: string) => ({ minHeight: 40, border: 0, borderRadius: 8, padding: "8px 12px", background, color: "#fff", fontWeight: 700, cursor: "pointer" });

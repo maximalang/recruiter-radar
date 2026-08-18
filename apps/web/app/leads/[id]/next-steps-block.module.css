@@ -7,8 +7,8 @@
 }
 
 .nextStepsLabel {
-  color: var(--rr-color-text-tertiary);
-  font-size: var(--rr-type-label-size);
+  color: var(--color-text-tertiary);
+  font-size: var(--type-label-size);
   font-weight: 600;
 }
 
@@ -26,17 +26,17 @@
   align-items: center;
   gap: 6px;
   box-sizing: border-box;
-  border: 1px solid var(--rr-color-separator);
-  border-radius: var(--rr-radius-control);
-  background-color: var(--rr-color-surface-primary);
-  color: var(--rr-color-text-secondary);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: var(--rr-type-metadata-size);
+  font-size: var(--type-metadata-size);
   text-decoration: none;
   transition:
-    color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    border-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .nextStepsLink {
@@ -51,14 +51,14 @@
 
 .nextStepsLink:hover,
 .nextStepsBtn:hover {
-  border-color: var(--rr-color-signal);
-  color: var(--rr-color-signal);
+  border-color: var(--color-signal);
+  color: var(--color-signal);
 }
 
 .nextStepsLink:focus-visible,
 .nextStepsBtn:focus-visible,
 .nextStepsPreview > summary:focus-visible {
-  outline: 2px solid var(--rr-color-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -71,9 +71,9 @@
 }
 
 .nextStepsBtn[data-variant="primary"] {
-  border-color: var(--rr-color-signal);
-  background-color: var(--rr-color-signal-soft);
-  color: var(--rr-color-signal);
+  border-color: var(--color-signal);
+  background-color: var(--color-signal-soft);
+  color: var(--color-signal);
 }
 
 .nextStepsBtn:disabled {
@@ -83,8 +83,8 @@
 
 .nextStepsError {
   margin: 0;
-  color: var(--rr-color-destructive);
-  font-size: var(--rr-type-metadata-size);
+  color: var(--color-destructive);
+  font-size: var(--type-metadata-size);
 }
 
 .nextStepsPreview {
@@ -95,21 +95,21 @@
   min-height: 40px;
   display: flex;
   align-items: center;
-  color: var(--rr-color-text-tertiary);
+  color: var(--color-text-tertiary);
   cursor: pointer;
-  font-size: var(--rr-type-metadata-size);
+  font-size: var(--type-metadata-size);
   user-select: none;
 }
 
 .nextStepsPre {
   margin: 6px 0 0;
   padding: 10px 12px;
-  border: 1px solid var(--rr-color-separator);
-  border-radius: var(--rr-radius-control);
-  background-color: var(--rr-color-canvas);
-  color: var(--rr-color-text-secondary);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-canvas);
+  color: var(--color-text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--rr-type-metadata-size);
+  font-size: var(--type-metadata-size);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;

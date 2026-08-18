@@ -16,12 +16,12 @@
 .title {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
 }
 
 .count {
   font-size: 0.85rem;
-  color: var(--rr-color-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .barTrack {
@@ -34,7 +34,7 @@
 .barFill {
   height: 100%;
   border-radius: 999px;
-  background: var(--rr-color-signal);
+  background: var(--color-signal);
   transition: width 0.3s ease;
 }
 
@@ -56,11 +56,11 @@
   align-items: center;
   gap: 6px;
   font-size: 0.85rem;
-  color: var(--rr-color-text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 .checkItem[data-filled] {
-  color: var(--rr-color-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 /* Checklist icon — inline-SVG, sized to the item text, tone via currentColor.
@@ -91,7 +91,7 @@
   width: 0.95em;
   height: 0.95em;
   vertical-align: -0.1em;
-  color: var(--rr-color-text-tertiary);
+  color: var(--color-text-tertiary);
   margin-right: 2px;
 }
 
@@ -104,16 +104,16 @@
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.5;
-  color: var(--rr-color-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .previewText strong {
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
 }
 
 .previewEmpty {
   margin: 0;
   font-size: 0.88rem;
   line-height: 1.5;
-  color: var(--rr-color-text-tertiary);
+  color: var(--color-text-tertiary);
 }

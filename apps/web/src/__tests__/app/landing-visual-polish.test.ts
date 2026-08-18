@@ -29,8 +29,8 @@ describe("polished unified landing visual contract", () => {
     expect(heroScene).not.toContain("HeroInstrument");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);
-    expect(sceneStyles).toContain("var(--rr-color-canvas)");
-    expect(sceneStyles).toContain("var(--rr-color-signal)");
+    expect(sceneStyles).toContain("var(--color-canvas)");
+    expect(sceneStyles).toContain("var(--color-signal)");
     expect(sceneStyles).not.toMatch(/animation\s*:/);
     expect(sceneStyles).not.toContain("translateY(-1px)");
     expect(landingStyles).not.toMatch(/\.(detectionScene|detectionField|detectionCopy|detectionLock|detectionFooter|instrumentCaption)/);

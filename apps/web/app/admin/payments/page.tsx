@@ -224,7 +224,7 @@ function formatDate(value: string | null): string {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ padding: 14, border: "1px solid rgba(15,23,42,.1)", borderRadius: 12 }}>
-      <div style={{ color: "#667085", fontSize: ".75rem" }}>{label}</div>
+      <div style={{ color: "var(--color-text-tertiary)", fontSize: ".75rem" }}>{label}</div>
       <strong style={{ display: "block", marginTop: 5, fontSize: "1.05rem" }}>{value}</strong>
     </div>
   );

@@ -1,77 +1,68 @@
 :root {
-  --rr-color-canvas: #ece9e1;
-  --rr-color-surface-primary: #f8f6f0;
-  --rr-color-surface-secondary: #f1eee6;
-  --rr-color-surface-selected: #e4efeb;
-  --rr-color-surface-elevated: #fffdf8;
-  --rr-color-text-primary: #14201c;
-  --rr-color-text-secondary: #4e5c55;
-  --rr-color-text-tertiary: #5c6862;
-  --rr-color-text-disabled: #8f9893;
-  --rr-color-text-inverse: #f4f1e9;
-  --rr-color-separator-subtle: #e2e0d9;
-  --rr-color-separator: #d7d6cf;
-  --rr-color-separator-strong: #b7bcb8;
-  --rr-color-signal: #2f7467;
-  --rr-color-signal-hover: #245b51;
-  --rr-color-signal-soft: #e4efeb;
-  --rr-color-copper: #8e5d42;
-  --rr-color-positive: #2e6b4d;
-  --rr-color-warning: #8a5a1f;
-  --rr-color-destructive: #a33d36;
-  --rr-color-information: #3f687a;
-  --rr-color-confidence-high: #416f5c;
-  --rr-color-confidence-medium: #75663d;
-  --rr-color-confidence-low: #707975;
-  --rr-color-focus: #1e6d60;
-  --rr-color-selection: #d5e7e1;
-  --rr-color-overlay: rgba(14, 21, 19, 0.52);
+  --color-canvas: #ece9e1;
+  --color-surface-primary: #f8f6f0;
+  --color-surface-secondary: #f1eee6;
+  --color-surface-selected: #e4efeb;
+  --color-surface-elevated: #fffdf8;
+  --color-text-primary: #14201c;
+  --color-text-secondary: #4e5c55;
+  --color-text-tertiary: #5c6862;
+  --color-text-disabled: #8f9893;
+  --color-text-inverse: #f4f1e9;
+  --color-separator-subtle: #e2e0d9;
+  --color-separator: #d7d6cf;
+  --color-separator-strong: #b7bcb8;
+  --color-signal: #2f7467;
+  --color-signal-hover: #245b51;
+  --color-signal-soft: #e4efeb;
+  --color-copper: #8e5d42;
+  --color-positive: #2e6b4d;
+  --color-warning: #8a5a1f;
+  --color-destructive: #a33d36;
+  --color-information: #3f687a;
+  --color-confidence-high: #416f5c;
+  --color-confidence-medium: #75663d;
+  --color-confidence-low: #707975;
+  --color-focus: #1e6d60;
+  --color-selection: #d5e7e1;
+  --color-overlay: rgba(14, 21, 19, 0.52);
+--color-surface-primary: var(--color-surface-primary);
+--color-surface-selected: var(--color-surface-selected);
+--color-text-primary: var(--color-text-primary);
+--color-text-tertiary: var(--color-text-tertiary);
+--color-signal: var(--color-signal);
+--color-confidence-medium: var(--color-confidence-medium);
+--font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-plex-mono, "IBM Plex Mono"), "SFMono-Regular", Consolas, monospace;
 
-  --color-canvas: var(--rr-color-canvas);
-  --color-surface-primary: var(--rr-color-surface-primary);
-  --color-surface-secondary: var(--rr-color-surface-secondary);
-  --color-surface-selected: var(--rr-color-surface-selected);
-  --color-surface-elevated: var(--rr-color-surface-elevated);
-  --color-text-primary: var(--rr-color-text-primary);
-  --color-text-secondary: var(--rr-color-text-secondary);
-  --color-text-tertiary: var(--rr-color-text-tertiary);
-  --color-separator: var(--rr-color-separator);
-  --color-signal: var(--rr-color-signal);
-  --color-confidence-high: var(--rr-color-confidence-high);
-  --color-confidence-medium: var(--rr-color-confidence-medium);
-  --color-confidence-low: var(--rr-color-confidence-low);
+  --type-display-size: clamp(3rem, 6vw, 5rem);
+  --type-page-size: clamp(2rem, 3.2vw, 2.5rem);
+  --type-section-size: clamp(1.5rem, 2.3vw, 1.75rem);
+  --type-subsection-size: 1.25rem;
+  --type-object-size: 1.0625rem;
+  --type-body-size: 0.9375rem;
+  --type-metadata-size: 0.8125rem;
+  --type-label-size: 0.75rem;
+  --type-data-size: 0.875rem;
+  --type-data-large-size: 1.75rem;
 
-  --rr-font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --rr-font-mono: var(--font-plex-mono, "IBM Plex Mono"), "SFMono-Regular", Consolas, monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
 
-  --rr-type-display-size: clamp(3rem, 6vw, 5rem);
-  --rr-type-page-size: clamp(2rem, 3.2vw, 2.5rem);
-  --rr-type-section-size: clamp(1.5rem, 2.3vw, 1.75rem);
-  --rr-type-subsection-size: 1.25rem;
-  --rr-type-object-size: 1.0625rem;
-  --rr-type-body-size: 0.9375rem;
-  --rr-type-metadata-size: 0.8125rem;
-  --rr-type-label-size: 0.75rem;
-  --rr-type-data-size: 0.875rem;
-  --rr-type-data-large-size: 1.75rem;
+  --radius-control: 8px;
+  --radius-surface: 10px;
+  --radius-overlay: 14px;
+  --radius-pill: 999px;
 
-  --rr-space-1: 4px;
-  --rr-space-2: 8px;
-  --rr-space-3: 12px;
-  --rr-space-4: 16px;
-  --rr-space-6: 24px;
-  --rr-space-8: 32px;
-  --rr-space-12: 48px;
-  --rr-space-16: 64px;
-  --rr-space-24: 96px;
-
-  --rr-radius-control: 8px;
-  --rr-radius-surface: 10px;
-  --rr-radius-overlay: 14px;
-  --rr-radius-pill: 999px;
-
-  --rr-shadow-float: 0 12px 32px rgba(14, 21, 19, 0.10), 0 2px 8px rgba(14, 21, 19, 0.05);
-  --rr-shadow-overlay: 0 24px 64px rgba(14, 21, 19, 0.18), 0 6px 18px rgba(14, 21, 19, 0.08);
+  --shadow-float: 0 12px 32px rgba(14, 21, 19, 0.10), 0 2px 8px rgba(14, 21, 19, 0.05);
+  --shadow-overlay: 0 24px 64px rgba(14, 21, 19, 0.18), 0 6px 18px rgba(14, 21, 19, 0.08);
 
   color-scheme: light;
   background: var(--color-canvas);
@@ -95,8 +86,8 @@ body {
   margin: 0;
   background: var(--color-canvas);
   color: var(--color-text-primary);
-  font-family: var(--rr-font-sans);
-  font-size: var(--rr-type-body-size);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
   line-height: 1.53;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
@@ -105,7 +96,7 @@ body {
 }
 
 ::selection {
-  background: var(--rr-color-selection);
+  background: var(--color-selection);
   color: var(--color-text-primary);
 }
 
@@ -126,7 +117,7 @@ summary {
 }
 
 :where(a, button, input, select, textarea, summary):focus-visible {
-  outline: 2px solid var(--rr-color-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 3px;
 }
 

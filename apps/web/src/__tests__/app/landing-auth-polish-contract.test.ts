@@ -40,8 +40,8 @@ describe("landing visual and login reliability polish", () => {
     expect(hero).not.toContain("HeroRadar");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);
-    expect(heroScene).toContain("var(--rr-color-canvas)");
-    expect(heroScene).toContain("var(--rr-color-signal)");
+    expect(heroScene).toContain("var(--color-canvas)");
+    expect(heroScene).toContain("var(--color-signal)");
     expect(heroScene).not.toMatch(/animation\s*:/);
     expect(heroScene).not.toContain("#c8f36a");
     expect(visual).not.toContain("data-hero-instrument");
@@ -92,8 +92,8 @@ describe("landing visual and login reliability polish", () => {
     const onboardingStyles = source("app/onboarding/onboarding.module.css");
 
     expect(onboarding).toContain('data-ui-system="recruiter-radar"');
-    expect(onboardingStyles).toContain("var(--rr-color-canvas)");
-    expect(onboardingStyles).toContain("var(--rr-color-signal)");
+    expect(onboardingStyles).toContain("var(--color-canvas)");
+    expect(onboardingStyles).toContain("var(--color-signal)");
     expect(onboardingStyles).not.toMatch(/Georgia|Times New Roman|serif/);
     expect(onboardingStyles).not.toMatch(/#(?:a85924|b8662e|ca7c38|bd7138)/i);
   });

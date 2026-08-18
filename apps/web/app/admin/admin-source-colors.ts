@@ -3,7 +3,7 @@ const SOURCE_COLORS: Record<string, string> = {
   'habr-career': '#7c3aed',
   'rabota-rossii': '#047857',
   superjob: '#b45309',
-  hh: '#64748b',
+  hh: 'var(--color-text-tertiary)',
 }
 
 const FALLBACK_PALETTE = [
@@ -12,7 +12,7 @@ const FALLBACK_PALETTE = [
   '#0369a1',
   '#a16207',
   '#6d28d9',
-  '#15803d',
+  'var(--color-positive)',
   '#c2410c',
 ] as const
 

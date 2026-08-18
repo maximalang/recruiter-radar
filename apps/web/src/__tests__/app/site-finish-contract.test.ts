@@ -56,9 +56,9 @@ describe("cross-route visual layer contract", () => {
   it("keeps pending auth actions on the paper/ink semantic foundation without a floating SaaS card", () => {
     const pendingAuth = readAppFile("auth/pending-auth-action.module.css");
 
-    expect(pendingAuth).toContain("background: var(--rr-color-canvas)");
-    expect(pendingAuth).toContain("outline: 2px solid var(--rr-color-focus)");
-    expect(pendingAuth).toContain("color: var(--rr-color-text-inverse)");
+    expect(pendingAuth).toContain("background: var(--color-canvas)");
+    expect(pendingAuth).toContain("outline: 2px solid var(--color-focus)");
+    expect(pendingAuth).toContain("color: var(--color-text-inverse)");
     expect(pendingAuth).toMatch(/\.card \{[\s\S]*?border-radius: 0;[\s\S]*?background: transparent;[\s\S]*?box-shadow: none;/);
     expect(pendingAuth).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
     expect(pendingAuth).not.toMatch(/rgba\(/gi);
@@ -68,12 +68,12 @@ describe("cross-route visual layer contract", () => {
     const feedback = readAppFile("leads/[id]/feedback-buttons.module.css");
 
     for (const token of [
-      "--rr-color-positive",
-      "--rr-color-warning",
-      "--rr-color-information",
-      "--rr-color-destructive",
-      "--rr-color-focus",
-      "--rr-color-text-inverse",
+      "--color-positive",
+      "--color-warning",
+      "--color-information",
+      "--color-destructive",
+      "--color-focus",
+      "--color-text-inverse",
     ]) {
       expect(feedback).toContain(token);
     }
@@ -85,11 +85,11 @@ describe("cross-route visual layer contract", () => {
   it("keeps Company Brief next actions on semantic motion, focus and target-size contracts", () => {
     const nextSteps = readAppFile("leads/[id]/next-steps-block.module.css");
 
-    expect(nextSteps).toContain("var(--rr-motion-duration-control)");
-    expect(nextSteps).toContain("var(--rr-motion-ease-standard)");
-    expect(nextSteps).toContain("outline: 2px solid var(--rr-color-focus)");
-    expect(nextSteps).toContain("background-color: var(--rr-color-signal-soft)");
-    expect(nextSteps).toContain("color: var(--rr-color-destructive)");
+    expect(nextSteps).toContain("var(--motion-duration-control)");
+    expect(nextSteps).toContain("var(--motion-ease-standard)");
+    expect(nextSteps).toContain("outline: 2px solid var(--color-focus)");
+    expect(nextSteps).toContain("background-color: var(--color-signal-soft)");
+    expect(nextSteps).toContain("color: var(--color-destructive)");
     expect(nextSteps).toContain("min-height: 40px");
     expect(nextSteps).toContain("min-height: 44px");
     expect(nextSteps).not.toContain("transition: all");
@@ -127,14 +127,14 @@ describe("cross-route visual layer contract", () => {
     expect(internalPage).not.toContain(".detailMain > .contentCard");
     expect(internalPage).not.toContain(".detailSidebar > .contentCard");
     expect(leads).toContain(".list{display:grid}");
-    expect(leads).toMatch(/\.row\{[\s\S]*?border-bottom:1px solid var\(--rr-color-separator\)/);
+    expect(leads).toMatch(/\.row\{[\s\S]*?border-bottom:1px solid var\(--color-separator\)/);
     expect(leads).not.toContain(".disclosure");
     expect(internalPage).not.toContain("signalLeadSections");
     expect(internalPage).not.toContain("scoreGauge");
     expect(internalPage).not.toContain("scoreBar");
     expect(opportunities).toMatch(/\.cardList \{[\s\S]*?gap: 0;/);
     expect(opportunities).toMatch(/\.decisionGrid \{[\s\S]*?border-radius: 0;/);
-    expect(radar).toMatch(/\.detailPanel \{[\s\S]*?border-left: 1px solid var\(--rr-color-separator-strong\);[\s\S]*?background: var\(--rr-color-surface-secondary\);/);
+    expect(radar).toMatch(/\.detailPanel \{[\s\S]*?border-left: 1px solid var\(--color-separator-strong\);[\s\S]*?background: var\(--color-surface-secondary\);/);
     expect(radar).toMatch(/\.canvas \{[\s\S]*?background: var\(--radar-field\);/);
   });
 });

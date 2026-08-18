@@ -8,7 +8,7 @@
   display: grid;
   gap: 16px;
   padding: 28px 0;
-  border-bottom: 1px solid var(--rr-color-separator);
+  border-bottom: 1px solid var(--color-separator);
 }
 
 .section:first-child {
@@ -22,8 +22,8 @@
 
 .sectionHeader h2 {
   margin: 0;
-  color: var(--rr-color-text-primary);
-  font-size: var(--rr-type-subsection-size);
+  color: var(--color-text-primary);
+  font-size: var(--type-subsection-size);
   font-weight: 620;
   letter-spacing: -.018em;
 }
@@ -32,19 +32,19 @@
 .muted {
   max-width: 62ch;
   margin: 0;
-  color: var(--rr-color-text-secondary);
-  font-size: var(--rr-type-body-size);
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.53;
 }
 
 .sectionContent {
   display: grid;
-  gap: var(--rr-space-4);
+  gap: var(--space-4);
 }
 
 .ledger {
   margin: 0;
-  border-top: 1px solid var(--rr-color-separator);
+  border-top: 1px solid var(--color-separator);
 }
 
 .ledger > div {
@@ -52,18 +52,18 @@
   grid-template-columns: minmax(150px, .45fr) minmax(0, 1fr);
   gap: 16px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--rr-color-separator-subtle);
+  border-bottom: 1px solid var(--color-separator-subtle);
 }
 
 .ledger dt {
-  color: var(--rr-color-text-tertiary);
-  font-size: var(--rr-type-metadata-size);
+  color: var(--color-text-tertiary);
+  font-size: var(--type-metadata-size);
 }
 
 .ledger dd {
   margin: 0;
-  color: var(--rr-color-text-primary);
-  font-size: var(--rr-type-data-size);
+  color: var(--color-text-primary);
+  font-size: var(--type-data-size);
   font-variant-numeric: tabular-nums;
 }
 
@@ -79,28 +79,28 @@
   align-items: center;
   justify-content: center;
   padding: 0 16px;
-  border: 1px solid var(--rr-color-signal);
-  border-radius: var(--rr-radius-control);
-  background: var(--rr-color-signal);
-  color: var(--rr-color-text-inverse);
-  font-size: var(--rr-type-body-size);
+  border: 1px solid var(--color-signal);
+  border-radius: var(--radius-control);
+  background: var(--color-signal);
+  color: var(--color-text-inverse);
+  font-size: var(--type-body-size);
   font-weight: 600;
   text-decoration: none;
 }
 
 .primaryAction:hover {
-  border-color: var(--rr-color-signal-hover);
-  background: var(--rr-color-signal-hover);
+  border-color: var(--color-signal-hover);
+  background: var(--color-signal-hover);
 }
 
 .primaryAction:focus-visible {
-  outline: 2px solid var(--rr-color-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
 .orders {
   display: grid;
-  border-top: 1px solid var(--rr-color-separator);
+  border-top: 1px solid var(--color-separator);
 }
 
 .order {
@@ -109,7 +109,7 @@
   gap: 16px;
   align-items: baseline;
   padding: 12px 0;
-  border-bottom: 1px solid var(--rr-color-separator-subtle);
+  border-bottom: 1px solid var(--color-separator-subtle);
 }
 
 .orderIdentity {
@@ -118,35 +118,35 @@
 }
 
 .orderIdentity strong {
-  color: var(--rr-color-text-primary);
-  font-size: var(--rr-type-metadata-size);
+  color: var(--color-text-primary);
+  font-size: var(--type-metadata-size);
   font-weight: 600;
 }
 
 .orderIdentity small,
 .orderMeta {
-  color: var(--rr-color-text-tertiary);
-  font-size: var(--rr-type-metadata-size);
+  color: var(--color-text-tertiary);
+  font-size: var(--type-metadata-size);
 }
 
 .orderAmount,
 .orderStatus {
-  color: var(--rr-color-text-primary);
-  font-size: var(--rr-type-data-size);
+  color: var(--color-text-primary);
+  font-size: var(--type-data-size);
   font-variant-numeric: tabular-nums;
 }
 
 .orderStatus {
-  font-size: var(--rr-type-metadata-size);
+  font-size: var(--type-metadata-size);
   font-weight: 600;
 }
 
 .notice {
   margin: 0;
   padding: 10px 0 10px 14px;
-  border-left: 2px solid var(--rr-color-warning);
-  color: var(--rr-color-text-secondary);
-  font-size: var(--rr-type-metadata-size);
+  border-left: 2px solid var(--color-warning);
+  color: var(--color-text-secondary);
+  font-size: var(--type-metadata-size);
   line-height: 1.5;
 }
 

@@ -21,7 +21,7 @@
   border-right: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 0;
   background: rgba(255, 254, 249, .46);
-  color: #334155;
+  color: var(--color-text-primary);
   text-decoration: none;
 }
 
@@ -34,7 +34,7 @@
 }
 
 .todayLane > strong {
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 1.65rem;
   letter-spacing: -0.04em;
 }
@@ -48,7 +48,7 @@
 }
 
 .todayLane[data-active="true"] {
-  border-color: var(--rr-color-signal);
+  border-color: var(--color-signal);
   background: rgba(35, 128, 111, 0.08);
 }
 
@@ -64,7 +64,7 @@
   display: list-item;
   min-height: 44px;
   padding: 0 15px;
-  color: #475569;
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 720;
@@ -93,7 +93,7 @@
 }
 
 .researchForm label > span {
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.68rem;
   font-weight: 700;
 }
@@ -103,10 +103,10 @@
   width: 100%;
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-separator-strong);
   border-radius: 10px;
   background: #fff;
-  color: #0f172a;
+  color: var(--color-text-primary);
   font: inherit;
   font-size: 0.8rem;
 }
@@ -123,10 +123,10 @@
   align-items: center;
   justify-content: center;
   padding: 0 14px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-separator-strong);
   border-radius: 10px;
   background: #fff;
-  color: #334155;
+  color: var(--color-text-primary);
   cursor: pointer;
   font: inherit;
   font-size: 0.78rem;
@@ -135,8 +135,8 @@
 }
 
 .researchActions button {
-  border-color: var(--rr-color-signal);
-  background: var(--rr-color-signal);
+  border-color: var(--color-signal);
+  background: var(--color-signal);
   color: #fff;
 }
 
@@ -147,7 +147,7 @@
   padding: 0 14px;
   border: 1px solid rgba(35, 128, 111, 0.2);
   border-radius: 11px;
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
   font-size: 0.82rem;
   font-weight: 720;
   text-decoration: none;
@@ -167,16 +167,16 @@
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.75);
-  color: #475569;
+  color: var(--color-text-secondary);
   font-size: 0.8rem;
   font-weight: 680;
   text-decoration: none;
 }
 
 .filterLink[data-active="true"] {
-  border-color: var(--rr-color-signal);
+  border-color: var(--color-signal);
   background: #eaf2ff;
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
 }
 
 .cardList {
@@ -210,7 +210,7 @@
 
 .eyebrow {
   margin-bottom: 7px;
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
   font-size: 0.68rem;
   font-weight: 780;
   letter-spacing: 0.08em;
@@ -220,7 +220,7 @@
 .cardTitle {
   max-width: 32ch;
   margin: 0;
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: clamp(1.2rem, 2.5vw, 1.65rem);
   line-height: 1.18;
   letter-spacing: -0.025em;
@@ -228,7 +228,7 @@
 
 .organization {
   margin: 8px 0 0;
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.82rem;
 }
 
@@ -238,11 +238,11 @@
   align-items: baseline;
   justify-content: flex-end;
   gap: 3px;
-  color: #64748b;
+  color: var(--color-text-tertiary);
 }
 
 .score strong {
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 1.75rem;
   letter-spacing: -0.04em;
 }
@@ -262,10 +262,10 @@
   margin: 16px 0 0;
   padding: 12px 14px;
   border: 0;
-  border-left: 2px solid #94a3b8;
+  border-left: 2px solid var(--color-text-tertiary);
   border-radius: 0;
   background: transparent;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-size: 0.78rem;
   line-height: 1.5;
 }
@@ -283,8 +283,8 @@
   overflow: visible;
   margin-top: 22px;
   border: 0;
-  border-top: 1px solid #e2e8f0;
-  border-bottom: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-separator);
+  border-bottom: 1px solid var(--color-separator);
   border-radius: 0;
   background: transparent;
 }
@@ -296,7 +296,7 @@
 .decisionSection {
   min-width: 0;
   padding: 16px;
-  border-right: 1px solid #e2e8f0;
+  border-right: 1px solid var(--color-separator);
   background: transparent;
 }
 
@@ -304,7 +304,7 @@
 
 .decisionSection h3 {
   margin: 0;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-size: 0.66rem;
   font-weight: 760;
   letter-spacing: 0.07em;
@@ -324,7 +324,7 @@
 }
 
 .decisionSection .insufficientValue {
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-style: italic;
 }
 
@@ -349,8 +349,8 @@
 .commercialHistory {
   margin-top: 20px;
   border: 0;
-  border-top: 1px solid #e2e8f0;
-  border-bottom: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-separator);
+  border-bottom: 1px solid var(--color-separator);
   border-radius: 0;
   background: transparent;
 }
@@ -359,7 +359,7 @@
   display: grid;
   gap: 3px;
   margin-top: 10px;
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.68rem;
 }
 
@@ -368,7 +368,7 @@
 }
 
 .conclusionBasis[data-basis="evidence"] > span {
-  color: #166534;
+  color: var(--color-positive);
 }
 
 .conclusionBasis small {
@@ -377,7 +377,7 @@
 }
 
 .conclusionBasis a {
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
   font-size: inherit;
   text-underline-offset: 3px;
 }
@@ -400,7 +400,7 @@
 
 .commercialSignalHeading span,
 .commercialSignalHeading small {
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.68rem;
 }
 
@@ -411,7 +411,7 @@
 }
 
 .commercialSignalHeading strong {
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 0.94rem;
 }
 
@@ -429,7 +429,7 @@
 
 .signalMetricsSection > h3 {
   margin: 0;
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 0.88rem;
 }
 
@@ -445,14 +445,14 @@
   gap: 7px;
   min-width: 0;
   padding: 13px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-separator);
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--color-surface-primary);
 }
 
 .signalMetric h3 {
   margin: 0;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-size: 0.66rem;
   font-weight: 760;
   letter-spacing: 0.04em;
@@ -465,7 +465,7 @@
 
 .signalMetric small {
   overflow-wrap: anywhere;
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.64rem;
   line-height: 1.45;
 }
@@ -475,20 +475,20 @@
   overflow: hidden;
   height: 4px;
   border-radius: 999px;
-  background: #e2e8f0;
+  background: var(--color-separator);
 }
 
 .signalMetricBar::after {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #64748b;
+  background: var(--color-text-tertiary);
   content: "";
 }
 
 .signalDiagnostics {
   margin-top: 0.75rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-separator);
   padding-top: 0.75rem;
 }
 
@@ -517,7 +517,7 @@
 
 .signalDiagnostics dd {
   margin: 0;
-  color: #64748b;
+  color: var(--color-text-tertiary);
   overflow-wrap: anywhere;
 }
 
@@ -532,7 +532,7 @@
 
 .signalMetric[data-level="high"] .signalMetricBar::after {
   width: 100%;
-  background: #166534;
+  background: var(--color-positive);
 }
 
 .signalConstraints {
@@ -562,12 +562,12 @@
 
 .sectionHeading h3 {
   margin: 0;
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 0.88rem;
 }
 
 .sectionHeading > span {
-  color: #94a3b8;
+  color: var(--color-text-tertiary);
   font-size: 0.7rem;
 }
 
@@ -609,7 +609,7 @@
   margin-top: 4px;
   border: 2px solid rgba(35, 128, 111, 0.24);
   border-radius: 50%;
-  background: var(--rr-color-signal);
+  background: var(--color-signal);
 }
 
 .timelineItem > div {
@@ -619,7 +619,7 @@
 }
 
 .timelineDate {
-  color: #94a3b8;
+  color: var(--color-text-tertiary);
   font-size: 0.66rem;
 }
 
@@ -638,13 +638,13 @@
 }
 
 .timelineItem small {
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.68rem;
 }
 
 .evidenceFallback {
   margin: 13px 0 0;
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.78rem;
 }
 
@@ -657,7 +657,7 @@
   gap: 14px;
   margin-top: 20px;
   padding: 16px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-separator-strong);
   border-radius: 14px;
   background: #fff;
 }
@@ -676,7 +676,7 @@
 
 .workflowHeading span,
 .workflowSummary dt {
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.66rem;
   font-weight: 760;
   letter-spacing: 0.07em;
@@ -685,15 +685,15 @@
 
 .workflowHeading h3 {
   margin: 0;
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 0.94rem;
 }
 
 .workflowHeading > strong {
   padding: 5px 9px;
   border-radius: 999px;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
   font-size: 0.7rem;
 }
 
@@ -714,7 +714,7 @@
   gap: 4px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--color-surface-primary);
 }
 
 .workflowSummary dd {
@@ -727,16 +727,16 @@
 .workflowNote {
   margin: 0;
   padding: 11px 12px;
-  border-left: 3px solid #94a3b8;
-  background: #f8fafc;
-  color: #334155;
+  border-left: 3px solid var(--color-text-tertiary);
+  background: var(--color-surface-primary);
+  color: var(--color-text-primary);
   font-size: 0.78rem;
   line-height: 1.55;
   white-space: pre-wrap;
 }
 
 .workflowEditor {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-separator);
   padding-top: 12px;
 }
 
@@ -745,7 +745,7 @@
   min-height: 44px;
   align-items: center;
   width: fit-content;
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
   cursor: pointer;
   font-size: 0.76rem;
   font-weight: 720;
@@ -761,7 +761,7 @@
 .workflowForm label {
   display: grid;
   gap: 6px;
-  color: #334155;
+  color: var(--color-text-primary);
   font-size: 0.74rem;
   font-weight: 680;
 }
@@ -772,10 +772,10 @@
   width: 100%;
   min-height: 44px;
   padding: 8px 10px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-separator-strong);
   border-radius: 9px;
   background: #fff;
-  color: #0f172a;
+  color: var(--color-text-primary);
   font: inherit;
   font-size: 0.78rem;
 }
@@ -790,7 +790,7 @@
 }
 
 .workflowNoteField small {
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.68rem;
   font-weight: 500;
 }
@@ -800,7 +800,7 @@
   overflow: hidden;
   border: 1px solid #dbe3ed;
   border-radius: 14px;
-  background: #f8fafc;
+  background: var(--color-surface-primary);
 }
 
 .outcomeToggle {
@@ -812,7 +812,7 @@
   padding: 14px 16px;
   border: 0;
   background: transparent;
-  color: #334155;
+  color: var(--color-text-primary);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -825,7 +825,7 @@
 
 .outcomeToggle small,
 .dealValue span {
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.66rem;
   font-weight: 760;
   letter-spacing: 0.07em;
@@ -833,24 +833,24 @@
 }
 
 .outcomeToggle strong {
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 0.9rem;
 }
 
 .outcomeToggle > span:last-child {
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
   font-size: 0.74rem;
   font-weight: 720;
 }
 
 .outcomeBody {
   padding: 0 16px 16px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-separator);
 }
 
 .outcomeMuted {
   margin: 13px 0 0;
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.74rem;
 }
 
@@ -861,7 +861,7 @@
 }
 
 .dealValue strong {
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 1rem;
 }
 
@@ -878,14 +878,14 @@
   grid-template-columns: minmax(105px, auto) minmax(0, 1fr);
   gap: 2px 12px;
   padding: 10px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-separator);
   border-radius: 10px;
   background: #fff;
 }
 
 .outcomeTimeline span,
 .outcomeTimeline small {
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.68rem;
 }
 
@@ -919,7 +919,7 @@
 .outcomeForm label {
   display: grid;
   gap: 6px;
-  color: #334155;
+  color: var(--color-text-primary);
   font-size: 0.74rem;
   font-weight: 680;
 }
@@ -930,10 +930,10 @@
   width: 100%;
   min-height: 44px;
   padding: 8px 10px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-separator-strong);
   border-radius: 9px;
   background: #fff;
-  color: #0f172a;
+  color: var(--color-text-primary);
   font: inherit;
   font-size: 0.78rem;
 }
@@ -954,7 +954,7 @@
 }
 
 .funnelHeading span {
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
   font-size: 0.66rem;
   font-weight: 760;
   letter-spacing: 0.08em;
@@ -963,12 +963,12 @@
 
 .funnelHeading h2 {
   margin: 4px 0 0;
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 1rem;
 }
 
 .funnelHeading small {
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.7rem;
 }
 
@@ -978,27 +978,27 @@
   gap: 1px;
   overflow: hidden;
   margin-top: 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-separator);
   border-radius: 12px;
-  background: #e2e8f0;
+  background: var(--color-separator);
 }
 
 .funnelStages > div {
   display: grid;
   gap: 4px;
   padding: 11px 12px;
-  background: #f8fafc;
+  background: var(--color-surface-primary);
 }
 
 .funnelStages span,
 .funnelConversions span,
 .funnelConversions small {
-  color: #64748b;
+  color: var(--color-text-tertiary);
   font-size: 0.68rem;
 }
 
 .funnelStages strong {
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 1.05rem;
 }
 
@@ -1015,11 +1015,11 @@
   gap: 3px 12px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--color-surface-primary);
 }
 
 .funnelConversions strong {
-  color: #334155;
+  color: var(--color-text-primary);
   font-size: 0.74rem;
 }
 
@@ -1044,10 +1044,10 @@
   align-items: center;
   justify-content: center;
   padding: 0 14px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-separator-strong);
   border-radius: 11px;
   background: #fff;
-  color: #334155;
+  color: var(--color-text-primary);
   cursor: pointer;
   font: inherit;
   font-size: 0.78rem;
@@ -1056,8 +1056,8 @@
 }
 
 .actionButton[data-tone="primary"] {
-  border-color: var(--rr-color-signal);
-  background: var(--rr-color-signal);
+  border-color: var(--color-signal);
+  background: var(--color-signal);
   color: #fff;
 }
 
@@ -1093,7 +1093,7 @@
 .actionError {
   min-height: 18px;
   margin: 7px 0 0;
-  color: #b91c1c;
+  color: var(--color-destructive);
   font-size: 0.72rem;
 }
 
@@ -1132,7 +1132,7 @@
 
   .decisionSection {
     border-right: 0;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--color-separator);
   }
 
   .decisionSection:last-child { border-bottom: 0; }

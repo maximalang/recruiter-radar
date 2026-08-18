@@ -48,7 +48,7 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
         gap: "12px",
         alignItems: "start",
         padding: "12px 14px",
-        border: "1px solid var(--rr-color-separator)",
+        border: "1px solid var(--color-separator)",
         borderRadius: "12px",
       }}
     >
@@ -56,10 +56,10 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
         <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>
           {user.fullName ?? user.email}
           {user.fullName ? (
-            <span style={{ fontWeight: 400, color: "var(--rr-color-text-tertiary)" }}> · {user.email}</span>
+            <span style={{ fontWeight: 400, color: "var(--color-text-tertiary)" }}> · {user.email}</span>
           ) : null}
         </div>
-        <div style={{ fontSize: "0.76rem", color: "var(--rr-color-text-tertiary)", display: "grid", gap: "2px", marginTop: "4px" }}>
+        <div style={{ fontSize: "0.76rem", color: "var(--color-text-tertiary)", display: "grid", gap: "2px", marginTop: "4px" }}>
           <span>
             Рабочее пространство: {user.workspace ? `${user.workspace.name} · ${user.workspace.role}` : "нет"}
           </span>
@@ -100,8 +100,8 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
               borderRadius: "8px",
               fontWeight: 600,
               fontSize: "0.76rem",
-              border: "1px solid var(--rr-color-separator)",
-              color: "var(--rr-color-text-secondary)",
+              border: "1px solid var(--color-separator)",
+              color: "var(--color-text-secondary)",
               textDecoration: "none",
             }}
           >
@@ -119,15 +119,15 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
         }}
       >
         {user.hasPaidOrder ? (
-          <span style={tagStyle("var(--rr-color-positive)")}>оплачен</span>
+          <span style={tagStyle("var(--color-positive)")}>оплачен</span>
         ) : null}
         {user.access.status === "active" ? (
-          <span style={tagStyle("var(--rr-color-information)")}>доступ: {user.access.source}</span>
+          <span style={tagStyle("var(--color-information)")}>доступ: {user.access.source}</span>
         ) : null}
         {profileActive && hasTelegram ? (
-          <span style={tagStyle("var(--rr-color-signal)")}>доставка</span>
+          <span style={tagStyle("var(--color-signal)")}>доставка</span>
         ) : null}
-        <span style={{ fontSize: "0.72rem", color: "var(--rr-color-text-tertiary)", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "0.72rem", color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>
           {new Date(user.createdAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" })}
         </span>
       </div>
@@ -142,7 +142,7 @@ function tagStyle(color: string): React.CSSProperties {
     fontSize: "0.72rem",
     fontWeight: 700,
     color,
-    background: "var(--rr-color-surface-secondary)",
+    background: "var(--color-surface-secondary)",
     whiteSpace: "nowrap",
   };
 }

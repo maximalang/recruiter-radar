@@ -10,8 +10,8 @@
 
 .feedbackGroupLabel {
   margin-bottom: 4px;
-  color: var(--rr-color-text-tertiary);
-  font-size: var(--rr-type-label-size);
+  color: var(--color-text-tertiary);
+  font-size: var(--type-label-size);
   font-weight: 600;
 }
 
@@ -27,18 +27,18 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  border: 1px solid var(--rr-color-separator);
-  border-radius: var(--rr-radius-control);
-  background-color: var(--rr-color-surface-primary);
-  color: var(--rr-color-text-secondary);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: var(--rr-type-metadata-size);
+  font-size: var(--type-metadata-size);
   font-weight: 500;
   transition:
-    color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    border-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    box-shadow var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 /* Inline-SVG triage icon — inherits the button tone via currentColor. */
@@ -57,7 +57,7 @@
 .noteInput:focus-visible,
 .noteSave:focus-visible,
 .noteSkip:focus-visible {
-  outline: 2px solid var(--rr-color-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -69,38 +69,38 @@
 }
 
 .feedbackBtn[data-active="true"][data-tone="success"] {
-  border-color: var(--rr-color-positive);
-  box-shadow: inset 0 0 0 1px var(--rr-color-positive);
-  background-color: color-mix(in srgb, var(--rr-color-positive) 8%, var(--rr-color-surface-primary));
-  color: var(--rr-color-positive);
+  border-color: var(--color-positive);
+  box-shadow: inset 0 0 0 1px var(--color-positive);
+  background-color: color-mix(in srgb, var(--color-positive) 8%, var(--color-surface-primary));
+  color: var(--color-positive);
 }
 
 .feedbackBtn[data-active="true"][data-tone="neutral"] {
-  border-color: var(--rr-color-separator-strong);
-  box-shadow: inset 0 0 0 1px var(--rr-color-separator-strong);
-  background-color: var(--rr-color-surface-secondary);
-  color: var(--rr-color-text-secondary);
+  border-color: var(--color-separator-strong);
+  box-shadow: inset 0 0 0 1px var(--color-separator-strong);
+  background-color: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
 }
 
 .feedbackBtn[data-active="true"][data-tone="warning"] {
-  border-color: var(--rr-color-warning);
-  box-shadow: inset 0 0 0 1px var(--rr-color-warning);
-  background-color: color-mix(in srgb, var(--rr-color-warning) 8%, var(--rr-color-surface-primary));
-  color: var(--rr-color-warning);
+  border-color: var(--color-warning);
+  box-shadow: inset 0 0 0 1px var(--color-warning);
+  background-color: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface-primary));
+  color: var(--color-warning);
 }
 
 .feedbackBtn[data-active="true"][data-tone="info"] {
-  border-color: var(--rr-color-information);
-  box-shadow: inset 0 0 0 1px var(--rr-color-information);
-  background-color: color-mix(in srgb, var(--rr-color-information) 8%, var(--rr-color-surface-primary));
-  color: var(--rr-color-information);
+  border-color: var(--color-information);
+  box-shadow: inset 0 0 0 1px var(--color-information);
+  background-color: color-mix(in srgb, var(--color-information) 8%, var(--color-surface-primary));
+  color: var(--color-information);
 }
 
 .feedbackBtn[data-active="true"][data-tone="danger"] {
-  border-color: var(--rr-color-destructive);
-  box-shadow: inset 0 0 0 1px var(--rr-color-destructive);
-  background-color: color-mix(in srgb, var(--rr-color-destructive) 8%, var(--rr-color-surface-primary));
-  color: var(--rr-color-destructive);
+  border-color: var(--color-destructive);
+  box-shadow: inset 0 0 0 1px var(--color-destructive);
+  background-color: color-mix(in srgb, var(--color-destructive) 8%, var(--color-surface-primary));
+  color: var(--color-destructive);
 }
 
 .noteRow {
@@ -116,55 +116,55 @@
   min-width: 0;
   min-height: 40px;
   padding: 6px 10px;
-  border: 1px solid var(--rr-color-separator);
-  border-radius: var(--rr-radius-control);
-  background-color: var(--rr-color-surface-primary);
-  color: var(--rr-color-text-primary);
-  font-size: var(--rr-type-metadata-size);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-primary);
+  font-size: var(--type-metadata-size);
 }
 
 .noteSave,
 .noteSkip {
   min-height: 40px;
   padding: 6px 12px;
-  border-radius: var(--rr-radius-control);
+  border-radius: var(--radius-control);
   cursor: pointer;
-  font-size: var(--rr-type-metadata-size);
+  font-size: var(--type-metadata-size);
   font-weight: 600;
 }
 
 .noteSave {
-  border: 1px solid var(--rr-color-signal);
-  background-color: var(--rr-color-signal);
-  color: var(--rr-color-text-inverse);
+  border: 1px solid var(--color-signal);
+  background-color: var(--color-signal);
+  color: var(--color-text-inverse);
 }
 
 .noteSave:hover {
-  border-color: var(--rr-color-signal-hover);
-  background-color: var(--rr-color-signal-hover);
+  border-color: var(--color-signal-hover);
+  background-color: var(--color-signal-hover);
 }
 
 .noteSkip {
-  border: 1px solid var(--rr-color-separator);
-  background-color: var(--rr-color-surface-primary);
-  color: var(--rr-color-text-tertiary);
+  border: 1px solid var(--color-separator);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-tertiary);
 }
 
 .noteSkip:hover {
-  background-color: var(--rr-color-surface-secondary);
+  background-color: var(--color-surface-secondary);
 }
 
 .errorText {
   margin-top: 6px;
-  color: var(--rr-color-destructive);
-  font-size: var(--rr-type-metadata-size);
+  color: var(--color-destructive);
+  font-size: var(--type-metadata-size);
 }
 
 .statusText {
   min-height: 1.05rem;
   margin: 6px 0 0;
-  color: var(--rr-color-text-tertiary);
-  font-size: var(--rr-type-metadata-size);
+  color: var(--color-text-tertiary);
+  font-size: var(--type-metadata-size);
 }
 
 .statusText:empty {

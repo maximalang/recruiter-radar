@@ -1,34 +1,34 @@
 /* Recruiter Radar motion language: state transition, not decoration. */
 :root {
-  --rr-motion-duration-instant: 90ms;
-  --rr-motion-duration-fast: 90ms;
-  --rr-motion-duration-control: 140ms;
-  --rr-motion-duration-disclosure: 180ms;
-  --rr-motion-duration-context: 220ms;
-  --rr-motion-duration-navigation: var(--rr-motion-duration-context);
-  --rr-motion-duration-emphasis: 260ms;
-  --rr-motion-duration-signal: 520ms;
-  --rr-motion-duration-scan: 760ms;
-  --rr-motion-ease-standard: cubic-bezier(.2, .75, .25, 1);
-  --rr-motion-ease-enter: cubic-bezier(.22, 1, .36, 1);
-  --rr-motion-ease-exit: cubic-bezier(.4, 0, 1, 1);
-  --rr-motion-ease-signal: cubic-bezier(.2, .8, .2, 1);
-  --rr-motion-distance-short: 4px;
+  --motion-duration-instant: 90ms;
+  --motion-duration-fast: 90ms;
+  --motion-duration-control: 140ms;
+  --motion-duration-disclosure: 180ms;
+  --motion-duration-context: 220ms;
+  --motion-duration-navigation: var(--motion-duration-context);
+  --motion-duration-emphasis: 260ms;
+  --motion-duration-signal: 520ms;
+  --motion-duration-scan: 760ms;
+  --motion-ease-standard: cubic-bezier(.2, .75, .25, 1);
+  --motion-ease-enter: cubic-bezier(.22, 1, .36, 1);
+  --motion-ease-exit: cubic-bezier(.4, 0, 1, 1);
+  --motion-ease-signal: cubic-bezier(.2, .8, .2, 1);
+  --motion-distance-short: 4px;
 }
 
 [data-motion-interactive] {
   transition:
-    color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    border-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    opacity var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    opacity var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 /* Status feedback may enter quietly, but ordinary list rows never receive
  * automatic page-load choreography or positional animation. */
 [data-motion-status] {
   opacity: 1;
-  transition: opacity var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter);
+  transition: opacity var(--motion-duration-disclosure) var(--motion-ease-enter);
 }
 
 @starting-style {
@@ -40,8 +40,8 @@
 [data-motion-disclosure] {
   opacity: 1;
   transition:
-    opacity var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter),
-    content-visibility var(--rr-motion-duration-disclosure) allow-discrete;
+    opacity var(--motion-duration-disclosure) var(--motion-ease-enter),
+    content-visibility var(--motion-duration-disclosure) allow-discrete;
 }
 
 @starting-style {
@@ -56,8 +56,8 @@
   justify-content: center;
   transform-origin: center;
   transition:
-    color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    opacity var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    opacity var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 [data-motion-icon] > svg {
@@ -95,7 +95,7 @@
 }
 
 [data-motion-signal][data-motion-state="acquired"]::after {
-  animation: rr-signal-acquired var(--rr-motion-duration-signal) var(--rr-motion-ease-signal) both;
+  animation: rr-signal-acquired var(--motion-duration-signal) var(--motion-ease-signal) both;
 }
 
 [data-motion-relationship] {
@@ -104,7 +104,7 @@
 }
 
 [data-motion-relationship][data-motion-state="revealed"] {
-  animation: rr-relationship-reveal var(--rr-motion-duration-emphasis) var(--rr-motion-ease-enter) both;
+  animation: rr-relationship-reveal var(--motion-duration-emphasis) var(--motion-ease-enter) both;
 }
 
 @keyframes rr-motion-icon-progress {

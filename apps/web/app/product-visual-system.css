@@ -5,120 +5,120 @@
 
 html,
 body {
-  background: var(--rr-color-canvas);
-  color: var(--rr-color-text-primary);
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
 }
 
 [data-ui-system="recruiter-radar"],
 [data-product-workspace="true"] {
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
 }
 
 [data-theme="inverse"] {
-  --rr-color-canvas: #0e1513;
-  --rr-color-surface-primary: #131d1a;
-  --rr-color-surface-secondary: #18231f;
-  --rr-color-surface-selected: #1c2b26;
-  --rr-color-surface-elevated: #202f2a;
-  --rr-color-text-primary: #f3f0e8;
-  --rr-color-text-secondary: #bbc4be;
-  --rr-color-text-tertiary: #919c95;
-  --rr-color-text-disabled: #707a74;
-  --rr-color-text-inverse: #14201c;
-  --rr-color-separator-subtle: rgba(243, 240, 232, .08);
-  --rr-color-separator: rgba(243, 240, 232, .12);
-  --rr-color-separator-strong: rgba(243, 240, 232, .22);
-  --rr-color-signal: #8fc7b8;
-  --rr-color-signal-hover: #a6d5c9;
-  --rr-color-signal-soft: rgba(143, 199, 184, .12);
-  --rr-color-copper: #c18c6f;
-  --rr-color-positive: #7fb996;
-  --rr-color-warning: #d2a365;
-  --rr-color-destructive: #e08b84;
-  --rr-color-information: #86b2c4;
-  --rr-color-focus: #a6d5c9;
+  --color-canvas: #0e1513;
+  --color-surface-primary: #131d1a;
+  --color-surface-secondary: #18231f;
+  --color-surface-selected: #1c2b26;
+  --color-surface-elevated: #202f2a;
+  --color-text-primary: #f3f0e8;
+  --color-text-secondary: #bbc4be;
+  --color-text-tertiary: #919c95;
+  --color-text-disabled: #707a74;
+  --color-text-inverse: #14201c;
+  --color-separator-subtle: rgba(243, 240, 232, .08);
+  --color-separator: rgba(243, 240, 232, .12);
+  --color-separator-strong: rgba(243, 240, 232, .22);
+  --color-signal: #8fc7b8;
+  --color-signal-hover: #a6d5c9;
+  --color-signal-soft: rgba(143, 199, 184, .12);
+  --color-copper: #c18c6f;
+  --color-positive: #7fb996;
+  --color-warning: #d2a365;
+  --color-destructive: #e08b84;
+  --color-information: #86b2c4;
+  --color-focus: #a6d5c9;
 }
 
 
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea) {
   min-height: 44px;
-  border: 1px solid var(--rr-color-separator-strong);
-  border-radius: var(--rr-radius-control);
-  background: var(--rr-color-surface-primary);
-  color: var(--rr-color-text-primary);
+  border: 1px solid var(--color-separator-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-primary);
+  color: var(--color-text-primary);
   box-shadow: none;
   transition:
-    border-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea):focus-visible {
-  border-color: var(--rr-color-focus);
-  outline: 2px solid var(--rr-color-focus);
+  border-color: var(--color-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(button[type="submit"], input[type="submit"]) {
   min-height: 44px;
-  border: 1px solid var(--rr-color-signal);
-  border-radius: var(--rr-radius-control);
-  background: var(--rr-color-signal);
-  color: var(--rr-color-text-inverse);
+  border: 1px solid var(--color-signal);
+  border-radius: var(--radius-control);
+  background: var(--color-signal);
+  color: var(--color-text-inverse);
   box-shadow: none;
 }
 
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(button[type="submit"], input[type="submit"]):hover {
-  border-color: var(--rr-color-signal-hover);
-  background: var(--rr-color-signal-hover);
+  border-color: var(--color-signal-hover);
+  background: var(--color-signal-hover);
 }
 
 [data-product-workspace="true"] main :where(h1, h2, h3) {
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
 }
 
 [data-product-workspace="true"] main h1 {
-  font-size: var(--rr-type-page-size);
+  font-size: var(--type-page-size);
   font-weight: 590;
   letter-spacing: -.04em;
   line-height: 1.1;
 }
 
 [data-product-workspace="true"] main h2 {
-  font-size: var(--rr-type-section-size);
+  font-size: var(--type-section-size);
   font-weight: 600;
   letter-spacing: -.03em;
   line-height: 1.2;
 }
 
 [data-product-workspace="true"] main h3 {
-  font-size: var(--rr-type-subsection-size);
+  font-size: var(--type-subsection-size);
   font-weight: 620;
   letter-spacing: -.018em;
   line-height: 1.3;
 }
 
 [data-product-workspace="true"] :where(table, th, td, tbody tr) {
-  border-color: var(--rr-color-separator);
+  border-color: var(--color-separator);
 }
 
 [data-product-workspace="true"] thead,
 [data-product-workspace="true"] th {
-  color: var(--rr-color-text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 [data-product-workspace="true"] th {
-  font-size: var(--rr-type-label-size);
+  font-size: var(--type-label-size);
   font-weight: 600;
   letter-spacing: .01em;
   text-transform: none;
 }
 
 [data-product-workspace="true"] tbody tr {
-  transition: background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+  transition: background-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 [data-product-workspace="true"] tbody tr:hover {
-  background: var(--rr-color-signal-soft);
+  background: var(--color-signal-soft);
 }
 
 [data-product-workspace="true"] :where(.tabular, [data-numeric="true"]) {

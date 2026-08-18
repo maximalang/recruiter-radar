@@ -3,7 +3,7 @@
   align-items: center;
   gap: 0.62rem;
   min-width: 0;
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
   line-height: 1;
 }
 
@@ -32,7 +32,7 @@
 }
 
 .logo[data-tone="dark"] .wordmark {
-  color: var(--rr-color-canvas);
+  color: var(--color-canvas);
 }
 
 .logo[data-size="small"] {

@@ -119,8 +119,8 @@ describe("auth v2 onboarding view", () => {
       "utf8",
     );
 
-    expect(styles).toContain("background:var(--rr-color-text-primary)");
-    expect(styles).toContain("font-size:var(--rr-type-metadata-size)");
+    expect(styles).toContain("background:var(--color-text-primary)");
+    expect(styles).toContain("font-size:var(--type-metadata-size)");
     expect(styles).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
     expect(styles).not.toMatch(/font-size:\.(?:6|7)\d*rem/gi);
   });

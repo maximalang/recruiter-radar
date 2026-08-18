@@ -26,7 +26,7 @@
 }
 
 .subnav a[aria-current="page"] {
-  background: #111827;
+  background: var(--color-text-primary);
   color: #fff;
 }
 
@@ -54,7 +54,7 @@
 .card h2,
 .transferCard h2 {
   margin: 4px 0 0;
-  color: #111827;
+  color: var(--color-text-primary);
   letter-spacing: -0.025em;
 }
 
@@ -81,14 +81,14 @@
 }
 
 .heroMetric strong {
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
   font-size: 2rem;
   line-height: 1;
 }
 
 .heroMetric span {
   margin-top: 5px;
-  color: #667085;
+  color: var(--color-text-tertiary);
   font-size: 0.78rem;
 }
 
@@ -109,7 +109,7 @@
   border: 1px solid rgba(4, 120, 87, 0.14);
   border-radius: 15px;
   background: #f2fbf6;
-  color: #166534;
+  color: var(--color-positive);
   line-height: 1.5;
 }
 
@@ -141,7 +141,7 @@
   padding: 5px 9px;
   border-radius: 999px;
   background: rgba(35, 128, 111, 0.08);
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
   font-size: 0.74rem;
   font-weight: 800;
   text-align: center;
@@ -150,7 +150,7 @@
 .muted {
   max-width: 68ch;
   margin: 10px 0 18px;
-  color: #667085;
+  color: var(--color-text-tertiary);
   line-height: 1.6;
 }
 
@@ -181,7 +181,7 @@
   border: 1px solid rgba(15, 23, 42, 0.14);
   border-radius: 12px;
   background: #fff;
-  color: #111827;
+  color: var(--color-text-primary);
   font: inherit;
 }
 
@@ -199,8 +199,8 @@
 }
 
 .primaryButton {
-  border: 1px solid var(--rr-color-signal);
-  background: var(--rr-color-signal);
+  border: 1px solid var(--color-signal);
+  background: var(--color-signal);
   color: #fff;
   box-shadow: 0 12px 24px rgba(35, 128, 111, 0.2);
 }
@@ -218,7 +218,7 @@
   padding: 7px 10px;
   border: 1px solid rgba(185, 28, 28, 0.14);
   background: #fff7f7;
-  color: #991b1b;
+  color: var(--color-destructive);
 }
 
 .memberList,
@@ -245,8 +245,8 @@
   width: 40px;
   height: 40px;
   border-radius: 13px;
-  background: linear-gradient(145deg, rgba(35, 128, 111, 0.12), var(--rr-color-surface-primary));
-  color: var(--rr-color-signal);
+  background: linear-gradient(145deg, rgba(35, 128, 111, 0.12), var(--color-surface-primary));
+  color: var(--color-signal);
   font-weight: 850;
 }
 
@@ -279,7 +279,7 @@
 .memberIdentity time {
   display: block;
   margin: 4px 0 0;
-  color: #667085;
+  color: var(--color-text-tertiary);
   font-size: 0.79rem;
   line-height: 1.45;
 }
@@ -297,7 +297,7 @@
 
 .roleBadge[data-role="owner"] {
   background: rgba(35, 128, 111, 0.08);
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
 }
 
 .roleBadge[data-role="admin"] {
@@ -330,7 +330,7 @@
 
 .inviteList p {
   margin: 4px 0 0;
-  color: #667085;
+  color: var(--color-text-tertiary);
   font-size: 0.8rem;
 }
 

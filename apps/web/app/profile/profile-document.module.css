@@ -8,7 +8,7 @@
 .formZone,
 .secondaryZone {
   padding: 28px 0;
-  border-bottom: 1px solid var(--rr-color-separator);
+  border-bottom: 1px solid var(--color-separator);
 }
 
 .summaryZone {
@@ -31,8 +31,8 @@
 
 .sectionIntro h2 {
   margin: 0;
-  color: var(--rr-color-text-primary);
-  font-size: var(--rr-type-subsection-size);
+  color: var(--color-text-primary);
+  font-size: var(--type-subsection-size);
   font-weight: 620;
   letter-spacing: -.018em;
 }
@@ -40,14 +40,14 @@
 .sectionIntro p {
   max-width: 64ch;
   margin: 0;
-  color: var(--rr-color-text-secondary);
-  font-size: var(--rr-type-body-size);
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.53;
 }
 
 .emptyZone {
   padding: 24px 0;
-  border-top: 1px solid var(--rr-color-separator);
+  border-top: 1px solid var(--color-separator);
 }
 
 @media (max-width: 760px) {

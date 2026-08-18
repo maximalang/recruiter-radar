@@ -13,9 +13,9 @@
   gap: 6px;
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid var(--rr-color-separator);
-  background-color: var(--rr-color-surface-primary);
-  color: var(--rr-color-text-secondary);
+  border: 1px solid var(--color-separator);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-secondary);
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
@@ -23,7 +23,7 @@
 }
 
 .btn:focus-visible {
-  outline: 2px solid var(--rr-color-signal);
+  outline: 2px solid var(--color-signal);
   outline-offset: 2px;
 }
 
@@ -43,7 +43,7 @@
 }
 
 .btn[data-tone="danger"] {
-  color: #b91c1c;
+  color: var(--color-destructive);
   border-color: #fecaca;
   background-color: #fef2f2;
 }
@@ -77,7 +77,7 @@
 }
 
 .verdict[data-tone="danger"] {
-  color: #b91c1c;
+  color: var(--color-destructive);
   background-color: #fef2f2;
   border: 1px solid #fecaca;
 }
@@ -87,7 +87,7 @@
   align-items: center;
   gap: 8px;
   font-size: 0.82rem;
-  color: #b91c1c;
+  color: var(--color-destructive);
 }
 
 @media (max-width: 640px) {

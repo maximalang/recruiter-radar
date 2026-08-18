@@ -4,7 +4,7 @@
   place-items: center;
   padding: 28px 18px;
   box-sizing: border-box;
-  background: var(--rr-color-canvas);
+  background: var(--color-canvas);
 }
 
 .shell {
@@ -18,8 +18,8 @@
   display: inline-flex;
   align-items: center;
   justify-self: center;
-  color: var(--rr-color-text-primary);
-  font-size: var(--rr-type-metadata-size);
+  color: var(--color-text-primary);
+  font-size: var(--type-metadata-size);
   font-weight: 700;
   letter-spacing: -0.01em;
   text-decoration: none;
@@ -29,8 +29,8 @@
   display: grid;
   justify-items: center;
   padding: clamp(28px, 6vw, 44px) 0;
-  border-top: 1px solid var(--rr-color-separator);
-  border-bottom: 1px solid var(--rr-color-separator);
+  border-top: 1px solid var(--color-separator);
+  border-bottom: 1px solid var(--color-separator);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -43,16 +43,16 @@
   height: 48px;
   margin-bottom: 18px;
   place-items: center;
-  border: 1px solid var(--rr-color-separator-strong);
+  border: 1px solid var(--color-separator-strong);
   border-radius: 50%;
-  background: var(--rr-color-surface-secondary);
+  background: var(--color-surface-secondary);
 }
 
 .icon span {
   position: relative;
   width: 20px;
   height: 15px;
-  border: 2px solid var(--rr-color-signal);
+  border: 2px solid var(--color-signal);
   border-radius: 4px;
 }
 
@@ -62,22 +62,22 @@
   top: -9px;
   width: 8px;
   height: 8px;
-  border: 2px solid var(--rr-color-signal);
+  border: 2px solid var(--color-signal);
   border-bottom: 0;
   border-radius: 8px 8px 0 0;
   content: "";
 }
 
 .eyebrow {
-  color: var(--rr-color-copper);
-  font-size: var(--rr-type-label-size);
+  color: var(--color-copper);
+  font-size: var(--type-label-size);
   font-weight: 600;
 }
 
 .card h1 {
   max-width: 15ch;
   margin: 8px 0 0;
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
   font-size: clamp(1.7rem, 5vw, 2.25rem);
   font-weight: 600;
   letter-spacing: -0.035em;
@@ -87,8 +87,8 @@
 .card > p {
   max-width: 42ch;
   margin: 12px 0 24px;
-  color: var(--rr-color-text-secondary);
-  font-size: var(--rr-type-body-size);
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.6;
 }
 
@@ -99,24 +99,24 @@
   align-items: center;
   justify-content: center;
   padding: 0 18px;
-  border-radius: var(--rr-radius-control);
+  border-radius: var(--radius-control);
   font: inherit;
-  font-size: var(--rr-type-button-size);
+  font-size: var(--type-button-size);
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
 }
 
 .primary {
-  border: 1px solid var(--rr-color-signal);
-  background: var(--rr-color-signal);
-  color: var(--rr-color-text-inverse);
+  border: 1px solid var(--color-signal);
+  background: var(--color-signal);
+  color: var(--color-text-inverse);
   box-shadow: none;
 }
 
 .primary:hover {
-  border-color: var(--rr-color-signal-hover);
-  background: var(--rr-color-signal-hover);
+  border-color: var(--color-signal-hover);
+  background: var(--color-signal-hover);
 }
 
 .primary:disabled {
@@ -126,18 +126,18 @@
 
 .secondary {
   margin-top: 12px;
-  border: 1px solid var(--rr-color-separator-strong);
+  border: 1px solid var(--color-separator-strong);
   background: transparent;
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
 }
 
 .secondary:hover {
-  background: var(--rr-color-surface-secondary);
+  background: var(--color-surface-secondary);
 }
 
 .status {
-  color: var(--rr-color-text-secondary);
-  font-size: var(--rr-type-body-size);
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-size);
   font-weight: 600;
 }
 
@@ -150,23 +150,23 @@
   padding: 16px 16px 16px 18px;
   box-sizing: border-box;
   border: 0;
-  border-left: 2px solid var(--rr-color-positive);
+  border-left: 2px solid var(--color-positive);
   border-radius: 0;
-  background: color-mix(in srgb, var(--rr-color-positive) 6%, transparent);
-  color: var(--rr-color-text-primary);
+  background: color-mix(in srgb, var(--color-positive) 6%, transparent);
+  color: var(--color-text-primary);
   text-align: left;
 }
 
 .result span,
 .error span {
-  color: var(--rr-color-text-secondary);
-  font-size: var(--rr-type-metadata-size);
+  color: var(--color-text-secondary);
+  font-size: var(--type-metadata-size);
   line-height: 1.5;
 }
 
 .error {
-  border-left-color: var(--rr-color-destructive);
-  background: color-mix(in srgb, var(--rr-color-destructive) 6%, transparent);
+  border-left-color: var(--color-destructive);
+  background: color-mix(in srgb, var(--color-destructive) 6%, transparent);
 }
 
 .result .primary,
@@ -179,15 +179,15 @@
 .card small {
   max-width: 46ch;
   margin-top: 22px;
-  color: var(--rr-color-text-tertiary);
-  font-size: var(--rr-type-metadata-size);
+  color: var(--color-text-tertiary);
+  font-size: var(--type-metadata-size);
   line-height: 1.5;
 }
 
 .primary:focus-visible,
 .secondary:focus-visible,
 .brand:focus-visible {
-  outline: 2px solid var(--rr-color-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 3px;
 }
 

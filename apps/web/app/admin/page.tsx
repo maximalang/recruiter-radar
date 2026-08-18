@@ -59,7 +59,7 @@ function statusTone(status: string | undefined): { color: string; bg: string; la
     case "critical":
       return { color: "#b42318", bg: "#fee4e2", label: "critical" };
     default:
-      return { color: "#4b5563", bg: "#f3f4f6", label: "нет данных" };
+      return { color: "#4b5563", bg: "var(--color-surface-secondary)", label: "нет данных" };
   }
 }
 
@@ -68,7 +68,7 @@ const GATE_COLOR: Record<string, string> = {
   A: "#047857",
   B: "#1d4ed8",
   C: "#b45309",
-  D: "#64748b",
+  D: "var(--color-text-tertiary)",
 };
 
 function rateColor(r: number): string {
@@ -212,13 +212,13 @@ export default async function AdminPage() {
           </div>
           {feedbackFunnel && feedbackFunnel.length > 0 ? (
             <div style={{ marginTop: "14px", display: "grid", gap: "6px" }}>
-              <div style={{ fontSize: "0.78rem", color: "var(--rr-color-text-tertiary)", fontWeight: 700 }}>
+              <div style={{ fontSize: "0.78rem", color: "var(--color-text-tertiary)", fontWeight: 700 }}>
                 Воронка обратной связи
               </div>
               {feedbackFunnel.map((row) => (
                 <div key={row.status} style={funnelRowStyle}>
-                  <span style={{ fontSize: "0.84rem", color: "var(--rr-color-text-secondary)" }}>{row.label}</span>
-                  <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--rr-color-text-primary)" }}>
+                  <span style={{ fontSize: "0.84rem", color: "var(--color-text-secondary)" }}>{row.label}</span>
+                  <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--color-text-primary)" }}>
                     {row.count}
                   </span>
                 </div>
@@ -240,13 +240,13 @@ export default async function AdminPage() {
                 const max = Math.max(...quality.gateDistribution.map((x) => x.count), 1);
                 return (
                   <div key={g.gate} style={funnelRowStyle}>
-                    <span style={{ fontSize: "0.84rem", color: GATE_COLOR[g.gate] ?? "#64748b", fontWeight: 700, minWidth: "180px" }}>
+                    <span style={{ fontSize: "0.84rem", color: GATE_COLOR[g.gate] ?? "var(--color-text-tertiary)", fontWeight: 700, minWidth: "180px" }}>
                       {GATE_LABELS[g.gate] ?? g.gate}
                     </span>
                     <div style={{ flex: 1, height: "8px", borderRadius: "999px", background: "rgba(15,23,42,0.07)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${(g.count / max) * 100}%`, background: GATE_COLOR[g.gate] ?? "#64748b", borderRadius: "999px" }} />
+                      <div style={{ height: "100%", width: `${(g.count / max) * 100}%`, background: GATE_COLOR[g.gate] ?? "var(--color-text-tertiary)", borderRadius: "999px" }} />
                     </div>
-                    <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--rr-color-text-secondary)", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--color-text-secondary)", whiteSpace: "nowrap" }}>
                       {g.count} · {g.percentage}%
                     </span>
                   </div>
@@ -267,7 +267,7 @@ export default async function AdminPage() {
                 <div key={row.source} style={sourceRowStyle}>
                   <div style={{ minWidth: "120px" }}>
                     <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>{row.source}</div>
-                    <div style={{ fontSize: "0.74rem", color: "var(--rr-color-text-tertiary)" }}>
+                    <div style={{ fontSize: "0.74rem", color: "var(--color-text-tertiary)" }}>
                       {row.leads} лидов
                       {row.avgAgeDays != null ? ` · ср. свежесть ${row.avgAgeDays}д` : ""}
                     </div>
@@ -276,8 +276,8 @@ export default async function AdminPage() {
                     <Tag color="#047857" bg="#d1fae5">A {row.gateA}</Tag>
                     <Tag color="#1d4ed8" bg="#dbeafe">B {row.gateB}</Tag>
                     <Tag color="#b45309" bg="#fef3c7">C {row.gateC}</Tag>
-                    <Tag color="#4b5563" bg="#f3f4f6">прям. {row.directHiringProof}</Tag>
-                    <Tag color="#4b5563" bg="#f3f4f6">агр. {row.platformAggregation}</Tag>
+                    <Tag color="#4b5563" bg="var(--color-surface-secondary)">прям. {row.directHiringProof}</Tag>
+                    <Tag color="#4b5563" bg="var(--color-surface-secondary)">агр. {row.platformAggregation}</Tag>
                   </div>
                 </div>
               ))}
@@ -287,7 +287,7 @@ export default async function AdminPage() {
               {sourcePerformance.map((row) => (
                 <div key={row.source} style={sourceRowStyle}>
                   <span style={{ fontWeight: 700, fontSize: "0.88rem", minWidth: "120px" }}>{row.source}</span>
-                  <span style={{ fontSize: "0.82rem", color: "var(--rr-color-text-secondary)" }}>
+                  <span style={{ fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
                     {row.leads} лидов · ср. {row.avgScore?.toFixed(1) ?? "—"} / 4
                   </span>
                 </div>
@@ -338,19 +338,19 @@ export default async function AdminPage() {
                     gap: "12px",
                     alignItems: "center",
                     padding: "10px 12px",
-                    border: "1px solid var(--rr-color-separator)",
+                    border: "1px solid var(--color-separator)",
                     borderRadius: "12px",
                   }}
                 >
                   <div>
                     <div style={{ fontWeight: 700, fontSize: "0.92rem" }}>{s.name}</div>
-                    <div style={{ fontSize: "0.76rem", color: "var(--rr-color-text-tertiary)" }}>
+                    <div style={{ fontSize: "0.76rem", color: "var(--color-text-tertiary)" }}>
                       {s.id} · {s.category}{s.isPrimary ? " · primary" : ""}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", fontSize: "0.8rem", color: "var(--rr-color-text-secondary)" }}>
+                  <div style={{ textAlign: "right", fontSize: "0.8rem", color: "var(--color-text-secondary)" }}>
                     <div>{s.recordsLast24h ?? 0} зап. / 24ч</div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--rr-color-text-tertiary)" }}>
+                    <div style={{ fontSize: "0.72rem", color: "var(--color-text-tertiary)" }}>
                       {s.lastRun ?? "нет запуска"}
                     </div>
                   </div>
@@ -441,8 +441,8 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 function Metric({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div style={{ padding: "12px", borderRadius: "12px", background: "rgba(241,245,249,0.6)" }}>
-      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: accent ?? "var(--rr-color-text-primary)" }}>{value}</div>
-      <div style={{ fontSize: "0.76rem", color: "var(--rr-color-text-tertiary)" }}>{label}</div>
+      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: accent ?? "var(--color-text-primary)" }}>{value}</div>
+      <div style={{ fontSize: "0.76rem", color: "var(--color-text-tertiary)" }}>{label}</div>
     </div>
   );
 }
@@ -460,7 +460,7 @@ const funnelRowStyle: CSSProperties = {
   alignItems: "center",
   gap: "12px",
   padding: "8px 12px",
-  border: "1px solid var(--rr-color-separator)",
+  border: "1px solid var(--color-separator)",
   borderRadius: "10px",
 };
 
@@ -471,7 +471,7 @@ const sourceRowStyle: CSSProperties = {
   justifyContent: "space-between",
   flexWrap: "wrap",
   padding: "10px 12px",
-  border: "1px solid var(--rr-color-separator)",
+  border: "1px solid var(--color-separator)",
   borderRadius: "12px",
 };
 
@@ -532,10 +532,10 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
                     })
                   : null}
               </div>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: d.total > 0 ? "var(--rr-color-text-primary)" : "var(--rr-color-text-tertiary)" }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: d.total > 0 ? "var(--color-text-primary)" : "var(--color-text-tertiary)" }}>
                 {d.total}
               </div>
-              <div style={{ fontSize: "0.7rem", color: "var(--rr-color-text-tertiary)" }}>{dayLabel}</div>
+              <div style={{ fontSize: "0.7rem", color: "var(--color-text-tertiary)" }}>{dayLabel}</div>
             </div>
           );
         })}
@@ -543,7 +543,7 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
       {orderedSources.length > 0 ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: "10px" }}>
           {orderedSources.map((s) => (
-            <span key={s} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.72rem", color: "var(--rr-color-text-secondary)" }}>
+            <span key={s} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.72rem", color: "var(--color-text-secondary)" }}>
               <span style={{ width: "9px", height: "9px", borderRadius: "2px", background: sourceColor(s), display: "inline-block" }} />
               {s}
             </span>

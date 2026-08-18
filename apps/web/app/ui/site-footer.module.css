@@ -1,8 +1,8 @@
 .siteFooter {
   container-type: inline-size;
   margin-top: clamp(16px, 2vw, 24px);
-  border-top: 1px solid var(--rr-color-separator);
-  color: var(--rr-color-text-secondary);
+  border-top: 1px solid var(--color-separator);
+  color: var(--color-text-secondary);
 }
 
 .siteFooter[data-tone="dark"] {
@@ -175,16 +175,16 @@
 .siteFooter[data-tone="light"] .footerLink,
 .siteFooter[data-tone="light"] .footerOperator,
 .siteFooter[data-tone="light"] .footerOperatorEmail {
-  color: var(--rr-color-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .siteFooter[data-tone="light"] .footerNav strong,
 .siteFooter[data-tone="light"] .footerOperatorName {
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
 }
 
 .siteFooter[data-tone="light"] .footerCopy {
-  color: var(--rr-color-text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 .siteFooter[data-tone="light"] .footerMark {

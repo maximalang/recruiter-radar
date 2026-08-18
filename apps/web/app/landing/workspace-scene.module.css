@@ -37,7 +37,7 @@
   gap: 1rem;
   padding: .66rem .95rem;
   background: transparent;
-  color: var(--rr-color-text-primary);
+  color: var(--color-text-primary);
 }
 
 .railIdentity {
@@ -45,21 +45,21 @@
   flex-wrap: wrap;
   align-items: center;
   gap: .45rem .8rem;
-  font-family: var(--rr-font-mono);
+  font-family: var(--font-mono);
   font-size: .58rem;
   letter-spacing: .055em;
   text-transform: uppercase;
 }
 
-.railIdentity strong { color: var(--rr-color-signal); font-weight: 650; }
-.railIdentity span { color: var(--rr-color-text-tertiary); }
+.railIdentity strong { color: var(--color-signal); font-weight: 650; }
+.railIdentity span { color: var(--color-text-tertiary); }
 
 .railStatus {
   display: inline-flex;
   align-items: center;
   gap: .45rem;
-  color: var(--rr-color-text-tertiary);
-  font-family: var(--rr-font-mono);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
   font-size: .56rem;
   text-transform: uppercase;
 }
@@ -68,7 +68,7 @@
   width: .38rem;
   height: .38rem;
   border-radius: 50%;
-  background: var(--rr-color-signal);
+  background: var(--color-signal);
   content: "";
   box-shadow: 0 0 0 0 rgba(141,217,193,0);
 }
@@ -104,7 +104,7 @@
 }
 
 .presets::-webkit-scrollbar { display: none; }
-.presets > span { margin-right: .15rem; color: rgba(23,35,45,.52); font-family: var(--rr-font-mono); font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; }
+.presets > span { margin-right: .15rem; color: rgba(23,35,45,.52); font-family: var(--font-mono); font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; }
 .presets a {
   min-height: 44px;
   padding: .42rem .58rem;
@@ -253,7 +253,7 @@
 
 .confidence {
   color: #315f52;
-  font-size: var(--rr-type-label-size);
+  font-size: var(--type-label-size);
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -288,7 +288,7 @@
 .evidenceBlock > span,
 .factors > span {
   color: rgba(23, 35, 45, .62);
-  font-family: var(--rr-font-mono);
+  font-family: var(--font-mono);
   font-size: .58rem;
   letter-spacing: .045em;
   text-transform: uppercase;
@@ -378,7 +378,7 @@
 
 .footerRail small {
   color: rgba(23, 35, 45, .6);
-  font-family: var(--rr-font-mono);
+  font-family: var(--font-mono);
   font-size: .56rem;
   text-transform: uppercase;
 }

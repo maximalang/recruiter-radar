@@ -770,11 +770,11 @@ function OnboardingPreviewCard(props: {
             ) : null;
           })()}
         </div>
-        <span style={{ color: "#64748b", fontSize: "0.9rem" }}>{formatVacanciesCount(item.vacancies_count)}</span>
+        <span style={{ color: "var(--color-text-tertiary)", fontSize: "0.9rem" }}>{formatVacanciesCount(item.vacancies_count)}</span>
       </div>
 
       <div className={styles.previewReasonList}>
-        <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>Почему это важно</div>
+        <div style={{ color: "var(--color-text-tertiary)", fontSize: "0.78rem", fontWeight: 700 }}>Почему это важно</div>
         <div>{primaryReason}</div>
       </div>
 

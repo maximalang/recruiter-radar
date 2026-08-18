@@ -4,13 +4,13 @@ import path from 'node:path'
 const APP_ROOT = path.resolve(process.cwd(), 'app')
 const SOURCE_EXTENSIONS = new Set(['.css', '.ts', '.tsx'])
 const ALLOWED_RR_TOKEN_PREFIXES = [
-  '--rr-color-',
-  '--rr-font-',
-  '--rr-type-',
-  '--rr-space-',
-  '--rr-radius-',
-  '--rr-shadow-',
-  '--rr-motion-',
+  '--color-',
+  '--font-',
+  '--type-',
+  '--space-',
+  '--radius-',
+  '--shadow-',
+  '--motion-',
 ]
 
 function sourceFiles(directory: string): string[] {

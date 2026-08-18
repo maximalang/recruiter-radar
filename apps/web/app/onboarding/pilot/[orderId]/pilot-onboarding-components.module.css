@@ -36,7 +36,7 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background-color: var(--rr-color-signal);
+  background-color: var(--color-signal);
   color: #fff;
   font-size: 0.82rem;
   font-weight: 700;
@@ -61,7 +61,7 @@
 .openerLabel {
   font-size: 0.78rem;
   font-weight: 700;
-  color: #667085;
+  color: var(--color-text-tertiary);
 }
 
 /* Opener */
@@ -85,7 +85,7 @@
   display: inline-flex;
   padding: 4px 8px;
   border-radius: 999px;
-  background-color: #f8fafc;
+  background-color: var(--color-surface-primary);
   border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
@@ -109,7 +109,7 @@
   padding: 4px 8px;
   border-radius: 999px;
   background-color: rgba(35, 128, 111, 0.08);
-  color: var(--rr-color-signal);
+  color: var(--color-signal);
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -136,23 +136,23 @@
   border-radius: 999px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background-color: #fff;
-  color: #111827;
+  color: var(--color-text-primary);
 }
 
 .stepPill[data-current="true"] {
-  background-color: var(--rr-color-signal);
+  background-color: var(--color-signal);
   color: #fff;
 }
 
 .stepPill[data-complete="true"] {
   background-color: #eefbf3;
-  color: #111827;
+  color: var(--color-text-primary);
 }
 
 /* Future (not-current, not-complete) steps recede — muted text + border so the
    eye lands on the current step first. */
 .stepPill[data-future="true"] {
-  color: var(--rr-color-text-tertiary);
+  color: var(--color-text-tertiary);
   border-color: rgba(15, 23, 42, 0.06);
   background-color: rgba(255, 255, 255, 0.6);
 }
@@ -183,8 +183,8 @@
   justify-content: center;
   padding: 12px 18px;
   border-radius: 14px;
-  border: 1px solid var(--rr-color-signal);
-  background: var(--rr-color-signal);
+  border: 1px solid var(--color-signal);
+  background: var(--color-signal);
   color: #fff;
   text-decoration: none;
   font-weight: 700;

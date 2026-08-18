@@ -22,14 +22,14 @@ describe('product motion system', () => {
 
   it('defines a restrained timing vocabulary and opt-in primitives', () => {
     for (const contract of [
-      '--rr-motion-duration-fast: 90ms',
-      '--rr-motion-duration-control: 140ms',
-      '--rr-motion-duration-disclosure: 180ms',
-      '--rr-motion-duration-context: 220ms',
-      '--rr-motion-duration-emphasis: 260ms',
-      '--rr-motion-ease-standard:',
-      '--rr-motion-ease-enter:',
-      '--rr-motion-distance-short: 4px',
+      '--motion-duration-fast: 90ms',
+      '--motion-duration-control: 140ms',
+      '--motion-duration-disclosure: 180ms',
+      '--motion-duration-context: 220ms',
+      '--motion-duration-emphasis: 260ms',
+      '--motion-ease-standard:',
+      '--motion-ease-enter:',
+      '--motion-distance-short: 4px',
       '[data-motion-interactive]',
       '[data-motion-status]',
       '[data-motion-disclosure]',

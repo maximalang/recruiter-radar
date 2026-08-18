@@ -1,7 +1,7 @@
 /* Recruiter Radar — interaction hardening loaded after the visual finish layer. */
 
 :where(a, button, input, select, textarea, summary) {
-  -webkit-tap-highlight-color: var(--rr-color-selection);
+  -webkit-tap-highlight-color: var(--color-selection);
 }
 
 :where(button, input, select, textarea) {

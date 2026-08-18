@@ -27,7 +27,7 @@ describe('cross-route interaction hardening', () => {
   });
 
   it('keeps touch feedback on the final semantic token system without dead sidebar selectors', () => {
-    expect(interactions).toContain('-webkit-tap-highlight-color: var(--rr-color-selection)');
+    expect(interactions).toContain('-webkit-tap-highlight-color: var(--color-selection)');
     expect(interactions).not.toContain('rgba(35, 128, 111');
     expect(interactions).not.toContain('sidebarBrand');
   });
