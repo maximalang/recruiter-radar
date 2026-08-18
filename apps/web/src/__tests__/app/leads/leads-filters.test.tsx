@@ -1,17 +1,12 @@
 /**
  * @jest-environment jsdom
  *
- * Phase 3 (T3.1) — the leads filter bar must show active state visually on the
- * selects (not just via the subtitle "(фильтр активен)" text), the today-toggle
- * must read as a premium active pill with a CheckIcon, and the reset button
- * must carry an XIcon — so a recruiter sees the active filter at a glance on
- * mobile without reading text.
+ * Leads filter bar contract: active state stays visible and the live surface
+ * reuses the shared Calm Intelligence FilterBar/SearchField primitives.
  */
 import { render, screen } from '@testing-library/react';
 import LeadsFilters from '@/app/leads/leads-filters';
 
-// Mock next/navigation — LeadsFilters is a client component using useRouter +
-// useSearchParams. We stub useSearchParams to control the active filter state.
 const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -22,7 +17,14 @@ afterEach(() => {
   mockPush.mockClear();
 });
 
-describe('LeadsFilters (T3.1 — active filter state)', () => {
+describe('LeadsFilters', () => {
+  it('uses the shared filter and search primitives on the live workspace', () => {
+    const { container } = render(<LeadsFilters profiles={[]} />);
+    expect(container.querySelector('[data-ui="filter-bar"]')).not.toBeNull();
+    expect(container.querySelector('[data-ui="search-field"]')).not.toBeNull();
+    expect(screen.getByRole('searchbox', { name: 'Поиск по текущему списку компаний' })).toBeInTheDocument();
+  });
+
   it('marks the gate select data-active when a gate value is set', () => {
     const { container } = render(<LeadsFilters profiles={[]} />);
     const gateSelect = container.querySelector('[aria-label="Уровень подтверждения"]');
@@ -39,15 +41,14 @@ describe('LeadsFilters (T3.1 — active filter state)', () => {
     expect(fbSelect?.getAttribute('data-active')).toBeNull();
   });
 
-  it('renders an XIcon SVG inside the reset button (only when a filter is active)', () => {
-    // gate=A is active via the mock → reset button is rendered with an XIcon.
-    const { container } = render(<LeadsFilters profiles={[]} />);
+  it('renders an XIcon SVG inside the reset button', () => {
+    render(<LeadsFilters profiles={[]} />);
     const resetBtn = screen.getByRole('button', { name: /сбросить/i });
     expect(resetBtn.querySelector('svg')).not.toBeNull();
   });
 
   it('renders the today-toggle with a CheckIcon SVG', () => {
-    const { container } = render(<LeadsFilters profiles={[]} />);
+    render(<LeadsFilters profiles={[]} />);
     const todayBtn = screen.getByRole('button', { name: /сегодня в работе/i });
     expect(todayBtn.querySelector('svg')).not.toBeNull();
   });

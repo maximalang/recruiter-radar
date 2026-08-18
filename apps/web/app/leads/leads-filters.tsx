@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckIcon, MotionIcon, SearchIcon, XIcon } from '../ui/icons';
+import { FilterBar, SearchField } from '../ui/intelligence-primitives';
 import { GATE_LABELS } from '../ui/internal-page';
 import s from './leads-filters.module.css';
 
@@ -78,15 +79,16 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
   const hasEphemeralFilters = currentQuery !== '' || currentGate !== '' || currentFeedback !== '' || currentToday;
 
   return (
-    <div className={s.filterBar} aria-busy={isPending}>
+    <FilterBar className={s.filterBar} aria-busy={isPending} aria-label="Фильтры компаний">
       <form className={s.search} role="search" onSubmit={submitSearch}>
         <SearchIcon aria-hidden="true" />
-        <input
+        <SearchField
           type="search"
           value={query}
           disabled={isPending}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Компания, роль или сигнал"
+          label="Поиск по текущему списку компаний"
           aria-label="Поиск по текущему списку компаний"
         />
       </form>
@@ -134,6 +136,6 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
       <span className={s.filterStatus} role="status" aria-live="polite" data-motion-status>
         {isPending ? 'Обновляем список…' : ''}
       </span>
-    </div>
+    </FilterBar>
   );
 }
