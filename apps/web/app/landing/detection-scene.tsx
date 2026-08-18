@@ -5,7 +5,7 @@ import sceneStyles from "./detection-scene.module.css";
 
 export default function DetectionScene({ previewHref, paymentConfigured }: { previewHref: string; paymentConfigured: boolean }) {
   return (
-    <section id="scene-detection" className={sceneStyles.section} aria-labelledby="detection-title" data-header-tone="light" data-hero-layout="signal-spine" data-theme="inverse">
+    <section id="scene-detection" className={sceneStyles.section} aria-labelledby="detection-title" data-header-tone="dark" data-hero-layout="signal-spine" data-theme="inverse">
       <div className={sceneStyles.copy} data-hero-copy>
         <p className={sceneStyles.serviceLabel}>Радар клиентских возможностей для рекрутинговых агентств</p>
         <h1 id="detection-title" className={sceneStyles.title} data-hero-title>Компании, которым стоит написать сегодня.</h1>
