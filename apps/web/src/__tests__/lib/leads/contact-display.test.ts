@@ -22,15 +22,36 @@ describe('contact-display', () => {
         display: 'HR-почта: hr@acme.ru',
         href: 'mailto:hr@acme.ru',
       })
-      // Phone href strips separators to a tel: URI.
       expect(views[1].href).toBe('tel:+74951234567')
       expect(views[1].isHiringSurface).toBe(false)
-      // Telegram is an external https link.
       expect(views[2].href).toBe('https://t.me/acme_hr')
       expect(views[2].label).toBe('Telegram')
-      // Contact form is an external https link.
       expect(views[3].href).toBe('https://acme.ru/contacts')
       expect(views[3].label).toBe('Форма обратной связи')
+    })
+
+    it('does not create unsafe links from externally discovered contact values', () => {
+      const views = toContactPathViews([
+        { category: 'contact-form', value: 'javascript:alert(1)' },
+        { category: 'telegram', value: 'data:text/html,boom' },
+        { category: 'whatsapp', value: 'file:///etc/passwd' },
+        { category: 'hr-email', value: 'hr@acme.ru?bcc=attacker@example.com' },
+        { category: 'phone', value: 'call-me' },
+      ])
+
+      expect(views.map((view) => view.href)).toEqual([null, null, null, null, null])
+    })
+
+    it('allows only absolute http(s) URLs for externally linkable channels', () => {
+      const views = toContactPathViews([
+        { category: 'contact-form', value: 'http://acme.ru/contact' },
+        { category: 'telegram', value: '  https://t.me/acme_hr  ' },
+        { category: 'whatsapp', value: '/relative-contact' },
+      ])
+
+      expect(views[0].href).toBe('http://acme.ru/contact')
+      expect(views[1].href).toBe('https://t.me/acme_hr')
+      expect(views[2].href).toBeNull()
     })
 
     it('marks hr-email and careers-email as hiring surfaces, generic-email not', () => {
