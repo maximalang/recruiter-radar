@@ -27,6 +27,7 @@ import {
   MetricGrid,
   GateBadgeInline,
 } from '@/app/ui/internal-page';
+import { ProductErrorState, StaticEmptyState } from '@/app/ui/product-state';
 import { SearchIcon, CheckIcon } from '@/app/ui/icons';
 
 type IconCmp = (p: SVGProps<SVGSVGElement>) => ReactElement;
@@ -86,6 +87,25 @@ describe('EmptyState (T0.2 — SVG icon API)', () => {
     expect(svgEl).not.toBeNull();
     // The icon container should not echo a literal string glyph.
     expect(container.textContent).not.toMatch(/✓|○/);
+  });
+});
+
+describe('Product state primitives', () => {
+  it('supports repeated instances without duplicate document ids', () => {
+    const { container } = render(
+      <>
+        <StaticEmptyState title="Нет лидов" />
+        <StaticEmptyState title="Нет возможностей" />
+        <ProductErrorState title="Ошибка профиля" />
+        <ProductErrorState title="Ошибка доставки" />
+      </>,
+    );
+
+    expect(container.querySelectorAll('[id]')).toHaveLength(0);
+    expect(screen.getByRole('region', { name: 'Нет лидов' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Нет возможностей' })).toBeTruthy();
+    expect(screen.getByRole('alert', { name: 'Ошибка профиля' })).toBeTruthy();
+    expect(screen.getByRole('alert', { name: 'Ошибка доставки' })).toBeTruthy();
   });
 });
 
