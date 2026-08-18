@@ -4,35 +4,36 @@
   --color-surface-secondary: #f1eee6;
   --color-surface-selected: #e4efeb;
   --color-surface-elevated: #fffdf8;
+
   --color-text-primary: #14201c;
   --color-text-secondary: #4e5c55;
   --color-text-tertiary: #5c6862;
   --color-text-disabled: #8f9893;
   --color-text-inverse: #f4f1e9;
+
   --color-separator-subtle: #e2e0d9;
   --color-separator: #d7d6cf;
   --color-separator-strong: #b7bcb8;
+
   --color-signal: #2f7467;
   --color-signal-hover: #245b51;
   --color-signal-soft: #e4efeb;
   --color-copper: #8e5d42;
+
   --color-positive: #2e6b4d;
   --color-warning: #8a5a1f;
   --color-destructive: #a33d36;
   --color-information: #3f687a;
+
   --color-confidence-high: #416f5c;
   --color-confidence-medium: #75663d;
   --color-confidence-low: #707975;
+
   --color-focus: #1e6d60;
   --color-selection: #d5e7e1;
   --color-overlay: rgba(14, 21, 19, 0.52);
---color-surface-primary: var(--color-surface-primary);
---color-surface-selected: var(--color-surface-selected);
---color-text-primary: var(--color-text-primary);
---color-text-tertiary: var(--color-text-tertiary);
---color-signal: var(--color-signal);
---color-confidence-medium: var(--color-confidence-medium);
---font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-plex-mono, "IBM Plex Mono"), "SFMono-Regular", Consolas, monospace;
 
   --type-display-size: clamp(3rem, 6vw, 5rem);
