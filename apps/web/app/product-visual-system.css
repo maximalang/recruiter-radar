@@ -36,9 +36,13 @@ body {
   --color-warning: #d2a365;
   --color-destructive: #e08b84;
   --color-information: #86b2c4;
+  --color-confidence-high: #7fb996;
+  --color-confidence-medium: #d2a365;
+  --color-confidence-low: #919c95;
   --color-focus: #a6d5c9;
+  --color-selection: rgba(143, 199, 184, .20);
+  --color-overlay: rgba(0, 0, 0, .64);
 }
-
 
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea) {
   min-height: 44px;
