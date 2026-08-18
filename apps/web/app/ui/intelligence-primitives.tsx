@@ -10,7 +10,7 @@ type ConfidenceLevel = "high" | "medium" | "low";
  */
 
 export function AppCanvas({ children }: { children: ReactNode }) {
-  return <main className={styles.canvas} data-ui="app-canvas">{children}</main>;
+  return <div className={styles.canvas} data-ui="app-canvas">{children}</div>;
 }
 
 export function WorkspaceHeader({
