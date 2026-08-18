@@ -131,7 +131,7 @@ export function ProductWorkspaceHeader(props: {
   status?: ReactNode;
 }) {
   return (
-    <div className={styles.semanticHeader}>
+    <div style={{ marginBottom: "var(--space-8)" }}>
       <WorkspaceHeader
         eyebrow={props.eyebrow}
         title={props.title}
