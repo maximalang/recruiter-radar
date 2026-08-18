@@ -37,6 +37,11 @@
   line-height: 1.53;
 }
 
+.sectionContent {
+  display: grid;
+  gap: var(--rr-space-4);
+}
+
 .ledger {
   margin: 0;
   border-top: 1px solid var(--rr-color-separator);
