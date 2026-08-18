@@ -25,6 +25,10 @@ import {
   formatSignalFreshness,
   LoadingState,
 } from '../ui/internal-page';
+import {
+  ConfidenceIndicator as ConfidenceIndicatorPrimitive,
+  LeadRow as LeadRowPrimitive,
+} from '../ui/intelligence-primitives';
 import { ProductErrorState } from '../ui/product-error-state';
 import { StaticEmptyState } from '../ui/static-empty-state';
 import { buildAccountNavigation } from '../ui/account-navigation';
@@ -44,7 +48,6 @@ type HiringMode = 'specialist' | 'executive' | 'volume';
 
 type ConfidenceView = {
   level: 'high' | 'medium' | 'low';
-  segments: 1 | 2 | 3;
   label: string;
 };
 
@@ -53,22 +56,17 @@ function StateLink({ href, label }: { href: string; label: string }) {
 }
 
 function confidenceView(gate: LeadItem['confidenceGate']): ConfidenceView {
-  if (gate === 'A') return { level: 'high', segments: 3, label: 'высокая' };
-  if (gate === 'B') return { level: 'medium', segments: 2, label: 'достаточная' };
-  if (gate === 'C') return { level: 'medium', segments: 2, label: 'требует проверки' };
-  return { level: 'low', segments: 1, label: 'недостаточно' };
+  if (gate === 'A') return { level: 'high', label: 'высокая' };
+  if (gate === 'B') return { level: 'medium', label: 'достаточная' };
+  if (gate === 'C') return { level: 'medium', label: 'требует проверки' };
+  return { level: 'low', label: 'недостаточно' };
 }
 
 function ConfidenceIndicator({ gate }: { gate: LeadItem['confidenceGate'] }) {
   const view = confidenceView(gate);
   return (
     <div className={styles.confidence} data-level={view.level} aria-label={`Уверенность: ${view.label}`}>
-      <span className={styles.segments} aria-hidden="true">
-        {[1, 2, 3].map((segment) => (
-          <span key={segment} className={styles.segment} data-on={segment <= view.segments ? 'true' : undefined} />
-        ))}
-      </span>
-      <span className={styles.confidenceLabel}>{view.label}</span>
+      <ConfidenceIndicatorPrimitive level={view.level}>{view.label}</ConfidenceIndicatorPrimitive>
     </div>
   );
 }
@@ -119,7 +117,7 @@ export function LeadRow({
   ].filter(Boolean).join(' · ');
 
   return (
-    <article className={styles.row} data-lead-row="true">
+    <LeadRowPrimitive className={styles.row} data-lead-row="true">
       <div className={styles.rank}>{String(rank).padStart(2, '0')}</div>
 
       <div className={styles.identity}>
@@ -156,7 +154,7 @@ export function LeadRow({
           {secondarySignals ? <span className={styles.secondaryMeta}>{secondarySignals}</span> : null}
         </div>
       ) : null}
-    </article>
+    </LeadRowPrimitive>
   );
 }
 
