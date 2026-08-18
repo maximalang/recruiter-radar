@@ -47,6 +47,15 @@ describe("digest delivery entitlement composition", () => {
     expect(mockRunDigest).not.toHaveBeenCalled();
     expect(mockDeliver).not.toHaveBeenCalled();
   });
+
+  test("does not expose unexpected internal error details", async () => {
+    mockAssert.mockRejectedValueOnce(new Error("password authentication failed for user postgres"));
+    const response = await POST(requestForProfile("7"));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: "Failed to deliver digest." });
+  });
 });
 
 function requestForProfile(clientProfileId: string): Request {
