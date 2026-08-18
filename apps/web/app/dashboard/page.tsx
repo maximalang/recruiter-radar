@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth-v2/authorization";
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
 import { getDashboardTodayRadar } from "@/lib/dashboard-data";
 import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";
+import { getEffectiveEntitlement } from "@/lib/entitlements";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import DashboardAccountOverview from "./dashboard-account-overview";
 import DashboardTodayRadar from "./dashboard-today-radar";
