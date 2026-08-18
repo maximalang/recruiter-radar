@@ -156,7 +156,7 @@
   min-height: 2.75rem;
   overflow: hidden;
   border-radius: var(--radius-control);
-  background: var(--slate-900);
+  background: var(--color-text-primary);
   color: color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary));
   transition: transform .16s ease, background-color .18s ease, box-shadow .18s ease;
 }
@@ -239,7 +239,7 @@
 }
 
 .leadPrimary :global([data-lead-score] strong) {
-  color: var(--signal-deep, var(--color-signal));
+  color: var(--color-signal-hover);
   font-size: 1.25rem;
   font-weight: 520;
   line-height: 1;
