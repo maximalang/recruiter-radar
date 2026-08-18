@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 export type SettingsSectionProps = {
   title: ReactNode;
@@ -15,9 +15,11 @@ export function SettingsSection({
   description,
   children,
 }: SettingsSectionProps) {
+  const titleId = useId();
+
   return (
-    <section aria-labelledby="settings-section-title">
-      <h2 id="settings-section-title">{title}</h2>
+    <section aria-labelledby={titleId}>
+      <h2 id={titleId}>{title}</h2>
       {description ? <p>{description}</p> : null}
       <div>{children}</div>
     </section>
