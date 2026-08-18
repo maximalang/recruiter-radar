@@ -1,16 +1,21 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
+
+type EmptyStateIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 export function StaticEmptyState({
   title,
   description,
   action,
+  icon: Icon,
 }: {
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
+  icon?: EmptyStateIcon;
 }) {
   return (
     <section aria-label="Пустое состояние">
+      {Icon ? <Icon aria-hidden="true" focusable="false" /> : null}
       <h2>{title}</h2>
       {description ? <p>{description}</p> : null}
       {action}
