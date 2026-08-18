@@ -1,5 +1,7 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 
+import { EmptyState } from "./intelligence-primitives";
+
 type EmptyStateIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 export function StaticEmptyState({
@@ -14,12 +16,12 @@ export function StaticEmptyState({
   icon?: EmptyStateIcon;
 }) {
   return (
-    <section>
-      {Icon ? <Icon aria-hidden="true" focusable="false" /> : null}
-      <h2>{title}</h2>
-      {description ? <p>{description}</p> : null}
-      {action}
-    </section>
+    <EmptyState
+      title={title}
+      description={description}
+      action={action}
+      leading={Icon ? <Icon aria-hidden="true" focusable="false" /> : undefined}
+    />
   );
 }
 
