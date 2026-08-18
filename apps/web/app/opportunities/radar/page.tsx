@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { isEvidenceRadarV1EnabledForContext } from '@/lib/intelligence/evidence-radar-config'
@@ -9,11 +10,11 @@ import {
 } from '@/lib/opportunities/authorization'
 import { isOpportunityEngineV1EnabledForContext } from '@/lib/opportunities/config'
 import {
-  EmptyState,
-  ErrorState,
   InternalPageFrame,
   InternalPageHeader,
 } from '../../ui/internal-page'
+import { ProductErrorState } from '../../ui/product-error-state'
+import { StaticEmptyState } from '../../ui/static-empty-state'
 import { EvidenceRadarMap } from '../evidence-radar-map'
 import { buildOpportunityRadarNavigation } from '../navigation'
 
@@ -25,6 +26,10 @@ export const metadata: Metadata = {
 }
 
 const NAVIGATION = buildOpportunityRadarNavigation()
+
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>
+}
 
 export default async function EvidenceRadarPage() {
   const authorization = await getOpportunityAuthorizationContext('opportunities:read')
@@ -38,10 +43,10 @@ export default async function EvidenceRadarPage() {
           title="Радар"
           subtitle="Свежесть сигнала и уровень подтверждения в одном пространстве."
         />
-        <EmptyState
+        <StaticEmptyState
           title="Нет доступа к Радару"
-          text="Войдите в рабочее пространство с доступом к подтверждённым сигналам."
-          action={{ href: '/login', label: 'Войти' }}
+          description="Войдите в рабочее пространство с доступом к подтверждённым сигналам."
+          action={<StateLink href="/login" label="Войти" />}
         />
       </InternalPageFrame>
     )
@@ -65,11 +70,12 @@ export default async function EvidenceRadarPage() {
       {leads ? (
         <EvidenceRadarMap leads={leads} referenceTimestamp={Date.now()} />
       ) : (
-        <ErrorState
+        <ProductErrorState
           title="Радар временно не загрузился"
           description="Данные других рабочих пространств не показываются. Последние неподтверждённые связи не подставляются вместо результата."
-          action={{ href: '/opportunities/radar', label: 'Обновить' }}
-        />
+        >
+          <StateLink href="/opportunities/radar" label="Обновить" />
+        </ProductErrorState>
       )}
     </InternalPageFrame>
   )
