@@ -1,12 +1,4 @@
 .landingPage {
---slate-900: var(--color-information);
---slate-800: var(--color-information);
---paper-soft: color-mix(in srgb, var(--color-copper) 16%, var(--color-surface-primary));
---ink: var(--color-information);
---muted-light: color-mix(in srgb, var(--color-information) 62%, transparent);
---line-light: color-mix(in srgb, var(--color-information) 14%, transparent);
---signal-strong: var(--color-signal);
---copper: var(--color-copper);
 --scene-pad: clamp(1.15rem, 4.1vw, 5.6rem);
   --content: 78rem;
   --display: clamp(3.2rem, 7.6vw, 7.4rem);
