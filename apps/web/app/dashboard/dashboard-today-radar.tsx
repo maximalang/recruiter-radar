@@ -117,7 +117,7 @@ export default function DashboardTodayRadar({ topLeads, pendingReview, hiringMod
       </div>
 
       <div className={styles.todayWorkflow} aria-labelledby="today-workflow-heading">
-        <span className={styles.sectionEyebrow}>Workflow</span>
+        <span className={styles.sectionEyebrow}>Работа</span>
         <h3 id="today-workflow-heading">Рабочий контур</h3>
         <Link href="/review" className={styles.todayWorkflowRow}>
           <span>На проверке</span>
