@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { ProductErrorState } from "../ui/product-error-state";
@@ -9,7 +9,10 @@ import { InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
 const REVIEW_NAV = buildAccountNavigation("review");
 
 export default function ReviewError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  const correlationId = error.digest ?? crypto.randomUUID();
+  const correlationId = useMemo(
+    () => error.digest ?? crypto.randomUUID(),
+    [error],
+  );
 
   useEffect(() => {
     console.error("[review] route render failed", { correlationId, name: error.name });
