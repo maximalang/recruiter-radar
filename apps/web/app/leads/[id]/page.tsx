@@ -22,6 +22,11 @@ import {
   GATE_DESC,
   FEEDBACK_LABELS,
 } from '../../ui/internal-page';
+import {
+  ConfidenceIndicator,
+  EvidenceTimeline,
+  Provenance,
+} from '../../ui/intelligence-primitives';
 import { ProductErrorState } from '../../ui/product-error-state';
 import { StaticEmptyState } from '../../ui/static-empty-state';
 import { buildAccountNavigation } from '../../ui/account-navigation';
@@ -31,27 +36,13 @@ import styles from './lead-brief.module.css';
 export const dynamic = 'force-dynamic';
 const LEAD_DETAIL_NAV = buildAccountNavigation('leads');
 
-type ConfidenceView = { level: 'high' | 'medium' | 'low'; segments: 1 | 2 | 3; label: string };
+type ConfidenceView = { level: 'high' | 'medium' | 'low'; label: string };
 
 function confidenceView(gate: string): ConfidenceView {
-  if (gate === 'A') return { level: 'high', segments: 3, label: 'высокая уверенность' };
-  if (gate === 'B') return { level: 'medium', segments: 2, label: 'достаточная уверенность' };
-  if (gate === 'C') return { level: 'medium', segments: 2, label: 'ограниченная уверенность' };
-  return { level: 'low', segments: 1, label: 'низкая уверенность' };
-}
-
-function ConfidenceIndicator({ gate }: { gate: string }) {
-  const view = confidenceView(gate);
-  return (
-    <div className={styles.confidence} data-level={view.level} aria-label={view.label}>
-      <span className={styles.segments} aria-hidden="true">
-        {[1, 2, 3].map((segment) => (
-          <span key={segment} className={styles.segment} data-on={segment <= view.segments ? 'true' : undefined} />
-        ))}
-      </span>
-      <span className={styles.confidenceLabel}>{view.label}</span>
-    </div>
-  );
+  if (gate === 'A') return { level: 'high', label: 'высокая уверенность' };
+  if (gate === 'B') return { level: 'medium', label: 'достаточная уверенность' };
+  if (gate === 'C') return { level: 'medium', label: 'ограниченная уверенность' };
+  return { level: 'low', label: 'низкая уверенность' };
 }
 
 function formatRoleCount(count: number): string {
@@ -219,6 +210,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const latestSignal = lead.latestPublishedAt
     ? new Date(lead.latestPublishedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
     : null;
+  const confidence = confidenceView(lead.confidenceGate);
 
   return (
     <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
@@ -240,13 +232,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             {latestSignal ? <span>последний сигнал {latestSignal}</span> : null}
             {lead.reviewStatus && lead.reviewStatus !== 'auto_approved' ? <span>на проверке</span> : null}
           </div>
-          <div className={styles.scoreBlock}>
-            <div className={styles.score} data-numeric="true" aria-label={`Сила сигнала ${score}`}>{score}</div>
-            <ConfidenceIndicator gate={lead.confidenceGate} />
-          </div>
         </div>
 
-        <section className={styles.decision} aria-label="Решение" data-company-brief-decision>
+        <section className={styles.decision} aria-label="Почему сейчас" data-company-brief-decision>
           <div className={styles.decisionSection}>
             <span className={styles.label}>Почему сейчас</span>
             <p className={styles.whyNow}>{lead.whyNow?.trim() || urgency.label}</p>
@@ -254,34 +242,48 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {urgency.label}{shownRoles.length > 0 ? ` · ${shownRoles.join(' · ')}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}` : ''}
             </div>
           </div>
-          <div className={styles.decisionSection}>
-            <span className={styles.label}>Следующий ход</span>
-            <p className={styles.nextMove}>{nextMove}</p>
-          </div>
         </section>
 
         <div className={styles.layout}>
           <section className={`${styles.section} ${styles.evidenceSection}`} data-company-brief-evidence>
-            <h2>Подтверждения</h2>
+            <h2>Лента подтверждений</h2>
             <div className={styles.stats}>
               <span>{formatVacanciesCount(lead.vacanciesCount)}</span>
               <span>{formatRoleCount(lead.distinctVacancyNamesCount)}</span>
               <span>{formatSourceCount(lead.sourceFamilies.length)}</span>
             </div>
             {lead.evidenceTitles.length > 0 ? (
-              <ol className={styles.evidenceList}>
+              <EvidenceTimeline>
                 {lead.evidenceTitles.map((title, index) => (
                   <li key={`${title}:${index}`}>
-                    <span className={styles.evidenceIndex}>{String(index + 1).padStart(2, '0')}</span>
-                    <span>{title}</span>
+                    <div className={styles.evidenceFact}>
+                      <span className={styles.evidenceIndex}>{String(index + 1).padStart(2, '0')}</span>
+                      <span>{title}</span>
+                    </div>
                   </li>
                 ))}
-              </ol>
+              </EvidenceTimeline>
             ) : <p className={styles.body}>Подтверждённые факты пока не сформированы.</p>}
-            {lead.sourceFamilies.length > 0 ? (
-              <div className={styles.provenance}>Источники: {lead.sourceFamilies.join(' · ')}</div>
-            ) : null}
           </section>
+
+          <section className={`${styles.section} ${styles.confidenceSection}`} data-company-brief-confidence>
+            <h2>Уверенность</h2>
+            <ConfidenceIndicator level={confidence.level}>{confidence.label}</ConfidenceIndicator>
+            <p className={styles.body}>{GATE_DESC[lead.confidenceGate] ?? GATE_DESC.D}</p>
+          </section>
+
+          <section className={`${styles.section} ${styles.nextMoveSection}`} data-company-brief-next-move>
+            <h2>Следующий ход</h2>
+            <p className={styles.nextMove}>{nextMove}</p>
+          </section>
+
+          <div className={styles.provenanceSection} data-company-brief-provenance>
+            <Provenance>
+              <span>Источники: {lead.sourceFamilies.length > 0 ? lead.sourceFamilies.join(' · ') : 'не подтверждены'}</span>
+              {latestSignal ? <span>Последний сигнал: {latestSignal}</span> : null}
+              <span data-numeric="true">Сила сигнала: {score}</span>
+            </Provenance>
+          </div>
 
           <aside className={styles.aside} aria-label="Действия и контекст" data-company-brief-action>
             <div className={styles.rail}>
@@ -315,12 +317,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <div className={styles.railValue}>{feedback ? feedback.label : 'Обратной связи ещё нет'}</div>
                 {lead.feedbackNote ? <p className={styles.body}>{lead.feedbackNote}</p> : null}
                 <FeedbackButtons orgId={lead.orgId} clientProfileId={lead.clientProfileId} currentStatus={lead.feedbackStatus ?? 'none'} />
-              </section>
-
-              <section className={styles.railSection}>
-                <span className={styles.railTitle}>Подтверждение</span>
-                <div className={styles.railValue}>{confidenceView(lead.confidenceGate).label}</div>
-                <div className={styles.metaList}>{GATE_DESC[lead.confidenceGate] ?? GATE_DESC.D}</div>
               </section>
 
               <section className={styles.railSection}>
