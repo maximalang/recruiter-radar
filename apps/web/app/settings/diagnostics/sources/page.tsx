@@ -14,11 +14,11 @@ import {
 } from '@/lib/opportunities/authorization'
 import { isOpportunityEngineV1EnabledForContext } from '@/lib/opportunities/config'
 import {
-  EmptyState,
-  ErrorState,
   InternalPageFrame,
   InternalPageHeader,
 } from '../../../ui/internal-page'
+import { ProductErrorState } from '../../../ui/product-error-state'
+import { StaticEmptyState } from '../../../ui/static-empty-state'
 import { buildAccountNavigation } from '../../../ui/account-navigation'
 import styles from './source-registry.module.css'
 
@@ -45,6 +45,10 @@ const ROLE_LABELS: Record<SourceRole, string> = {
   first_party: 'First-party Signals',
 }
 
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>
+}
+
 export default async function DiagnosticsSourcesPage() {
   const authorization = await getOpportunityAuthorizationContext('opportunities:read')
 
@@ -53,10 +57,10 @@ export default async function DiagnosticsSourcesPage() {
       <InternalPageFrame navItems={NAVIGATION}>
         <InternalPageHeader title="Источники" subtitle="Управляемый реестр доказательных источников." />
         <section className={styles.noticeSurface}>
-          <EmptyState
+          <StaticEmptyState
             title="Нет доступа к диагностике источников"
-            text="Войдите в рабочее пространство с доступом к диагностике."
-            action={{ href: '/login', label: 'Войти' }}
+            description="Войдите в рабочее пространство с доступом к диагностике."
+            action={<StateLink href="/login" label="Войти" />}
           />
         </section>
       </InternalPageFrame>
@@ -74,11 +78,12 @@ export default async function DiagnosticsSourcesPage() {
           title="Источники"
           subtitle="Текущие подключения и решения правового review."
         />
-        <ErrorState
+        <ProductErrorState
           title="Диагностика источников временно не загрузилась"
           description="Статический policy-файл не используется как подмена operational журнала review. Проверьте миграции и подключение к БД."
-          action={{ href: '/settings/diagnostics/sources', label: 'Обновить' }}
-        />
+        >
+          <StateLink href="/settings/diagnostics/sources" label="Обновить" />
+        </ProductErrorState>
       </InternalPageFrame>
     )
   }
