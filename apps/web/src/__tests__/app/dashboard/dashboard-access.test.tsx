@@ -6,7 +6,10 @@ import { render, screen } from "@testing-library/react";
 jest.mock("@/lib/account-auth", () => ({ getAccountById: jest.fn() }));
 jest.mock("@/lib/auth-v2/authorization", () => ({ getSession: jest.fn() }));
 jest.mock("@/lib/clientProfiles", () => ({ getClientProfileByOwnerId: jest.fn() }));
-jest.mock("@/lib/dashboard-data", () => ({ getDashboardTodayRadar: jest.fn() }));
+jest.mock("@/lib/dashboard-data", () => ({
+  getDashboardTodayRadar: jest.fn(),
+  getDashboardSourceHealth: jest.fn(),
+}));
 jest.mock("@/lib/entitlements", () => ({ getEffectiveEntitlement: jest.fn() }));
 jest.mock("@/app/dashboard/dashboard-today-radar", () => ({
   __esModule: true,
@@ -26,7 +29,7 @@ import { getAccountById } from "@/lib/account-auth";
 import { getSession } from "@/lib/auth-v2/authorization";
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
 import { getEffectiveEntitlement } from "@/lib/entitlements";
-import { getDashboardTodayRadar } from "@/lib/dashboard-data";
+import { getDashboardSourceHealth, getDashboardTodayRadar } from "@/lib/dashboard-data";
 
 describe("dashboard canonical access states", () => {
   beforeEach(() => {
@@ -34,6 +37,12 @@ describe("dashboard canonical access states", () => {
     jest.mocked(getSession).mockResolvedValue({ userId: "84", dataOwnerId: "42", workspaceId: "ws-1" } as never);
     jest.mocked(getAccountById).mockResolvedValue({ id: "84" } as never);
     jest.mocked(getDashboardTodayRadar).mockResolvedValue({ topLeads: [], pendingReview: 0, hiringModeByProfileId: {}, lastRunAt: null });
+    jest.mocked(getDashboardSourceHealth).mockResolvedValue({
+      sourceCount: 0,
+      degradedSourceCount: 0,
+      latestSuccessfulRunAt: null,
+      latestAttemptAt: null,
+    } as never);
   });
 
   test("denies premium dashboard before loading tenant product data", async () => {
@@ -74,7 +83,6 @@ describe("dashboard canonical access states", () => {
     expect(screen.getByText(/Профиль радара временно недоступен/)).toBeInTheDocument();
     expect(screen.queryByText(/Радар ещё не настроен/)).not.toBeInTheDocument();
   });
-
 
   test("links a radar data failure to the canonical radar settings route", async () => {
     jest.mocked(getEffectiveEntitlement).mockResolvedValue({ status: "active", source: "admin", plan: "radar-admin", startsAt: "2026-08-09T00:00:00.000Z", expiresAt: null, features: ["dashboard"], activeSources: ["admin"] });
