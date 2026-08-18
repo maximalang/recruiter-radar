@@ -44,8 +44,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
           <small>{[location, vacanciesCaption].filter(Boolean).join(" · ")}</small>
         </span>
         <span className={`${styles.workspaceSignal} ${sceneStyles.leadSignal}`}>{whyNow}</span>
-        <span className={styles.workspaceScore} data-lead-score>
-          <strong>{points}</strong>
+        <span className={styles.workspaceScore} data-lead-confidence>
           <b className={sceneStyles.confidence}>{item.confidenceLabel}</b>
         </span>
       </div>
