@@ -9,12 +9,11 @@ import {
   InternalPageFrame,
   InternalPageHeader,
   formatSignalFreshness,
-  EmptyState,
   LoadingState,
-  ErrorState,
 } from '../ui/internal-page';
+import { ProductErrorState } from '../ui/product-error-state';
+import { StaticEmptyState } from '../ui/static-empty-state';
 import { buildAccountNavigation } from '../ui/account-navigation';
-import { CheckIcon, TargetIcon } from '../ui/icons';
 import ReviewActions from './review-actions';
 import { deriveReviewReason } from './review-reason';
 import { pluralizeLeads } from '../leads/page-helpers';
@@ -46,6 +45,10 @@ interface ReviewCandidate {
   createdAt: string;
 }
 
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>;
+}
+
 async function getReviewCandidates(
   clientProfileId: string,
   limit: number,
@@ -70,8 +73,6 @@ async function getReviewCandidates(
     const data = await res.json();
     return { items: data.items ?? [], total: data.total ?? 0 };
   } catch {
-    // Genuine fetch failure → flag it so the page shows an ErrorState instead
-    // of a silent empty queue that reads as "очередь пуста".
     return { items: [], total: 0, error: true };
   }
 }
@@ -134,14 +135,16 @@ export default async function ReviewPage({
   }>;
 }) {
   const params = await searchParams;
-  // Keep authentication, canonical entitlement, and data failures distinct.
-  // A missing session must never look like an account with zero profiles.
   const authorization = await getSession({ permission: 'leads:read' });
   if (!authorization) {
     return (
       <InternalPageFrame navItems={REVIEW_NAV}>
         <InternalPageHeader title="На проверке" subtitle="Защищённое рабочее пространство" />
-        <EmptyState title="Нужен вход в аккаунт" text="Войдите, чтобы открыть очередь проверки своего workspace." action={{ href: '/login?returnTo=/review', label: 'Войти' }} />
+        <StaticEmptyState
+          title="Нужен вход в аккаунт"
+          description="Войдите, чтобы открыть очередь проверки своего workspace."
+          action={<StateLink href="/login?returnTo=/review" label="Войти" />}
+        />
       </InternalPageFrame>
     );
   }
@@ -154,7 +157,12 @@ export default async function ReviewPage({
     return (
       <InternalPageFrame navItems={REVIEW_NAV}>
         <InternalPageHeader title="На проверке" subtitle="Проверка доступа" />
-        <ErrorState title="Не удалось проверить доступ" description="Мы не загружаем очередь, пока сервер не подтвердит права аккаунта." action={{ href: '/settings/access', label: 'Доступ и оплата' }} />
+        <ProductErrorState
+          title="Не удалось проверить доступ"
+          description="Мы не загружаем очередь, пока сервер не подтвердит права аккаунта."
+        >
+          <StateLink href="/settings/access" label="Доступ и оплата" />
+        </ProductErrorState>
       </InternalPageFrame>
     );
   }
@@ -166,7 +174,11 @@ export default async function ReviewPage({
     return (
       <InternalPageFrame navItems={REVIEW_NAV}>
         <InternalPageHeader title="На проверке" subtitle="Доступ не активен" />
-        <EmptyState title="Нужен активный доступ" text="Очередь и история сохранены. После активации проверка снова станет доступна." action={{ href: '/settings/access', label: 'Проверить доступ' }} />
+        <StaticEmptyState
+          title="Нужен активный доступ"
+          description="Очередь и история сохранены. После активации проверка снова станет доступна."
+          action={<StateLink href="/settings/access" label="Проверить доступ" />}
+        />
       </InternalPageFrame>
     );
   }
@@ -178,7 +190,12 @@ export default async function ReviewPage({
     return (
       <InternalPageFrame navItems={REVIEW_NAV}>
         <InternalPageHeader title="На проверке" subtitle="Радар" />
-        <ErrorState title="Не удалось загрузить профили радара" description="Это временная ошибка данных, а не пустая очередь." action={{ href: '/settings/radar', label: 'Открыть настройки радара' }} />
+        <ProductErrorState
+          title="Не удалось загрузить профили радара"
+          description="Это временная ошибка данных, а не пустая очередь."
+        >
+          <StateLink href="/settings/radar" label="Открыть настройки радара" />
+        </ProductErrorState>
       </InternalPageFrame>
     );
   }
@@ -205,18 +222,16 @@ export default async function ReviewPage({
       />
 
       {profiles.length === 0 && allProfiles.length > 0 ? (
-        <EmptyState
-          icon={TargetIcon}
+        <StaticEmptyState
           title="Профиль радара приостановлен"
-          text="Настройки и решения сохранены, но очередь не обновляется. Включите профиль, чтобы продолжить проверку новых кандидатов."
-          action={{ href: '/settings/radar', label: 'Включить профиль радара' }}
+          description="Настройки и решения сохранены, но очередь не обновляется. Включите профиль, чтобы продолжить проверку новых кандидатов."
+          action={<StateLink href="/settings/radar" label="Включить профиль радара" />}
         />
       ) : profiles.length === 0 ? (
-        <EmptyState
-          icon={TargetIcon}
+        <StaticEmptyState
           title="Нет клиентских профилей"
-          text="Создайте профиль в онбординге, чтобы увидеть очередь проверки."
-          action={{ href: '/onboarding', label: 'Настроить радар' }}
+          description="Создайте профиль в онбординге, чтобы увидеть очередь проверки."
+          action={<StateLink href="/onboarding" label="Настроить радар" />}
         />
       ) : (
         <>
@@ -236,29 +251,28 @@ export default async function ReviewPage({
           <p className={styles.summary}><strong>{reviewData.total}</strong> на проверке</p>
 
           {reviewData.error ? (
-            <ErrorState
+            <ProductErrorState
               title="На проверке не загрузилась"
               description="Кандидаты с уровнем подтверждения C и одиночным источником собираются из доказательств. Повторите через минуту — если очередь не появится, напишите поддержку."
             />
           ) : (
-          <Suspense fallback={<LoadingState variant="skeleton" />}>
-            {reviewData.items.length === 0 ? (
-              <EmptyState
-                icon={CheckIcon}
-                title="Очередь пуста"
-                text="Нет кандидатов, требующих проверки. Новые карьерные страницы и платформенные сигналы появляются ежедневно — кандидаты с уровнем подтверждения C или одиночным источником появятся здесь автоматически."
-              />
-            ) : (
-              <div className={styles.list} role="list">
-                <div className={styles.listHeader}>
-                  <strong>{reviewData.items.length}</strong> {pluralizeLeads(reviewData.items.length)} на проверке
+            <Suspense fallback={<LoadingState variant="skeleton" />}>
+              {reviewData.items.length === 0 ? (
+                <StaticEmptyState
+                  title="Очередь пуста"
+                  description="Нет кандидатов, требующих проверки. Новые карьерные страницы и платформенные сигналы появляются ежедневно — кандидаты с уровнем подтверждения C или одиночным источником появятся здесь автоматически."
+                />
+              ) : (
+                <div className={styles.list} role="list">
+                  <div className={styles.listHeader}>
+                    <strong>{reviewData.items.length}</strong> {pluralizeLeads(reviewData.items.length)} на проверке
+                  </div>
+                  {reviewData.items.map((candidate) => (
+                    <ReviewRow key={candidate.id} candidate={candidate} clientProfileId={activeProfileId} />
+                  ))}
                 </div>
-                {reviewData.items.map((candidate) => (
-                  <ReviewRow key={candidate.id} candidate={candidate} clientProfileId={activeProfileId} />
-                ))}
-              </div>
-            )}
-          </Suspense>
+              )}
+            </Suspense>
           )}
         </>
       )}
