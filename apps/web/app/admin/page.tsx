@@ -511,7 +511,7 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
                   minHeight: d.total > 0 ? "6px" : "2px",
                   display: "flex",
                   flexDirection: "column-reverse",
-                  borderRadius: "6px 6px 0 0",
+                  borderRadius: "var(--radius-detail) var(--radius-detail) 0 0",
                   overflow: "hidden",
                   background: d.total > 0 ? "transparent" : "color-mix(in srgb, var(--color-information) 8%, transparent)",
                   transition: "height 0.2s ease",
@@ -553,4 +553,3 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
     </div>
   );
 }
-
