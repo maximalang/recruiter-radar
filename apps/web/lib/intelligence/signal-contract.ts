@@ -1,7 +1,7 @@
 export type SignalEvidenceReference = {
-  source: string
   proof: string
-  occurredAt: string
+  source?: string
+  occurredAt?: string
   freshness?: string
 }
 
@@ -16,7 +16,8 @@ export type SignalConfidence = {
  * This is intentionally a presentation contract, not a scoring contract:
  * domain engines and database models keep their existing semantics while UI
  * surfaces consume the same Signal → Why now → Evidence → Confidence → Action
- * hierarchy.
+ * hierarchy. Evidence provenance/time stay optional because some existing
+ * projections expose proof text without a truthful one-to-one source mapping.
  */
 export type SignalContract = {
   signal: string
@@ -24,7 +25,7 @@ export type SignalContract = {
   evidence: readonly SignalEvidenceReference[]
   confidence: SignalConfidence
   action: string
-  timestamp: string
+  timestamp?: string
   outcome?: string | null
 }
 
