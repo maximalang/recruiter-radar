@@ -1,4 +1,4 @@
-import { Children, isValidElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 jest.mock("@/lib/auth-v2/authorization", () => ({ getSession: jest.fn() }));
 jest.mock("@/lib/entitlements", () => ({ getEffectiveEntitlement: jest.fn() }));
@@ -33,7 +33,7 @@ describe("access settings page", () => {
     jest.mocked(listCheckoutOrdersForAccess).mockResolvedValue([]);
 
     const page = await AccessSettingsPage();
-    const text = collectText(page);
+    const text = collectRenderedText(page);
     expect(text).toContain("Текущий доступ");
     expect(text).toContain("radar-admin-7");
     expect(text).toContain("Выдан оператором");
@@ -77,7 +77,7 @@ describe("access settings page", () => {
     ]);
 
     const page = await AccessSettingsPage();
-    const text = collectText(page);
+    const text = collectRenderedText(page);
 
     expect(text).toContain("1 день");
     expect(text).not.toContain("1 дн.");
@@ -96,15 +96,13 @@ describe("access settings page", () => {
     jest.mocked(listCheckoutOrdersForAccess).mockRejectedValue(new Error("database unavailable"));
 
     const page = await AccessSettingsPage();
+    const text = collectRenderedText(page);
 
-    expect(collectText(page)).toContain("История заказов временно недоступна");
-    expect(collectText(page)).not.toContain("Заказов пока нет");
+    expect(text).toContain("История заказов временно недоступна");
+    expect(text).not.toContain("Заказов пока нет");
   });
 });
 
-function collectText(node: ReactNode): string {
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (!isValidElement<Record<string, unknown>>(node)) return "";
-  const children = (node.props as { children?: ReactNode }).children;
-  return Children.toArray(children).map(collectText).join(" ");
+function collectRenderedText(node: React.ReactNode): string {
+  return renderToStaticMarkup(node).replace(/<[^>]+>/g, " ");
 }
