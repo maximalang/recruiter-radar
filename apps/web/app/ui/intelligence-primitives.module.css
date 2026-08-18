@@ -252,6 +252,13 @@
   margin: 0;
 }
 
+.emptyState > :is(a, button, [role="button"]) {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
 .loadingState {
   display: grid;
   gap: var(--space-3);
