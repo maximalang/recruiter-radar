@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "use client";
+import { useEffect } from "react";
 
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { ProductErrorState } from "../ui/product-error-state";
