@@ -9,6 +9,7 @@ import {
   TrendIcon,
 } from "./icons";
 import { BrandLogo } from "./brand-logo";
+import { AppCanvas, SignalIndicator, WorkspaceHeader } from "./intelligence-primitives";
 import type { NavItem } from "./internal-page";
 import styles from "./product-workspace.module.css";
 
@@ -78,45 +79,47 @@ export function ProductWorkspaceFrame(props: { navItems: NavItem[]; children: Re
   const settingsActive = props.navItems.some((item) => item.active && (item.href === "/settings" || item.href.startsWith("/settings/")));
 
   return (
-    <div className={styles.workspace} data-product-workspace="true" data-ui-system="recruiter-radar">
-      <a href="#main-content" className={styles.skipLink}>К содержанию</a>
+    <AppCanvas>
+      <div className={styles.workspace} data-product-workspace="true" data-ui-system="recruiter-radar">
+        <a href="#main-content" className={styles.skipLink}>К содержанию</a>
 
-      <header className={styles.topbar}>
-        <Link href="/" className={styles.topbarBrand} aria-label="Recruiter Radar — на главную">
-          <BrandLogo size="small" joined />
-        </Link>
-        <nav className={styles.primaryNav} aria-label="Основные разделы">
-          {coreItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={styles.primaryNavItem}
-              data-active={item.active ? "true" : undefined}
-              aria-current={item.active ? "page" : undefined}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <Link
-          href="/settings"
-          className={styles.accountLink}
-          data-active={settingsActive ? "true" : undefined}
-          aria-current={settingsActive ? "page" : undefined}
-        >
-          Аккаунт
-        </Link>
-      </header>
+        <header className={styles.topbar}>
+          <Link href="/" className={styles.topbarBrand} aria-label="Recruiter Radar — на главную">
+            <BrandLogo size="small" joined />
+          </Link>
+          <nav className={styles.primaryNav} aria-label="Основные разделы">
+            {coreItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={styles.primaryNavItem}
+                data-active={item.active ? "true" : undefined}
+                aria-current={item.active ? "page" : undefined}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+          <Link
+            href="/settings"
+            className={styles.accountLink}
+            data-active={settingsActive ? "true" : undefined}
+            aria-current={settingsActive ? "page" : undefined}
+          >
+            Аккаунт
+          </Link>
+        </header>
 
-      <div className={styles.workspaceBody}>
-        <div className={styles.mobileTopbar}>
-          <Link href="/" aria-label="Recruiter Radar — на главную"><BrandLogo size="small" joined /></Link>
+        <div className={styles.workspaceBody}>
+          <div className={styles.mobileTopbar}>
+            <Link href="/" aria-label="Recruiter Radar — на главную"><BrandLogo size="small" joined /></Link>
+          </div>
+          <main id="main-content" className={styles.content} tabIndex={-1}>{props.children}</main>
+          <ProductFooter />
+          <MobileNavigation items={props.navItems} />
         </div>
-        <main id="main-content" className={styles.content} tabIndex={-1}>{props.children}</main>
-        <ProductFooter />
-        <MobileNavigation items={props.navItems} />
       </div>
-    </div>
+    </AppCanvas>
   );
 }
 
@@ -128,17 +131,15 @@ export function ProductWorkspaceHeader(props: {
   status?: ReactNode;
 }) {
   return (
-    <header className={styles.pageHeader}>
-      <div className={styles.pageHeaderCopy}>
-        {props.eyebrow ? <span className={styles.pageEyebrow}>{props.eyebrow}</span> : null}
-        <h1>{props.title}</h1>
-        {props.subtitle ? <p>{props.subtitle}</p> : null}
-      </div>
-      <div className={styles.pageHeaderAside}>
-        {props.status ? <div className={styles.pageStatus}>{props.status}</div> : null}
-        {props.actions ? <div className={styles.pageActions}>{props.actions}</div> : null}
-      </div>
-    </header>
+    <div className={styles.semanticHeader}>
+      <WorkspaceHeader
+        eyebrow={props.eyebrow}
+        title={props.title}
+        description={props.subtitle}
+        meta={props.status ? <SignalIndicator>{props.status}</SignalIndicator> : undefined}
+        actions={props.actions}
+      />
+    </div>
   );
 }
 
