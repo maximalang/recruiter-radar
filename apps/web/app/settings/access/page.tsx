@@ -57,6 +57,7 @@ export default async function AccessSettingsPage() {
         <SettingsSection
           className={styles.section}
           headerClassName={styles.sectionHeader}
+          contentClassName={styles.sectionContent}
           title="Текущий доступ"
           description="Показываем только фактическое состояние доступа, без предположений о подписке или будущих списаниях."
         >
@@ -86,6 +87,7 @@ export default async function AccessSettingsPage() {
         <SettingsSection
           className={styles.section}
           headerClassName={styles.sectionHeader}
+          contentClassName={styles.sectionContent}
           title="История заказов"
           description="Отдельный журнал платёжных операций. Он не подменяет текущее состояние доступа."
         >
