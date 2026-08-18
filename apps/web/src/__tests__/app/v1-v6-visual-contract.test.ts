@@ -3,15 +3,6 @@ import path from 'node:path'
 
 const APP_ROOT = path.resolve(process.cwd(), 'app')
 const SOURCE_EXTENSIONS = new Set(['.css', '.ts', '.tsx'])
-const ALLOWED_RR_TOKEN_PREFIXES = [
-  '--color-',
-  '--font-',
-  '--type-',
-  '--space-',
-  '--radius-',
-  '--shadow-',
-  '--motion-',
-]
 
 function sourceFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -57,23 +48,68 @@ describe('Recruiter Radar V1-V6 visual contract', () => {
     expect(failures).toEqual([])
   })
 
-  it('uses only the final semantic Recruiter Radar token namespaces', () => {
+  it('rejects legacy --c-* and --rr-* token namespaces', () => {
     const failures: string[] = []
 
     for (const file of files) {
       const content = fs.readFileSync(file, 'utf8')
-      const legacyCTokens = content.match(/--c-[a-z0-9-]+/gi) ?? []
-      for (const token of new Set(legacyCTokens)) {
-        failures.push(`${relative(file)}: ${token}`)
-      }
-
-      const rrTokens = content.match(/--rr-[a-z0-9-]+/gi) ?? []
-      for (const token of new Set(rrTokens)) {
-        if (ALLOWED_RR_TOKEN_PREFIXES.some((prefix) => token.startsWith(prefix))) continue
+      for (const token of new Set(content.match(/--(?:c|rr)-[a-z0-9-]+/gi) ?? [])) {
         failures.push(`${relative(file)}: ${token}`)
       }
     }
 
     expect(failures).toEqual([])
+  })
+
+  it('defines the required semantic foundation tokens', () => {
+    const globals = fs.readFileSync(path.join(APP_ROOT, 'globals.css'), 'utf8')
+    const required = [
+      '--color-canvas',
+      '--color-surface-primary',
+      '--color-surface-secondary',
+      '--color-surface-selected',
+      '--color-surface-elevated',
+      '--color-text-primary',
+      '--color-text-secondary',
+      '--color-text-tertiary',
+      '--color-separator',
+      '--color-signal',
+      '--color-confidence-high',
+      '--color-confidence-medium',
+      '--color-confidence-low',
+    ]
+
+    for (const token of required) {
+      expect(globals).toContain(`${token}:`)
+    }
+  })
+
+  it('provides the core intelligence primitives without a universal Card primitive', () => {
+    const primitives = fs.readFileSync(path.join(APP_ROOT, 'ui/intelligence-primitives.tsx'), 'utf8')
+    const required = [
+      'AppCanvas',
+      'WorkspaceHeader',
+      'Zone',
+      'Separator',
+      'DataRow',
+      'LeadRow',
+      'DecisionBrief',
+      'EvidenceRow',
+      'EvidenceTimeline',
+      'Provenance',
+      'MetadataLine',
+      'SignalIndicator',
+      'ConfidenceIndicator',
+      'FilterBar',
+      'SearchField',
+      'ContextPane',
+      'EmptyState',
+      'LoadingState',
+    ]
+
+    for (const primitive of required) {
+      expect(primitives).toMatch(new RegExp(`export function ${primitive}\\b`))
+    }
+    expect(primitives).not.toMatch(/export function (?:Card|UniversalCard)\b/)
   })
 })
