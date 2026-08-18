@@ -2,6 +2,7 @@ import type { ReactNode, ReactElement, SVGProps } from "react";
 import Link from "next/link";
 import { BrandLogo } from "./brand-logo";
 import { ProductWorkspaceFrame } from "./product-workspace";
+import { WorkspaceHeader } from "./intelligence-primitives";
 
 import s from "./internal-page.module.css";
 import { repairPossiblyMojibakeText } from "../../lib/copy/repair";
@@ -129,17 +130,13 @@ export function InternalPageHeader(props: {
   nav?: ReactNode;
 }) {
   return (
-    <header className={s.internalPageHeader}>
-      <div className={s.internalPageHeaderTop}>
-        <div>
-          <h1 className={s.internalPageTitle}>{repairVisibleNode(props.title)}</h1>
-          {props.subtitle ? (
-            <div className={s.internalPageSubtitle}>{props.subtitle}</div>
-          ) : null}
-        </div>
-        {props.nav ? <nav className={s.internalPageHeaderNav}>{props.nav}</nav> : null}
-      </div>
-    </header>
+    <div style={{ marginBottom: "var(--space-8)" }}>
+      <WorkspaceHeader
+        title={repairVisibleNode(props.title)}
+        description={props.subtitle}
+        actions={props.nav ? <nav className={s.internalPageHeaderNav}>{props.nav}</nav> : undefined}
+      />
+    </div>
   );
 }
 
@@ -338,75 +335,43 @@ export const REVIEW_LABELS: Record<string, { label: string; icon: (p: SVGProps<S
  * Inline review-status badge. Returns null for auto_approved / unknown so the
  * default case renders no badge (the lead simply reads as a normal lead).
  */
-export function ReviewStatusBadge(props: { status: string | null }) {
+export function ReviewBadge(props: { status: string | null | undefined }) {
   if (!props.status || props.status === 'auto_approved') return null;
-  const entry = REVIEW_LABELS[props.status];
-  if (!entry) return null;
-  const Icon = entry.icon;
+  const meta = REVIEW_LABELS[props.status];
+  if (!meta) return null;
+  const Icon = meta.icon;
   return (
-    <span
-      className={s.reviewBadge}
-      data-tone={entry.tone}
-      title={
-        props.status === 'pending_review'
-          ? 'Требует проверки аналитиком перед доставкой как лид'
-          : props.status === 'approved'
-            ? 'Проверен аналитиком — доставлен как лид'
-            : 'Отклонён аналитиком — скрыт из радара'
-      }
-    >
-      <Icon className={s.reviewBadgeIcon} /> {entry.label}
+    <span className={s.reviewBadge} data-tone={meta.tone}>
+      <Icon className={s.reviewBadgeIcon} aria-hidden="true" />
+      {repairVisibleNode(meta.label)}
     </span>
   );
 }
 
 /* ── Empty state ── */
 
-/**
- * Inline-SVG icon component type for state primitives. Mirrors the established
- * `(p: SVGProps<SVGSVGElement>) => ReactElement` shape used by FEEDBACK_LABELS,
- * REVIEW_LABELS, and FIT_DIMENSION_ICON_COMPONENT so every glyph comes from
- * the single app/ui/icons vocabulary.
- */
-type StateIcon = (p: SVGProps<SVGSVGElement>) => ReactElement;
+export type StateIcon = (props: SVGProps<SVGSVGElement>) => ReactElement;
 
 export function EmptyState(props: {
-  /**
-   * Semantic SVG glyph (from app/ui/icons). Replaces the previous dead
-   * `icon?: string` prop (which 0 callers passed). Rendered inside the icon
-   * well; tone comes from the `.emptyStateIcon` CSS (`currentColor`).
-   */
   icon?: StateIcon;
   title: string;
-  text?: string;
-  /** Optional next-step call to action — turns a dead end into a guided step. */
-  action?: { href: string; label: string };
+  description: string;
+  action?: ReactNode;
 }) {
   const Icon = props.icon;
   return (
-    <div className={s.emptyState} role="status">
-      {Icon ? (
-        <div className={s.emptyStateIcon}>
-          <Icon />
-        </div>
-      ) : null}
-      <p className={s.emptyStateTitle}>{repairVisibleNode(props.title)}</p>
-      {props.text ? <p className={s.emptyStateText}>{repairVisibleNode(props.text)}</p> : null}
-      {props.action ? (
-        <Link href={props.action.href} className={s.emptyStateAction}>
-          {repairVisibleNode(props.action.label)}
-        </Link>
-      ) : null}
-    </div>
+    <section className={s.emptyState}>
+      {Icon ? <Icon className={s.emptyStateIcon} aria-hidden="true" /> : null}
+      <h2>{repairVisibleNode(props.title)}</h2>
+      <p>{repairVisibleNode(props.description)}</p>
+      {props.action}
+    </section>
   );
 }
 
-/* ── Not-found state ── */
+/* ── Not found state ── */
 
-/** Full-page "not found" state. Use *instead of* InternalPageFrame, not nested inside it —
- *  otherwise you'd get `<main>` inside `<main>`. */
 export function NotFoundState(props: {
-  /** Semantic SVG glyph (from app/ui/icons). */
   icon?: StateIcon;
   title: string;
   backHref: string;
@@ -414,97 +379,10 @@ export function NotFoundState(props: {
 }) {
   const Icon = props.icon;
   return (
-    <div className={s.notFoundState}>
-      <div className={s.notFoundContent}>
-        {Icon ? (
-          <div className={s.emptyStateIcon}>
-            <Icon />
-          </div>
-        ) : null}
-        <p className={s.emptyStateTitle}>{props.title}</p>
-        <InternalBackLink href={props.backHref}>{props.backLabel}</InternalBackLink>
-      </div>
-    </div>
+    <section className={s.notFound}>
+      {Icon ? <Icon className={s.notFoundIcon} aria-hidden="true" /> : null}
+      <h2>{repairVisibleNode(props.title)}</h2>
+      <Link href={props.backHref}>{props.backLabel}</Link>
+    </section>
   );
 }
-
-/* ── Loading state ── */
-
-/**
- * Unified Suspense / data-loading fallback. Replaces the flat
- * `<div>Загрузка...</div>` strings scattered across pages so every loading
- * moment speaks one calm vocabulary.
- *
- *   variant="inline"  — a quiet centered text line (reuses `.loadingState`).
- *   variant="skeleton" — an `aria-busy` skeleton block with placeholder bars,
- *                        so a Suspense gap doesn't flash white. Used for
- *                        data-shaped sections (lists, metric grids).
- *
- * Defaults to "inline" so callers can drop it in without a variant for the
- * simple case and opt into skeleton where the shape is known.
- */
-export function LoadingState(props: { variant?: "skeleton" | "inline" }) {
-  const variant = props.variant ?? "inline";
-  if (variant === "skeleton") {
-    return (
-      <div className={s.loadingSkeleton} role="status" aria-busy="true" aria-live="polite">
-        <span className={s.srOnly}>Загрузка…</span>
-        <div className={s.loadingSkeletonLine} data-skeleton="true" />
-        <div className={s.loadingSkeletonLine} data-skeleton="true" />
-        <div className={s.loadingSkeletonLine} data-skeleton="true" style={{ width: "55%" }} />
-      </div>
-    );
-  }
-  return <div className={s.loadingState}>Загрузка…</div>;
-}
-
-/* ── Error state ── */
-
-/**
- * Unified data-error fallback. When a data surface (analytics, leads, review,
- * today-radar, quality) fails to load, it shows this instead of a raw error
- * string or a silent empty list that reads as "no data". The contract:
- *
- *   - `title` — a short, human sentence: what went wrong (no internals).
- *   - `description` — a concrete next step the user can take (повторите позже /
- *     проверить профиль / написать поддержку), or an honest "собираем данные".
- *   - `action` — optional link to the next step (e.g. /profile).
- *
- * `role="alert"` + `aria-live="assertive"` so AT announces the failure. The
- * raw internal error is NEVER rendered — only the human copy the caller passes.
- * Mirrors `EmptyState`'s calm premium styling so an error reads as a quiet,
- * recoverable moment, not a loud crash.
- */
-export function ErrorState(props: {
-  title: string;
-  description?: ReactNode;
-  action?: { href: string; label: string };
-  retryAction?: { label: string; onClick: () => void };
-}) {
-  return (
-    <div className={s.errorState} role="alert" aria-live="assertive">
-      <div className={s.errorStateTitle}>{repairVisibleNode(props.title)}</div>
-      {props.description ? (
-        <div className={s.errorStateText}>{repairVisibleNode(props.description)}</div>
-      ) : null}
-      {props.action ? (
-        <a className={s.errorStateAction} href={props.action.href}>
-          {repairVisibleNode(props.action.label)}
-        </a>
-      ) : null}
-      {props.retryAction ? (
-        <button type="button" className={s.errorStateAction} onClick={props.retryAction.onClick}>
-          {repairVisibleNode(props.retryAction.label)}
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-/* ── Table card ── */
-
-
-
-/* ── CSS class re-exports for use in sub-components ── */
-
-export const internalPageClasses = s;
