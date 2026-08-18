@@ -79,8 +79,8 @@ export function ProductWorkspaceFrame(props: { navItems: NavItem[]; children: Re
   const settingsActive = props.navItems.some((item) => item.active && (item.href === "/settings" || item.href.startsWith("/settings/")));
 
   return (
-    <AppCanvas>
-      <div className={styles.workspace} data-product-workspace="true" data-ui-system="recruiter-radar">
+    <AppCanvas data-product-workspace="true" data-ui-system="recruiter-radar">
+      <div className={styles.workspace}>
         <a href="#main-content" className={styles.skipLink}>К содержанию</a>
 
         <header className={styles.topbar}>
