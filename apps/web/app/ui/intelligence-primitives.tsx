@@ -1,16 +1,28 @@
-import type { InputHTMLAttributes, ReactNode } from "react";
+import type {
+  HTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+} from "react";
 
 import styles from "./intelligence-primitives.module.css";
 
 type ConfidenceLevel = "high" | "medium" | "low";
+
+function classes(base: string, custom?: string) {
+  return custom ? `${base} ${custom}` : base;
+}
 
 /**
  * Calm Intelligence primitives.
  * These primitives model information hierarchy rather than generic cards.
  */
 
-export function AppCanvas({ children }: { children: ReactNode }) {
-  return <div className={styles.canvas} data-ui="app-canvas">{children}</div>;
+export function AppCanvas({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div {...props} className={classes(styles.canvas, className)} data-ui="app-canvas">
+      {children}
+    </div>
+  );
 }
 
 export function WorkspaceHeader({
@@ -43,45 +55,80 @@ export function WorkspaceHeader({
   );
 }
 
-export function Zone({ children, label }: { children: ReactNode; label?: string }) {
+export function Zone({
+  className,
+  children,
+  "aria-label": ariaLabel,
+  ...props
+}: HTMLAttributes<HTMLElement>) {
   return (
-    <section className={styles.zone} data-ui="zone" aria-label={label}>
+    <section
+      {...props}
+      className={classes(styles.zone, className)}
+      data-ui="zone"
+      aria-label={ariaLabel}
+    >
       {children}
     </section>
   );
 }
 
-export function Separator() {
-  return <div className={styles.separator} data-ui="separator" role="separator" />;
+export function Separator(props: HTMLAttributes<HTMLDivElement>) {
+  return <div {...props} className={classes(styles.separator, props.className)} data-ui="separator" role="separator" />;
 }
 
-export function DataRow({ children }: { children: ReactNode }) {
-  return <div className={styles.dataRow} data-ui="data-row">{children}</div>;
-}
-
-export function LeadRow({ children }: { children: ReactNode }) {
-  return <article className={styles.leadRow} data-ui="lead-row">{children}</article>;
-}
-
-export function DecisionBrief({ children, title }: { children: ReactNode; title?: ReactNode }) {
+export function DataRow({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <section className={styles.decisionBrief} data-ui="decision-brief">
+    <div {...props} className={classes(styles.dataRow, className)} data-ui="data-row">
+      {children}
+    </div>
+  );
+}
+
+export function LeadRow({ className, children, ...props }: HTMLAttributes<HTMLElement>) {
+  return (
+    <article {...props} className={classes(styles.leadRow, className)} data-ui="lead-row">
+      {children}
+    </article>
+  );
+}
+
+export function DecisionBrief({
+  className,
+  children,
+  title,
+  ...props
+}: HTMLAttributes<HTMLElement> & { title?: ReactNode }) {
+  return (
+    <section {...props} className={classes(styles.decisionBrief, className)} data-ui="decision-brief">
       {title ? <h2 className={styles.decisionBriefTitle}>{title}</h2> : null}
       {children}
     </section>
   );
 }
 
-export function EvidenceRow({ children }: { children: ReactNode }) {
-  return <div className={styles.evidenceRow} data-ui="evidence-row">{children}</div>;
+export function EvidenceRow({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div {...props} className={classes(styles.evidenceRow, className)} data-ui="evidence-row">
+      {children}
+    </div>
+  );
 }
 
-export function EvidenceTimeline({ children }: { children: ReactNode }) {
-  return <ol className={styles.evidenceTimeline} data-ui="evidence-timeline">{children}</ol>;
+export function EvidenceTimeline({ className, children, ...props }: HTMLAttributes<HTMLOListElement>) {
+  return (
+    <ol {...props} className={classes(styles.evidenceTimeline, className)} data-ui="evidence-timeline">
+      {children}
+    </ol>
+  );
 }
 
-export function Provenance({ children }: { children: ReactNode }) {
-  return <footer className={styles.provenance} data-ui="provenance">{children}</footer>;
+export function Provenance({ className, children, ...props }: HTMLAttributes<HTMLElement>) {
+  return (
+    <footer {...props} className={classes(styles.provenance, className)} data-ui="provenance">
+      {children}
+    </footer>
+  );
 }
 
 export function MetadataLine({ children, label }: { children: ReactNode; label?: ReactNode }) {
@@ -111,9 +158,20 @@ export function ConfidenceIndicator({
   );
 }
 
-export function FilterBar({ children, label = "Фильтры" }: { children: ReactNode; label?: string }) {
+export function FilterBar({
+  className,
+  children,
+  "aria-label": ariaLabel = "Фильтры",
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={styles.filterBar} data-ui="filter-bar" role="group" aria-label={label}>
+    <div
+      {...props}
+      className={classes(styles.filterBar, className)}
+      data-ui="filter-bar"
+      role="group"
+      aria-label={ariaLabel}
+    >
       {children}
     </div>
   );
@@ -131,9 +189,19 @@ export function SearchField({
   );
 }
 
-export function ContextPane({ children, label }: { children: ReactNode; label?: string }) {
+export function ContextPane({
+  className,
+  children,
+  "aria-label": ariaLabel,
+  ...props
+}: HTMLAttributes<HTMLElement>) {
   return (
-    <aside className={styles.contextPane} data-ui="context-pane" aria-label={label}>
+    <aside
+      {...props}
+      className={classes(styles.contextPane, className)}
+      data-ui="context-pane"
+      aria-label={ariaLabel}
+    >
       {children}
     </aside>
   );
