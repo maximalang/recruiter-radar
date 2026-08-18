@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getSession } from "../../lib/auth-v2/authorization";
 import {
   InternalPageFrame,
   InternalPageHeader,
-  EmptyState,
 } from "../ui/internal-page";
+import { StaticEmptyState } from "../ui/static-empty-state";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { getClientProfileByOwnerId, resolveHiringMode } from "../../lib/clientProfiles";
 import { getDeliveryPreferencesByOwnerId } from "../../lib/deliveryPreferences";
@@ -32,6 +33,10 @@ export const metadata: Metadata = {
 };
 
 const PROFILE_NAV = buildAccountNavigation("profile");
+
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>;
+}
 
 export default async function ProfilePage() {
   const session = await getSession({ permission: "profiles:read" });
@@ -100,14 +105,14 @@ export default async function ProfilePage() {
             <ProfileForm profile={profile} resolvedHiringMode={resolvedHiringMode} />
           ) : (
             <div className={styles.emptyZone}>
-              <EmptyState
+              <StaticEmptyState
                 title={ownerId ? "Профиль ещё не активирован" : "Нужен вход в аккаунт"}
-                text={ownerId
+                description={ownerId
                   ? "Профиль появится после активации Радара. Завершите онбординг, чтобы настроить рабочую практику."
                   : "Сессия этого браузера не связана с аккаунтом. Восстановите доступ, чтобы изменить профиль."}
                 action={ownerId
-                  ? { href: "/checkout", label: "Активировать Радар" }
-                  : { href: "/login", label: "Войти в аккаунт" }}
+                  ? <StateLink href="/checkout" label="Активировать Радар" />
+                  : <StateLink href="/login" label="Войти в аккаунт" />}
               />
             </div>
           )}
