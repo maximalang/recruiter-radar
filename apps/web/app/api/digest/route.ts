@@ -100,10 +100,12 @@ export async function GET(request: Request) {
       }, { status: 400 });
     }
 
-    const message = error instanceof Error ? error.message : "Failed to run digest.";
+    const message = error instanceof Error ? error.message : "";
     const status = message.includes("inactive") || message.includes("No active subscription") || message.includes("entitlement") ? 403 :
                    message.includes("not found") ? 404 : 500;
-    const publicMessage = status === 500 ? "Failed to run digest." : message;
+    const publicMessage = status === 403 ? "entitlement_required" :
+                          status === 404 ? "client_profile_not_found" :
+                          "Failed to run digest.";
 
     return NextResponse.json({
       success: false,
