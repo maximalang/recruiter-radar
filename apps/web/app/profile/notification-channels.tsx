@@ -31,8 +31,20 @@ const STATUS_LABELS: Record<string, string> = {
   error: "Ошибка",
 };
 
+function safeExternalUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function ActionFeedback({ state }: { state: NotificationActionResult | null }) {
   if (!state) return null;
+  const privateLink = safeExternalUrl(state.privateLink);
+  const groupLink = safeExternalUrl(state.groupLink);
   return (
     <div className={styles.feedback}>
       <NoticeBox
@@ -40,15 +52,15 @@ function ActionFeedback({ state }: { state: NotificationActionResult | null }) {
         title={state.ok ? "Готово" : "Не удалось"}
         description={state.message}
       />
-      {state.privateLink || state.groupLink ? (
+      {privateLink || groupLink ? (
         <div className={styles.linkGrid}>
-          {state.privateLink ? (
-            <a className={styles.primaryLink} href={state.privateLink} target="_blank" rel="noreferrer">
+          {privateLink ? (
+            <a className={styles.primaryLink} href={privateLink} target="_blank" rel="noreferrer">
               Подключить личный чат
             </a>
           ) : null}
-          {state.groupLink ? (
-            <a className={styles.secondaryLink} href={state.groupLink} target="_blank" rel="noreferrer">
+          {groupLink ? (
+            <a className={styles.secondaryLink} href={groupLink} target="_blank" rel="noreferrer">
               Добавить бота в группу
             </a>
           ) : null}
