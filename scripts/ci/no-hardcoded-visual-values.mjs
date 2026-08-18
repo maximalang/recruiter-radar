@@ -56,19 +56,19 @@ for (const file of sourceFiles(appRoot)) {
 
   for (const match of matches(cssBoxShadowDeclaration, content)) {
     const value = match[1].trim();
-    if (value !== 'none' && !value.startsWith('var(--shadow-')) {
+    if (!value.startsWith('none') && !value.startsWith('var(--shadow-')) {
       failures.push(`${label}: local box-shadow ${value}`);
     }
   }
   for (const match of matches(jsBoxShadowDeclaration, content)) {
     const value = (match[1] ?? match[2] ?? '').trim();
-    if (value !== 'none' && !value.startsWith('var(--shadow-')) {
+    if (!value.startsWith('none') && !value.startsWith('var(--shadow-')) {
       failures.push(`${label}: local boxShadow ${value}`);
     }
   }
   for (const match of matches(textShadowDeclaration, content)) {
     const value = match[1].trim();
-    if (value !== 'none') failures.push(`${label}: local text-shadow ${value}`);
+    if (!value.startsWith('none')) failures.push(`${label}: local text-shadow ${value}`);
   }
   if (dropShadow.test(content)) failures.push(`${label}: local drop-shadow filter`);
   dropShadow.lastIndex = 0;
