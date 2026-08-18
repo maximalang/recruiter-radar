@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { getAccountById } from "@/lib/account-auth";
 import { getSession } from "@/lib/auth-v2/authorization";
@@ -11,8 +12,9 @@ import {
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { logoutAction } from "../login/actions";
-import { EmptyState, InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
+import { InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
 import ppStyles from "../ui/page-primitives.module.css";
+import { StaticEmptyState } from "../ui/static-empty-state";
 import SettingsDocumentSummary from "./settings-document-summary";
 import styles from "./settings-account.module.css";
 
@@ -22,6 +24,10 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
+
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>;
+}
 
 export default async function SettingsIndexPage() {
   const authorization = await getSession({
@@ -38,10 +44,10 @@ export default async function SettingsIndexPage() {
       <InternalPageFrame navItems={buildAccountNavigation("settings")}>
         <InternalPageHeader title="Настройки" subtitle="Для доступа к настройкам нужен вход." />
         <div className={styles.emptySection}>
-          <EmptyState
+          <StaticEmptyState
             title="Сессия не найдена"
-            text="Восстановите доступ — после входа здесь появятся профиль радара и каналы доставки."
-            action={{ href: "/login", label: "Войти в аккаунт" }}
+            description="Восстановите доступ — после входа здесь появятся профиль радара и каналы доставки."
+            action={<StateLink href="/login" label="Войти в аккаунт" />}
           />
         </div>
       </InternalPageFrame>
@@ -58,10 +64,10 @@ export default async function SettingsIndexPage() {
       <InternalPageFrame navItems={buildAccountNavigation("settings")}>
         <InternalPageHeader title="Настройки" subtitle="Аккаунт активен, профиль радара ещё не создан." />
         <div className={styles.emptySection}>
-          <EmptyState
+          <StaticEmptyState
             title="Профиль ещё не создан"
-            text="Сначала активируйте Радар, затем настройте практику и доставку."
-            action={{ href: "/checkout", label: "Активировать Радар" }}
+            description="Сначала активируйте Радар, затем настройте практику и доставку."
+            action={<StateLink href="/checkout" label="Активировать Радар" />}
           />
         </div>
         <section className={styles.accountSection} aria-labelledby="account-title">
