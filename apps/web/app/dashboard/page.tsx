@@ -8,8 +8,9 @@ import { getDashboardTodayRadar } from "@/lib/dashboard-data";
 import { getEffectiveEntitlement } from "@/lib/entitlements";
 import DashboardTodayRadar from "./dashboard-today-radar";
 import { buildAccountNavigation } from "../ui/account-navigation";
-import { EmptyState, ErrorState } from "../ui/internal-page";
+import { ProductErrorState } from "../ui/product-error-state";
 import { ProductWorkspaceFrame, ProductWorkspaceHeader } from "../ui/product-workspace";
+import { StaticEmptyState } from "../ui/static-empty-state";
 import dashStyles from "./dashboard-workspace.module.css";
 
 export const metadata: Metadata = {
@@ -20,6 +21,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const DASHBOARD_NAV = buildAccountNavigation("dashboard");
+
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>;
+}
 
 export default async function DashboardPage() {
   const authorization = await getSession({
@@ -33,10 +38,10 @@ export default async function DashboardPage() {
           title="Сегодня"
           subtitle="Войдите, чтобы видеть только свой профиль, компании и историю работы."
         />
-        <EmptyState
+        <StaticEmptyState
           title="Нужен вход в аккаунт"
-          text="Сессия этого браузера не связана с аккаунтом. Восстановите доступ или активируйте Радар."
-          action={{ href: "/login?returnTo=/dashboard", label: "Войти в аккаунт" }}
+          description="Сессия этого браузера не связана с аккаунтом. Восстановите доступ или активируйте Радар."
+          action={<StateLink href="/login?returnTo=/dashboard" label="Войти в аккаунт" />}
         />
       </ProductWorkspaceFrame>
     );
@@ -51,11 +56,12 @@ export default async function DashboardPage() {
           title="Сегодня"
           subtitle="Сессия активна, но данные аккаунта временно недоступны."
         />
-        <ErrorState
+        <ProductErrorState
           title="Данные аккаунта временно недоступны"
           description="Обновите страницу немного позже. Повторный вход не требуется."
-          action={{ href: "/settings/account", label: "Открыть настройки аккаунта" }}
-        />
+        >
+          <StateLink href="/settings/account" label="Открыть настройки аккаунта" />
+        </ProductErrorState>
       </ProductWorkspaceFrame>
     );
   }
@@ -69,11 +75,12 @@ export default async function DashboardPage() {
     return (
       <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader title="Сегодня" subtitle="Радар не показывает рабочий набор, пока сервер не подтвердит права аккаунта." />
-        <ErrorState
+        <ProductErrorState
           title="Проверка доступа временно недоступна"
           description="Обновите страницу немного позже. Настройки аккаунта остаются доступны."
-          action={{ href: "/settings/access", label: "Открыть доступ и оплату" }}
-        />
+        >
+          <StateLink href="/settings/access" label="Открыть доступ и оплату" />
+        </ProductErrorState>
       </ProductWorkspaceFrame>
     );
   }
@@ -81,10 +88,10 @@ export default async function DashboardPage() {
     return (
       <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader title="Сегодня" subtitle="Профиль и история аккаунта сохранены." />
-        <EmptyState
+        <StaticEmptyState
           title="Доступ к Радару не активен"
-          text="Выберите срок доступа. После активации рабочий набор откроется без повторной настройки."
-          action={{ href: "/settings/access", label: "Проверить доступ" }}
+          description="Выберите срок доступа. После активации рабочий набор откроется без повторной настройки."
+          action={<StateLink href="/settings/access" label="Проверить доступ" />}
         />
       </ProductWorkspaceFrame>
     );
@@ -99,11 +106,12 @@ export default async function DashboardPage() {
     return (
       <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader title="Сегодня" subtitle="Не удалось загрузить профиль радара." />
-        <ErrorState
+        <ProductErrorState
           title="Профиль радара временно недоступен"
           description="Это временная ошибка данных. Сохранённые настройки не потеряны."
-          action={{ href: "/settings/radar", label: "Открыть профиль радара" }}
-        />
+        >
+          <StateLink href="/settings/radar" label="Открыть профиль радара" />
+        </ProductErrorState>
       </ProductWorkspaceFrame>
     );
   }
@@ -115,10 +123,10 @@ export default async function DashboardPage() {
     return (
       <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader title="Сегодня" subtitle="Аккаунт найден, но рабочий профиль ещё не создан." />
-        <EmptyState
+        <StaticEmptyState
           title="Радар ещё не настроен"
-          text="Пройдите четыре коротких шага: команда, практика, рынок и доставка."
-          action={{ href: "/onboarding", label: "Настроить Радар" }}
+          description="Пройдите четыре коротких шага: команда, практика, рынок и доставка."
+          action={<StateLink href="/onboarding" label="Настроить Радар" />}
         />
       </ProductWorkspaceFrame>
     );
@@ -128,15 +136,14 @@ export default async function DashboardPage() {
     return (
       <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader title="Сегодня" subtitle="Настройки сохранены, но новые компании не формируются." />
-        <EmptyState
+        <StaticEmptyState
           title="Профиль радара приостановлен"
-          text="Возобновите профиль в настройках — после этого следующие сканирования снова будут учитывать вашу практику."
-          action={{ href: "/settings/radar", label: "Открыть профиль радара" }}
+          description="Возобновите профиль в настройках — после этого следующие сканирования снова будут учитывать вашу практику."
+          action={<StateLink href="/settings/radar" label="Открыть профиль радара" />}
         />
       </ProductWorkspaceFrame>
     );
   }
-
 
   return (
     <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
@@ -152,7 +159,6 @@ export default async function DashboardPage() {
       />
 
       <div className={dashStyles.dashboardStack}>
-
         {todayRadar ? (
           <DashboardTodayRadar
             topLeads={todayRadar.topLeads}
@@ -161,11 +167,12 @@ export default async function DashboardPage() {
             lastRunAt={todayRadar.lastRunAt}
           />
         ) : (
-          <ErrorState
+          <ProductErrorState
             title="Радар временно не загрузился"
             description="Профиль и настройки доступны. Обновите страницу через минуту — данные других аккаунтов здесь не показываются."
-            action={{ href: "/settings/radar", label: "Проверить профиль радара" }}
-          />
+          >
+            <StateLink href="/settings/radar" label="Проверить профиль радара" />
+          </ProductErrorState>
         )}
       </div>
     </ProductWorkspaceFrame>
