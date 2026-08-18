@@ -348,6 +348,9 @@ export function ReviewBadge(props: { status: string | null | undefined }) {
   );
 }
 
+/** Backwards-compatible name retained for surfaces not yet migrated. */
+export const ReviewStatusBadge = ReviewBadge;
+
 /* ── Empty state ── */
 
 export type StateIcon = (props: SVGProps<SVGSVGElement>) => ReactElement;
@@ -386,3 +389,23 @@ export function NotFoundState(props: {
     </section>
   );
 }
+
+/* ── Loading state ── */
+
+export function LoadingState(props: { variant?: "skeleton" | "inline" }) {
+  const variant = props.variant ?? "inline";
+  if (variant === "skeleton") {
+    return (
+      <div className={s.loadingSkeleton} role="status" aria-busy="true" aria-live="polite">
+        <span className={s.srOnly}>Загрузка…</span>
+        <div className={s.loadingSkeletonLine} data-skeleton="true" />
+        <div className={s.loadingSkeletonLine} data-skeleton="true" />
+        <div className={s.loadingSkeletonLine} data-skeleton="true" style={{ width: "55%" }} />
+      </div>
+    );
+  }
+  return <div className={s.loadingState}>Загрузка…</div>;
+}
+
+/* CSS-module class access retained for server/page sub-components. */
+export const internalPageClasses = s;
