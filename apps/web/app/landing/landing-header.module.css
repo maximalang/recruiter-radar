@@ -5,19 +5,19 @@
   min-height: 72px;
   border-bottom: 1px solid transparent;
   background: transparent;
-  color: var(--paper);
+  color: var(--color-canvas);
   transition: color .18s ease, background-color .18s ease, border-color .18s ease, backdrop-filter .18s ease;
 }
 
 .header[data-tone="light"]:not([data-scrolled]) {
-  color: var(--ink);
+  color: var(--color-text-primary);
 }
 
 .header[data-scrolled],
 .header[data-menu-open] {
   border-bottom-color: color-mix(in srgb, var(--color-warning) 10%, transparent);
   background: color-mix(in srgb, var(--color-signal) 94%, transparent);
-  color: var(--paper);
+  color: var(--color-canvas);
   backdrop-filter: blur(20px) saturate(108%);
 }
 
