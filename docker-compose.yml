@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${RR_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -20,7 +20,7 @@ services:
     image: n8nio/n8n:latest
     restart: unless-stopped
     ports:
-      - "${N8N_PORT:-5678}:${N8N_PORT:-5678}"
+      - "${RR_BIND_HOST:-127.0.0.1}:${N8N_PORT:-5678}:${N8N_PORT:-5678}"
     environment:
       N8N_HOST: ${N8N_HOST:-localhost}
       N8N_PORT: ${N8N_PORT:-5678}
@@ -39,7 +39,7 @@ services:
     image: ghcr.io/firecrawl/firecrawl:latest
     restart: unless-stopped
     ports:
-      - "${FIRECRAWL_PORT:-3002}:3002"
+      - "${RR_BIND_HOST:-127.0.0.1}:${FIRECRAWL_PORT:-3002}:3002"
     environment:
       FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-change-me-local-firecrawl-key}
       LLM_MODEL: ${CODEXOID_MODEL:-${FIRECRAWL_LLM_MODEL:-gpt-4o-mini}}
