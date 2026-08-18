@@ -4,12 +4,13 @@ import Link from "next/link";
 import { getAccountById } from "@/lib/account-auth";
 import { getSession } from "@/lib/auth-v2/authorization";
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
-import { getDashboardTodayRadar } from "@/lib/dashboard-data";
+import { getDashboardSourceHealth, getDashboardTodayRadar } from "@/lib/dashboard-data";
 import { getEffectiveEntitlement } from "@/lib/entitlements";
 import DashboardTodayRadar from "./dashboard-today-radar";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { ProductErrorState } from "../ui/product-error-state";
 import { ProductWorkspaceFrame, ProductWorkspaceHeader } from "../ui/product-workspace";
+import { RadarOperationalState } from "../ui/radar-operational-state";
 import { StaticEmptyState } from "../ui/static-empty-state";
 import dashStyles from "./dashboard-workspace.module.css";
 
@@ -24,6 +25,21 @@ const DASHBOARD_NAV = buildAccountNavigation("dashboard");
 
 function StateLink({ href, label }: { href: string; label: string }) {
   return <Link href={href}>{label}</Link>;
+}
+
+function formatOperationalTimestamp(value: string | null): string {
+  if (!value) return "ещё не зафиксирована";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "время не определено";
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function formatEvidenceFreshness(latestPublishedAt: string | null): string {
+  if (!latestPublishedAt) return "свежие подтверждения не зафиксированы";
+  return `последнее подтверждение ${formatOperationalTimestamp(latestPublishedAt)}`;
 }
 
 export default async function DashboardPage() {
@@ -97,9 +113,10 @@ export default async function DashboardPage() {
     );
   }
 
-  const [profileResult, todayRadarResult] = await Promise.allSettled([
+  const [profileResult, todayRadarResult, sourceHealthResult] = await Promise.allSettled([
     getClientProfileByOwnerId(authorization.dataOwnerId),
     getDashboardTodayRadar(authorization.dataOwnerId),
+    getDashboardSourceHealth(),
   ]);
 
   if (profileResult.status === "rejected") {
@@ -118,6 +135,7 @@ export default async function DashboardPage() {
 
   const profile = profileResult.value;
   const todayRadar = todayRadarResult.status === "fulfilled" ? todayRadarResult.value : null;
+  const sourceHealth = sourceHealthResult.status === "fulfilled" ? sourceHealthResult.value : [];
 
   if (!profile) {
     return (
@@ -145,6 +163,18 @@ export default async function DashboardPage() {
     );
   }
 
+  const latestEvidenceAt = todayRadar?.topLeads.reduce<string | null>((latest, lead) => {
+    if (!lead.latestPublishedAt) return latest;
+    if (!latest) return lead.latestPublishedAt;
+    return new Date(lead.latestPublishedAt).getTime() > new Date(latest).getTime()
+      ? lead.latestPublishedAt
+      : latest;
+  }, null) ?? null;
+  const healthySources = sourceHealth.filter((source) => source.status === "excellent" || source.status === "good").length;
+  const sourcesLabel = sourceHealth.length > 0
+    ? `${healthySources} из ${sourceHealth.length} в норме`
+    : "данные о состоянии источников недоступны";
+
   return (
     <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
       <ProductWorkspaceHeader
@@ -159,6 +189,14 @@ export default async function DashboardPage() {
       />
 
       <div className={dashStyles.dashboardStack}>
+        <RadarOperationalState
+          profile="активен"
+          evidenceFreshness={formatEvidenceFreshness(latestEvidenceAt)}
+          sources={sourcesLabel}
+          delivery={profile.telegramChatId ? "Telegram настроен" : "канал доставки не настроен"}
+          lastSync={formatOperationalTimestamp(todayRadar?.lastRunAt ?? null)}
+        />
+
         {todayRadar ? (
           <DashboardTodayRadar
             topLeads={todayRadar.topLeads}
