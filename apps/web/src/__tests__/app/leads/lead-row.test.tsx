@@ -33,13 +33,14 @@ const baseLead = {
 } as unknown as LeadItem;
 
 describe('LeadRow V1-V6 decision-row contract', () => {
-  it('renders rank → company → why now → proof → score → confidence without the retired score legend', () => {
+  it('renders the decision hierarchy through canonical row and confidence primitives', () => {
     const { container } = render(
       <LeadRow lead={baseLead} fitPreview={null} hiringMode="specialist" rank={1} />,
     );
 
     const row = container.querySelector('[data-lead-row="true"]');
     expect(row).not.toBeNull();
+    expect(row).toHaveAttribute('data-ui', 'lead-row');
     expect(row?.textContent).toContain('01');
     expect(screen.getByRole('link', { name: 'Ромашка' })).toHaveAttribute('href', '/leads/lead-1');
     expect(screen.getByText('Hiring burst across 3 roles')).toBeInTheDocument();
@@ -47,6 +48,7 @@ describe('LeadRow V1-V6 decision-row contract', () => {
     expect(row?.textContent).toContain('1 источник');
     expect(container.querySelector('[aria-label="Сила сигнала 80"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Уверенность: высокая"]')).not.toBeNull();
+    expect(container.querySelector('[data-ui="confidence-indicator"]')).toHaveTextContent('высокая');
     expect(screen.getByRole('link', { name: 'Открыть анализ компании Ромашка' })).toHaveAttribute('href', '/leads/lead-1');
 
     expect(screen.queryByRole('meter')).toBeNull();
