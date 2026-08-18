@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 import { buildAccountNavigation } from "../ui/account-navigation";
-import { ErrorState } from "../ui/internal-page";
+import { ProductErrorState } from "../ui/product-error-state";
 import { ProductWorkspaceFrame, ProductWorkspaceHeader } from "../ui/product-workspace";
 
 const DASHBOARD_NAV = buildAccountNavigation("dashboard");
@@ -15,12 +15,14 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const correlationId = error.digest ?? crypto.randomUUID();
+
   useEffect(() => {
     console.error("[dashboard] route render failed", {
-      digest: error.digest ?? null,
+      correlationId,
       name: error.name,
     });
-  }, [error]);
+  }, [correlationId, error]);
 
   return (
     <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
@@ -28,9 +30,10 @@ export default function DashboardError({
         title="Не удалось открыть раздел «Сегодня»"
         subtitle="Сессия и сохранённые настройки не изменились."
       />
-      <ErrorState
+      <ProductErrorState
         title="Раздел «Сегодня» временно недоступен"
         description="Повторите загрузку. Если ошибка сохранится, откройте настройки аккаунта."
+        correlationId={correlationId}
         retryAction={{ label: "Повторить", onClick: reset }}
       />
     </ProductWorkspaceFrame>
