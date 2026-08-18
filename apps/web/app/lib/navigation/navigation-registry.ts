@@ -36,14 +36,14 @@ export const NavigationRegistry: NavigationRegistryEntry[] = [
   {
     id: "review",
     route: "/review",
-    permission: "review:read",
+    permission: "leads:read",
     visibility: "workspace",
     analyticsKey: "review_open",
   },
   {
     id: "profile",
     route: "/profile",
-    permission: "workspace:read",
+    permission: "profiles:read",
     visibility: "workspace",
     analyticsKey: "profile_open",
   },
@@ -56,8 +56,8 @@ export const NavigationRegistry: NavigationRegistryEntry[] = [
   },
   {
     id: "diagnostics",
-    route: "/settings/diagnostics",
-    permission: "workspace:read",
+    route: "/settings/diagnostics/sources",
+    permission: "opportunities:read",
     visibility: "workspace",
     analyticsKey: "diagnostics_open",
   },
