@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,23 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - name: Finish landing semantic migration
-        if: ${{ github.event_name == 'push' && github.ref_name == 'chatgpt/full-v1-v6-implementation' }}
-        run: |
-          node scripts/ci/migrate-landing-semantic-aliases.mjs
-          if git diff --quiet; then
-            echo 'Landing semantic aliases already migrated.'
-          else
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add apps/web/app/landing
-            git commit -m 'chore(landing): apply semantic alias cleanup'
-            git push origin HEAD:${GITHUB_REF_NAME}
-          fi
       - name: Enforce semantic visual system
         run: node scripts/ci/no-hardcoded-visual-values.mjs
