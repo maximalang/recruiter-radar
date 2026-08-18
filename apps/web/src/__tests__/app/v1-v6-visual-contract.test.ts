@@ -61,6 +61,22 @@ describe('Recruiter Radar V1-V6 visual contract', () => {
     expect(failures).toEqual([])
   })
 
+  it('does not create a landing-specific color or radius namespace', () => {
+    const landingRoot = path.join(APP_ROOT, 'landing')
+    const landingFiles = sourceFiles(landingRoot)
+    const forbiddenAliases = /--(?:paper(?:-soft|-strong)?|ink|muted-(?:dark|light)|line-(?:dark|light)|signal(?:-strong|-deep|-soft)?|copper|warning|surface-radius)\s*:/gi
+    const failures: string[] = []
+
+    for (const file of landingFiles) {
+      const content = fs.readFileSync(file, 'utf8')
+      for (const alias of new Set(content.match(forbiddenAliases) ?? [])) {
+        failures.push(`${relative(file)}: ${alias.replace(/\s*:$/, '')}`)
+      }
+    }
+
+    expect(failures).toEqual([])
+  })
+
   it('defines the required semantic foundation tokens', () => {
     const globals = fs.readFileSync(path.join(APP_ROOT, 'globals.css'), 'utf8')
     const required = [
