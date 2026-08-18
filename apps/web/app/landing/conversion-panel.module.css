@@ -106,7 +106,7 @@
 }
 
 .offerTopline > span {
-  color: var(--copper);
+  color: var(--color-copper);
   font-family: var(--font-mono);
   font-size: .55rem;
   letter-spacing: .04em;
@@ -165,7 +165,7 @@
 .secondaryOffers :global(li svg) {
   flex: 0 0 auto;
   margin-top: .1rem;
-  color: var(--signal-strong);
+  color: var(--color-signal);
 }
 
 .faq :global(details) {
@@ -203,7 +203,7 @@
     radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--color-signal) 10%, transparent), transparent 32%),
     radial-gradient(circle at 18% 110%, color-mix(in srgb, var(--color-copper) 4%, transparent), transparent 30%),
     linear-gradient(135deg, color-mix(in srgb, var(--color-surface-elevated) 1.8%, transparent), transparent 48%),
-    var(--slate-900);
+    var(--color-text-primary);
   color: color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary));
 }
 
@@ -234,7 +234,7 @@
 .final a:first-child {
   border-color: var(--color-signal);
   background: var(--color-signal);
-  color: var(--slate-900);
+  color: var(--color-text-primary);
   box-shadow: none;
   transition: transform .18s ease, border-color .18s ease, background-color .18s ease;
 }
