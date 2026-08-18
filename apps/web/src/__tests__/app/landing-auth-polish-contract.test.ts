@@ -19,7 +19,7 @@ describe("landing visual and login reliability polish", () => {
     expect(conversion).toContain('data-faq-surface="true"');
     expect(visual).toContain(':global(#pricing),');
     expect(visual).toContain(':global(#faq)');
-    expect(visual).toMatch(/color\s*:\s*var\(--ink\)\s*;/);
+    expect(visual).toMatch(/color\s*:\s*var\(--color-text-primary\)\s*;/);
     expect(visual).toContain(':global(#pricing [data-pricing-primary])');
     expect(visual).toContain(':global(#pricing [data-pricing-secondary] p)');
     expect(visual).toContain(':global(#faq summary)');
