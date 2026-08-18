@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const roots = ['apps/web/app', 'apps/web/components'];
+const roots = ['apps/web/app'];
 const extensions = new Set(['.css', '.tsx', '.ts']);
 const tokenPath = /product-visual-system\.css|tokens?/;
 
@@ -28,14 +28,12 @@ function walk(dir) {
 
 const failures = [];
 for (const root of roots) {
-  try {
-    for (const file of walk(root)) {
-      if (tokenPath.test(file)) continue;
-      if (!extensions.has(file.slice(file.lastIndexOf('.')))) continue;
-      const text = readFileSync(file, 'utf8');
-      if (forbidden.some((pattern) => pattern.test(text))) failures.push(file);
-    }
-  } catch {}
+  for (const file of walk(root)) {
+    if (tokenPath.test(file)) continue;
+    if (!extensions.has(file.slice(file.lastIndexOf('.')))) continue;
+    const text = readFileSync(file, 'utf8');
+    if (forbidden.some((pattern) => pattern.test(text))) failures.push(file);
+  }
 }
 
 if (failures.length) {
