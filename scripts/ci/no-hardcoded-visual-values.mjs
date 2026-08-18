@@ -8,7 +8,7 @@ const tokenSources = new Set([
   path.resolve('apps/web/app/product-visual-system.css'),
 ]);
 const rawColorLiteral = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)|\bhwb\([^)]*\)/g;
-const bannedTokenNamespace = /--(?:c|rr)-[a-z0-9-]+/gi;
+const bannedTokenNamespace = /--(?:c|rr|slate)-[a-z0-9-]+/gi;
 const bannedLandingAlias = /--(?:paper(?:-soft|-strong)?|ink|muted-(?:dark|light)|line-(?:dark|light)|signal(?:-strong|-deep|-soft)?|copper|warning|surface-radius)\b/gi;
 const cssRadiusDeclaration = /border-radius\s*:\s*([^;}\n]+)/gi;
 const jsRadiusDeclaration = /\bborderRadius\s*:\s*(?:"([^"]+)"|'([^']+)'|(\d+(?:\.\d+)?))/g;
