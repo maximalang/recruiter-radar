@@ -37,12 +37,7 @@ describe("dashboard canonical access states", () => {
     jest.mocked(getSession).mockResolvedValue({ userId: "84", dataOwnerId: "42", workspaceId: "ws-1" } as never);
     jest.mocked(getAccountById).mockResolvedValue({ id: "84" } as never);
     jest.mocked(getDashboardTodayRadar).mockResolvedValue({ topLeads: [], pendingReview: 0, hiringModeByProfileId: {}, lastRunAt: null });
-    jest.mocked(getDashboardSourceHealth).mockResolvedValue({
-      sourceCount: 0,
-      degradedSourceCount: 0,
-      latestSuccessfulRunAt: null,
-      latestAttemptAt: null,
-    } as never);
+    jest.mocked(getDashboardSourceHealth).mockResolvedValue([]);
   });
 
   test("denies premium dashboard before loading tenant product data", async () => {
