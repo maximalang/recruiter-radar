@@ -153,9 +153,8 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ items, total, limit, offset });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to fetch review queue.";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Failed to fetch review queue." }, { status: 500 });
   }
 }
 
@@ -269,15 +268,13 @@ export async function POST(request: Request) {
           digestCandidateId: payload.candidateId,
           action: "badfit",
         });
-      } catch (suppressError) {
-        // The review_status UPDATE already succeeded — log the suppression
-        // failure but don't fail the whole request. The candidate is rejected;
-        // suppression is a best-effort coherence bonus.
-        const message = suppressError instanceof Error ? suppressError.message : "suppression failed";
+      } catch {
+        // The review_status UPDATE already succeeded, so preserve the successful
+        // review result without exposing internal suppression/database details.
         return NextResponse.json({
           ok: true,
           candidate: result.rows[0],
-          warning: `Rejected, but suppression failed: ${message}`,
+          warning: "Rejected, but suppression failed.",
         });
       }
     }
@@ -286,8 +283,7 @@ export async function POST(request: Request) {
       ok: true,
       candidate: result.rows[0],
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update review status.";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Failed to update review status." }, { status: 500 });
   }
 }
