@@ -2,9 +2,7 @@
   position: relative;
   overflow: hidden;
   padding-block: clamp(4.5rem, 7vw, 7rem);
-  background:
-    radial-gradient(circle at 85% 5%, color-mix(in srgb, var(--color-signal) 7.5%, transparent), transparent 28%),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary)) 0%, color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary)) 58%, color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary)) 100%);
+  background: var(--color-surface-primary);
 }
 
 .section::before {
@@ -13,7 +11,7 @@
   right: -17rem;
   width: 42rem;
   height: 42rem;
-  border: 1px solid color-mix(in srgb, var(--color-signal) 7.5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-signal) 6%, transparent);
   border-radius: 50%;
   content: "";
   pointer-events: none;
@@ -47,10 +45,11 @@
   bottom: 0;
   left: 0;
   width: 1px;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-copper) 24%, transparent), color-mix(in srgb, var(--color-signal) 62%, transparent) 70%, color-mix(in srgb, var(--color-signal) 16%, transparent));
+  background: linear-gradient(to bottom, var(--color-separator), color-mix(in srgb, var(--color-signal) 58%, transparent) 72%, var(--color-separator-subtle));
   content: "";
-  transform: scaleY(0);
+  transform: scaleY(1);
   transform-origin: top;
+  transition: transform 320ms var(--motion-ease-enter);
 }
 .trajectory i {
   position: absolute;
@@ -58,9 +57,10 @@
   bottom: 0;
   left: 0;
   height: 1px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--color-signal) 60%, transparent), color-mix(in srgb, var(--color-signal) 8%, transparent));
-  transform: scaleX(0);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-signal) 54%, transparent), var(--color-separator-subtle));
+  transform: scaleX(1);
   transform-origin: left;
+  transition: transform 280ms var(--motion-ease-enter) 150ms;
 }
 
 .events { display: grid; margin: 0; padding: 0; list-style: none; }
@@ -72,25 +72,29 @@
   gap: .75rem;
   align-items: center;
   min-height: 5rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-information) 10.5%, transparent);
-  opacity: 0;
-  transform: translate3d(0, 4px, 0);
-  transition: opacity .18s ease, background-color .18s ease, color .18s ease;
+  border-bottom: 1px solid var(--color-separator);
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 220ms var(--motion-ease-enter),
+    transform 220ms var(--motion-ease-enter),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    color var(--motion-duration-control) var(--motion-ease-standard);
 }
 .event::before { position: absolute; top: .65rem; bottom: .65rem; left: 0; width: 2px; background: var(--color-signal); content: ""; opacity: 0; transform: scaleY(.25); transition: opacity .18s ease, transform .22s ease; }
-.event time { color: color-mix(in srgb, var(--color-information) 50%, transparent); font-family: var(--font-mono); font-size: .55rem; text-align: right; text-transform: uppercase; }
+.event time { color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: .55rem; text-align: right; text-transform: uppercase; }
 .node { position: relative; z-index: 2; display: grid; width: 1.9rem; height: 1.9rem; place-items: center; }
-.node::before { width: .42rem; height: .42rem; border-radius: 50%; background: var(--color-destructive); content: ""; box-shadow: none; transition: background-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.node::before { width: .42rem; height: .42rem; border-radius: 50%; background: var(--color-text-tertiary); content: ""; box-shadow: none; transition: background-color .18s ease, transform .18s ease; }
 .event:nth-child(n+3) .node::before { background: var(--color-signal); }
 .eventCopy { display: grid; gap: .24rem; min-width: 0; }
-.eventCopy strong { font-size: clamp(.92rem, 1.15vw, 1.04rem); font-weight: 600; line-height: 1.3; }
-.eventCopy small { color: color-mix(in srgb, var(--color-information) 48%, transparent); font-family: var(--font-mono); font-size: .52rem; letter-spacing: .04em; text-transform: uppercase; }
+.eventCopy strong { color: var(--color-text-primary); font-size: clamp(.92rem, 1.15vw, 1.04rem); font-weight: 600; line-height: 1.3; }
+.eventCopy small { color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: .52rem; letter-spacing: .04em; text-transform: uppercase; }
 .eventState { justify-self: end; color: var(--color-signal); font-family: var(--font-mono); font-size: .49rem; letter-spacing: .055em; text-transform: uppercase; }
 .event:focus-visible { outline: 1px solid color-mix(in srgb, var(--color-signal) 38%, transparent); outline-offset: -1px; }
-.event:hover, .event:focus-visible { background: linear-gradient(90deg, color-mix(in srgb, var(--color-signal) 5%, transparent), transparent 72%); }
+.event:hover, .event:focus-visible { background: color-mix(in srgb, var(--color-signal-soft) 62%, transparent); }
 .event:hover::before, .event:focus-visible::before { opacity: 1; transform: scaleY(1); }
 .event:hover .node::before,
-.event:focus-visible .node::before { background: var(--color-signal); box-shadow: none; transform: scale(1.08); }
+.event:focus-visible .node::before { background: var(--color-signal); transform: scale(1.08); }
 .events:has(.event:hover) .event:not(:hover),
 .events:has(.event:focus-visible) .event:not(:focus-visible) { opacity: .62 !important; }
 
@@ -100,24 +104,23 @@
   gap: .25rem .85rem;
   margin: 1.05rem 0 0 7.35rem;
   padding: 1rem 1.05rem;
-  border: 1px solid color-mix(in srgb, var(--color-signal) 16%, transparent);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--color-signal) 7%, transparent), color-mix(in srgb, var(--color-surface-elevated) 18%, transparent) 70%, transparent);
-  opacity: 0;
-  transform: translate3d(0, 3px, 0);
+  border-top: 1px solid color-mix(in srgb, var(--color-signal) 34%, var(--color-separator));
+  border-bottom: 1px solid var(--color-separator);
+  background: transparent;
+  opacity: 1;
+  transform: none;
+  transition: opacity 220ms var(--motion-ease-enter), transform 220ms var(--motion-ease-enter);
 }
 .lock > span { grid-row: 1 / 3; align-self: start; padding-top: .08rem; color: var(--color-signal); font-family: var(--font-mono); font-size: .5rem; font-weight: 700; letter-spacing: .065em; }
-.lock strong { font-size: 1rem; font-weight: 650; letter-spacing: -.015em; }
-.lock small { color: color-mix(in srgb, var(--color-information) 50%, transparent); font-family: var(--font-mono); font-size: .52rem; text-transform: uppercase; }
+.lock strong { color: var(--color-text-primary); font-size: 1rem; font-weight: 650; letter-spacing: -.015em; }
+.lock small { color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: .52rem; text-transform: uppercase; }
 
-.section:global([data-motion-state="visible"]) .trajectory::before { animation: none; }
-.section:global([data-motion-state="visible"]) .trajectory i { animation: none; }
-.section:global([data-motion-state="visible"]) .event { animation: none; }
-.section:global([data-motion-state="visible"]) .lock { animation: none; }
-
-@keyframes lineDrawY { to { transform: scaleY(1); } }
-@keyframes lineDrawX { to { transform: scaleX(1); } }
-@keyframes eventResolve { to { opacity: 1; transform: translate3d(0,0,0); } }
-@keyframes lockResolve { from { opacity: 0; transform: translate3d(0,4px,0); box-shadow: none; } to { opacity: 1; transform: translate3d(0,0,0); box-shadow: none; } }
+.section:global([data-motion-state="pending"]) .trajectory::before { transform: scaleY(0); }
+.section:global([data-motion-state="pending"]) .trajectory i { transform: scaleX(0); }
+.section:global([data-motion-state="pending"]) .event { opacity: 0; transform: translate3d(0, 4px, 0); }
+.section:global([data-motion-state="pending"]) .lock { opacity: 0; transform: translate3d(0, 3px, 0); }
+.section:global([data-motion-state="visible"]) .event { transition-delay: calc(var(--event-index) * 55ms); }
+.section:global([data-motion-state="visible"]) .lock { transition-delay: 220ms; }
 
 @media (max-width: 1040px) {
   .layout { grid-template-columns: 1fr; gap: 2.2rem; }
@@ -126,19 +129,20 @@
 }
 
 @media (max-width: 680px) {
-  .section { padding-block: 4rem; }
-  .trajectory { left: .95rem; bottom: 7.2rem; }
-  .event { grid-template-columns: 1.9rem minmax(0,1fr) auto; gap: .45rem .7rem; min-height: 6.1rem; padding-block: .55rem; }
+  .section { padding-block: 3.5rem; }
+  .layout { gap: 1.7rem; }
+  .trajectory { left: .95rem; bottom: 6.35rem; }
+  .event { grid-template-columns: 1.9rem minmax(0,1fr) auto; gap: .35rem .7rem; min-height: 5.35rem; padding-block: .45rem; }
   .event::before { left: -.15rem; }
   .event time { grid-column: 2; grid-row: 1; text-align: left; }
   .node { grid-column: 1; grid-row: 1 / 3; }
   .eventCopy { grid-column: 2 / 4; grid-row: 2; }
   .eventState { grid-column: 3; grid-row: 1; }
-  .lock { margin-left: 0; grid-template-columns: 1fr; }
+  .lock { margin-left: 0; grid-template-columns: 1fr; padding-inline: 0; }
   .lock > span { grid-row: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .trajectory::before, .trajectory i, .event, .lock { animation: none; opacity: 1 !important; transform: none !important; }
-  .event, .event::before, .node::before { transition: none !important; }
+  .trajectory::before, .trajectory i, .event, .lock { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .event::before, .node::before { transition: none !important; }
 }
