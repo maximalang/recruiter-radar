@@ -65,7 +65,8 @@ describe("DashboardTodayRadar radar icon", () => {
       />,
     );
 
-    const row = screen.getByRole("link", { name: /Ромашка/ });
+    const row = screen.getByText(/1 источник/).closest("a");
+    expect(row).not.toBeNull();
     expect(row).toHaveTextContent("1 подтверждение");
     expect(row).toHaveTextContent("1 источник");
     expect(row).toHaveTextContent("1 вакансия");
