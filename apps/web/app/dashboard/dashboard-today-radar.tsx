@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { LeadItem } from "@/lib/leads-data";
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from "@/lib/leads/lead-quality";
 import { formatVacanciesCount, pluralForm } from "@/lib/format/plural";
-import { formatSignalFreshness, EmptyState } from "../ui/internal-page";
+import { formatSignalFreshness } from "../ui/internal-page";
+import { StaticEmptyState } from "../ui/static-empty-state";
 import { TargetIcon } from "../ui/icons";
 import styles from "./dashboard-workspace.module.css";
 
@@ -39,11 +40,11 @@ export default function DashboardTodayRadar({ topLeads, pendingReview, hiringMod
       </div>
 
       {topLeads.length === 0 ? (
-        <EmptyState
+        <StaticEmptyState
           icon={TargetIcon}
           title={lastRunAt ? "Подходящих компаний пока нет" : "Первое сканирование ещё не завершено"}
-          text={lastRunAt ? "Последний запуск завершён, но компании не прошли текущие условия. Можно уточнить профиль или дождаться новых сигналов." : "После первого сканирования здесь появятся компании, причины приоритета и подтверждения."}
-          action={{ href: "/settings/radar", label: "Проверить профиль радара" }}
+          description={lastRunAt ? "Последний запуск завершён, но компании не прошли текущие условия. Можно уточнить профиль или дождаться новых сигналов." : "После первого сканирования здесь появятся компании, причины приоритета и подтверждения."}
+          action={<Link href="/settings/radar">Проверить профиль радара</Link>}
         />
       ) : (
         <div className={styles.todayRadarList}>
