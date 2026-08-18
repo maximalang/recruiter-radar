@@ -12,6 +12,7 @@ import {
   InternalPageFrame,
   InternalPageHeader,
 } from "../../ui/internal-page";
+import { SettingsSection } from "../../ui/settings-section";
 import styles from "./access-ledger.module.css";
 
 export const dynamic = "force-dynamic";
@@ -53,12 +54,12 @@ export default async function AccessSettingsPage() {
       />
 
       <div className={styles.document}>
-        <section className={styles.section} aria-labelledby="current-access-title">
-          <div className={styles.sectionHeader}>
-            <h2 id="current-access-title">Текущий доступ</h2>
-            <p>Показываем только фактическое состояние доступа, без предположений о подписке или будущих списаниях.</p>
-          </div>
-
+        <SettingsSection
+          className={styles.section}
+          headerClassName={styles.sectionHeader}
+          title="Текущий доступ"
+          description="Показываем только фактическое состояние доступа, без предположений о подписке или будущих списаниях."
+        >
           {access.status === "active" ? (
             <dl className={styles.ledger}>
               <div><dt>Статус</dt><dd>Активен</dd></div>
@@ -80,16 +81,16 @@ export default async function AccessSettingsPage() {
               {access.status === "active" ? "Продлить доступ" : "Выбрать период доступа"}
             </Link>
           </div>
-        </section>
+        </SettingsSection>
 
-        <section className={styles.section} aria-labelledby="orders-title">
-          <div className={styles.sectionHeader}>
-            <h2 id="orders-title">История заказов</h2>
-            <p>Отдельный журнал платёжных операций. Он не подменяет текущее состояние доступа.</p>
-          </div>
-
+        <SettingsSection
+          className={styles.section}
+          headerClassName={styles.sectionHeader}
+          title="История заказов"
+          description="Отдельный журнал платёжных операций. Он не подменяет текущее состояние доступа."
+        >
           {orders === null ? (
-            <p className={styles.notice} role="status">
+            <p className={styles.notice} role="status" aria-live="polite">
               История заказов временно недоступна. Текущий доступ выше остаётся источником истины.
             </p>
           ) : orders.length === 0 ? (
@@ -113,7 +114,7 @@ export default async function AccessSettingsPage() {
               ))}
             </div>
           )}
-        </section>
+        </SettingsSection>
       </div>
     </InternalPageFrame>
   );
