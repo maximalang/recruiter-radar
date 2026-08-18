@@ -9,6 +9,7 @@ const tokenSources = new Set([
 ]);
 const rawColorLiteral = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)|\bhwb\([^)]*\)/g;
 const bannedTokenNamespace = /--(?:c|rr)-[a-z0-9-]+/gi;
+const bannedLandingAlias = /--(?:paper(?:-soft|-strong)?|ink|muted-(?:dark|light)|line-(?:dark|light)|signal(?:-strong|-deep|-soft)?|copper|warning|surface-radius)\b/gi;
 const cssRadiusDeclaration = /border-radius\s*:\s*([^;}\n]+)/gi;
 const jsRadiusDeclaration = /\bborderRadius\s*:\s*(?:"([^"]+)"|'([^']+)'|(\d+(?:\.\d+)?))/g;
 const cssBoxShadowDeclaration = /box-shadow\s*:\s*([^;}\n]+)/gi;
@@ -41,6 +42,12 @@ for (const file of sourceFiles(appRoot)) {
 
   for (const token of new Set(content.match(bannedTokenNamespace) ?? [])) {
     failures.push(`${label}: banned token namespace ${token}`);
+  }
+
+  if (label.startsWith('apps/web/app/landing/')) {
+    for (const token of new Set(content.match(bannedLandingAlias) ?? [])) {
+      failures.push(`${label}: banned landing alias ${token}`);
+    }
   }
 
   for (const match of matches(cssRadiusDeclaration, content)) {
@@ -86,4 +93,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Semantic visual contract passed: canonical namespaces, colors, radii, and shadows only.');
+console.log('Semantic visual contract passed: canonical namespaces, colors, radii, shadows, and landing tokens only.');
