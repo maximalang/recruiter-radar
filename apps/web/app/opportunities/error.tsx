@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { ProductErrorState } from '../ui/product-error-state'
 import { InternalPageFrame, InternalPageHeader } from '../ui/internal-page'
 import { buildOpportunityNavigation } from './navigation'
-import styles from './opportunities.module.css'
 
 export default function OpportunitiesError(props: { error?: Error & { digest?: string }; reset: () => void }) {
-  const correlationId = props.error?.digest ?? crypto.randomUUID()
+  const correlationId = useMemo(
+    () => props.error?.digest ?? crypto.randomUUID(),
+    [props.error],
+  )
 
   useEffect(() => {
     console.error('[opportunities] route render failed', {
