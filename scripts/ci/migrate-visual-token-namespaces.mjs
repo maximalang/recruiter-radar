@@ -9,6 +9,13 @@ const tokenSources = new Set([
 ]);
 
 const rawColorLiteral = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)/g;
+const cssRadiusDeclaration = /border-radius\s*:\s*([^;}\n]+)/gi;
+const jsRadiusString = /\bborderRadius\s*:\s*("([^"]+)"|'([^']+)')/g;
+const jsRadiusNumber = /\bborderRadius\s*:\s*(\d+(?:\.\d+)?)(?![\w.])/g;
+const cssBoxShadowDeclaration = /box-shadow\s*:\s*([^;}]+)/gi;
+const jsBoxShadowDeclaration = /\bboxShadow\s*:\s*("([^"]+)"|'([^']+)')/g;
+const cssTextShadowDeclaration = /text-shadow\s*:\s*([^;}]+)/gi;
+const cssDropShadowFilter = /filter\s*:\s*drop-shadow\([^;}]+\)/gi;
 
 const semantic = {
   canvas: '--color-canvas',
@@ -129,14 +136,90 @@ function semanticColor(value) {
   return parsed.a < 0.999 ? translucentSemantic(parsed) : opaqueSemantic(parsed);
 }
 
+function radiusToken(number) {
+  if (number === 0) return '0';
+  if (number >= 100) return 'var(--radius-pill)';
+  if (number <= 4) return 'var(--radius-detail)';
+  if (number <= 8) return 'var(--radius-control)';
+  if (number <= 12) return 'var(--radius-surface)';
+  return 'var(--radius-overlay)';
+}
+
+function normalizeCssRadius(value) {
+  return value.replace(/(\d*\.?\d+)(px|rem|em)\b/gi, (_match, rawNumber) => radiusToken(Number(rawNumber)));
+}
+
+function normalizeJsRadiusValue(value) {
+  const trimmed = value.trim();
+  if (/^\d*\.?\d+(?:px|rem|em)$/i.test(trimmed)) {
+    return radiusToken(Number.parseFloat(trimmed));
+  }
+  return trimmed;
+}
+
+function shadowTokenFor(file, value) {
+  const normalized = value.trim().replace(/\s+/g, ' ');
+  if (normalized.startsWith('none')) return normalized;
+  if (/\binset\b/.test(normalized) || /^0 0 0\b/.test(normalized)) return 'none';
+
+  const relative = file.replaceAll(path.sep, '/');
+  if (
+    relative.includes('/landing/detection-scene') ||
+    relative.includes('/landing/final-radar') ||
+    relative.includes('/landing/workspace-scene') ||
+    relative.includes('/landing/signal-timeline-scene') ||
+    relative.includes('/ui/product-workspace-polish') ||
+    relative.includes('/settings/') ||
+    relative.includes('/profile/') ||
+    relative.includes('/opportunities/')
+  ) {
+    return 'none';
+  }
+
+  if (
+    relative.includes('/checkout/') ||
+    relative.includes('/landing/landing-header') ||
+    relative.includes('/ui/legal-document') ||
+    relative.includes('/yandex-metrika')
+  ) {
+    return 'var(--shadow-overlay)';
+  }
+
+  return 'var(--shadow-float)';
+}
+
+function normalizeVisualStructure(content, file) {
+  let next = content;
+
+  next = next.replace(cssRadiusDeclaration, (full, value) => full.replace(value, normalizeCssRadius(value)));
+  next = next.replace(jsRadiusString, (_full, quoted, doubleQuoted, singleQuoted) => {
+    const value = doubleQuoted ?? singleQuoted ?? '';
+    const normalized = normalizeJsRadiusValue(value);
+    const quote = quoted.startsWith("'") ? "'" : '"';
+    return `borderRadius: ${quote}${normalized}${quote}`;
+  });
+  next = next.replace(jsRadiusNumber, (_full, rawNumber) => `borderRadius: "${radiusToken(Number(rawNumber))}"`);
+
+  next = next.replace(cssBoxShadowDeclaration, (_full, value) => `box-shadow: ${shadowTokenFor(file, value)}`);
+  next = next.replace(jsBoxShadowDeclaration, (_full, quoted, doubleQuoted, singleQuoted) => {
+    const value = doubleQuoted ?? singleQuoted ?? '';
+    return `boxShadow: "${shadowTokenFor(file, value)}"`;
+  });
+  next = next.replace(cssTextShadowDeclaration, 'text-shadow: none');
+  next = next.replace(cssDropShadowFilter, 'filter: none');
+
+  return next;
+}
+
 let changed = 0;
 for (const file of filesUnder(appRoot)) {
   if (!extensions.has(path.extname(file)) || tokenSources.has(file)) continue;
   const before = readFileSync(file, 'utf8');
-  const after = before.replace(rawColorLiteral, semanticColor);
+  const recolored = before.replace(rawColorLiteral, semanticColor);
+  const after = normalizeVisualStructure(recolored, file);
   if (after === before) continue;
   writeFileSync(file, after);
   changed += 1;
 }
 
-console.log(`Normalized legacy visual palettes in ${changed} UI files.`);
+console.log(`Normalized legacy colors, radii, and shadows in ${changed} UI files.`);
