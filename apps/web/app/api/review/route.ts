@@ -52,8 +52,17 @@ export async function GET(request: Request) {
     );
   }
 
-  const limit = Math.min(Number(searchParams.get("limit") ?? 50), 200);
-  const offset = Math.max(Number(searchParams.get("offset") ?? 0), 0);
+  const rawLimit = searchParams.get("limit");
+  const rawOffset = searchParams.get("offset");
+  const limit = rawLimit === null ? 50 : Number(rawLimit);
+  const offset = rawOffset === null ? 0 : Number(rawOffset);
+
+  if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+    return NextResponse.json({ error: "limit must be an integer between 1 and 200." }, { status: 400 });
+  }
+  if (!Number.isInteger(offset) || offset < 0) {
+    return NextResponse.json({ error: "offset must be a non-negative integer." }, { status: 400 });
+  }
 
   // Owner-scope: reject reads of another tenant's review queue. The JOIN +
   // owner predicate below also defends against a forged clientProfileId.
