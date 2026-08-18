@@ -145,8 +145,14 @@ body {
   transition: background-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-[data-product-workspace="true"] tbody tr:hover {
-  background: var(--color-surface-secondary);
+[data-product-workspace="true"] tbody tr:focus-within {
+  background: var(--color-surface-selected);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-product-workspace="true"] tbody tr:hover {
+    background: var(--color-surface-selected);
+  }
 }
 
 [data-product-workspace="true"] :where(.tabular, [data-numeric="true"]) {
