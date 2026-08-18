@@ -33,6 +33,10 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const safeLinks = links.flatMap((link) => {
+    const href = safeExternalHref(link.href);
+    return href ? [{ ...link, href }] : [];
+  });
 
   function handleCopy() {
     // Clipboard API with a graceful fallback for non-secure contexts / older
@@ -71,9 +75,9 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
     <div className={s.nextSteps}>
       <div className={s.nextStepsLabel}>Дальнейшие шаги</div>
 
-      {links.length > 0 && (
+      {safeLinks.length > 0 && (
         <div className={s.nextStepsLinks}>
-          {links.map((l) => (
+          {safeLinks.map((l) => (
             <a
               key={l.href}
               href={l.href}
@@ -115,6 +119,15 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
       </details>
     </div>
   );
+}
+
+function safeExternalHref(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function legacyCopy(text: string): boolean {
