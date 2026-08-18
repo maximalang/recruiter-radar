@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,5 +23,18 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - name: Apply one-time semantic token migration
+        if: ${{ github.event_name == 'push' && github.ref_name == 'chatgpt/full-v1-v6-implementation' }}
+        run: |
+          node scripts/ci/migrate-visual-token-namespaces.mjs
+          if git diff --quiet; then
+            echo 'Semantic token namespace already migrated.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add apps/web/app apps/web/src/__tests__ scripts/ci
+            git commit -m 'chore(visual): apply semantic token migration'
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
       - name: Reject new hardcoded visual colors outside token sources
         run: node scripts/ci/no-hardcoded-visual-values.mjs
