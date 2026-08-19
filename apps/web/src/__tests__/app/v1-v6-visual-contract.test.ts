@@ -66,6 +66,14 @@ describe('Recruiter Radar V1-V6 visual contract', () => {
     expect(interactions).not.toMatch(/\[class(?:[*^$|~]?=)/)
   })
 
+  it('keeps public legal documents documentary instead of glossy', () => {
+    const legal = fs.readFileSync(path.join(APP_ROOT, 'ui/legal-document.module.css'), 'utf8')
+    expect(legal).not.toMatch(/backdrop-filter\s*:/)
+    expect(legal).not.toMatch(/(?:radial|linear)-gradient\s*\(/)
+    expect(legal).not.toMatch(/box-shadow\s*:\s*var\(--shadow-/)
+    expect(legal).toContain('outline: 2px solid var(--color-focus)')
+  })
+
   it('rejects legacy --c-* and --rr-* token namespaces', () => {
     const failures: string[] = []
 
