@@ -1,0 +1,62 @@
+name: Apply source-ingest assertion patch
+
+on:
+  push:
+    branches: [codex/source-closure-2026-08]
+    paths: ['.github/workflows/patch-source-ingest-test.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/source-closure-2026-08
+          fetch-depth: 0
+      - name: Patch only the policy-unavailable scheduler assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/src/__tests__/lib/lead-discovery/source-ingest.test.ts')
+          text = path.read_text()
+          old = """      const primaryCount = getPrimarySourceIds().length
+                const supportingCount = getDailySupportingSourceIds().length
+                expect(result).toHaveLength(primaryCount + supportingCount)
+                expect(events.slice(0, primaryCount)).toEqual(Array(primaryCount).fill('primary'))
+                expect(events.slice(primaryCount)).toEqual(Array(supportingCount).fill('supporting'))
+          """
+          new = """      const primaryCount = getPrimarySourceIds().length
+                const supportingCount = getDailySupportingSourceIds().length
+                const supportingResults = result.slice(primaryCount)
+                const unavailableCount = supportingResults.filter(
+                  entry => entry.diagnostics?.zeroReason === 'source-unavailable',
+                ).length
+                expect(result).toHaveLength(primaryCount + supportingCount)
+                expect(unavailableCount).toBe(1)
+                expect(supportingResults).toEqual(expect.arrayContaining([
+                  expect.objectContaining({
+                    source: 'telegram-company-channels',
+                    outcome: 'deferred',
+                    diagnostics: { zeroReason: 'source-unavailable' },
+                  }),
+                ]))
+                expect(events.slice(0, primaryCount)).toEqual(Array(primaryCount).fill('primary'))
+                expect(events.slice(primaryCount)).toEqual(Array(supportingCount - unavailableCount).fill('supporting'))
+          """
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exact assertion block once, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+          PY
+          rm .github/workflows/patch-source-ingest-test.yml
+          git diff --check
+          git diff --stat
+      - name: Commit minimal patch and remove helper workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/web/src/__tests__/lib/lead-discovery/source-ingest.test.ts .github/workflows/patch-source-ingest-test.yml
+          git commit -m 'test(sources): account for policy-unavailable scheduler entries'
+          git push origin HEAD:codex/source-closure-2026-08
