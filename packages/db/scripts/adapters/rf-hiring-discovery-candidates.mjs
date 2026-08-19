@@ -55,7 +55,7 @@ export function buildRfHiringDiscoveryCandidate({ family, posting, vacancyUrl, d
 }
 
 export async function resolveCandidateIdentity(client, candidate) {
-  const strongKeys = [...new Set((candidate?.strongIdentityKeys ?? [])
+  const strongKeys = [...new Set((candidate?.strongIdentityKeys ?? candidate?.strong_identity_keys ?? [])
     .map((key) => classifyStrongIdentityKey(key)?.key)
     .filter(Boolean))];
   if (strongKeys.length === 0) {
@@ -139,10 +139,34 @@ export async function upsertRfHiringDiscoveryCandidate(client, candidate) {
          published_at = COALESCE(EXCLUDED.published_at, rf_hiring_discovery_candidates_v2.published_at),
          last_detected_at = GREATEST(rf_hiring_discovery_candidates_v2.last_detected_at, EXCLUDED.last_detected_at),
          acquisition_method = EXCLUDED.acquisition_method,
-         identity_status = EXCLUDED.identity_status,
-         resolved_org_id = EXCLUDED.resolved_org_id,
-         resolution_reason = EXCLUDED.resolution_reason,
-         strong_identity_keys = EXCLUDED.strong_identity_keys,
+         identity_status = CASE
+           WHEN rf_hiring_discovery_candidates_v2.promoted_at IS NOT NULL
+             THEN rf_hiring_discovery_candidates_v2.identity_status
+           WHEN rf_hiring_discovery_candidates_v2.identity_status = 'resolved'
+             AND EXCLUDED.identity_status = 'pending'
+             THEN rf_hiring_discovery_candidates_v2.identity_status
+           ELSE EXCLUDED.identity_status
+         END,
+         resolved_org_id = CASE
+           WHEN rf_hiring_discovery_candidates_v2.promoted_at IS NOT NULL
+             THEN rf_hiring_discovery_candidates_v2.resolved_org_id
+           WHEN rf_hiring_discovery_candidates_v2.identity_status = 'resolved'
+             AND EXCLUDED.identity_status = 'pending'
+             THEN rf_hiring_discovery_candidates_v2.resolved_org_id
+           ELSE EXCLUDED.resolved_org_id
+         END,
+         resolution_reason = CASE
+           WHEN rf_hiring_discovery_candidates_v2.promoted_at IS NOT NULL
+             THEN rf_hiring_discovery_candidates_v2.resolution_reason
+           WHEN rf_hiring_discovery_candidates_v2.identity_status = 'resolved'
+             AND EXCLUDED.identity_status = 'pending'
+             THEN rf_hiring_discovery_candidates_v2.resolution_reason
+           ELSE EXCLUDED.resolution_reason
+         END,
+         strong_identity_keys = CASE
+           WHEN CARDINALITY(EXCLUDED.strong_identity_keys) > 0 THEN EXCLUDED.strong_identity_keys
+           ELSE rf_hiring_discovery_candidates_v2.strong_identity_keys
+         END,
          payload = rf_hiring_discovery_candidates_v2.payload || EXCLUDED.payload,
          content_fingerprint = EXCLUDED.content_fingerprint,
          updated_at = NOW()
