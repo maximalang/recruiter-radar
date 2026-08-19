@@ -103,7 +103,7 @@
 
 .cue {
   grid-area: cue;
-  min-height: 40px;
+  min-height: 44px;
   align-self: center;
   padding: 0 8px;
   border: 0;
@@ -115,10 +115,13 @@
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition: background-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.cue:hover {
-  background: var(--color-surface-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .cue:hover {
+    background: var(--color-surface-secondary);
+  }
 }
 
 .cue:focus-visible {
