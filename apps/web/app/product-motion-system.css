@@ -67,7 +67,7 @@
 
 /* Rotation is reserved for a real pending/processing state. */
 [data-motion-icon][data-motion-state="pending"] {
-  animation: rr-motion-icon-progress 720ms linear infinite;
+  animation: rr-motion-icon-progress var(--motion-duration-scan) linear infinite;
 }
 
 /* Success and error are communicated by semantic state/content, never by
