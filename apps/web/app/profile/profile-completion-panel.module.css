@@ -35,7 +35,7 @@
   height: 100%;
   border-radius: var(--radius-pill);
   background: var(--color-signal);
-  transition: width 0.3s ease;
+  transition: width var(--motion-duration-context) var(--motion-ease-standard);
 }
 
 .barFill[data-complete] {
@@ -97,7 +97,7 @@
 
 .preview {
   padding-top: 10px;
-  border-top: 1px solid var(--color-surface-primary);
+  border-top: 1px solid var(--color-separator-subtle);
 }
 
 .previewText {
