@@ -214,9 +214,7 @@ export default async function OpportunitiesPage(props: {
           query={query}
           confidenceGate={confidenceGate}
           workflowEnabled={workflowEnabled}
-        >
-          {funnel ? <OpportunityFunnel summary={funnel} /> : null}
-        </OpportunityResearchMode>
+        />
 
         {visibleOpportunities.length > 0 ? (
           <div className={styles.cardList}>
@@ -247,6 +245,8 @@ export default async function OpportunitiesPage(props: {
             action={<StateLink href="/leads" label="Открыть компании" />}
           />
         )}
+
+        {funnel ? <OpportunityFunnel summary={funnel} /> : null}
       </div>
     </InternalPageFrame>
   )
