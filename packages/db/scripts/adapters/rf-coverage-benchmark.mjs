@@ -13,14 +13,16 @@ export const RF_SOURCE_INTELLIGENCE_V2_TARGETS = Object.freeze({
  *
  * benchmarkCompanies: [{ id, hiringActive, evidenceAppearedAt, detectedAt? }]
  * attributionAudits: [{ wrongCompany: boolean }]
- * demandRows: [{ canonicalDemandId? }] where the absence of a canonical id is
- *             treated as a unique row (never hides duplicates by accident).
+ * demandAudits: [{ groundTruthDemandId, observedCanonicalDemandIds: string[] }]
+ *   A duplicate means ONE audited real hiring demand was split across two or
+ *   more canonical vacancy ids. Multiple source publications already collapsed
+ *   into one canonical id are correctly NOT duplicates.
  * priorityOpportunities: [{ directEvidence, independentCorroboration }]
  */
 export function evaluateRfCoverageBenchmark({
   benchmarkCompanies = [],
   attributionAudits = [],
-  demandRows = [],
+  demandAudits = [],
   priorityOpportunities = [],
   targets = RF_SOURCE_INTELLIGENCE_V2_TARGETS,
 } = {}) {
@@ -38,13 +40,12 @@ export function evaluateRfCoverageBenchmark({
   const wrongAttributions = auditedAttributions.filter((row) => row.wrongCompany).length;
   const wrongCompanyAttributionRate = ratio(wrongAttributions, auditedAttributions.length);
 
-  const canonicalDemandKeys = new Set();
-  for (const [index, row] of demandRows.entries()) {
-    const key = nonEmptyText(row?.canonicalDemandId) ?? `unclustered:${index}`;
-    canonicalDemandKeys.add(key);
-  }
-  const duplicateRows = Math.max(0, demandRows.length - canonicalDemandKeys.size);
-  const duplicateHiringDemandRate = ratio(duplicateRows, demandRows.length);
+  const auditedDemands = demandAudits.filter((row) => (
+    nonEmptyText(row?.groundTruthDemandId)
+    && Array.isArray(row?.observedCanonicalDemandIds)
+  ));
+  const splitDemands = auditedDemands.filter((row) => uniqueNonEmpty(row.observedCanonicalDemandIds).length > 1);
+  const duplicateHiringDemandRate = ratio(splitDemands.length, auditedDemands.length);
 
   const corroboratedPriority = priorityOpportunities.filter((row) => (
     row?.directEvidence === true || row?.independentCorroboration === true
@@ -64,8 +65,9 @@ export function evaluateRfCoverageBenchmark({
       activeCompanies: activeCompanies.length,
       detectedCompanies: detectedCompanies.length,
       attributionAudits: auditedAttributions.length,
-      demandRows: demandRows.length,
-      canonicalDemandRows: canonicalDemandKeys.size,
+      wrongAttributions,
+      demandAudits: auditedDemands.length,
+      splitDemands: splitDemands.length,
       priorityOpportunities: priorityOpportunities.length,
     }),
     metrics: Object.freeze({
@@ -111,6 +113,10 @@ function hoursBetween(from, to) {
 
 function isFiniteDate(value) {
   return typeof value === 'string' && Number.isFinite(Date.parse(value));
+}
+
+function uniqueNonEmpty(values) {
+  return [...new Set(values.map(nonEmptyText).filter(Boolean))];
 }
 
 function nonEmptyText(value) {
