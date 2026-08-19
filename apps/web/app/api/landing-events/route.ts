@@ -124,8 +124,7 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(415, "Unsupported media type");
   }
 
-  const declaredLength = Number(request.headers.get("content-length") ?? 0);
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+  if (hasDeclaredOversizedBody(request, MAX_BODY_BYTES)) {
     return jsonError(413, "Payload too large");
   }
 
@@ -138,10 +137,8 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
-  const body = await request.text();
-  if (new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES) {
-    return jsonError(413, "Payload too large");
-  }
+  const body = await readBoundedBody(request, MAX_BODY_BYTES);
+  if (body === null) return jsonError(413, "Payload too large");
 
   let rawPayload: unknown;
   try {
@@ -164,4 +161,44 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   return new Response(null, { status: 204 });
+}
+
+function hasDeclaredOversizedBody(request: Request, maximumBytes: number): boolean {
+  const contentLength = request.headers.get("content-length");
+  if (!contentLength || !/^\d+$/.test(contentLength)) return false;
+  const declaredBytes = Number(contentLength);
+  return Number.isSafeInteger(declaredBytes) && declaredBytes > maximumBytes;
+}
+
+async function readBoundedBody(
+  request: Request,
+  maximumBytes: number,
+): Promise<string | null> {
+  if (!request.body) return "";
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maximumBytes) {
+        await reader.cancel("payload_too_large");
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
 }
