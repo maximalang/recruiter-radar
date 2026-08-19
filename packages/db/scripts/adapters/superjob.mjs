@@ -2,10 +2,10 @@
  * SuperJob API adapter.
  *
  * Uses the official SuperJob 2.0 vacancy-search API. The default production
- * mode is broad incremental discovery: no keyword, last 12 hours, count=100.
- * SuperJob caps list queries at 500 entities, so windows that exceed 500 are
- * recursively split by date_published_from/date_published_to instead of being
- * silently truncated.
+ * mode is broad incremental discovery: no keyword, direct employers only,
+ * last 12 hours, count=100. SuperJob caps list queries at 500 entities, so
+ * windows that exceed 500 are recursively split by publication time instead of
+ * being silently truncated.
  */
 
 import { fetchJson } from './source-http.mjs';
@@ -24,6 +24,7 @@ const DEFAULT_LOOKBACK_HOURS = 12;
 const MAX_LOOKBACK_HOURS = 168;
 const DEFAULT_MIN_PARTITION_MINUTES = 10;
 const DEFAULT_MAX_PARTITION_DEPTH = 12;
+const DIRECT_EMPLOYER_AGENCY_ID = '1';
 
 const ENV_PARAM_MAP = [
   ['SUPERJOB_TOWN', 'town'],
@@ -37,6 +38,7 @@ const ENV_PARAM_MAP = [
   ['SUPERJOB_DATE_PUBLISHED_TO', 'date_published_to'],
   ['SUPERJOB_ORDER_FIELD', 'order_field'],
   ['SUPERJOB_ORDER_DIRECTION', 'order_direction'],
+  ['SUPERJOB_AGENCY', 'agency'],
 ];
 
 export class SuperjobCoverageTruncationError extends Error {
@@ -71,6 +73,16 @@ export function resolveSuperjobSearchConfig(env = process.env, now = new Date())
     1,
     MAX_LOOKBACK_HOURS,
   );
+
+  // In discovery mode we only need attributable end-employer demand. Filtering
+  // at the official API boundary avoids spending the 500-result search window on
+  // recruiting agencies, outsourcing firms and aggregators that are rejected by
+  // downstream candidate_eligible semantics anyway. An explicit SUPERJOB_AGENCY
+  // always wins; explicit keyword mode remains unfiltered by default so the live
+  // verifier can still exercise publisher classification across agency types.
+  if (!keyword && extraParams.agency === undefined) {
+    extraParams.agency = DIRECT_EMPLOYER_AGENCY_ID;
+  }
 
   if (broadIncremental) {
     const nowDate = normalizeDate(now) ?? new Date();
