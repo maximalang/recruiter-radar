@@ -10,6 +10,7 @@ const tokenSources = new Set([
 const canonicalMotionSource = path.resolve('apps/web/app/product-motion-system.css');
 const globalInteractionLayer = path.resolve('apps/web/app/site-interactions.css');
 const rawColorLiteral = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)|\bhwb\([^)]*\)/g;
+const namedColorDeclaration = /\b(?:color|background(?:-color)?|border(?:-[a-z]+)?-color|outline-color|fill|stroke)\s*:\s*(black|white|red|green|blue|gray|grey|orange|yellow|purple|pink|brown|navy|teal|cyan|magenta)\b/gi;
 const bannedTokenNamespace = /--(?:c|rr|slate)-[a-z0-9-]+/gi;
 const bannedLandingAlias = /--(?:paper(?:-soft|-strong)?|ink|muted-(?:dark|light)|line-(?:dark|light)|signal(?:-strong|-deep|-soft)?|copper|warning|surface-radius)\b/gi;
 const versionedVisualMarker = /recruiter-radar-(?:landing-)?v\d+/gi;
@@ -119,6 +120,9 @@ for (const file of sourceFiles(appRoot)) {
 
   for (const literal of new Set(content.match(rawColorLiteral) ?? [])) {
     failures.push(`${label}: hardcoded color ${literal}`);
+  }
+  for (const match of matches(namedColorDeclaration, content)) {
+    failures.push(`${label}: hardcoded named color ${match[1]}`);
   }
 }
 
