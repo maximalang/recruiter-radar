@@ -128,7 +128,9 @@ export function extractTransparentBusinessFnsRecords(parsed) {
     } = record;
     return {
       ...normalized,
-      detected_at: latest_period ? `${latest_period}-12-31T00:00:00.000Z` : undefined,
+      detected_at: /^\d{4}$/.test(latest_period ?? '')
+        ? `${latest_period}-12-31T00:00:00.000Z`
+        : undefined,
     };
   });
 }
