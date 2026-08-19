@@ -7,6 +7,9 @@ import { logError, logEvent } from "@/lib/runtime";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const PUBLIC_CONFIGURATION_ERROR = "Notification retry service is not configured.";
+const PUBLIC_PROCESSING_ERROR = "Notification retry queue failed.";
+
 export async function GET() {
   return NextResponse.json({
     ok: true,
@@ -19,7 +22,7 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.CRON_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { success: false, error: "CRON_API_KEY is not configured." },
+      { success: false, error: PUBLIC_CONFIGURATION_ERROR },
       { status: 500 },
     );
   }
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest) {
       ...result,
     });
   } catch (error) {
-    const rawMessage = error instanceof Error ? error.message : "Notification retry queue failed.";
+    const rawMessage = error instanceof Error ? error.message : PUBLIC_PROCESSING_ERROR;
     const safeMessage = redactProviderSecret(rawMessage).slice(0, 1000);
     logError("notification.retry_queue.failed", new Error(safeMessage), {
       durationMs: Date.now() - startedAt,
@@ -54,7 +57,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: safeMessage,
+        error: PUBLIC_PROCESSING_ERROR,
       },
       { status: 500 },
     );
