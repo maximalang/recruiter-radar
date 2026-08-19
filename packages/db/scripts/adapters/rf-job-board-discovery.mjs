@@ -1,5 +1,6 @@
 import { fetchText } from './source-http.mjs';
 import { fetchPublicPageWithEscalation } from './public-page-escalation.mjs';
+import { extractRfJobDetailFallback } from './rf-job-board-detail-fallback.mjs';
 import {
   canonicalizePublicUrl,
   extractEmbeddedJsonDocuments,
@@ -150,6 +151,7 @@ export function extractPublicJobPostingsFromHtml(html, pageUrl) {
       location: extractJobLocation(node.jobLocation),
       employmentType: normalizeEmploymentType(node.employmentType),
       externalId: extractIdentifier(node.identifier),
+      publisherType: inferStructuredPublisherType(node),
       extractionMethod: 'json-ld-job-posting',
     }));
   }
@@ -189,7 +191,7 @@ export function extractPublicPaginationLinks(
   let root;
   try {
     page = new URL(pageUrl);
-    root = new URL(surface?.baseUrl ?? pageUrl);
+    root = new URL(surface?.paginationBaseUrl ?? surface?.baseUrl ?? pageUrl);
   } catch {
     return [];
   }
@@ -230,6 +232,21 @@ function extractDiscoveryRecordsFromHtml(html, pageUrl, family, surface, policy,
     ));
   for (const posting of postings) records.push({ kind: 'job-posting', posting });
 
+  // Some RF boards render a fully usable vacancy detail page but omit
+  // schema.org JobPosting. Fall back to conservative H1 + same-platform employer
+  // profile extraction for the detail URL itself. Agency publishers are tagged
+  // so their identity cannot be mistaken for the target hiring company.
+  if (postings.length === 0) {
+    const fallbackPosting = extractRfJobDetailFallback(html, pageUrl, family);
+    if (
+      fallbackPosting
+      && isAllowedPlatformOrigin(fallbackPosting.vacancyUrl, family.platformDomains)
+      && isRobotsPathAllowed(fallbackPosting.vacancyUrl, policy.robots)
+    ) {
+      records.push({ kind: 'job-posting', posting: fallbackPosting });
+    }
+  }
+
   const links = extractPublicVacancyLinks(html, pageUrl, family, { maxLinks })
     .filter((url) => isRobotsPathAllowed(url, policy.robots));
   for (const url of links) records.push({ kind: 'vacancy-link', url });
@@ -266,7 +283,7 @@ function extractDiscoveryRecordsFromMarkdown(markdown, pageUrl, family, surface,
   const paginationSeen = new Set();
   let root;
   try {
-    root = new URL(surface?.baseUrl ?? pageUrl);
+    root = new URL(surface?.paginationBaseUrl ?? surface?.baseUrl ?? pageUrl);
   } catch {
     root = page;
   }
@@ -330,6 +347,17 @@ function belongsToListingSurface(candidateUrl, rootUrl) {
   const candidatePath = candidate.pathname.replace(/\/+$/, '') || '/';
   if (rootPath === '/') return candidate.origin === root.origin;
   return candidatePath === rootPath || candidatePath.startsWith(`${rootPath}/`);
+}
+
+function inferStructuredPublisherType(node) {
+  const value = [
+    node?.hiringOrganization?.['@type'],
+    node?.hiringOrganization?.description,
+    node?.description,
+  ].flat().filter(Boolean).join(' ');
+  return /(?:recruit(?:ing|ment)\s+agency|staffing\s+agency|рекрутингов(?:ое|ая)\s+агентств|кадров(?:ое|ая)\s+агентств)/i.test(value)
+    ? 'agency'
+    : 'unknown';
 }
 
 function flattenJsonLdNodes(document) {
