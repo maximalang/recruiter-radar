@@ -62,6 +62,14 @@ function slug(route) {
   return route === '/' ? 'landing' : route.replace(/^\//, '').replace(/[^a-z0-9]+/gi, '-');
 }
 
+async function waitForVisualReadiness(page) {
+  await page.waitForLoadState('load', { timeout: 15_000 });
+  await page.evaluate(async () => {
+    if (document.fonts?.ready) await document.fonts.ready;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+}
+
 await fs.mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({
   headless: true,
@@ -100,7 +108,7 @@ try {
         waitUntil: 'domcontentloaded',
         timeout: 30_000,
       });
-      await page.waitForLoadState('networkidle', { timeout: 30_000 });
+      await waitForVisualReadiness(page);
 
       const analyticsConsent = page.locator('[data-analytics-consent="true"]');
       if (await analyticsConsent.isVisible().catch(() => false)) {

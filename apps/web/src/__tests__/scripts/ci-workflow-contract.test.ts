@@ -49,18 +49,19 @@ describe('pull request CI workflow contract', () => {
   it('runs migration and production acceptance against a disposable database', () => {
     expect(workflow).toContain('npm run test:entitlements:migration:db')
     expect(workflow).toContain('npm run test:production:acceptance')
-    expect(workflow).toContain('npx playwright install-deps chromium')
-    expect(workflow).not.toContain('npx playwright install --with-deps chromium')
+    expect(workflow).not.toContain('playwright install-deps chromium')
+    expect(workflow).not.toContain('playwright install --with-deps chromium')
     expect(productionAcceptance).toContain('run-workspace-billing-db-tests.mjs')
     expect(workflow).toContain("ENTITLEMENT_DISPOSABLE_DB_CONFIRMED: 'true'")
     expect(workflow).toContain("WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED: 'true'")
   })
 
-  it('uses the runner image browser without a region-dependent CDN download', () => {
+  it('uses and verifies the runner image browser without a region-dependent download', () => {
     expect(workflow).toContain(
       'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome',
     )
     expect(workflow).toContain('test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"')
+    expect(workflow).toContain('"$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH" --version')
     for (const runner of browserRunners) {
       expect(runner).toContain('process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH')
     }

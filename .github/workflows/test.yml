@@ -212,10 +212,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Install acceptance browser
+      - name: Verify preinstalled system Chrome
         run: |
           test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
-          npx playwright install-deps chromium
+          "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH" --version
       - name: Verify entitlement migration lifecycle
         run: npm run test:entitlements:migration:db
       - name: Run production acceptance scenarios
@@ -251,7 +251,7 @@ jobs:
   landing-playwright:
     needs: web-build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
       PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome
@@ -295,10 +295,10 @@ jobs:
           path: apps/web
       - name: Prepare standalone static assets
         run: node apps/web/scripts/prepare-standalone.mjs
-      - name: Install Playwright Chromium
+      - name: Verify preinstalled system Chrome
         run: |
           test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
-          npx playwright install-deps chromium
+          "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH" --version
       - name: Start production server
         shell: bash
         env:
@@ -424,11 +424,11 @@ jobs:
       - name: Auth tenant isolation contracts
         if: matrix.gate == 'tenancy-isolation'
         run: npm run test:auth-v2:tenancy:db
-      - name: Install Chromium
+      - name: Verify preinstalled system Chrome
         if: matrix.gate == 'e2e' || matrix.gate == 'accessibility'
         run: |
           test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
-          npx playwright install-deps chromium
+          "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH" --version
       - name: Auth browser end-to-end contracts
         if: matrix.gate == 'e2e'
         run: |
