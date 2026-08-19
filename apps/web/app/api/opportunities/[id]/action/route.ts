@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
+import { readBoundedRequestText } from '@/lib/http/read-bounded-request-text'
 import {
   isOpportunityEngineV1EnabledForContext,
 } from '@/lib/opportunities/config'
@@ -57,8 +58,8 @@ export async function POST(
 
   let body: Record<string, unknown>
   try {
-    const raw = await request.text()
-    if (Buffer.byteLength(raw, 'utf8') > MAX_BODY_BYTES) {
+    const raw = await readBoundedRequestText(request, MAX_BODY_BYTES)
+    if (raw === null) {
       return legacyJson({ error: 'payload_too_large' }, 400, id)
     }
     const parsed = JSON.parse(raw) as unknown
