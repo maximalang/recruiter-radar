@@ -1,64 +1,53 @@
-.desktopControls {
+.mobileToggle {
+  display: none;
+}
+
+.researchControls {
   display: grid;
   gap: 16px;
 }
 
-.mobileDisclosure {
-  display: none;
-}
-
 @media (max-width: 680px) {
-  .desktopControls {
-    display: none;
-  }
-
-  .mobileDisclosure {
-    display: block;
-    border: 0;
-    background: transparent;
-  }
-
-  .mobileDisclosure > summary {
+  .mobileToggle {
+    width: 100%;
     min-height: 48px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 10px;
     padding: 0;
+    border: 0;
+    background: transparent;
     color: var(--color-text-primary);
     cursor: pointer;
+    font: inherit;
     font-size: var(--type-body-size);
     font-weight: 650;
-    list-style: none;
+    text-align: left;
   }
 
-  .mobileDisclosure > summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .mobileDisclosure > summary::after {
-    color: var(--color-signal);
-    content: "+";
-    font-size: 1rem;
-    font-weight: 500;
-  }
-
-  .mobileDisclosure[open] > summary::after {
-    content: "−";
-  }
-
-  .mobileDisclosure > summary small {
+  .mobileToggle small {
     color: var(--color-text-tertiary);
     font-size: var(--type-metadata-size);
     font-weight: 600;
   }
 
-  .mobileDisclosure > summary:focus-visible {
+  .toggleMark {
+    color: var(--color-signal);
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  .mobileToggle:focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
 
-  .mobileControls {
+  .researchControls {
+    display: none;
+  }
+
+  .researchControls[data-mobile-open="true"] {
     display: grid;
     gap: 12px;
     padding: 12px 0 2px;
