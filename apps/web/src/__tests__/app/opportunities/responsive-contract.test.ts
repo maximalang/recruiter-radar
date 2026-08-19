@@ -20,7 +20,7 @@ describe('opportunities responsive contract', () => {
       '\\.timelineItem a',
       '\\.actionButton',
     ]) {
-      expect(css).toMatch(new RegExp(`${selector}\\s*\\{[^}]*min-height:\\s*44px`))
+      expect(css).toMatch(new RegExp(`${selector}[^\\{]*\\{[^}]*min-height:\\s*44px`))
     }
   })
 })

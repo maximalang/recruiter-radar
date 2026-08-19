@@ -70,6 +70,10 @@ describe('cross-route interaction hardening', () => {
     expect(responsiveAudit).toContain('const disclosureWasOpen = await firstDisclosure.evaluate');
     expect(responsiveAudit).toContain('if (!disclosureWasOpen) await firstDisclosure.click()');
     expect(responsiveAudit).toContain('navigationDurationMs');
-    expect(responsiveAudit).toContain("waitForLoadState('networkidle'");
+    expect(responsiveAudit).toContain('async function waitForVisualReadiness(page)');
+    expect(responsiveAudit).toContain("waitForLoadState('load'");
+    expect(responsiveAudit).toContain('document.fonts?.ready');
+    expect(responsiveAudit).toContain('requestAnimationFrame(() => requestAnimationFrame(resolve))');
+    expect(responsiveAudit).not.toContain("waitForLoadState('networkidle'");
   });
 });
