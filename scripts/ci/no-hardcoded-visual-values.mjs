@@ -21,9 +21,12 @@ const jsBoxShadowDeclaration = /\bboxShadow\s*:\s*(?:"([^"]+)"|'([^']+)')/g;
 const textShadowDeclaration = /text-shadow\s*:\s*([^;}\n]+)/gi;
 const dropShadow = /drop-shadow\s*\(/gi;
 const localLength = /(?:^|[\s(,+-])\d*\.?\d+(?:px|rem|em)\b/i;
-const cssMotionDeclaration = /\b(?:transition(?:-duration|-delay)?|animation(?:-duration|-delay)?)\s*:\s*([^;}]+)/gi;
+const cssMotionDeclaration = /\b(?:transition(?:-property|-duration|-delay|-timing-function)?|animation(?:-name|-duration|-delay|-timing-function|-iteration-count)?)\s*:\s*([^;}]+)/gi;
 const cssTimeLiteral = /(?:^|[\s,])((?:\d*\.)?\d+)(ms|s)\b/gi;
 const componentClassSelector = /\[class(?:[*^$|~]?=)/i;
+const localEasing = /\b(?:ease(?:-in|-out|-in-out)?|linear|cubic-bezier|steps)\b/i;
+const infiniteMotion = /\binfinite\b/i;
+const transitionAll = /(?:^|[\s,])all(?:[\s,]|$)/i;
 
 function sourceFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -45,6 +48,12 @@ function matches(regex, content) {
 function isReducedMotionSentinel(value, unit) {
   const milliseconds = unit === 's' ? Number(value) * 1000 : Number(value);
   return milliseconds <= 0.01;
+}
+
+function withoutCanonicalMotionTokens(value) {
+  return value
+    .replaceAll(/var\(--motion-(?:duration|ease)-[a-z0-9-]+\)/gi, '')
+    .trim();
 }
 
 const failures = [];
@@ -112,6 +121,16 @@ for (const file of sourceFiles(appRoot)) {
         if (!isReducedMotionSentinel(number, unit)) {
           failures.push(`${label}: local motion timing ${number}${unit} in ${value}`);
         }
+      }
+      const stripped = withoutCanonicalMotionTokens(value);
+      if (localEasing.test(stripped)) {
+        failures.push(`${label}: local motion easing in ${value}`);
+      }
+      if (infiniteMotion.test(value)) {
+        failures.push(`${label}: infinite motion outside canonical pending primitive in ${value}`);
+      }
+      if (declaration[0].toLowerCase().startsWith('transition') && transitionAll.test(value)) {
+        failures.push(`${label}: transition-all is not allowed in ${value}`);
       }
     }
   }
