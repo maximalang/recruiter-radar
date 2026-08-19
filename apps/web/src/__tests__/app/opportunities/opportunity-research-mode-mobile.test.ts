@@ -11,24 +11,31 @@ describe('Situation research mode mobile hierarchy', () => {
     'utf8',
   )
 
-  it('collapses secondary research controls behind a native disclosure on narrow screens', () => {
-    expect(source).toContain('<details')
-    expect(source).toContain('className={disclosureStyles.mobileDisclosure}')
+  it('collapses secondary research controls behind one accessible button on narrow screens', () => {
+    expect(source).toContain("'use client'")
+    expect(source).toContain('className={disclosureStyles.mobileToggle}')
+    expect(source).toContain('aria-expanded={mobileOpen}')
+    expect(source).toContain('aria-controls="situation-research-controls"')
     expect(source).toContain('<span>Поиск и фильтры</span>')
     expect(source).toContain('<small>{viewLabel(props.view)}</small>')
     expect(styles).toContain('@media (max-width: 680px)')
-    expect(styles).toMatch(/\.desktopControls\s*\{[^}]*display:\s*none/)
-    expect(styles).toMatch(/\.mobileDisclosure\s*\{[^}]*display:\s*block/)
-    expect(styles).toMatch(/\.mobileDisclosure > summary\s*\{[^}]*min-height:\s*48px/)
+    expect(styles).toMatch(/\.mobileToggle\s*\{[^}]*min-height:\s*48px/)
+    expect(styles).toMatch(/\.researchControls\s*\{[^}]*display:\s*none/)
+    expect(styles).toMatch(/\.researchControls\[data-mobile-open="true"\]\s*\{[^}]*display:\s*grid/)
   })
 
-  it('opens the disclosure when explicit search criteria need to stay visible', () => {
-    expect(source).toContain('const disclosureOpen = Boolean(props.query || props.confidenceGate)')
-    expect(source).toContain('open={disclosureOpen || undefined}')
+  it('keeps explicit criteria visible and resets disclosure state when the route view changes', () => {
+    expect(source).toContain('const hasExplicitCriteria = Boolean(props.query || props.confidenceGate)')
+    expect(source).toContain('useState(hasExplicitCriteria)')
+    expect(source).toContain('setMobileOpen(Boolean(props.query || props.confidenceGate))')
+    expect(source).toContain('[props.view, props.query, props.confidenceGate]')
   })
 
-  it('renders the funnel only once outside duplicated responsive controls', () => {
+  it('uses one control tree and renders the funnel only once', () => {
     expect(source.match(/\{props\.children\}/g)).toHaveLength(1)
-    expect(source.match(/<ResearchControls \{\.\.\.props\} \/>/g)).toHaveLength(2)
+    expect(source.match(/<ResearchControls \{\.\.\.props\} \/>/g)).toHaveLength(1)
+    expect(source.match(/name="q"/g)).toHaveLength(1)
+    expect(source.match(/name="gate"/g)).toHaveLength(1)
+    expect(source.match(/aria-label="Представления ситуаций"/g)).toHaveLength(1)
   })
 })
