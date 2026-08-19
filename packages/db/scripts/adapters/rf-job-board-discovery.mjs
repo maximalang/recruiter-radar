@@ -11,6 +11,8 @@ import {
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MAX_LINKS = 250;
 const MAX_PAGINATION_LINKS = 20;
+const MAX_EMBEDDED_NODES = 5_000;
+const MAX_EMBEDDED_POSTINGS = 250;
 
 export async function discoverRfJobBoardSurface(family, surface, {
   fetchTextImpl = fetchText,
@@ -109,34 +111,39 @@ export async function discoverRfJobBoardSurface(family, surface, {
   });
 }
 
-export function extractPublicJobPostingsFromHtml(html, pageUrl) {
+/**
+ * Extract explicit vacancy records from schema.org and public application state.
+ * Embedded state is never executed. A generic state object is accepted only when
+ * it carries both a job title and an explicit same-platform URL that matches the
+ * family's stable vacancy-detail route. IDs are never converted into guessed
+ * URLs and private API/XHR endpoints are never called.
+ */
+export function extractPublicJobPostingsFromHtml(html, pageUrl, family = null) {
   const documents = extractEmbeddedJsonDocuments(html, { maxDocuments: 50 });
-  const nodes = documents.flatMap(flattenJsonLdNodes);
   const postings = [];
   const seen = new Set();
-  for (const node of nodes) {
+
+  for (const node of documents.flatMap(flattenJsonLdNodes)) {
     if (!isJobPostingNode(node)) continue;
-    const title = nonEmptyText(node.title ?? node.name);
-    const employerName = nonEmptyText(node.hiringOrganization?.name);
-    const url = canonicalizePublicUrl(node.url ?? node['@id'] ?? pageUrl);
-    if (!title || !url) continue;
-    const identity = [url, title, employerName ?? ''].join('|');
-    if (seen.has(identity)) continue;
-    seen.add(identity);
-    postings.push(Object.freeze({
-      title,
-      employerName,
-      employerUrl: canonicalizePublicUrl(node.hiringOrganization?.sameAs ?? node.hiringOrganization?.url ?? null),
-      vacancyUrl: url,
-      datePosted: normalizeDate(node.datePosted),
-      validThrough: normalizeDate(node.validThrough),
-      location: extractJobLocation(node.jobLocation),
-      employmentType: normalizeEmploymentType(node.employmentType),
-      externalId: extractIdentifier(node.identifier),
-      publisherType: inferStructuredPublisherType(node),
-      extractionMethod: 'json-ld-job-posting',
-    }));
+    const posting = mapJobPostingNode(node, pageUrl);
+    appendPosting(postings, seen, posting);
   }
+
+  if (family?.id) {
+    const state = { nodes: 0, postings: 0 };
+    for (const document of documents) {
+      collectEmbeddedVacancyPostings(document, {
+        family,
+        pageUrl,
+        postings,
+        seen,
+        state,
+        depth: 0,
+      });
+      if (state.nodes >= MAX_EMBEDDED_NODES || state.postings >= MAX_EMBEDDED_POSTINGS) break;
+    }
+  }
+
   return postings;
 }
 
@@ -159,7 +166,13 @@ export function extractPublicVacancyLinks(html, pageUrl, family, { maxLinks = MA
   return candidates;
 }
 
-export function extractPublicPaginationLinks(html, pageUrl, family, surface = { baseUrl: pageUrl }, { maxLinks = MAX_PAGINATION_LINKS } = {}) {
+export function extractPublicPaginationLinks(
+  html,
+  pageUrl,
+  family,
+  surface = { baseUrl: pageUrl },
+  { maxLinks = MAX_PAGINATION_LINKS } = {},
+) {
   let page;
   let root;
   try {
@@ -184,6 +197,8 @@ export function extractPublicPaginationLinks(html, pageUrl, family, surface = { 
     const canonical = canonicalizePublicUrl(resolved.toString());
     if (!canonical || canonical === current || seen.has(canonical)) continue;
     if (!isAllowedPlatformOrigin(canonical, family?.platformDomains ?? [])) continue;
+    // Numeric vacancy IDs look pagination-like. Detail routes always win.
+    if (isRfVacancyDetailUrl(canonical, family?.id)) continue;
     if (!belongsToListingSurface(canonical, root)) continue;
     seen.add(canonical);
     links.push(canonical);
@@ -195,7 +210,7 @@ export function extractPublicPaginationLinks(html, pageUrl, family, surface = { 
 function extractDiscoveryRecordsFromHtml(html, pageUrl, family, surface, policy, { maxLinks, maxPaginationLinks }) {
   if (Buffer.byteLength(String(html ?? ''), 'utf8') > MAX_HTML_BYTES) return [];
   const records = [];
-  const postings = extractPublicJobPostingsFromHtml(html, pageUrl)
+  const postings = extractPublicJobPostingsFromHtml(html, pageUrl, family)
     .filter((posting) => isRfVacancyDetailUrl(posting.vacancyUrl, family.id)
       && isAllowedPlatformOrigin(posting.vacancyUrl, family.platformDomains)
       && isRobotsPathAllowed(posting.vacancyUrl, policy.robots));
@@ -261,6 +276,7 @@ function extractDiscoveryRecordsFromMarkdown(markdown, pageUrl, family, surface,
     const canonical = canonicalizePublicUrl(resolved.toString());
     if (!canonical || paginationSeen.has(canonical)) continue;
     if (!isAllowedPlatformOrigin(canonical, family.platformDomains)) continue;
+    if (isRfVacancyDetailUrl(canonical, family.id)) continue;
     if (!belongsToListingSurface(canonical, root)) continue;
     if (!isRobotsPathAllowed(canonical, policy.robots)) continue;
     paginationSeen.add(canonical);
@@ -268,6 +284,153 @@ function extractDiscoveryRecordsFromMarkdown(markdown, pageUrl, family, surface,
     if (paginationSeen.size >= Math.max(1, maxPaginationLinks)) break;
   }
   return records;
+}
+
+function collectEmbeddedVacancyPostings(node, context) {
+  if (context.depth > 10 || context.state.nodes >= MAX_EMBEDDED_NODES || context.state.postings >= MAX_EMBEDDED_POSTINGS) return;
+  if (!node || typeof node !== 'object') return;
+  context.state.nodes += 1;
+
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      collectEmbeddedVacancyPostings(item, { ...context, depth: context.depth + 1 });
+      if (context.state.nodes >= MAX_EMBEDDED_NODES || context.state.postings >= MAX_EMBEDDED_POSTINGS) break;
+    }
+    return;
+  }
+
+  if (!isJobPostingNode(node)) {
+    const posting = mapEmbeddedVacancyNode(node, context.pageUrl, context.family);
+    if (appendPosting(context.postings, context.seen, posting)) context.state.postings += 1;
+  }
+
+  for (const value of Object.values(node)) {
+    if (value && typeof value === 'object') {
+      collectEmbeddedVacancyPostings(value, { ...context, depth: context.depth + 1 });
+      if (context.state.nodes >= MAX_EMBEDDED_NODES || context.state.postings >= MAX_EMBEDDED_POSTINGS) break;
+    }
+  }
+}
+
+function mapJobPostingNode(node, pageUrl) {
+  const title = nonEmptyText(node?.title ?? node?.name);
+  const url = resolvePublicUrl(node?.url ?? node?.['@id'], pageUrl);
+  if (!title || !url) return null;
+  return Object.freeze({
+    title,
+    employerName: nonEmptyText(node?.hiringOrganization?.name),
+    employerUrl: resolvePublicUrl(node?.hiringOrganization?.sameAs ?? node?.hiringOrganization?.url, pageUrl),
+    vacancyUrl: url,
+    datePosted: normalizeDate(node?.datePosted),
+    validThrough: normalizeDate(node?.validThrough),
+    location: extractJobLocation(node?.jobLocation),
+    employmentType: normalizeEmploymentType(node?.employmentType),
+    externalId: extractIdentifier(node?.identifier),
+    publisherType: inferStructuredPublisherType(node),
+    extractionMethod: 'json-ld-job-posting',
+  });
+}
+
+function mapEmbeddedVacancyNode(node, pageUrl, family) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return null;
+  const title = firstText(node, [
+    'vacancyName', 'vacancy_name', 'jobTitle', 'job_title', 'positionTitle',
+    'position_title', 'profession', 'title',
+  ]);
+  if (!title || title.length > 300) return null;
+
+  const rawUrl = firstText(node, [
+    'vacancyUrl', 'vacancy_url', 'jobUrl', 'job_url', 'alternateUrl',
+    'alternate_url', 'detailUrl', 'detail_url', 'seoUrl', 'seo_url', 'href',
+    'link', 'path', 'url',
+  ]);
+  const vacancyUrl = resolvePublicUrl(rawUrl, pageUrl);
+  if (!vacancyUrl
+    || !isAllowedPlatformOrigin(vacancyUrl, family?.platformDomains ?? [])
+    || !isRfVacancyDetailUrl(vacancyUrl, family?.id)) return null;
+
+  const employer = firstObject(node, ['hiringOrganization', 'employer', 'company', 'organization']);
+  const employerName = nonEmptyText(
+    employer?.name ?? employer?.displayName ?? employer?.display_name
+      ?? node?.employerName ?? node?.employer_name ?? node?.companyName ?? node?.company_name,
+  );
+  const rawEmployerUrl = employer?.sameAs ?? employer?.website ?? employer?.websiteUrl
+    ?? employer?.website_url ?? employer?.profileUrl ?? employer?.profile_url ?? employer?.url
+    ?? node?.employerUrl ?? node?.employer_url ?? node?.companyUrl ?? node?.company_url;
+  const employerUrl = resolvePublicUrl(rawEmployerUrl, pageUrl);
+  const externalId = firstText(node, ['vacancyId', 'vacancy_id', 'externalId', 'external_id'])
+    ?? extractIdentifier(node?.identifier);
+
+  return Object.freeze({
+    title,
+    employerName,
+    employerUrl,
+    vacancyUrl,
+    datePosted: normalizeDate(firstValue(node, [
+      'datePosted', 'date_posted', 'publishedAt', 'published_at',
+      'publicationDate', 'publication_date', 'createdAt', 'created_at',
+    ])),
+    validThrough: normalizeDate(firstValue(node, ['validThrough', 'valid_through', 'expiresAt', 'expires_at'])),
+    location: extractEmbeddedLocation(node),
+    employmentType: normalizeEmploymentType(firstValue(node, ['employmentType', 'employment_type'])),
+    externalId,
+    publisherType: inferStructuredPublisherType({
+      hiringOrganization: employer,
+      description: node?.description ?? node?.summary,
+    }),
+    extractionMethod: 'embedded-public-app-state',
+  });
+}
+
+function appendPosting(postings, seen, posting) {
+  if (!posting) return false;
+  const key = `${posting.vacancyUrl}|${posting.title}`;
+  if (seen.has(key)) return false;
+  seen.add(key);
+  postings.push(posting);
+  return true;
+}
+
+function firstText(object, names) {
+  for (const name of names) {
+    const value = object?.[name];
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    const text = nonEmptyText(value);
+    if (text) return text;
+  }
+  return null;
+}
+
+function firstValue(object, names) {
+  for (const name of names) {
+    if (object?.[name] !== undefined && object?.[name] !== null) return object[name];
+  }
+  return null;
+}
+
+function firstObject(object, names) {
+  for (const name of names) {
+    const value = object?.[name];
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  }
+  return null;
+}
+
+function resolvePublicUrl(value, pageUrl) {
+  const text = nonEmptyText(typeof value === 'number' ? String(value) : value);
+  if (!text) return null;
+  try {
+    return canonicalizePublicUrl(new URL(text, pageUrl).toString());
+  } catch {
+    return null;
+  }
+}
+
+function extractEmbeddedLocation(node) {
+  const value = firstValue(node, ['location', 'locationName', 'location_name', 'city', 'area', 'region']);
+  if (typeof value === 'string' || typeof value === 'number') return nonEmptyText(String(value));
+  if (!value || typeof value !== 'object') return null;
+  return nonEmptyText(value?.name ?? value?.title ?? value?.city ?? value?.addressLocality ?? value?.address?.addressLocality);
 }
 
 function validateDiscoveryRecord(record) {
@@ -378,13 +541,13 @@ function extractIdentifier(value) {
 }
 
 function normalizeDate(value) {
-  const text = nonEmptyText(value);
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+  const text = nonEmptyText(typeof value === 'number' ? String(value) : value);
   if (!text || !Number.isFinite(Date.parse(text))) return null;
   return new Date(Date.parse(text)).toISOString();
 }
 
 function nonEmptyText(value) {
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (typeof value !== 'string') return null;
   const text = value.trim();
   return text === '' ? null : text;
