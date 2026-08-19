@@ -23,6 +23,16 @@ bash "$repo_root/scripts/deploy/run-government-source-sync.sh" rosstat-open-data
 grep -Fxq 'compose exec -T web sh -eu -c '"'"'' "$command_log" || grep -Fq 'compose exec -T web sh -eu -c' "$command_log"
 grep -Fxq 'compose exec -T web node packages/db/scripts/sync-rosstat-open-data-snapshot.mjs' "$command_log"
 
+: > "$command_log"
+bash "$repo_root/scripts/deploy/run-government-source-sync.sh" fedresurs
+grep -Fxq 'compose exec -T web node packages/db/scripts/sync-fedresurs-snapshot.mjs' "$command_log"
+grep -Fxq 'compose exec -T web node packages/db/scripts/source-fedresurs.mjs pipeline' "$command_log"
+
+: > "$command_log"
+bash "$repo_root/scripts/deploy/run-government-source-sync.sh" fns-open-data
+grep -Fxq 'compose exec -T web node packages/db/scripts/sync-fns-open-data-snapshot.mjs' "$command_log"
+grep -Fxq 'compose exec -T web node packages/db/scripts/source-transparent-business-fns.mjs pipeline' "$command_log"
+
 if bash "$repo_root/scripts/deploy/run-government-source-sync.sh" unknown >"$temporary_dir/invalid.out" 2>&1; then
   echo 'Invalid source unexpectedly succeeded.' >&2
   exit 1
