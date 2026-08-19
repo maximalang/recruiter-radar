@@ -21,7 +21,7 @@ describe('Recruiter Radar V1-V6 visual contract', () => {
 
   it('does not retain versioned visual systems or banned legacy visual grammar', () => {
     const banned = [
-      { label: 'versioned visual selector', regex: /recruiter-radar-v(?:6|7)/gi },
+      { label: 'versioned UI system', regex: /recruiter-radar-v\d+/gi },
       { label: 'legacy lime signal', regex: /#(?:9fca63|c8f36a|c9ec8b)\b/gi },
       { label: 'ScoreGauge', regex: /\bScoreGauge\b/g },
       { label: 'ScoreBar', regex: /\bScoreBar\b/g },
@@ -46,6 +46,24 @@ describe('Recruiter Radar V1-V6 visual contract', () => {
     }
 
     expect(failures).toEqual([])
+  })
+
+  it('keeps versioned deploy metadata out of visual selectors', () => {
+    const failures: string[] = []
+
+    for (const file of files.filter((candidate) => path.extname(candidate) === '.css')) {
+      const content = fs.readFileSync(file, 'utf8')
+      if (/recruiter-radar-(?:landing-)?v\d+/gi.test(content)) {
+        failures.push(relative(file))
+      }
+    }
+
+    expect(failures).toEqual([])
+  })
+
+  it('keeps the global interaction layer free of component-class compatibility selectors', () => {
+    const interactions = fs.readFileSync(path.join(APP_ROOT, 'site-interactions.css'), 'utf8')
+    expect(interactions).not.toMatch(/\[class(?:[*^$|~]?=)/)
   })
 
   it('rejects legacy --c-* and --rr-* token namespaces', () => {
