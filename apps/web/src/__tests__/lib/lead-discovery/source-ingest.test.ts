@@ -1255,9 +1255,21 @@ describe('source-ingest', () => {
 
       const primaryCount = getPrimarySourceIds().length
       const supportingCount = getDailySupportingSourceIds().length
+      const supportingResults = result.slice(primaryCount)
+      const unavailableCount = supportingResults.filter(
+        entry => entry.diagnostics?.zeroReason === 'source-unavailable',
+      ).length
       expect(result).toHaveLength(primaryCount + supportingCount)
+      expect(unavailableCount).toBe(1)
+      expect(supportingResults).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          source: 'telegram-company-channels',
+          outcome: 'deferred',
+          diagnostics: { zeroReason: 'source-unavailable' },
+        }),
+      ]))
       expect(events.slice(0, primaryCount)).toEqual(Array(primaryCount).fill('primary'))
-      expect(events.slice(primaryCount)).toEqual(Array(supportingCount).fill('supporting'))
+      expect(events.slice(primaryCount)).toEqual(Array(supportingCount - unavailableCount).fill('supporting'))
     })
 
     it('does not start supporting sources when there are no active profiles', async () => {
