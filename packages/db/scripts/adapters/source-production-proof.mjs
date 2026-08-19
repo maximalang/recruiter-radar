@@ -30,6 +30,7 @@ export function evaluateSourceProductionProof(proof, {
   requirePositive(proof, ['lineageCreated', 'lineage_rows', 'lineage'], 'lineage-missing', issues);
 
   requireTrue(proof, ['source_urls_preserved', 'sourceUrlsPreserved'], 'source-url-lineage-unproven', issues);
+  requireTrue(proof, ['extraction_preserved', 'extractionPreserved'], 'live-extraction-lineage-unproven', issues);
   requireTrue(proof, ['signal_owner_consistent', 'signalOwnerConsistent'], 'signal-owner-unproven', issues);
   requireTrue(proof, ['evidence_owner_consistent', 'evidenceOwnerConsistent'], 'evidence-owner-unproven', issues);
 
