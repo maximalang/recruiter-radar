@@ -114,12 +114,8 @@ main[data-ui-system] :is(
   a[class*="docNavLink"],
   a[class*="docNavAction"],
   a[class*="docLink"]
-) {
-  transition-duration: var(--motion-duration-control);
-  transition-timing-function: var(--motion-ease-standard);
-}
-
-main[data-ui-system] tr[class*="docTable"] {
+),
+main[data-ui-system] table[class*="docTable"] tbody tr {
   transition-duration: var(--motion-duration-control);
   transition-timing-function: var(--motion-ease-standard);
 }
@@ -178,6 +174,8 @@ main[data-ui-system] :is(
   }
 
   main[data-ui-system] a[class*="docNavAction"]:hover {
+    border-color: color-mix(in srgb, var(--color-signal) 10%, transparent);
+    background: color-mix(in srgb, var(--color-surface-elevated) 70%, transparent);
     transform: none;
   }
 
