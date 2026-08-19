@@ -43,6 +43,13 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
     expect(mapCss).not.toMatch(/\.leadScore strong\s*\{[^}]*font-size:\s*var\(--type-data-large-size\)/)
   })
 
+  it('keeps semantic company identities fully readable instead of clipping them', () => {
+    expect(mapCss).toMatch(/\.semanticIdentity strong\s*\{[^}]*overflow-wrap:\s*anywhere/)
+    expect(mapCss).toMatch(/\.semanticIdentity strong\s*\{[^}]*white-space:\s*normal/)
+    expect(mapCss).not.toMatch(/\.semanticIdentity strong\s*\{[^}]*text-overflow:\s*ellipsis/)
+    expect(mapCss).not.toMatch(/\.semanticIdentity strong\s*\{[^}]*white-space:\s*nowrap/)
+  })
+
   it('keeps selection operable for pointer, keyboard, touch and reduced motion', () => {
     expect(map).toContain('semanticList')
     expect(map).toContain('aria-pressed={props.selected}')
