@@ -1,4 +1,5 @@
 import { fetchText } from './source-http.mjs';
+import { fetchPublicPageWithEscalation } from './public-page-escalation.mjs';
 import {
   canonicalizePublicUrl,
   extractEmbeddedJsonDocuments,
@@ -11,14 +12,19 @@ const MAX_LINKS = 250;
 
 /**
  * Discover public RF job-board artifacts without claiming ingestion readiness.
- * This primitive is intentionally static/structured-data only. A caller can
- * escalate to rendered DOM through source-escalation when static extraction is
- * empty, but robots/access-control outcomes remain terminal policy decisions.
+ * The acquisition path is shared with other public-page sources and can use a
+ * health-aware stageOrder. Robots/access controls remain terminal policy stops;
+ * rendered/extraction stages are fallbacks for ordinary transport/parser drift,
+ * never anti-bot bypasses.
  */
 export async function discoverRfJobBoardSurface(family, surface, {
   fetchTextImpl = fetchText,
   signal,
   maxLinks = MAX_LINKS,
+  stageOrder = family?.transportStages,
+  renderPool,
+  fetchExtractionMarkdownImpl,
+  rendered = true,
 } = {}) {
   const baseUrl = canonicalizePublicUrl(surface?.baseUrl, { keepTracking: true });
   if (!baseUrl) return blocked('invalid-surface-url');
@@ -33,50 +39,71 @@ export async function discoverRfJobBoardSurface(family, surface, {
     return blocked('robots-disallow', policy.robotsState);
   }
 
-  let response;
-  try {
-    response = await fetchTextImpl(baseUrl, {
-      sourceName: `rf-discovery:${family.id}`,
-      headers: {
-        accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1',
-        'user-agent': 'RecruiterRadarSourceDiscovery/1.0',
-      },
-      redirect: 'follow',
-      signal,
-      retries: 1,
-      timeoutMs: 10_000,
-    });
-  } catch (error) {
-    return {
-      ...blocked('fetch-error', policy.robotsState),
-      httpStatus: Number.isInteger(Number(error?.status)) ? Number(error.status) : null,
-      errorCategory: boundedText(error?.message),
-    };
-  }
+  const result = await fetchPublicPageWithEscalation({
+    url: baseUrl,
+    sourceName: `rf-discovery:${family.id}`,
+    signal,
+    timeoutMs: 10_000,
+    headers: {
+      accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1',
+      'user-agent': 'RecruiterRadarSourceDiscovery/1.0',
+    },
+    stageOrder,
+    parseHtml: (html, pageUrl) => extractDiscoveryRecordsFromHtml(
+      html,
+      pageUrl,
+      family,
+      policy,
+      { maxLinks },
+    ),
+    parseMarkdown: (markdown, pageUrl) => extractDiscoveryRecordsFromMarkdown(
+      markdown,
+      pageUrl,
+      family,
+      policy,
+      { maxLinks },
+    ),
+    validateRecord: validateDiscoveryRecord,
+    dependencies: {
+      fetchText: fetchTextImpl,
+      accessPolicy: policy,
+      renderPool,
+      fetchExtractionMarkdown: fetchExtractionMarkdownImpl,
+      rendered,
+    },
+  });
 
-  const finalUrl = canonicalizePublicUrl(response.response?.url ?? baseUrl, { keepTracking: true });
-  if (!finalUrl || !isAllowedPlatformOrigin(finalUrl, family.platformDomains)) {
-    return blocked('cross-platform-redirect', policy.robotsState);
+  const structuredPostings = [];
+  const vacancyLinks = [];
+  const postingKeys = new Set();
+  const linkKeys = new Set();
+  for (const record of result.records) {
+    if (record.kind === 'job-posting') {
+      const key = `${record.posting.vacancyUrl}|${record.posting.title}`;
+      if (!postingKeys.has(key)) {
+        postingKeys.add(key);
+        structuredPostings.push(record.posting);
+      }
+      if (!linkKeys.has(record.posting.vacancyUrl)) {
+        linkKeys.add(record.posting.vacancyUrl);
+        vacancyLinks.push(record.posting.vacancyUrl);
+      }
+    } else if (record.kind === 'vacancy-link' && !linkKeys.has(record.url)) {
+      linkKeys.add(record.url);
+      vacancyLinks.push(record.url);
+    }
   }
-
-  const html = response.body ?? '';
-  if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
-    return blocked('html-too-large', policy.robotsState);
-  }
-
-  const structuredPostings = extractPublicJobPostingsFromHtml(html, finalUrl);
-  const vacancyLinks = extractPublicVacancyLinks(html, finalUrl, family, { maxLinks })
-    .filter((url) => isRobotsPathAllowed(url, policy.robots));
 
   return Object.freeze({
-    blocked: false,
-    reason: null,
-    robotsState: policy.robotsState,
-    selectedStage: structuredPostings.length > 0 ? 'structured-data' : 'static-http',
-    finalUrl,
+    blocked: result.stoppedByPolicy === true,
+    reason: result.error ?? null,
+    robotsState: result.robotsState ?? policy.robotsState,
+    selectedStage: result.selectedStage,
+    finalUrl: result.url ?? baseUrl,
+    attempts: Object.freeze((result.attempts ?? []).map((attempt) => Object.freeze({ ...attempt }))),
     structuredPostings: Object.freeze(structuredPostings),
     vacancyLinks: Object.freeze(vacancyLinks),
-    discoveredCount: Math.max(structuredPostings.length, vacancyLinks.length),
+    discoveredCount: linkKeys.size,
   });
 }
 
@@ -128,21 +155,74 @@ export function extractPublicVacancyLinks(html, pageUrl, family, { maxLinks = MA
   const seen = new Set();
 
   for (const match of String(html ?? '').matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>/gi)) {
-    let resolved;
-    try {
-      resolved = new URL(decodeHtmlAttribute(match[1]), page);
-    } catch {
-      continue;
-    }
-    const canonical = canonicalizePublicUrl(resolved.toString());
+    const canonical = resolveVacancyUrl(decodeHtmlAttribute(match[1]), page, platformDomains, family?.id);
     if (!canonical || seen.has(canonical)) continue;
-    if (!isAllowedPlatformOrigin(canonical, platformDomains)) continue;
-    if (!looksLikeVacancyPath(new URL(canonical).pathname, family?.id)) continue;
     seen.add(canonical);
     candidates.push(canonical);
     if (candidates.length >= Math.max(1, maxLinks)) break;
   }
   return candidates;
+}
+
+function extractDiscoveryRecordsFromHtml(html, pageUrl, family, policy, { maxLinks }) {
+  if (Buffer.byteLength(String(html ?? ''), 'utf8') > MAX_HTML_BYTES) return [];
+  const records = [];
+  const postings = extractPublicJobPostingsFromHtml(html, pageUrl)
+    .filter((posting) => (
+      isAllowedPlatformOrigin(posting.vacancyUrl, family.platformDomains)
+      && isRobotsPathAllowed(posting.vacancyUrl, policy.robots)
+    ));
+  for (const posting of postings) records.push({ kind: 'job-posting', posting });
+
+  const links = extractPublicVacancyLinks(html, pageUrl, family, { maxLinks })
+    .filter((url) => isRobotsPathAllowed(url, policy.robots));
+  for (const url of links) records.push({ kind: 'vacancy-link', url });
+  return records;
+}
+
+function extractDiscoveryRecordsFromMarkdown(markdown, pageUrl, family, policy, { maxLinks }) {
+  let page;
+  try {
+    page = new URL(pageUrl);
+  } catch {
+    return [];
+  }
+  const records = [];
+  const seen = new Set();
+  const text = String(markdown ?? '');
+  const candidates = [
+    ...[...text.matchAll(/\[[^\]]*\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/g)].map((match) => match[1]),
+    ...[...text.matchAll(/https?:\/\/[^\s<>)\]]+/g)].map((match) => match[0]),
+  ];
+  for (const raw of candidates) {
+    const canonical = resolveVacancyUrl(raw, page, family.platformDomains, family.id);
+    if (!canonical || seen.has(canonical) || !isRobotsPathAllowed(canonical, policy.robots)) continue;
+    seen.add(canonical);
+    records.push({ kind: 'vacancy-link', url: canonical });
+    if (records.length >= Math.max(1, maxLinks)) break;
+  }
+  return records;
+}
+
+function validateDiscoveryRecord(record) {
+  if (record?.kind === 'job-posting') {
+    return Boolean(nonEmptyText(record.posting?.title) && canonicalizePublicUrl(record.posting?.vacancyUrl));
+  }
+  return record?.kind === 'vacancy-link' && Boolean(canonicalizePublicUrl(record.url));
+}
+
+function resolveVacancyUrl(raw, page, platformDomains, familyId) {
+  let resolved;
+  try {
+    resolved = new URL(raw, page);
+  } catch {
+    return null;
+  }
+  const canonical = canonicalizePublicUrl(resolved.toString());
+  if (!canonical) return null;
+  if (!isAllowedPlatformOrigin(canonical, platformDomains)) return null;
+  if (!looksLikeVacancyPath(new URL(canonical).pathname, familyId)) return null;
+  return canonical;
 }
 
 function flattenJsonLdNodes(document) {
@@ -223,11 +303,6 @@ function decodeHtmlAttribute(value) {
     .replaceAll('&gt;', '>');
 }
 
-function boundedText(value) {
-  const text = nonEmptyText(value);
-  return text ? text.slice(0, 240) : null;
-}
-
 function blocked(reason, robotsState = 'blocked') {
   return Object.freeze({
     blocked: true,
@@ -235,6 +310,7 @@ function blocked(reason, robotsState = 'blocked') {
     robotsState,
     selectedStage: null,
     finalUrl: null,
+    attempts: Object.freeze([{ stage: 'static-http', outcome: 'blocked', reason }]),
     structuredPostings: Object.freeze([]),
     vacancyLinks: Object.freeze([]),
     discoveredCount: 0,
