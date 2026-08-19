@@ -15,6 +15,11 @@ export interface SourceActivationResult {
   missingByMode: Readonly<Record<string, readonly string[]>>
 }
 
+/** Sources that must never become runnable from credentials alone. */
+const POLICY_UNAVAILABLE_SOURCES = new Set<SourceId>([
+  'telegram-company-channels',
+])
+
 /**
  * Runtime activation is mode-based rather than a flat list of env vars.
  * A source may have multiple accepted configurations (for example an input
@@ -27,7 +32,11 @@ export interface SourceActivationResult {
 const SOURCE_ACTIVATION_MODES: Partial<Record<SourceId, readonly SourceActivationMode[]>> = {
   hh: [
     {
-      id: 'application-oauth',
+      id: 'application-token',
+      allOf: ['HH_USER_AGENT', 'HH_ACCESS_TOKEN'],
+    },
+    {
+      id: 'application-oauth-bootstrap',
       allOf: ['HH_USER_AGENT', 'HH_CLIENT_ID', 'HH_CLIENT_SECRET'],
     },
   ],
@@ -53,6 +62,7 @@ const SOURCE_ACTIVATION_MODES: Partial<Record<SourceId, readonly SourceActivatio
     { id: 'reviewed-file', allOf: ['EGRUL_FNS_INPUT_FILE'] },
   ],
   'transparent-business-fns': [
+    { id: 'official-fns-open-data-snapshot', allOf: ['SOURCE_SNAPSHOT_ROOT'] },
     { id: 'reviewed-file', allOf: ['TRANSPARENT_BUSINESS_FNS_INPUT_FILE'] },
     {
       id: 'approved-provider',
@@ -60,6 +70,7 @@ const SOURCE_ACTIVATION_MODES: Partial<Record<SourceId, readonly SourceActivatio
     },
   ],
   fedresurs: [
+    { id: 'official-public-export-snapshot', allOf: ['SOURCE_SNAPSHOT_ROOT'] },
     { id: 'reviewed-file', allOf: ['FEDRESURS_INPUT_FILE'] },
     {
       id: 'approved-provider',
@@ -93,6 +104,16 @@ export function evaluateSourceActivation(
   inheritedEnv: Readonly<Record<string, string | undefined>> = process.env,
 ): SourceActivationResult {
   const modes = getSourceActivationModes(source)
+
+  if (POLICY_UNAVAILABLE_SOURCES.has(source)) {
+    return {
+      state: 'unavailable',
+      mode: null,
+      acceptedModes: modes,
+      missingByMode: {},
+    }
+  }
+
   if (modes.length === 0) {
     return {
       state: 'configured',

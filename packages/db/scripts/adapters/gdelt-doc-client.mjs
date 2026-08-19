@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
-import { fetchJson, fetchWithSourcePolicy } from './source-http.mjs';
+import { parseRssAtomFeed } from './feed-parser.mjs';
+import { fetchJson, fetchText, fetchWithSourcePolicy } from './source-http.mjs';
 
 const DEFAULT_CACHE_TTL_MS = 30 * 60_000;
 const DEFAULT_MIN_INTERVAL_MS = 6_000;
@@ -10,6 +11,9 @@ const DEFAULT_MAX_ATTEMPTS = 4;
 const DEFAULT_BASE_BACKOFF_MS = 10_000;
 const DEFAULT_MAX_BACKOFF_MS = 5 * 60_000;
 const DEFAULT_THROTTLE_COOLDOWN_MS = 30 * 60_000;
+const GDELT_GAL_RSS_URL = 'https://data.gdeltproject.org/gdeltv3/gal/feed.rss';
+const GDELT_GAL_MAX_ITEMS = 2_000;
+const GDELT_GAL_MAX_BYTES = 8_000_000;
 
 /** Process-wide bounded GDELT scheduler with persistent response cache. */
 export function createGdeltDocClient(options = {}) {
@@ -42,6 +46,7 @@ export function createGdeltDocClient(options = {}) {
   let nextRequestAt = 0;
   let cachePromise = null;
   let persistChain = Promise.resolve();
+  let galFeedPromise = null;
 
   async function request(url, { timeoutMs = 60_000 } = {}) {
     const cache = await loadCache();
@@ -57,6 +62,17 @@ export function createGdeltDocClient(options = {}) {
           body: cached.body,
           cacheHit: true,
           staleCache: true,
+          attempts: 0,
+          deferredMs: 0,
+          retryAt: persistedNextRequestAt,
+        };
+      }
+      const fallback = await tryGalFallback(url, timeoutMs);
+      if (fallback) {
+        cache.entries[cacheKey] = { storedAt: now(), body: fallback.body };
+        await persistCache(cache);
+        return {
+          ...fallback,
           attempts: 0,
           deferredMs: 0,
           retryAt: persistedNextRequestAt,
@@ -81,7 +97,7 @@ export function createGdeltDocClient(options = {}) {
         response = await (options.requestImpl ?? defaultRequest)(url, timeoutMs);
       } catch (error) {
         lastError = error;
-        if (attempt === maxAttempts) throw error;
+        if (attempt === maxAttempts) break;
         const backoff = computeBackoff(attempt, null, random);
         nextRequestAt = Math.max(nextRequestAt, now() + backoff);
         continue;
@@ -101,6 +117,16 @@ export function createGdeltDocClient(options = {}) {
         };
         await persistCache(cache);
         lastError.retryAt = nextRequestAt;
+
+        // The DOC endpoint is convenience search, not the only public GDELT
+        // transport. Do not burn repeated quota/backoff attempts after a clear
+        // throttle: the official GAL RSS stream is a bounded, keyless fallback.
+        const fallback = await tryGalFallback(url, timeoutMs);
+        if (fallback) {
+          cache.entries[cacheKey] = { storedAt: now(), body: fallback.body };
+          await persistCache(cache);
+          return { ...fallback, attempts: attempt, deferredMs, retryAt: nextRequestAt };
+        }
         if (!retryAfter || attempt === maxAttempts) break;
         continue;
       }
@@ -119,7 +145,7 @@ export function createGdeltDocClient(options = {}) {
       cache.entries[cacheKey] = { storedAt: now(), body };
       cache.scheduler = { nextRequestAt: 0 };
       await persistCache(cache);
-      return { body, cacheHit: false, attempts: attempt, deferredMs };
+      return { body, cacheHit: false, attempts: attempt, deferredMs, transport: 'gdelt-doc-api' };
     }
 
     if (cached?.body) {
@@ -131,7 +157,78 @@ export function createGdeltDocClient(options = {}) {
         deferredMs,
       };
     }
+
+    const fallback = await tryGalFallback(url, timeoutMs);
+    if (fallback) {
+      cache.entries[cacheKey] = { storedAt: now(), body: fallback.body };
+      await persistCache(cache);
+      return { ...fallback, attempts: maxAttempts, deferredMs };
+    }
     throw lastError ?? new Error('GDELT DOC API request failed');
+  }
+
+  async function tryGalFallback(docUrl, timeoutMs) {
+    const companyPhrase = extractIdentityPhrase(docUrl);
+    if (!companyPhrase) return null;
+
+    try {
+      galFeedPromise ??= loadGalFeed(timeoutMs).catch((error) => {
+        galFeedPromise = null;
+        throw error;
+      });
+      const items = await galFeedPromise;
+      const maxRecords = extractMaxRecords(docUrl);
+      const normalizedCompany = normalizeMatchText(companyPhrase);
+      const articles = [];
+
+      for (const item of items) {
+        const haystack = normalizeMatchText(`${item.title ?? ''} ${item.summary ?? ''}`);
+        if (!containsPhrase(haystack, normalizedCompany)) continue;
+        if (!hasBusinessContext(item.title, item.summary)) continue;
+        const articleUrl = safePublicHttpUrl(item.url);
+        if (!articleUrl) continue;
+
+        articles.push({
+          title: cleanText(item.title),
+          url: articleUrl,
+          domain: new URL(articleUrl).hostname.toLowerCase().replace(/^www\./, ''),
+          seendate: item.publishedAt ?? new Date(now()).toISOString(),
+        });
+        if (articles.length >= maxRecords) break;
+      }
+
+      return {
+        body: { articles },
+        cacheHit: false,
+        fallback: true,
+        transport: 'gdelt-gal-rss',
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadGalFeed(timeoutMs) {
+    if (options.galItems) return options.galItems;
+    if (options.galRequestImpl) return options.galRequestImpl(GDELT_GAL_RSS_URL, timeoutMs);
+
+    const { response, body } = await fetchText(GDELT_GAL_RSS_URL, {
+      sourceName: 'funding-business-signals gdelt-gal',
+      retries: 1,
+      timeoutMs,
+      headers: {
+        accept: 'application/rss+xml, application/xml, text/xml',
+        'user-agent': 'RecruiterRadar/1.0 (funding-business-signals)',
+      },
+    });
+    const responseUrl = new URL(response?.url ?? GDELT_GAL_RSS_URL);
+    if (responseUrl.protocol !== 'https:' || responseUrl.hostname !== 'data.gdeltproject.org') {
+      throw new Error('GDELT GAL redirect left the approved public host.');
+    }
+    if (Buffer.byteLength(String(body ?? ''), 'utf8') > GDELT_GAL_MAX_BYTES) {
+      throw new Error(`GDELT GAL RSS exceeds ${GDELT_GAL_MAX_BYTES} bytes.`);
+    }
+    return parseRssAtomFeed(body, GDELT_GAL_RSS_URL, { maxItems: GDELT_GAL_MAX_ITEMS });
   }
 
   async function loadCache() {
@@ -183,6 +280,57 @@ async function defaultRequest(url, timeoutMs) {
       throw new AggregateError([transportError, fallbackError], 'GDELT DOC API transports failed.');
     }
   }
+}
+
+function extractIdentityPhrase(value) {
+  let query;
+  try {
+    query = new URL(value).searchParams.get('query') ?? '';
+  } catch {
+    return null;
+  }
+  const quoted = query.match(/"([^"\\]{2,120})"/);
+  return cleanText(quoted?.[1]);
+}
+
+function extractMaxRecords(value) {
+  try {
+    return boundedInteger(new URL(value).searchParams.get('maxrecords'), 10, 1, 250);
+  } catch {
+    return 10;
+  }
+}
+
+function containsPhrase(haystack, phrase) {
+  if (!phrase || phrase.length < 2) return false;
+  return ` ${haystack} `.includes(` ${phrase} `);
+}
+
+function hasBusinessContext(title, summary) {
+  const text = normalizeMatchText(`${title ?? ''} ${summary ?? ''}`);
+  return /funding|investment|invest|raises|raised|series|seed|venture|capital|acqui|merger|expan|launch|new office|new factory|hiring|recruit|jobs|government contract|restructur|layoff|инвест|финанс|раунд|поглощ|слияни|расшир|запуск|ваканс|найм|сокращ|реструктур/u.test(text);
+}
+
+function safePublicHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeMatchText(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replaceAll('ё', 'е')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function cleanText(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 function computeBackoff(attempt, retryAfter, random) {

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildHhVacanciesUrl,
+  describeHhFailure,
   fetchHhVacancyPages,
   HhAccessForbiddenError,
   resolveHhVacancySearchConfig,
@@ -102,6 +103,25 @@ try {
   assert.equal(vacancyAttempts, 2);
 
   globalThis.fetch = async () => jsonResponse(
+    { errors: [{ type: 'oauth', value: 'token_revoked' }] },
+    { status: 403 },
+  );
+  await assert.rejects(
+    () => fetchHhVacancyPages({
+      userAgent: 'RecruiterRadarSmoke/1.0',
+      config: { ...config, pages: 1 },
+      env: { HH_ACCESS_TOKEN: 'revoked-application-token' },
+    }),
+    (error) => {
+      const diagnostic = describeHhFailure(error);
+      return diagnostic.status === 403
+        && diagnostic.errorType === 'oauth'
+        && diagnostic.oauthFailure === true
+        && diagnostic.accessForbidden === false;
+    },
+  );
+
+  globalThis.fetch = async () => jsonResponse(
     { errors: [{ type: 'forbidden' }] },
     { status: 403 },
   );
@@ -118,13 +138,27 @@ try {
     ),
   );
 
+  await assert.rejects(
+    () => fetchHhVacancyPages({
+      userAgent: 'RecruiterRadarSmoke/1.0',
+      config: { ...config, pages: 1 },
+      env: {
+        HH_ACCESS_TOKEN: 'application-token',
+        HH_PROXY_URL: 'https://proxy.example.test:1080',
+      },
+    }),
+    /HH_PROXY_URL must use a socks scheme/,
+  );
+
   console.log(JSON.stringify({
     ok: true,
     smoke: 'hh-adapter',
     pagesFetched: result.pagesFetched,
     recordsParsed: result.items.length,
     forbiddenMapped: true,
+    oauth403Classified: true,
     unauthorizedRefreshVerified: true,
+    suppliedProxyEnvVerified: true,
     transport: 'same-copy-undici-dispatcher',
   }, null, 2));
 } finally {

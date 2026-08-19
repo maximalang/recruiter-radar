@@ -56,4 +56,29 @@ describe('HH scheduler credential gate', () => {
     expect(run).toHaveBeenCalledTimes(1)
     expect(results[0]).toMatchObject({ source: 'hh', outcome: 'ingested' })
   })
+
+  test('pre-issued HH application access token makes the scheduler runnable', async () => {
+    const run = jest.fn(async () => ({
+      source: 'hh' as const,
+      success: true,
+      outcome: 'ingested' as const,
+      fetchedCount: 1,
+      upsertedCount: 1,
+    }))
+
+    const results = await runSupportingSourceScheduler({
+      sources: ['hh'],
+      run,
+      db: null,
+      env: {
+        HH_USER_AGENT: 'Recruiter Radar ops@example.com',
+        HH_ACCESS_TOKEN: 'application-access-token',
+      },
+      inheritedEnv: {},
+      now: new Date('2026-08-14T10:00:00.000Z'),
+    })
+
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(results[0]).toMatchObject({ source: 'hh', outcome: 'ingested' })
+  })
 })

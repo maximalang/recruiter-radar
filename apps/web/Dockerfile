@@ -31,9 +31,11 @@ WORKDIR /app
 # published at https://www.gosuslugi.ru/crt. Install the fingerprint-pinned
 # root and current intermediate for both the Alpine/Chromium trust store and
 # Node's documented extra-CA path; certificate verification remains enabled.
+# p7zip is used only for bounded streaming extraction of the official Fedresurs
+# monthly public export archive.
 COPY packages/db/certs/russian-trusted-root-ca.pem /usr/local/share/ca-certificates/russian-trusted-root-ca.crt
 COPY packages/db/certs/russian-trusted-sub-ca-2024.pem /usr/local/share/ca-certificates/russian-trusted-sub-ca-2024.crt
-RUN apk add --no-cache ca-certificates chromium nss-tools openssh-client \
+RUN apk add --no-cache ca-certificates chromium nss-tools openssh-client p7zip \
   && update-ca-certificates \
   && cat /usr/local/share/ca-certificates/russian-trusted-root-ca.crt \
     /usr/local/share/ca-certificates/russian-trusted-sub-ca-2024.crt \
@@ -75,6 +77,8 @@ COPY --from=builder /app/node_modules/xmlchars ./node_modules/xmlchars
 
 # Telegram's MTProto client is loaded only by a dynamically spawned source
 # script, so Next standalone tracing cannot discover this dependency closure.
+# The source is currently policy-unavailable for automated aggregation, but the
+# dependency closure remains for reviewed/manual compatibility fixtures.
 COPY --from=builder /app/node_modules/teleproto ./node_modules/teleproto
 COPY --from=builder /app/node_modules/big-integer ./node_modules/big-integer
 COPY --from=builder /app/node_modules/mime ./node_modules/mime
@@ -88,12 +92,13 @@ COPY --from=builder /app/node_modules/playwright ./node_modules/playwright
 COPY --from=builder /app/node_modules/playwright-core ./node_modules/playwright-core
 
 # Scheduled official-source refreshes execute inside the same non-root runtime
-# that consumes the persistent snapshot volume. Keep the four sync entrypoints
+# that consumes the persistent snapshot volume. Keep the sync entrypoints
 # explicit so standalone tracing cannot silently omit an operator-only command.
 COPY --from=builder /app/packages/db/scripts/sync-fns-open-data-snapshot.mjs ./packages/db/scripts/sync-fns-open-data-snapshot.mjs
 COPY --from=builder /app/packages/db/scripts/sync-government-procurement-snapshot.mjs ./packages/db/scripts/sync-government-procurement-snapshot.mjs
 COPY --from=builder /app/packages/db/scripts/sync-rosstat-open-data-snapshot.mjs ./packages/db/scripts/sync-rosstat-open-data-snapshot.mjs
 COPY --from=builder /app/packages/db/scripts/sync-rospatent-open-data-snapshot.mjs ./packages/db/scripts/sync-rospatent-open-data-snapshot.mjs
+COPY --from=builder /app/packages/db/scripts/sync-fedresurs-snapshot.mjs ./packages/db/scripts/sync-fedresurs-snapshot.mjs
 COPY --from=builder /app/packages/db/scripts/adapters/government-ca-runtime.mjs ./packages/db/scripts/adapters/government-ca-runtime.mjs
 COPY --from=builder /app/packages/db/source-policy.json ./packages/db/source-policy.json
 COPY --from=builder /app/packages/db/industry-media-feed-registry.json ./packages/db/industry-media-feed-registry.json
@@ -117,7 +122,7 @@ COPY --from=builder /app/packages/db/scripts/verify-source-runtime-image.mjs ./p
 
 # ETag/cooldown and incremental crawl state survives container replacement.
 # SOURCE_SNAPSHOT_ROOT deliberately has no default: only an explicit mounted
-# snapshot root may activate the four government snapshot consumers.
+# snapshot root may activate government/public snapshot consumers.
 ENV SOURCE_RUNTIME_STATE_ROOT=/var/lib/recruiter-radar/source-state
 ENV GITHUB_COMPANY_ORG_CACHE_FILE=/var/lib/recruiter-radar/source-state/github-company-org.json
 ENV YOUTUBE_COMPANY_CHANNELS_CACHE_FILE=/var/lib/recruiter-radar/source-state/youtube-company-channels.json
@@ -133,12 +138,11 @@ RUN mkdir -p /var/lib/recruiter-radar/source-state \
 VOLUME ["/var/lib/recruiter-radar"]
 
 # The Commercial Signal route launches this script as a child process. Import
-# its default path and every import-safe HH runtime dependency in the final
-# image. The CLI itself executes at module load, so assert its traced path and
-# import the adapter + lineage writer separately; missing standalone files or
-# dependencies then fail the image build rather than a production run.
+# its default path and every import-safe source runtime dependency in the final
+# image. Missing standalone files or dependencies then fail the image build
+# rather than a production run.
 RUN node packages/db/scripts/verify-source-runtime-image.mjs --filesystem \
-  && node --input-type=module -e "const { accessSync } = await import('node:fs'); accessSync('./packages/db/scripts/ingest-hh.mjs'); accessSync('./packages/db/scripts/verify-hh-live-pipeline.mjs'); await import('./packages/db/scripts/execute-query-planner-v2.mjs'); await import('./packages/db/scripts/adapters/hh.mjs'); await import('./packages/db/scripts/lib/source-lineage-writer.mjs'); await import('./packages/db/scripts/derive-source-temporal-intelligence.mjs'); await import('./packages/db/scripts/sync-fns-open-data-snapshot.mjs'); await import('./packages/db/scripts/sync-government-procurement-snapshot.mjs'); await import('./packages/db/scripts/sync-rosstat-open-data-snapshot.mjs'); await import('./packages/db/scripts/sync-rospatent-open-data-snapshot.mjs')"
+  && node --input-type=module -e "const { accessSync } = await import('node:fs'); accessSync('./packages/db/scripts/ingest-hh.mjs'); accessSync('./packages/db/scripts/verify-hh-live-pipeline.mjs'); await import('./packages/db/scripts/execute-query-planner-v2.mjs'); await import('./packages/db/scripts/adapters/hh.mjs'); await import('./packages/db/scripts/lib/source-lineage-writer.mjs'); await import('./packages/db/scripts/derive-source-temporal-intelligence.mjs'); await import('./packages/db/scripts/sync-fns-open-data-snapshot.mjs'); await import('./packages/db/scripts/sync-government-procurement-snapshot.mjs'); await import('./packages/db/scripts/sync-rosstat-open-data-snapshot.mjs'); await import('./packages/db/scripts/sync-rospatent-open-data-snapshot.mjs'); await import('./packages/db/scripts/sync-fedresurs-snapshot.mjs')"
 
 # Startup script: run migrations, then start server
 COPY --from=builder /app/apps/web/docker-entrypoint.sh ./docker-entrypoint.sh

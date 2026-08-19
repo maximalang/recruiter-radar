@@ -1,0 +1,69 @@
+name: Public Source Bootstrap
+
+on:
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-source-bootstrap-prod
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Setup SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Bootstrap credential-free source snapshots
+        run: |
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" <<'SSH_EOF'
+          set -euo pipefail
+          cd /opt/recruiter-radar
+
+          has_snapshot() {
+            local source_id="$1"
+            docker compose exec -T web node --input-type=module - "$source_id" <<'NODE'
+          import { resolveActiveSnapshot } from './packages/db/scripts/adapters/snapshot-activation.mjs';
+          const sourceId = process.argv[2];
+          process.exit(resolveActiveSnapshot(sourceId) ? 0 : 1);
+          NODE
+          }
+
+          if has_snapshot 'fns-open-data'; then
+            echo 'FNS snapshot is active; projecting Transparent Business enrichment.'
+            docker compose exec -T web \
+              node packages/db/scripts/source-transparent-business-fns.mjs pipeline
+          else
+            echo 'FNS snapshot is not active yet; Transparent Business projection remains safely deferred.'
+          fi
+
+          if has_snapshot 'fedresurs'; then
+            echo 'Fedresurs snapshot already active; running idempotent context ingestion.'
+            docker compose exec -T web \
+              node packages/db/scripts/source-fedresurs.mjs pipeline
+          else
+            echo 'No Fedresurs snapshot yet; bootstrapping the latest bounded official monthly export.'
+            /opt/recruiter-radar/scripts/deploy/run-government-source-sync.sh fedresurs
+          fi
+          SSH_EOF

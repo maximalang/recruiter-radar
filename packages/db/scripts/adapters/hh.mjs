@@ -10,7 +10,9 @@ import {
 import { RateLimiter } from './rate-limiter.mjs';
 
 const HH_VACANCIES_URL = 'https://api.hh.ru/vacancies';
-const HH_RATE_LIMIT = 30; // HH API: 30 requests/minute
+// Conservative application-side request budget. HH can return 429 independently;
+// source-http applies the shared retry policy for that response.
+const HH_RATE_LIMIT = 30;
 const hhRateLimiter = new RateLimiter(HH_RATE_LIMIT);
 const DEFAULT_SEARCH_TEXT = '\u0440\u0435\u043a\u0440\u0443\u0442\u0435\u0440';
 const DEFAULT_PER_PAGE = 20;
@@ -270,17 +272,16 @@ export async function fetchHhVacancyPages({
   const pageSummaries = [];
   let found = 0;
   let pagesAvailable = null;
-  const proxyDispatcher = resolveHhProxyDispatcher();
+  const proxyDispatcher = resolveHhProxyDispatcher(env);
   // Pair the dispatcher with undici's own fetchImpl (same undici copy) — see
   // resolveHhProxyFetch. null when no proxy: the direct path stays on global fetch.
-  const proxyFetch = resolveHhProxyFetch();
+  const proxyFetch = resolveHhProxyFetch(env);
   const oauthEnv = { ...env, HH_USER_AGENT: normalizedUserAgent };
   let authorization = await resolveHhApplicationAuthorization(oauthEnv, {
     ...(oauthFetchImpl ? { fetchImpl: oauthFetchImpl } : {}),
   });
 
   for (let page = 0; page < config.pages; page += 1) {
-    // Rate limiting: wait if we've exceeded 30 req/min
     const url = buildHhVacanciesUrl(config, page);
     const host = new URL(url).hostname;
     while (!(await hhRateLimiter.allow(host))) {
@@ -372,7 +373,7 @@ export function describeHhFailure(error) {
     status,
     errorType,
     captcha: /captcha/i.test(errorType) || /captcha/i.test(message),
-    oauthFailure: error instanceof HhOAuthError || status === 401,
+    oauthFailure: error instanceof HhOAuthError || status === 401 || errorType === 'oauth',
     rateLimit: status === 429 || /rate.?limit/i.test(errorType),
     accessForbidden: error instanceof HhAccessForbiddenError,
     networkFailure: status === null && !(error instanceof HhOAuthError),

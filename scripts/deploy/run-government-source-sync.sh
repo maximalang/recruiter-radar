@@ -3,9 +3,9 @@ set -euo pipefail
 
 source_id="${1:-}"
 case "$source_id" in
-  fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data) ;;
+  fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data|fedresurs) ;;
   *)
-    echo 'Usage: run-government-source-sync.sh <fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data>' >&2
+    echo 'Usage: run-government-source-sync.sh <fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data|fedresurs>' >&2
     exit 64
     ;;
 esac
@@ -31,5 +31,28 @@ fi
   test -d "$SOURCE_SNAPSHOT_ROOT" || { echo "Snapshot root is not mounted." >&2; exit 1; }
 ' >/dev/null
 
-"$docker_bin" compose exec -T web \
-  node "packages/db/scripts/sync-${source_id}-snapshot.mjs"
+sync_output="$(
+  "$docker_bin" compose exec -T web \
+    node "packages/db/scripts/sync-${source_id}-snapshot.mjs"
+)"
+printf '%s\n' "$sync_output"
+
+if printf '%s\n' "$sync_output" | grep -Fq '"reason": "deferred:no-eligible-legal-entities"'; then
+  echo 'No eligible tracked legal entities; skipping derived snapshot ingestion.'
+  exit 0
+fi
+
+# Snapshot-backed derived sources should become useful immediately after the
+# authoritative snapshot refresh rather than waiting for an unrelated daily
+# loop. Both are non-originating context/enrichment pipelines.
+case "$source_id" in
+  fns-open-data)
+    "$docker_bin" compose exec -T web \
+      node packages/db/scripts/source-transparent-business-fns.mjs pipeline
+    ;;
+  fedresurs)
+    "$docker_bin" compose exec -T web \
+      node packages/db/scripts/source-fedresurs.mjs pipeline
+    ;;
+  *) : ;;
+esac
