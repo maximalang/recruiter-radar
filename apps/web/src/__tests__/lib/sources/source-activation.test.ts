@@ -8,17 +8,25 @@ describe('source activation modes', () => {
       state: 'credential-gated',
       mode: null,
       missingByMode: {
-        'application-oauth': expect.arrayContaining(['HH_CLIENT_ID', 'HH_CLIENT_SECRET']),
+        'application-token': expect.arrayContaining(['HH_ACCESS_TOKEN']),
+        'application-oauth-bootstrap': expect.arrayContaining(['HH_CLIENT_ID', 'HH_CLIENT_SECRET']),
       },
     })
   })
 
-  test('HH is configured only with the complete application OAuth mode', () => {
+  test('HH is configured with the complete application OAuth bootstrap mode', () => {
     expect(evaluateSourceActivation('hh', {}, {
       HH_USER_AGENT: 'Recruiter Radar ops@example.com',
       HH_CLIENT_ID: 'client-id',
       HH_CLIENT_SECRET: 'client-secret',
-    })).toMatchObject({ state: 'configured', mode: 'application-oauth' })
+    })).toMatchObject({ state: 'configured', mode: 'application-oauth-bootstrap' })
+  })
+
+  test('HH is configured with a pre-issued application token', () => {
+    expect(evaluateSourceActivation('hh', {}, {
+      HH_USER_AGENT: 'Recruiter Radar ops@example.com',
+      HH_ACCESS_TOKEN: 'application-access-token',
+    })).toMatchObject({ state: 'configured', mode: 'application-token' })
   })
 
   test('multi-mode sources accept one complete mode and reject partial modes', () => {
