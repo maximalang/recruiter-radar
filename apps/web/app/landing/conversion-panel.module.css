@@ -40,20 +40,16 @@
 }
 
 .pilotOffer {
-  transition: background-color .22s ease, border-color .22s ease;
-}
-
-.pilotOffer:hover {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--color-surface-elevated) 4.5%, transparent), color-mix(in srgb, var(--color-signal) 4%, transparent));
+  transition:
+    background-color var(--motion-duration-context) var(--motion-ease-standard),
+    border-color var(--motion-duration-context) var(--motion-ease-standard);
 }
 
 .pricing [data-pricing-primary="true"] > :global(a) {
   margin-top: auto;
-  transition: transform .18s ease, background-color .18s ease;
-}
-
-.pricing [data-pricing-primary="true"] > :global(a):hover {
-  transform: none;
+  transition:
+    transform var(--motion-duration-disclosure) var(--motion-ease-standard),
+    background-color var(--motion-duration-disclosure) var(--motion-ease-standard);
 }
 
 .pricing [data-pricing-primary="true"] > :global(a):active {
@@ -70,11 +66,10 @@
   position: relative;
   align-content: start;
   min-height: 0;
-  transition: background-color .2s ease, border-color .2s ease, opacity .2s ease;
-}
-
-.secondaryOffers:has(:global(article:hover)) :global(article:not(:hover)) {
-  opacity: .68;
+  transition:
+    background-color var(--motion-duration-context) var(--motion-ease-standard),
+    border-color var(--motion-duration-context) var(--motion-ease-standard),
+    opacity var(--motion-duration-context) var(--motion-ease-standard);
 }
 
 .secondaryOffers :global(article[data-recommended="true"]) {
@@ -170,21 +165,19 @@
 
 .faq :global(details) {
   border-color: color-mix(in srgb, var(--color-signal) 12%, transparent);
-  transition: background-color .18s ease, border-color .18s ease;
-}
-
-.faq :global(details:hover),
-.faq :global(details[open]) {
-  background: color-mix(in srgb, var(--color-surface-elevated) 1.8%, transparent);
+  transition:
+    background-color var(--motion-duration-disclosure) var(--motion-ease-standard),
+    border-color var(--motion-duration-disclosure) var(--motion-ease-standard);
 }
 
 .faq :global(details[open]) {
   border-color: color-mix(in srgb, var(--color-signal) 22%, transparent);
+  background: color-mix(in srgb, var(--color-surface-elevated) 1.8%, transparent);
 }
 
 .faq :global(summary) {
   min-height: 56px;
-  transition: color .18s ease;
+  transition: color var(--motion-duration-disclosure) var(--motion-ease-standard);
 }
 
 .faq :global(details[open] summary) {
@@ -236,10 +229,12 @@
   background: var(--color-signal);
   color: var(--color-text-primary);
   box-shadow: none;
-  transition: transform .18s ease, border-color .18s ease, background-color .18s ease;
+  transition:
+    transform var(--motion-duration-disclosure) var(--motion-ease-standard),
+    border-color var(--motion-duration-disclosure) var(--motion-ease-standard),
+    background-color var(--motion-duration-disclosure) var(--motion-ease-standard);
 }
 
-.final a:first-child:hover,
 .final a:first-child:focus-visible {
   border-color: var(--color-signal);
   background: var(--color-signal);
@@ -252,10 +247,12 @@
 
 .final a:last-child {
   color: color-mix(in srgb, var(--color-copper) 66%, transparent);
-  transition: color .18s ease;
+  transition: color var(--motion-duration-disclosure) var(--motion-ease-standard);
 }
-.final a:last-child:hover,
-.final a:last-child:focus-visible { color: color-mix(in srgb, var(--color-copper) 92%, transparent); }
+
+.final a:last-child:focus-visible {
+  color: color-mix(in srgb, var(--color-copper) 92%, transparent);
+}
 
 .finalTrust {
   position: relative;
@@ -286,6 +283,34 @@
   background: var(--color-signal);
   content: "";
   opacity: .8;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pilotOffer:hover {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--color-surface-elevated) 4.5%, transparent), color-mix(in srgb, var(--color-signal) 4%, transparent));
+  }
+
+  .pricing [data-pricing-primary="true"] > :global(a):hover {
+    transform: none;
+  }
+
+  .secondaryOffers:has(:global(article:hover)) :global(article:not(:hover)) {
+    opacity: .68;
+  }
+
+  .faq :global(details:hover) {
+    background: color-mix(in srgb, var(--color-surface-elevated) 1.8%, transparent);
+  }
+
+  .final a:first-child:hover {
+    border-color: var(--color-signal);
+    background: var(--color-signal);
+    transform: none;
+  }
+
+  .final a:last-child:hover {
+    color: color-mix(in srgb, var(--color-copper) 92%, transparent);
+  }
 }
 
 @media (min-width: 1180px) {
@@ -320,7 +345,9 @@
     margin-top: .35rem;
   }
 
-  .secondaryOffers:has(:global(article:hover)) :global(article:not(:hover)) { opacity: 1; }
+  .secondaryOffers :global(article) {
+    opacity: 1;
+  }
 
   .secondaryOffers :global(article[data-recommended="true"]) {
     margin-inline: -.55rem;
