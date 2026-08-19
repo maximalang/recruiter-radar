@@ -10,7 +10,7 @@ export function AuthShell(props: { children: ReactNode }) {
       <div className={styles.frame}>
         <aside className={styles.story} data-theme="inverse" aria-label="О Recruiter Radar">
           <Link href="/" className={styles.brand}>
-            <BrandLogo size="small" tone="dark" />
+            <BrandLogo size="small" />
           </Link>
           <div className={styles.compass} data-auth-compass="true" aria-hidden="true">
             <span className={styles.compassRing} />
