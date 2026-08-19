@@ -8,6 +8,7 @@ export function PageFrame(props: {
   maxWidth?: string;
   className?: string;
   dataDeployAnchor?: string;
+  layout?: "landing";
   as?: "main" | "div";
 }) {
   const Frame = props.as ?? "main";
@@ -16,6 +17,7 @@ export function PageFrame(props: {
     <Frame
       className={`${styles.pageFrame}${props.className ? ` ${props.className}` : ""}`}
       data-deploy-anchor={props.dataDeployAnchor}
+      data-layout={props.layout}
       data-ui-system="recruiter-radar"
     >
       <div
