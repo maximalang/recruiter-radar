@@ -148,11 +148,10 @@
 }
 
 .organizationMarker:focus-visible {
-  outline: 2px solid var(--color-surface-elevated);
+  outline: 2px solid var(--color-focus);
   outline-offset: 3px;
 }
 
-.organizationMarker:hover .organizationNode,
 .cluster[data-selected="true"] .organizationNode {
   border-color: var(--radar-signal);
   background: var(--radar-signal);
@@ -176,7 +175,7 @@
   border: 1px solid color-mix(in srgb, var(--radar-signal) 42%, transparent);
   border-radius: 50%;
   content: "";
-  animation: selectedSignal 520ms var(--motion-ease-signal) 1;
+  animation: selectedSignal var(--motion-duration-signal) var(--motion-ease-signal) 1;
 }
 
 .markerLabel {
@@ -193,7 +192,6 @@
 }
 
 .markerLabel[data-visible="true"],
-.organizationMarker:hover .markerLabel,
 .organizationMarker:focus-visible .markerLabel,
 .cluster[data-selected="true"] .markerLabel {
   opacity: 1;
@@ -289,10 +287,6 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-}
-
-.semanticList button:hover {
-  background: color-mix(in srgb, var(--color-surface-secondary) 62%, transparent);
 }
 
 .semanticList button:focus-visible {
@@ -517,6 +511,9 @@
 
 .timeline a {
   width: fit-content;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   color: var(--color-signal);
   text-underline-offset: 2px;
 }
@@ -540,7 +537,7 @@
 
 .contacts a,
 .contacts span {
-  min-height: 40px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   color: var(--color-signal);
@@ -639,6 +636,21 @@
 @keyframes selectedSignal {
   from { opacity: .42; transform: scale(.55); }
   to { opacity: 0; transform: scale(1.4); }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .organizationMarker:hover .organizationNode {
+    border-color: var(--radar-signal);
+    background: var(--radar-signal);
+  }
+
+  .organizationMarker:hover .markerLabel {
+    opacity: 1;
+  }
+
+  .semanticList button:hover {
+    background: color-mix(in srgb, var(--color-surface-secondary) 62%, transparent);
+  }
 }
 
 @media (max-width: 1180px) {
