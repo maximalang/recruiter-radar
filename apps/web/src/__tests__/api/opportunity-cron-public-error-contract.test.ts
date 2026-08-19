@@ -1,9 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const root = path.resolve(__dirname, '../../../..')
+const root = path.resolve(__dirname, '../../../../..')
 const route = fs.readFileSync(
-  path.join(root, 'app/api/cron/opportunities/[job]/route.ts'),
+  path.join(root, 'apps/web/app/api/cron/opportunities/[job]/route.ts'),
   'utf8',
 )
 
