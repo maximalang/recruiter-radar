@@ -30,8 +30,10 @@ export async function GET(request: NextRequest) {
   try {
     const metrics = await getDashboardQualityMetrics();
     return NextResponse.json(metrics);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json(
+      { error: "Dashboard metrics are temporarily unavailable." },
+      { status: 500 },
+    );
   }
 }
