@@ -26,6 +26,8 @@ CREATE TABLE rf_hiring_discovery_candidates_v2 (
   corroboration_families TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
   payload JSONB NOT NULL DEFAULT '{}'::JSONB CHECK (JSONB_TYPEOF(payload) = 'object'),
   content_fingerprint CHAR(64) NOT NULL CHECK (content_fingerprint ~ '^[a-f0-9]{64}$'),
+  promoted_at TIMESTAMPTZ,
+  promoted_signal_external_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (source_family, vacancy_key),
@@ -33,6 +35,16 @@ CREATE TABLE rf_hiring_discovery_candidates_v2 (
   CHECK (
     (identity_status = 'resolved' AND resolved_org_id IS NOT NULL)
     OR (identity_status <> 'resolved' AND resolved_org_id IS NULL)
+  ),
+  CHECK (
+    (promoted_at IS NULL AND promoted_signal_external_id IS NULL)
+    OR (
+      promoted_at IS NOT NULL
+      AND promoted_signal_external_id IS NOT NULL
+      AND BTRIM(promoted_signal_external_id) <> ''
+      AND identity_status = 'resolved'
+      AND resolved_org_id IS NOT NULL
+    )
   )
 );
 
@@ -43,5 +55,8 @@ CREATE INDEX rf_hiring_discovery_candidates_v2_org_idx
   WHERE resolved_org_id IS NOT NULL;
 CREATE INDEX rf_hiring_discovery_candidates_v2_source_idx
   ON rf_hiring_discovery_candidates_v2 (source_family, last_detected_at DESC, id DESC);
+CREATE INDEX rf_hiring_discovery_candidates_v2_promotion_idx
+  ON rf_hiring_discovery_candidates_v2 (source_family, promoted_at, last_detected_at DESC, id DESC)
+  WHERE identity_status = 'resolved';
 
 COMMIT;
