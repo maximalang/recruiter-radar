@@ -47,7 +47,7 @@ test('identity graph rejects job-board platform domains as employer identity', (
   assert.equal(report.invalidStrongRefs.length, 0);
 });
 
-test('transport degradation reorders ordinary failures but never bypasses policy stops', () => {
+test('transport degradation moves the static+structured dependency group together', () => {
   const attempts = [
     { at: '2026-08-19T00:00:00Z', stage: 'static-http', outcome: 'error' },
     { at: '2026-08-19T01:00:00Z', stage: 'static-http', outcome: 'error' },
@@ -56,7 +56,7 @@ test('transport degradation reorders ordinary failures but never bypasses policy
   ];
   const health = evaluateTransportHealth(attempts);
   const selected = selectTransportStages(['static-http', 'structured-data', 'rendered-dom'], health);
-  assert.deepEqual(selected.stages, ['structured-data', 'rendered-dom', 'static-http']);
+  assert.deepEqual(selected.stages, ['rendered-dom', 'static-http', 'structured-data']);
 
   const blockedHealth = evaluateTransportHealth([
     { at: '2026-08-19T04:00:00Z', stage: 'static-http', outcome: 'blocked' },
