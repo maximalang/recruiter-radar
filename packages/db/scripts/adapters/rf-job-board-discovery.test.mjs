@@ -52,20 +52,28 @@ test('extracts bounded public JobPosting evidence without evaluating scripts', (
   assert.deepEqual(postings[0].employmentType, ['FULL_TIME']);
 });
 
-test('keeps only same-platform vacancy links', () => {
+test('keeps only same-platform vacancy detail links and never stages listing pagination', () => {
   const links = extractPublicVacancyLinks(HTML, 'https://getmatch.ru/vacancies', FAMILY);
-  assert.deepEqual(links, [
-    'https://getmatch.ru/vacancies/42',
-    'https://getmatch.ru/vacancies?page=2',
-    'https://getmatch.ru/vacancies?page=3',
-  ]);
+  assert.deepEqual(links, ['https://getmatch.ru/vacancies/42']);
+});
+
+test('rabota filter URLs are listing surfaces, not vacancy detail evidence', () => {
+  const rabota = { id: 'rabota-ru', platformDomains: ['rabota.ru'] };
+  const html = `
+    <a href="/vacancy/кладовщик/75000%20руб/">Кладовщик</a>
+    <a href="/vacancy/54263671/">Real vacancy</a>
+  `;
+  assert.deepEqual(
+    extractPublicVacancyLinks(html, 'https://www.rabota.ru/vacancy', rabota),
+    ['https://www.rabota.ru/vacancy/54263671/'],
+  );
 });
 
 test('extracts only pagination links belonging to the configured listing root', () => {
   const html = `
     <a href="/vacancies/2">2</a>
     <a rel="next" href="/vacancies/3">Далее</a>
-    <a href="/vacancies/20541-senior-go-developer">Senior Go Developer</a>
+    <a href="/vacancy/69e2482a2215b591570d4e22">Senior AI Engineer</a>
     <a href="/companies/2">2</a>
     <a href="https://evil.example/vacancies/4">4</a>
   `;
@@ -133,7 +141,7 @@ test('robots-allowed surface produces postings, discovery links and pagination',
   assert.equal(result.blocked, false);
   assert.equal(result.selectedStage, 'structured-data');
   assert.equal(result.structuredPostings.length, 1);
-  assert.ok(result.vacancyLinks.includes('https://getmatch.ru/vacancies/42'));
+  assert.deepEqual(result.vacancyLinks, ['https://getmatch.ru/vacancies/42']);
   assert.deepEqual(result.paginationLinks, [
     'https://getmatch.ru/vacancies?page=2',
     'https://getmatch.ru/vacancies?page=3',
