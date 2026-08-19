@@ -3,9 +3,9 @@ set -euo pipefail
 
 source_id="${1:-}"
 case "$source_id" in
-  fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data) ;;
+  fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data|fedresurs) ;;
   *)
-    echo 'Usage: run-government-source-sync.sh <fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data>' >&2
+    echo 'Usage: run-government-source-sync.sh <fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data|fedresurs>' >&2
     exit 64
     ;;
 esac
