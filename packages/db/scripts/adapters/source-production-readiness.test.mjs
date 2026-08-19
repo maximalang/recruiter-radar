@@ -82,6 +82,27 @@ test('runtime credentials surface stale credential blocker as contract drift', (
   assert.ok(result.readinessDrift.some((item) => item.code === 'configured-but-credential-blocker-remains'));
 });
 
+test('HH production access token is a configured credential set but never a live proof', () => {
+  const source = sourceFixture({
+    live: { state: 'blocked', verifiedAt: null, evidence: ['awaiting evidence -> signal -> lineage proof'] },
+    blockers: ['credential-not-supplied'],
+  });
+  const result = evaluateSourceReadiness(
+    'hh',
+    source,
+    profiles,
+    { HH_USER_AGENT: 'RecruiterRadar test', HH_ACCESS_TOKEN: 'opaque-production-token' },
+    new Date('2026-08-19T12:00:00Z'),
+  );
+  assert.equal(result.configured, true);
+  assert.ok(result.acceptedEnvSets.some((envSet) => (
+    envSet.includes('HH_USER_AGENT') && envSet.includes('HH_ACCESS_TOKEN')
+  )));
+  assert.equal(result.liveVerified, false);
+  assert.equal(result.finalState, 'blocked');
+  assert.ok(result.readinessDrift.some((item) => item.code === 'configured-but-credential-blocker-remains'));
+});
+
 test('production proof requires full live evidence-signal-lineage semantics', () => {
   const proof = {
     ok: true,
