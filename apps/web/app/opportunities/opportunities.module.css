@@ -1080,13 +1080,9 @@
 .workflowForm select:focus-visible,
 .workflowForm input:focus-visible,
 .workflowForm textarea:focus-visible,
-.timelineItem a:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-signal) 34%, transparent);
-  outline-offset: 2px;
-}
-
+.timelineItem a:focus-visible,
 .conclusionBasis a:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-signal) 34%, transparent);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -1099,6 +1095,13 @@
 
 .errorAction {
   margin-top: 14px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    border-color: color-mix(in srgb, var(--color-signal) 28%, transparent);
+    background-color: color-mix(in srgb, var(--color-warning) 80%, transparent);
+  }
 }
 
 @media (max-width: 680px) {
@@ -1206,24 +1209,5 @@
 
   .signalMetrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .card,
-  .actionButton,
-  .filterLink,
-  .todayLane {
-    transition:
-      border-color 160ms ease,
-      box-shadow 160ms ease,
-      transform 160ms ease;
-  }
-
-  .card:hover {
-    border-color: color-mix(in srgb, var(--color-signal) 28%, transparent);
-    background-color: color-mix(in srgb, var(--color-warning) 80%, transparent);
-    box-shadow: none;
-    transform: none;
   }
 }
