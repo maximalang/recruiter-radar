@@ -127,7 +127,7 @@ TELEGRAM_WEBHOOK_SECRET=your_webhook_secret
 - [ ] Telegram bot config
 
 ### HH verification
-- [ ] `npm run verify:hh:oauth-smoke`
+- [ ] `npm run verify:hh:oauth`
 - [ ] `npm run verify:hh:smoke`
 - [ ] Run the isolated authenticated live pipeline verifier against a disposable database
 - [ ] Confirm HH signal → evidence → lineage persistence before marking HH live-verified
