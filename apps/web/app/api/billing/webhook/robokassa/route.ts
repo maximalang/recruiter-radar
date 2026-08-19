@@ -1,4 +1,5 @@
 import { getPool } from "@/lib/db";
+import { readBoundedRequestText } from "@/lib/http/read-bounded-request-text";
 import { processPaymentWebhook } from "@/lib/payments";
 import { logError, logEvent, logWarn } from "@/lib/runtime";
 
@@ -6,6 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PROCESSING_RECLAIM_TIMEOUT_MINUTES = 10;
+const MAX_BODY_BYTES = 16 * 1024;
 const HEADERS = {
   "Cache-Control": "no-store",
   "Content-Type": "text/plain; charset=utf-8",
@@ -24,9 +26,13 @@ async function handle(request: Request): Promise<Response> {
   let params: URLSearchParams;
 
   try {
-    params = request.method.toUpperCase() === "GET"
-      ? new URL(request.url).searchParams
-      : new URLSearchParams(await request.text());
+    if (request.method.toUpperCase() === "GET") {
+      params = new URL(request.url).searchParams;
+    } else {
+      const rawBody = await readBoundedRequestText(request, MAX_BODY_BYTES);
+      if (rawBody === null) return text("Invalid notification.", 413);
+      params = new URLSearchParams(rawBody);
+    }
   } catch {
     return text("Invalid notification.", 400);
   }
