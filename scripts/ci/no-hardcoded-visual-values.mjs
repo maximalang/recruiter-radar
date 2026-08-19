@@ -7,9 +7,12 @@ const tokenSources = new Set([
   path.resolve('apps/web/app/globals.css'),
   path.resolve('apps/web/app/product-visual-system.css'),
 ]);
+const canonicalMotionSource = path.resolve('apps/web/app/product-motion-system.css');
+const globalInteractionLayer = path.resolve('apps/web/app/site-interactions.css');
 const rawColorLiteral = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)|\bhwb\([^)]*\)/g;
 const bannedTokenNamespace = /--(?:c|rr|slate)-[a-z0-9-]+/gi;
 const bannedLandingAlias = /--(?:paper(?:-soft|-strong)?|ink|muted-(?:dark|light)|line-(?:dark|light)|signal(?:-strong|-deep|-soft)?|copper|warning|surface-radius)\b/gi;
+const versionedVisualMarker = /recruiter-radar-(?:landing-)?v\d+/gi;
 const cssRadiusDeclaration = /border-radius\s*:\s*([^;}\n]+)/gi;
 const jsRadiusDeclaration = /\bborderRadius\s*:\s*(?:"([^"]+)"|'([^']+)'|(\d+(?:\.\d+)?))/g;
 const cssBoxShadowDeclaration = /box-shadow\s*:\s*([^;}\n]+)/gi;
@@ -17,6 +20,9 @@ const jsBoxShadowDeclaration = /\bboxShadow\s*:\s*(?:"([^"]+)"|'([^']+)')/g;
 const textShadowDeclaration = /text-shadow\s*:\s*([^;}\n]+)/gi;
 const dropShadow = /drop-shadow\s*\(/gi;
 const localLength = /(?:^|[\s(,+-])\d*\.?\d+(?:px|rem|em)\b/i;
+const cssMotionDeclaration = /\b(?:transition(?:-duration|-delay)?|animation(?:-duration|-delay)?)\s*:\s*([^;}]+)/gi;
+const cssTimeLiteral = /(?:^|[\s,])((?:\d*\.)?\d+)(ms|s)\b/gi;
+const componentClassSelector = /\[class(?:[*^$|~]?=)/i;
 
 function sourceFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -35,10 +41,16 @@ function matches(regex, content) {
   return [...content.matchAll(regex)];
 }
 
+function isReducedMotionSentinel(value, unit) {
+  const milliseconds = unit === 's' ? Number(value) * 1000 : Number(value);
+  return milliseconds <= 0.01;
+}
+
 const failures = [];
 for (const file of sourceFiles(appRoot)) {
   const content = readFileSync(file, 'utf8');
   const label = relative(file);
+  const isCss = path.extname(file) === '.css';
 
   for (const token of new Set(content.match(bannedTokenNamespace) ?? [])) {
     failures.push(`${label}: banned token namespace ${token}`);
@@ -48,6 +60,16 @@ for (const file of sourceFiles(appRoot)) {
     for (const token of new Set(content.match(bannedLandingAlias) ?? [])) {
       failures.push(`${label}: banned landing alias ${token}`);
     }
+  }
+
+  if (isCss) {
+    for (const marker of new Set(content.match(versionedVisualMarker) ?? [])) {
+      failures.push(`${label}: versioned visual marker ${marker}`);
+    }
+  }
+
+  if (file === globalInteractionLayer && componentClassSelector.test(content)) {
+    failures.push(`${label}: component-class compatibility selector in global interaction layer`);
   }
 
   for (const match of matches(cssRadiusDeclaration, content)) {
@@ -80,6 +102,19 @@ for (const file of sourceFiles(appRoot)) {
   if (dropShadow.test(content)) failures.push(`${label}: local drop-shadow filter`);
   dropShadow.lastIndex = 0;
 
+  if (isCss && file !== canonicalMotionSource) {
+    for (const declaration of matches(cssMotionDeclaration, content)) {
+      const value = declaration[1].trim();
+      for (const time of matches(cssTimeLiteral, value)) {
+        const number = time[1];
+        const unit = time[2];
+        if (!isReducedMotionSentinel(number, unit)) {
+          failures.push(`${label}: local motion timing ${number}${unit} in ${value}`);
+        }
+      }
+    }
+  }
+
   if (tokenSources.has(file)) continue;
 
   for (const literal of new Set(content.match(rawColorLiteral) ?? [])) {
@@ -88,9 +123,9 @@ for (const file of sourceFiles(appRoot)) {
 }
 
 if (failures.length) {
-  console.error('Semantic visual contract failed. Components must use canonical color, radius, and shadow tokens.');
+  console.error('Semantic visual contract failed. Components must use canonical visual and motion primitives without compatibility selectors.');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log('Semantic visual contract passed: canonical namespaces, colors, radii, shadows, and landing tokens only.');
+console.log('Semantic visual contract passed: canonical namespaces, colors, radii, shadows, motion, and compatibility boundaries only.');
