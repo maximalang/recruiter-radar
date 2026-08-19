@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import {
   assertOfficialFedresursArchiveUrl,
+  discoverLatestFedresursArchive,
   parseFedresursExportIndex,
   parseFedresursXmlStream,
 } from './sync-fedresurs-snapshot.mjs';
@@ -22,6 +23,28 @@ test('Fedresurs index parser discovers bounded monthly public exports', () => {
   assert.equal(
     entries[2].url,
     'https://download.fedresurs.ru/export_messages/2026/06-2026.7z',
+  );
+});
+
+test('Fedresurs discovery refuses a stale-month fallback when the latest archive is oversized', async () => {
+  const indexUrl = 'https://download.fedresurs.ru/export_messages/2026/';
+  const html = `
+    <a href="05-2026.7z">05-2026.7z</a> 17-Jun-2026 00:44 205M
+    <a href="06-2026.7z">06-2026.7z</a> 17-Jul-2026 00:54 600M
+  `;
+  await assert.rejects(
+    () => discoverLatestFedresursArchive({
+      year: 2026,
+      maxArchiveBytes: 512 * 1024 * 1024,
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        url: indexUrl,
+        headers: new Headers(),
+        text: async () => html,
+      }),
+    }),
+    /refusing a stale-month fallback/,
   );
 });
 

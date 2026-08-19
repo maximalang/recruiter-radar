@@ -35,12 +35,18 @@ export async function discoverLatestFedresursArchive({
   assertOfficialFedresursIndexUrl(response.url || indexUrl, year);
   const html = await response.text();
   const candidates = parseFedresursExportIndex(html, year)
-    .filter((entry) => entry.bytes > 0 && entry.bytes <= maxArchiveBytes)
+    .filter((entry) => entry.bytes > 0)
     .sort((left, right) => right.month - left.month);
   if (candidates.length === 0) {
-    throw new Error(`Fedresurs exposed no ${year} monthly archive within the ${maxArchiveBytes}-byte safety limit.`);
+    throw new Error(`Fedresurs exposed no ${year} monthly archive.`);
   }
-  return candidates[0];
+  const latest = candidates[0];
+  if (latest.bytes > maxArchiveBytes) {
+    throw new Error(
+      `Latest Fedresurs archive ${latest.fileName} is ${latest.bytes} bytes, exceeding the ${maxArchiveBytes}-byte safety limit; refusing a stale-month fallback.`,
+    );
+  }
+  return latest;
 }
 
 export function parseFedresursExportIndex(html, year) {

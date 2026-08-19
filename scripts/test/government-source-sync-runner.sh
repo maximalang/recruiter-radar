@@ -10,6 +10,9 @@ command_log="$temporary_dir/docker.log"
 cat > "$temporary_dir/bin/fake-docker" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$RR_TEST_COMMAND_LOG"
+if [ "${RR_TEST_NO_ELIGIBLE:-false}" = 'true' ] && [[ "$*" == *'sync-fedresurs-snapshot.mjs'* ]]; then
+  printf '%s\n' '{"ok":true,"source":"fedresurs","outcome":"expected-zero","reason": "deferred:no-eligible-legal-entities","activated":false}'
+fi
 exit 0
 SH
 chmod +x "$temporary_dir/bin/fake-docker"
@@ -27,6 +30,14 @@ grep -Fxq 'compose exec -T web node packages/db/scripts/sync-rosstat-open-data-s
 bash "$repo_root/scripts/deploy/run-government-source-sync.sh" fedresurs
 grep -Fxq 'compose exec -T web node packages/db/scripts/sync-fedresurs-snapshot.mjs' "$command_log"
 grep -Fxq 'compose exec -T web node packages/db/scripts/source-fedresurs.mjs pipeline' "$command_log"
+
+: > "$command_log"
+RR_TEST_NO_ELIGIBLE=true bash "$repo_root/scripts/deploy/run-government-source-sync.sh" fedresurs
+grep -Fxq 'compose exec -T web node packages/db/scripts/sync-fedresurs-snapshot.mjs' "$command_log"
+if grep -Fq 'source-fedresurs.mjs pipeline' "$command_log"; then
+  echo 'Fedresurs pipeline ran despite no eligible tracked legal entities.' >&2
+  exit 1
+fi
 
 : > "$command_log"
 bash "$repo_root/scripts/deploy/run-government-source-sync.sh" fns-open-data
