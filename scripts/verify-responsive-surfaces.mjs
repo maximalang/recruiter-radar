@@ -55,6 +55,8 @@ const viewports = [
   { name: 'desktop-1536', width: 1536, height: 960 },
   { name: 'desktop-1920', width: 1920, height: 1080 },
 ];
+const representativeRoutes = new Set(['/', '/login', '/checkout', '/legal']);
+const representativeViewports = new Set(['mobile-390', 'tablet-1024', 'desktop-1440']);
 
 function slug(route) {
   return route === '/' ? 'landing' : route.replace(/^\//, '').replace(/[^a-z0-9]+/gi, '-');
@@ -420,7 +422,9 @@ try {
         || navigationTooSlow
         || consoleErrors.length > 0
       );
-      const screenshot = entryFailed || captureAll
+      const representativeCapture = representativeRoutes.has(route)
+        && representativeViewports.has(viewport.name);
+      const screenshot = entryFailed || captureAll || representativeCapture
         ? path.join(outputDir, `${viewport.name}-${slug(route)}.png`)
         : null;
       if (screenshot) await page.screenshot({ path: screenshot, fullPage: true });
