@@ -41,6 +41,7 @@ jobs:
           node --test packages/db/scripts/adapters/source-transport-health-store.test.mjs
           node --test packages/db/scripts/adapters/rf-source-intelligence-v2.test.mjs
           node --test packages/db/scripts/adapters/rf-job-board-discovery.test.mjs
+          node --test packages/db/scripts/adapters/rf-job-board-detail-fallback.test.mjs
           node --test packages/db/scripts/adapters/rf-hiring-discovery-candidates.test.mjs
           node --test packages/db/scripts/adapters/rf-hiring-candidate-reconciliation.test.mjs
           node --test packages/db/scripts/adapters/source-production-readiness.test.mjs
