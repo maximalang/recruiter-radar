@@ -101,6 +101,22 @@ body {
   line-height: 1.3;
 }
 
+/* Evidence Radar detail is intentionally narrow; keep identity readable before metrics. */
+[data-product-workspace="true"] [data-evidence-lead-detail] > header {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+[data-product-workspace="true"] [data-evidence-lead-detail] > header h2 {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+[data-product-workspace="true"] [data-evidence-lead-detail] > header > :last-child {
+  max-width: none;
+  justify-content: flex-start;
+  text-align: left;
+}
+
 /* Decision-driving sections read as editorial evidence bands rather than SaaS cards. */
 [data-product-workspace="true"] section[data-variant="hero"]:not([data-tone="danger"]) {
   border: 0;
