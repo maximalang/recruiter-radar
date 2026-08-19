@@ -6,9 +6,9 @@ import s from "./legal-document.module.css";
 const DOCUMENTS = [
   { href: "/legal", label: "Реквизиты" },
   { href: "/terms", label: "Оферта" },
-  { href: "/payment-and-refund", label: "Оплата и возврат" },
-  { href: "/privacy", label: "Политика ПДн" },
-  { href: "/personal-data-consent", label: "Согласие ПДн" },
+  { href: "/payment-and-refund", label: "Оплата" },
+  { href: "/privacy", label: "Политика" },
+  { href: "/personal-data-consent", label: "Согласие" },
 ] as const;
 
 export function LegalDocumentNav({ current }: { current: string }) {
