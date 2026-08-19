@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { auditOrganizationIdentityGraph } from './organization-identity-graph-audit.mjs';
 import { classifyStrongIdentityKey } from './organization-resolution.mjs';
 import {
   RF_DISCOVERY_FAMILY_IDS,
@@ -26,6 +27,24 @@ test('RF job-board domains cannot become strong employer domain identities', () 
     assert.equal(classifyStrongIdentityKey(`domain:${domain}`), null, domain);
   }
   assert.deepEqual(classifyStrongIdentityKey('domain:example.ru'), { key: 'domain:example.ru', type: 'domain' });
+});
+
+test('identity graph rejects one strong identity owned by multiple organizations', () => {
+  const report = auditOrganizationIdentityGraph([
+    { org_id: '10', source: 'hh', source_key: 'inn:7707083893' },
+    { org_id: '11', source: 'rabota-ru', source_key: 'inn:7707083893' },
+  ]);
+  assert.equal(report.pass, false);
+  assert.deepEqual(report.strongIdentityConflicts, [{ strongKey: 'inn:7707083893', orgIds: ['10', '11'] }]);
+});
+
+test('identity graph rejects job-board platform domains as employer identity', () => {
+  const report = auditOrganizationIdentityGraph([
+    { org_id: '10', source: 'getmatch', source_key: 'domain:getmatch.ru' },
+  ]);
+  assert.equal(report.pass, false);
+  assert.equal(report.platformDomainRefs.length, 1);
+  assert.equal(report.invalidStrongRefs.length, 0);
 });
 
 test('transport degradation reorders ordinary failures but never bypasses policy stops', () => {
