@@ -90,8 +90,8 @@ describe("cross-route visual layer contract", () => {
     expect(nextSteps).toContain("outline: 2px solid var(--color-focus)");
     expect(nextSteps).toContain("background-color: var(--color-signal-soft)");
     expect(nextSteps).toContain("color: var(--color-destructive)");
-    expect(nextSteps).toContain("min-height: 40px");
     expect(nextSteps).toContain("min-height: 44px");
+    expect(nextSteps).not.toContain("min-height: 40px");
     expect(nextSteps).not.toContain("transition: all");
     expect(nextSteps).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
     expect(nextSteps).not.toMatch(/rgba\(/gi);
