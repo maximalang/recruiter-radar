@@ -158,7 +158,7 @@ function hydratePriorityAudits(audits) {
     return {
       id: nonEmptyText(audit.id),
       directEvidence,
-      independentCorroboration: independentFamilies.length >= 2 || audit.independentCorroboration === true,
+      independentCorroboration: independentFamilies.length >= 1 || audit.independentCorroboration === true,
       independentEvidenceFamilies: independentFamilies,
     };
   });
@@ -215,7 +215,7 @@ function validateManifest(manifest) {
 
 function requiredId(value, label) {
   const text = nonEmptyText(String(value ?? ''));
-  if (!text || !/^\d+$/.test(text)) throw new TypeError(`${label} must be a positive database id.`);
+  if (!text || !/^[1-9]\d*$/.test(text)) throw new TypeError(`${label} must be a positive database id.`);
   return text;
 }
 
