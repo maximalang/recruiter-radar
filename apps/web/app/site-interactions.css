@@ -55,6 +55,11 @@ main[data-ui-system] :where([id]) {
   scroll-margin-top: 104px;
 }
 
+/* A keyboard-revealed skip link must not cover the first page heading. */
+main[data-ui-system] > a[href="#main-content"]:focus-visible + #main-content {
+  padding-top: 88px;
+}
+
 @media (max-width: 640px) {
   :where(input, select, textarea) {
     font-size: 16px;
@@ -64,6 +69,10 @@ main[data-ui-system] :where([id]) {
   [data-landing-experience] summary {
     box-sizing: border-box;
     max-width: calc(100% - 2px);
+  }
+
+  main[data-ui-system] > a[href="#main-content"]:focus-visible + #main-content {
+    padding-top: 80px;
   }
 }
 

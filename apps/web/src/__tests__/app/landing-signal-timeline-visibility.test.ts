@@ -32,6 +32,6 @@ describe("signal timeline visibility contract", () => {
   it("forces timeline facts back to a visible final state when motion is reduced", () => {
     const styles = source("app/landing/signal-timeline-scene.module.css");
 
-    expect(styles).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.trajectory::before, \.trajectory i, \.event, \.lock \{[\s\S]*?opacity:\s*1 !important;[\s\S]*?transform:\s*none !important;[\s\S]*?transition:\s*none !important;/);
+    expect(styles).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.trajectory::before,\s*\.trajectory i,\s*\.event,\s*\.lock\s*\{[\s\S]*?opacity:\s*1 !important;[\s\S]*?transform:\s*none !important;[\s\S]*?transition:\s*none !important;/);
   });
 });

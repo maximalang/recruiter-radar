@@ -159,10 +159,10 @@
 }
 
 @media (max-width: 680px) {
-  .section { padding-block: 3.5rem; }
-  .layout { gap: 1.7rem; }
+  .section { padding-block: 3rem; }
+  .layout { gap: 1.5rem; }
   .trajectory { left: .95rem; bottom: 6.35rem; }
-  .event { grid-template-columns: 1.9rem minmax(0,1fr) auto; gap: .35rem .7rem; min-height: 5.35rem; padding-block: .45rem; }
+  .event { grid-template-columns: 1.9rem minmax(0,1fr) auto; gap: .35rem .7rem; min-height: 5.1rem; padding-block: .35rem; }
   .event::before { left: -.15rem; }
   .event time { grid-column: 2; grid-row: 1; text-align: left; }
   .node { grid-column: 1; grid-row: 1 / 3; }

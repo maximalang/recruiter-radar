@@ -33,7 +33,7 @@ describe("polished unified landing visual contract", () => {
     expect(sceneStyles).toContain("var(--color-signal)");
     expect(sceneStyles).not.toMatch(/animation\s*:/);
     expect(sceneStyles).not.toContain("translateY(-1px)");
-    expect(landingStyles).not.toMatch(/\.(detectionScene|detectionField|detectionCopy|detectionLock|detectionFooter|instrumentCaption)/);
+    expect(landingStyles).not.toMatch(/\.(detectionScene|detectionField|detectionCopy|detectionLock|detectionFooter|instrumentCaption)\b/);
     expect(visualStyles).not.toContain('#scene-detection [class*=');
     expect(existsSync(obsoleteResponsiveStyles)).toBe(false);
   });
@@ -98,7 +98,7 @@ describe("polished unified landing visual contract", () => {
     const landingIndex = home.indexOf("{landing}");
     const cookieSettingsIndex = home.indexOf("<YandexMetrika />");
 
-    expect(home).toContain('<PageFrame as="div"');
+    expect(home).toMatch(/<PageFrame[\s\S]*?\bas="div"/);
     expect(skipLinkIndex).toBeGreaterThan(-1);
     expect(analyticsIndex).toBeGreaterThan(skipLinkIndex);
     expect(landingIndex).toBeGreaterThan(analyticsIndex);
