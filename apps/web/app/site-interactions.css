@@ -1,4 +1,5 @@
-/* Recruiter Radar — interaction hardening loaded after the visual finish layer. */
+/* Recruiter Radar — cross-product interaction safety.
+ * Component-specific interaction states belong to their canonical modules. */
 
 :where(a, button, input, select, textarea, summary) {
   -webkit-tap-highlight-color: var(--color-selection);
@@ -19,46 +20,13 @@
   background-image: none !important;
 }
 
-/* Text links that behave as product controls need a real, forgiving hit area. */
-:where(
-  a[class*="footerBrand"],
-  a[class*="footerLink"],
-  a[class*="footerOperatorEmail"],
-  a[class*="emptyStateAction"],
-  a[class*="skipLink"],
-  a[class*="pending-auth-action"][class*="brand"]
-) {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-}
-
-[data-product-workspace="true"] :is(
-  nav a,
-  header a[class*="Action"],
-  header a[class*="Cta"],
-  a[class*="navLink"],
-  a[class*="internalPageBackLink"],
-  a[class*="primaryAction"],
-  a[class*="secondaryAction"],
-  a[class*="accountPrimaryAction"],
-  a[class*="accountSecondaryAction"]
-),
-main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
-[data-landing-experience] :is(nav a, header a, a[class*="button"], a[class*="Button"], a[class*="action"], a[class*="Action"], button) {
-  min-height: 44px;
-}
-
-[data-product-workspace="true"] [class*="mobileTopbar"] > a {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-}
-
+/* Disclosure-like controls use the same minimum target everywhere. */
 [data-product-workspace="true"] :is(summary, [role="button"]) {
   min-height: 44px;
 }
 
+/* Generic prose may wrap at natural word boundaries. Individual URL/provenance
+ * primitives opt into more aggressive breaking in their own modules. */
 [data-product-workspace="true"] :is(
   h1,
   h2,
@@ -72,7 +40,7 @@ main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
   [role="alert"]
 ),
 main[data-ui-system] :is(h1, h2, h3, p, li, label, a, button) {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 [data-product-workspace="true"] :is(button, [role="button"]):disabled:hover,
@@ -85,65 +53,9 @@ main[data-ui-system] :where([id]) {
   scroll-margin-top: 104px;
 }
 
-/* Shared internal navigation follows the same focus, motion, and selected-surface
-   semantics as the rest of the workspace instead of inheriting legacy link states. */
-[data-product-workspace="true"] :is(
-  a[class*="topNavBrand"],
-  a[class*="topNavLink"],
-  a[class*="internalPageBackLink"],
-  a[class*="navLink"]
-) {
-  transition:
-    color var(--motion-duration-control) var(--motion-ease-standard),
-    background-color var(--motion-duration-control) var(--motion-ease-standard),
-    border-color var(--motion-duration-control) var(--motion-ease-standard);
-}
-
-[data-product-workspace="true"] :is(
-  a[class*="topNavBrand"],
-  a[class*="topNavLink"],
-  a[class*="internalPageBackLink"],
-  a[class*="navLink"]
-):focus-visible {
-  outline-color: var(--color-focus);
-}
-
-/* Public/legal documents share the product interaction contract even though their
-   visual layer predates the canonical motion and focus tokens. */
-main[data-ui-system] :is(
-  a[class*="docNavLink"],
-  a[class*="docNavAction"],
-  a[class*="docLink"]
-),
-main[data-ui-system] table[class*="docTable"] tbody tr {
-  transition-duration: var(--motion-duration-control);
-  transition-timing-function: var(--motion-ease-standard);
-}
-
-main[data-ui-system] :is(
-  a[class*="docBrandLink"],
-  a[class*="docNavLink"],
-  a[class*="docNavAction"],
-  a[class*="docLink"]
-):focus-visible {
-  outline-color: var(--color-focus);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  [data-product-workspace="true"] a[class*="topNavLink"]:not([data-active="true"]):hover {
-    background-color: var(--color-surface-selected);
-  }
-}
-
 @media (max-width: 640px) {
   :where(input, select, textarea) {
     font-size: 16px;
-  }
-
-  [data-product-workspace="true"] :is(nav a, a[class*="Action"], button),
-  main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
-  [data-landing-experience] :is(nav a, header a, a[class*="Action"], button) {
-    min-height: 46px;
   }
 
   /* Avoid the one-pixel overshoot created by nested full-width details borders. */
@@ -154,38 +66,8 @@ main[data-ui-system] :is(
 }
 
 @media (hover: none) {
-  [data-product-workspace="true"] :is(
-    section[class*="contentCard"],
-    button,
-    a
-  ):hover {
+  [data-product-workspace="true"] :is(button, a):hover {
     transform: none;
-  }
-
-  [data-product-workspace="true"] a[class*="topNavLink"]:not([data-active="true"]):hover {
-    background-color: transparent;
-    color: var(--color-text-tertiary);
-  }
-
-  main[data-ui-system] a[class*="docNavLink"]:not([aria-current="page"]):hover {
-    border-color: transparent;
-    background: transparent;
-    color: var(--color-text-secondary);
-  }
-
-  main[data-ui-system] a[class*="docNavAction"]:hover {
-    border-color: color-mix(in srgb, var(--color-signal) 10%, transparent);
-    background: color-mix(in srgb, var(--color-surface-elevated) 70%, transparent);
-    transform: none;
-  }
-
-  main[data-ui-system] a[class*="docLink"]:hover {
-    color: var(--color-signal-hover);
-    text-decoration-color: color-mix(in srgb, var(--color-signal) 34%, transparent);
-  }
-
-  main[data-ui-system] table[class*="docTable"] tbody tr:hover {
-    background: transparent;
   }
 }
 
