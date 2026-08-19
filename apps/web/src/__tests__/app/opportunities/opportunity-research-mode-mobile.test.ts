@@ -37,12 +37,12 @@ describe('Situation research mode mobile hierarchy', () => {
     expect(source).toContain('[props.view, props.query, props.confidenceGate]')
   })
 
-  it('uses one control tree and renders the funnel only once', () => {
-    expect(source.match(/\{props\.children\}/g)).toHaveLength(1)
+  it('uses one control tree and contains no analytics child slot', () => {
     expect(source.match(/<ResearchControls \{\.\.\.props\} \/>/g)).toHaveLength(1)
     expect(source.match(/name="q"/g)).toHaveLength(1)
     expect(source.match(/name="gate"/g)).toHaveLength(1)
     expect(source.match(/aria-label="Представления ситуаций"/g)).toHaveLength(1)
+    expect(source).not.toContain('props.children')
   })
 
   it('toggles the mobile disclosure without duplicating search controls', () => {
