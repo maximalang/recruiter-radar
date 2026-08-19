@@ -69,7 +69,7 @@ export function OpportunityCommercialSignalCard(props: {
         <h3 id={`signal-metrics-${props.opportunityId}`}>
           Почему лид в приоритете
         </h3>
-        <div className={styles.signalMetrics}>
+        <dl className={styles.signalMetricLedger}>
           <Metric
             heading="Вероятность внешнего подбора"
             metric={props.card.metrics.externalAgencyPropensity}
@@ -83,7 +83,7 @@ export function OpportunityCommercialSignalCard(props: {
             heading="Готовность к контакту"
             metric={props.card.metrics.actionability}
           />
-        </div>
+        </dl>
         {props.showDiagnostics === false ? null : <OpportunitySignalDiagnostics card={props.card} />}
       </section>
 
@@ -173,11 +173,10 @@ function Metric(props: {
 }) {
   const level = metricLevel(props.metric.value)
   return (
-    <section className={styles.signalMetric} data-level={level.key}>
-      <h3>{props.heading}</h3>
-      <strong>{level.label}</strong>
-      <span className={styles.signalMetricBar} aria-hidden="true" />
-    </section>
+    <div className={styles.signalMetricRow} data-level={level.key}>
+      <dt>{props.heading}</dt>
+      <dd>{level.label}</dd>
+    </div>
   )
 }
 
