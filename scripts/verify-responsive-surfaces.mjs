@@ -57,17 +57,36 @@ const viewports = [
 ];
 const representativeRoutes = new Set(['/', '/login', '/checkout', '/legal']);
 const representativeViewports = new Set(['mobile-390', 'tablet-1024', 'desktop-1440']);
+const RETRYABLE_CONTEXT_ERROR = /Execution context was destroyed|Cannot find context with specified id/i;
 
 function slug(route) {
   return route === '/' ? 'landing' : route.replace(/^\//, '').replace(/[^a-z0-9]+/gi, '-');
 }
 
 async function waitForVisualReadiness(page) {
-  await page.waitForLoadState('load', { timeout: 15_000 });
-  await page.evaluate(async () => {
-    if (document.fonts?.ready) await document.fonts.ready;
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  });
+  const deadline = Date.now() + 15_000;
+
+  while (Date.now() < deadline) {
+    const remaining = Math.max(1, deadline - Date.now());
+    await page.waitForLoadState('load', { timeout: remaining });
+    const settledUrl = page.url();
+
+    try {
+      await page.evaluate(async () => {
+        if (document.fonts?.ready) await document.fonts.ready;
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (RETRYABLE_CONTEXT_ERROR.test(message) && Date.now() < deadline) continue;
+      throw error;
+    }
+
+    await page.waitForTimeout(75);
+    if (page.url() === settledUrl) return;
+  }
+
+  throw new Error(`Visual readiness did not stabilize for ${page.url()}`);
 }
 
 await fs.mkdir(outputDir, { recursive: true });
