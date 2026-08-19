@@ -48,7 +48,7 @@ test('job-board platform URL is never accepted as employer website', () => {
   assert.deepEqual(candidate.strongIdentityKeys, []);
 });
 
-test('direct employer website can contribute a strong domain key', () => {
+test('direct employer website contributes the canonical strong domain key', () => {
   const candidate = buildRfHiringDiscoveryCandidate({
     family: FAMILY,
     posting: {
@@ -61,7 +61,7 @@ test('direct employer website can contribute a strong domain key', () => {
 
   assert.ok(candidate);
   assert.equal(candidate.employerWebsiteUrl, 'https://careers.example.ru/jobs');
-  assert.deepEqual(candidate.strongIdentityKeys, ['domain:careers.example.ru']);
+  assert.deepEqual(candidate.strongIdentityKeys, ['domain:example.ru']);
 });
 
 test('resolver leaves no-strong-key candidate pending without querying identity owners', async () => {
