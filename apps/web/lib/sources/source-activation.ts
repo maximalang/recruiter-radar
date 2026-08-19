@@ -27,7 +27,11 @@ export interface SourceActivationResult {
 const SOURCE_ACTIVATION_MODES: Partial<Record<SourceId, readonly SourceActivationMode[]>> = {
   hh: [
     {
-      id: 'application-oauth',
+      id: 'application-token',
+      allOf: ['HH_USER_AGENT', 'HH_ACCESS_TOKEN'],
+    },
+    {
+      id: 'application-oauth-bootstrap',
       allOf: ['HH_USER_AGENT', 'HH_CLIENT_ID', 'HH_CLIENT_SECRET'],
     },
   ],
