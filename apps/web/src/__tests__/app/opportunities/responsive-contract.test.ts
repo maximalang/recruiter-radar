@@ -23,4 +23,16 @@ describe('opportunities responsive contract', () => {
       expect(css).toMatch(new RegExp(`${selector}[^\\{]*\\{[^}]*min-height:\\s*44px`))
     }
   })
+
+  it('keeps situation state counts as compact operational metadata instead of KPI tiles', () => {
+    const css = readFileSync(
+      resolve(process.cwd(), 'app/opportunities/situations-page.module.css'),
+      'utf8',
+    )
+    expect(css).toMatch(/\.summaryLedger\s*\{[\s\S]*?display:\s*flex/)
+    expect(css).toMatch(/\.summaryLedger > div\s*\{[\s\S]*?display:\s*inline-flex/)
+    expect(css).toMatch(/\.summaryLedger strong\s*\{[\s\S]*?font-size:\s*var\(--type-data-size\)/)
+    expect(css).not.toContain('grid-template-columns: repeat(4, minmax(0, 1fr))')
+    expect(css).not.toMatch(/\.summaryLedger > div\s*\{[\s\S]*?border-right:/)
+  })
 })
