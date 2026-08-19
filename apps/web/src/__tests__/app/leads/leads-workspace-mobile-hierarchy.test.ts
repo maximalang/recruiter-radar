@@ -16,6 +16,15 @@ describe('leads workspace hierarchy', () => {
     expect(styles).toContain('.confidence{grid-area:confidence')
     expect(styles).toContain('.action{grid-area:action')
     expect(styles).toContain('.score{grid-area:score;justify-self:start;color:var(--color-text-tertiary);font-size:var(--type-metadata-size)')
+    expect(styles).toContain('.score::before{content:"Сила · ";font-size:var(--type-label-size);font-weight:600}')
+  })
+
+  it('keeps long company identities readable instead of clipping them in the ledger', async () => {
+    const styles = await readFile(stylesPath, 'utf8')
+
+    expect(styles).toContain('.company{display:block;overflow-wrap:anywhere;')
+    expect(styles).toContain('white-space:normal')
+    expect(styles).not.toContain('text-overflow:ellipsis;white-space:nowrap')
   })
 
   it('keeps mobile evidence beside confidence and score beside action after why-now context', async () => {
