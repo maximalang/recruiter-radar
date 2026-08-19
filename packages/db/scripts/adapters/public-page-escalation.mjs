@@ -11,7 +11,7 @@ import {
 let publicPageRenderPool = null;
 const accessPolicyCache = new Map();
 
-/** Canonical guarded escalation for company-owned public HTML surfaces. */
+/** Canonical guarded escalation for company-owned or public HTML surfaces. */
 export async function fetchPublicPageWithEscalation({
   url,
   sourceName,
@@ -22,6 +22,7 @@ export async function fetchPublicPageWithEscalation({
   signal,
   timeoutMs = 15_000,
   headers = {},
+  stageOrder,
   dependencies = {},
 }) {
   const publicUrl = canonicalizePublicUrl(url, { keepTracking: true });
@@ -44,6 +45,7 @@ export async function fetchPublicPageWithEscalation({
   const escalation = await runSourceEscalation({
     context: { url: resolvedUrl, sourceName },
     validateRecord,
+    stageOrder,
     stages: {
       'official-feed': typeof officialFeed === 'function'
         ? async () => ({ records: await officialFeed() })
