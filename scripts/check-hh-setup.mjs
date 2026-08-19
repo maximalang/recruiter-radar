@@ -44,7 +44,7 @@ if (!existsSync(envPath)) {
   }
 
   console.log('\nNext verification:');
-  console.log('1. npm run verify:hh:oauth-smoke');
+  console.log('1. npm run verify:hh:oauth');
   console.log('2. npm run verify:hh:smoke');
   console.log('3. Run verify:hh:live-pipeline only against an isolated disposable DATABASE_URL.');
 
