@@ -133,3 +133,76 @@ test('GDELT scheduler persists no-Retry-After cooldown across processes', async 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('GDELT DOC throttle falls back to identity-bound GAL RSS records', async () => {
+  const client = createGdeltDocClient({
+    persist: false,
+    maxAttempts: 1,
+    now: () => Date.parse('2026-08-19T12:00:00.000Z'),
+    requestImpl: async () => ({
+      status: 429,
+      headers: { get: () => null },
+      json: async () => ({}),
+    }),
+    galItems: [
+      {
+        title: 'RocketScale raises Series B and expands engineering hiring',
+        summary: null,
+        url: 'https://news.example/rocketscale-series-b',
+        publishedAt: '2026-08-19T11:55:00.000Z',
+      },
+      {
+        title: 'Unrelated Company raises Series B',
+        summary: null,
+        url: 'https://news.example/unrelated-series-b',
+        publishedAt: '2026-08-19T11:56:00.000Z',
+      },
+    ],
+  });
+
+  const url = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
+  url.searchParams.set('query', '"RocketScale" (funding OR investment OR hiring)');
+  url.searchParams.set('maxrecords', '10');
+
+  const result = await client.request(url);
+  assert.equal(result.transport, 'gdelt-gal-rss');
+  assert.equal(result.fallback, true);
+  assert.equal(result.attempts, 1);
+  assert.equal(result.body.articles.length, 1);
+  assert.equal(result.body.articles[0].title, 'RocketScale raises Series B and expands engineering hiring');
+  assert.equal(result.body.articles[0].domain, 'news.example');
+});
+
+test('GDELT GAL fallback rejects unrelated and non-business stories', async () => {
+  const client = createGdeltDocClient({
+    persist: false,
+    maxAttempts: 1,
+    now: () => Date.parse('2026-08-19T12:00:00.000Z'),
+    requestImpl: async () => ({
+      status: 429,
+      headers: { get: () => null },
+      json: async () => ({}),
+    }),
+    galItems: [
+      {
+        title: 'RocketScale publishes its summer playlist',
+        summary: null,
+        url: 'https://media.example/rocketscale-playlist',
+        publishedAt: '2026-08-19T11:55:00.000Z',
+      },
+      {
+        title: 'OtherCo announces hiring expansion',
+        summary: null,
+        url: 'https://media.example/otherco-hiring',
+        publishedAt: '2026-08-19T11:55:00.000Z',
+      },
+    ],
+  });
+
+  const url = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
+  url.searchParams.set('query', '"RocketScale" (funding OR investment OR hiring)');
+
+  const result = await client.request(url);
+  assert.equal(result.transport, 'gdelt-gal-rss');
+  assert.deepEqual(result.body.articles, []);
+});
