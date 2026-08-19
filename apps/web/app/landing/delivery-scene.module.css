@@ -165,10 +165,6 @@
     color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.channelRoute:hover {
-  background: var(--color-surface-secondary);
-}
-
 .channelTopline {
   display: flex;
   align-items: center;
@@ -390,6 +386,12 @@
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .channelRoute:hover {
+    background: var(--color-surface-secondary);
+  }
 }
 
 @media (max-width: 960px) {
