@@ -12,17 +12,6 @@ const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MAX_LINKS = 250;
 const MAX_PAGINATION_LINKS = 20;
 
-/**
- * Discover public RF job-board artifacts without claiming ingestion readiness.
- * The acquisition path is shared with other public-page sources and can use a
- * health-aware stageOrder. Robots/access controls remain terminal policy stops;
- * rendered/extraction stages are fallbacks for ordinary transport/parser drift,
- * never anti-bot bypasses.
- *
- * Pagination is discovery-only metadata. A caller may follow it within the
- * surface's bounded `maxPages` budget. We never synthesize page URLs: only links
- * actually present on the fetched public page are returned.
- */
 export async function discoverRfJobBoardSurface(family, surface, {
   fetchTextImpl = fetchText,
   signal,
@@ -42,9 +31,7 @@ export async function discoverRfJobBoardSurface(family, surface, {
     userAgent: 'RecruiterRadarSourceDiscovery',
   });
   if (policy.blocked) return blocked(policy.reason ?? 'robots-policy-blocked', policy.robotsState);
-  if (!isRobotsPathAllowed(baseUrl, policy.robots)) {
-    return blocked('robots-disallow', policy.robotsState);
-  }
+  if (!isRobotsPathAllowed(baseUrl, policy.robots)) return blocked('robots-disallow', policy.robotsState);
 
   const result = await fetchPublicPageWithEscalation({
     url: baseUrl,
@@ -127,24 +114,19 @@ export function extractPublicJobPostingsFromHtml(html, pageUrl) {
   const nodes = documents.flatMap(flattenJsonLdNodes);
   const postings = [];
   const seen = new Set();
-
   for (const node of nodes) {
     if (!isJobPostingNode(node)) continue;
     const title = nonEmptyText(node.title ?? node.name);
     const employerName = nonEmptyText(node.hiringOrganization?.name);
     const url = canonicalizePublicUrl(node.url ?? node['@id'] ?? pageUrl);
     if (!title || !url) continue;
-
     const identity = [url, title, employerName ?? ''].join('|');
     if (seen.has(identity)) continue;
     seen.add(identity);
-
     postings.push(Object.freeze({
       title,
       employerName,
-      employerUrl: canonicalizePublicUrl(
-        node.hiringOrganization?.sameAs ?? node.hiringOrganization?.url ?? null,
-      ),
+      employerUrl: canonicalizePublicUrl(node.hiringOrganization?.sameAs ?? node.hiringOrganization?.url ?? null),
       vacancyUrl: url,
       datePosted: normalizeDate(node.datePosted),
       validThrough: normalizeDate(node.validThrough),
@@ -155,7 +137,6 @@ export function extractPublicJobPostingsFromHtml(html, pageUrl) {
       extractionMethod: 'json-ld-job-posting',
     }));
   }
-
   return postings;
 }
 
@@ -166,12 +147,10 @@ export function extractPublicVacancyLinks(html, pageUrl, family, { maxLinks = MA
   } catch {
     return [];
   }
-  const platformDomains = family?.platformDomains ?? [];
   const candidates = [];
   const seen = new Set();
-
   for (const match of String(html ?? '').matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>/gi)) {
-    const canonical = resolveVacancyUrl(decodeHtmlAttribute(match[1]), page, platformDomains, family?.id);
+    const canonical = resolveVacancyUrl(decodeHtmlAttribute(match[1]), page, family?.platformDomains ?? [], family?.id);
     if (!canonical || seen.has(canonical)) continue;
     seen.add(canonical);
     candidates.push(canonical);
@@ -180,13 +159,7 @@ export function extractPublicVacancyLinks(html, pageUrl, family, { maxLinks = MA
   return candidates;
 }
 
-export function extractPublicPaginationLinks(
-  html,
-  pageUrl,
-  family,
-  surface = { baseUrl: pageUrl },
-  { maxLinks = MAX_PAGINATION_LINKS } = {},
-) {
+export function extractPublicPaginationLinks(html, pageUrl, family, surface = { baseUrl: pageUrl }, { maxLinks = MAX_PAGINATION_LINKS } = {}) {
   let page;
   let root;
   try {
@@ -195,16 +168,13 @@ export function extractPublicPaginationLinks(
   } catch {
     return [];
   }
-  const platformDomains = family?.platformDomains ?? [];
   const links = [];
   const seen = new Set();
   const current = canonicalizePublicUrl(page.toString());
-
   for (const match of String(html ?? '').matchAll(/<a\b([^>]*)\bhref\s*=\s*["']([^"']+)["']([^>]*)>([\s\S]*?)<\/a>/gi)) {
     const attrs = `${match[1] ?? ''} ${match[3] ?? ''}`;
     const text = stripHtml(match[4]);
     if (!looksLikePaginationAnchor(attrs, text, match[2])) continue;
-
     let resolved;
     try {
       resolved = new URL(decodeHtmlAttribute(match[2]), page);
@@ -213,7 +183,7 @@ export function extractPublicPaginationLinks(
     }
     const canonical = canonicalizePublicUrl(resolved.toString());
     if (!canonical || canonical === current || seen.has(canonical)) continue;
-    if (!isAllowedPlatformOrigin(canonical, platformDomains)) continue;
+    if (!isAllowedPlatformOrigin(canonical, family?.platformDomains ?? [])) continue;
     if (!belongsToListingSurface(canonical, root)) continue;
     seen.add(canonical);
     links.push(canonical);
@@ -226,23 +196,16 @@ function extractDiscoveryRecordsFromHtml(html, pageUrl, family, surface, policy,
   if (Buffer.byteLength(String(html ?? ''), 'utf8') > MAX_HTML_BYTES) return [];
   const records = [];
   const postings = extractPublicJobPostingsFromHtml(html, pageUrl)
-    .filter((posting) => (
-      isAllowedPlatformOrigin(posting.vacancyUrl, family.platformDomains)
-      && isRobotsPathAllowed(posting.vacancyUrl, policy.robots)
-    ));
+    .filter((posting) => isRfVacancyDetailUrl(posting.vacancyUrl, family.id)
+      && isAllowedPlatformOrigin(posting.vacancyUrl, family.platformDomains)
+      && isRobotsPathAllowed(posting.vacancyUrl, policy.robots));
   for (const posting of postings) records.push({ kind: 'job-posting', posting });
 
-  // Some RF boards render a fully usable vacancy detail page but omit
-  // schema.org JobPosting. Fall back to conservative H1 + same-platform employer
-  // profile extraction for the detail URL itself. Agency publishers are tagged
-  // so their identity cannot be mistaken for the target hiring company.
   if (postings.length === 0) {
     const fallbackPosting = extractRfJobDetailFallback(html, pageUrl, family);
-    if (
-      fallbackPosting
+    if (fallbackPosting
       && isAllowedPlatformOrigin(fallbackPosting.vacancyUrl, family.platformDomains)
-      && isRobotsPathAllowed(fallbackPosting.vacancyUrl, policy.robots)
-    ) {
+      && isRobotsPathAllowed(fallbackPosting.vacancyUrl, policy.robots)) {
       records.push({ kind: 'job-posting', posting: fallbackPosting });
     }
   }
@@ -277,7 +240,7 @@ function extractDiscoveryRecordsFromMarkdown(markdown, pageUrl, family, surface,
     if (!canonical || seen.has(canonical) || !isRobotsPathAllowed(canonical, policy.robots)) continue;
     seen.add(canonical);
     records.push({ kind: 'vacancy-link', url: canonical });
-    if (records.filter((record) => record.kind === 'vacancy-link').length >= Math.max(1, maxLinks)) break;
+    if (seen.size >= Math.max(1, maxLinks)) break;
   }
 
   const paginationSeen = new Set();
@@ -308,11 +271,8 @@ function extractDiscoveryRecordsFromMarkdown(markdown, pageUrl, family, surface,
 }
 
 function validateDiscoveryRecord(record) {
-  if (record?.kind === 'job-posting') {
-    return Boolean(nonEmptyText(record.posting?.title) && canonicalizePublicUrl(record.posting?.vacancyUrl));
-  }
-  return (record?.kind === 'vacancy-link' || record?.kind === 'pagination-link')
-    && Boolean(canonicalizePublicUrl(record.url));
+  if (record?.kind === 'job-posting') return Boolean(nonEmptyText(record.posting?.title) && canonicalizePublicUrl(record.posting?.vacancyUrl));
+  return (record?.kind === 'vacancy-link' || record?.kind === 'pagination-link') && Boolean(canonicalizePublicUrl(record.url));
 }
 
 function resolveVacancyUrl(raw, page, platformDomains, familyId) {
@@ -323,10 +283,23 @@ function resolveVacancyUrl(raw, page, platformDomains, familyId) {
     return null;
   }
   const canonical = canonicalizePublicUrl(resolved.toString());
-  if (!canonical) return null;
-  if (!isAllowedPlatformOrigin(canonical, platformDomains)) return null;
-  if (!looksLikeVacancyPath(new URL(canonical).pathname, familyId)) return null;
+  if (!canonical || !isAllowedPlatformOrigin(canonical, platformDomains) || !isRfVacancyDetailUrl(canonical, familyId)) return null;
   return canonical;
+}
+
+export function isRfVacancyDetailUrl(value, familyId) {
+  let path;
+  try {
+    path = new URL(value, 'https://example.invalid').pathname;
+  } catch {
+    return false;
+  }
+  if (familyId === 'geekjob') return /^\/vacancy\/[A-Za-z0-9_-]+\/?$/i.test(path);
+  if (familyId === 'getmatch') return /^\/vacancies\/\d+(?:-[^/]+)?\/?$/i.test(path);
+  if (familyId === 'rabota-ru') return /^\/vacancy\/\d{5,}\/?$/i.test(path);
+  if (familyId === 'zarplata-ru') return /^\/vacancy\/\d{5,}\/?$/i.test(path);
+  if (familyId === 'avito-rabota') return /\/vakansii\/[^/]+_\d{5,}\/?$/i.test(path);
+  return false;
 }
 
 function looksLikePaginationAnchor(attrs, text, href) {
@@ -350,11 +323,8 @@ function belongsToListingSurface(candidateUrl, rootUrl) {
 }
 
 function inferStructuredPublisherType(node) {
-  const value = [
-    node?.hiringOrganization?.['@type'],
-    node?.hiringOrganization?.description,
-    node?.description,
-  ].flat().filter(Boolean).join(' ');
+  const value = [node?.hiringOrganization?.['@type'], node?.hiringOrganization?.description, node?.description]
+    .flat().filter(Boolean).join(' ');
   return /(?:recruit(?:ing|ment)\s+agency|staffing\s+agency|рекрутингов(?:ое|ая)\s+агентств|кадров(?:ое|ая)\s+агентств)/i.test(value)
     ? 'agency'
     : 'unknown';
@@ -371,15 +341,6 @@ function isJobPostingNode(node) {
   const type = node?.['@type'];
   if (Array.isArray(type)) return type.some((value) => String(value).toLowerCase() === 'jobposting');
   return typeof type === 'string' && type.toLowerCase() === 'jobposting';
-}
-
-function looksLikeVacancyPath(pathname, familyId) {
-  const path = pathname.toLowerCase();
-  const generic = /\/(?:vacanc(?:y|ies)|vakansii|jobs?)(?:\/|$)/i.test(path);
-  if (generic) return true;
-  if (familyId === 'avito-rabota') return /\/vakansii(?:\/|$)/i.test(path);
-  if (familyId === 'rabota-ru') return /\/vacancy(?:\/|$)/i.test(path);
-  return false;
 }
 
 function isAllowedPlatformOrigin(url, platformDomains) {
