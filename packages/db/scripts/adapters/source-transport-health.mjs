@@ -36,30 +36,55 @@ export function evaluateTransportHealth(attempts = [], policy = DEFAULT_TRANSPOR
   });
 }
 
+/**
+ * Build a health-aware stage order while preserving hard dependencies.
+ * `structured-data` consumes the artifact produced by `static-http`, so those
+ * stages move as one dependency group. Reordering them independently would make
+ * the fallback plan invalid and could manufacture false parser degradation.
+ */
 export function selectTransportStages(configuredStages, health) {
   if (!Array.isArray(configuredStages)) throw new TypeError('configuredStages must be an array');
-  const healthy = [];
-  const degraded = [];
+  const stages = [...new Set(configuredStages.filter((stage) => typeof stage === 'string' && stage.trim()).map((stage) => stage.trim()))];
+  const groups = buildDependencyGroups(stages);
+  const healthyGroups = [];
+  const degradedGroups = [];
 
-  for (const stage of configuredStages) {
-    const stageHealth = health?.byStage?.[stage];
-    if (stageHealth?.stoppedByPolicy) {
-      // Access policy is terminal for this acquisition surface. Returning only
-      // stages before/including it would be misleading; caller must switch to
-      // another lawful surface, not another bypass transport.
-      return Object.freeze({ stages: Object.freeze([]), stoppedByPolicy: true, stoppedStage: stage });
+  for (const group of groups) {
+    for (const stage of group.stages) {
+      const stageHealth = health?.byStage?.[stage];
+      if (stageHealth?.stoppedByPolicy) {
+        // Access policy is terminal for this acquisition surface. Caller must
+        // switch to another lawful surface, not a more aggressive transport.
+        return Object.freeze({ stages: Object.freeze([]), stoppedByPolicy: true, stoppedStage: stage });
+      }
     }
-    if (stageHealth?.degraded) degraded.push(stage);
-    else healthy.push(stage);
+
+    const degraded = group.stages.some((stage) => health?.byStage?.[stage]?.degraded === true);
+    (degraded ? degradedGroups : healthyGroups).push(group);
   }
 
-  // Healthy stages run first. Degraded transports remain as last-resort probes,
-  // preserving the configured capability set and allowing automatic recovery.
   return Object.freeze({
-    stages: Object.freeze([...healthy, ...degraded]),
+    stages: Object.freeze([...healthyGroups, ...degradedGroups].flatMap((group) => group.stages)),
     stoppedByPolicy: false,
     stoppedStage: null,
   });
+}
+
+function buildDependencyGroups(stages) {
+  const groups = [];
+  const seen = new Set();
+  for (const stage of stages) {
+    if (seen.has(stage)) continue;
+    if (stage === 'static-http' || stage === 'structured-data') {
+      const pair = stages.filter((candidate) => candidate === 'static-http' || candidate === 'structured-data');
+      for (const item of pair) seen.add(item);
+      groups.push({ key: 'static-structured', stages: pair });
+      continue;
+    }
+    seen.add(stage);
+    groups.push({ key: stage, stages: [stage] });
+  }
+  return groups;
 }
 
 function evaluateStage(attempts, policy) {
