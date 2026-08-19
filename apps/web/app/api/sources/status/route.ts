@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const apiKey = process.env.INGEST_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'INGEST_API_KEY is not configured.' },
+      { error: 'Source status service is not configured.' },
       { status: 500 },
     );
   }
