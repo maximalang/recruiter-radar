@@ -46,6 +46,7 @@ try {
       surfaceReports.push({
         kind: surface.kind,
         baseUrl: surface.baseUrl,
+        market: surface.market ?? null,
         scope: 'identity-enrichment',
         skipped: true,
         skipReason: 'not-a-hiring-discovery-surface',
@@ -53,92 +54,141 @@ try {
       continue;
     }
 
-    const healthSourceId = `rf-discovery:${family.id}:${surface.kind}`;
-    const startedAt = new Date();
-    const plan = client
-      ? await loadHistoricalTransportPlan(client, {
-        sourceId: healthSourceId,
-        configuredStages: family.transportStages,
-        now: startedAt,
-      })
-      : {
-        sourceId: healthSourceId,
-        observations: 0,
-        attempts: 0,
-        stages: family.transportStages,
-        stoppedByPolicy: false,
-        stoppedStage: null,
-        health: { degradedStages: [], policyStoppedStages: [] },
-      };
+    const maxPages = normalizePageBudget(surface.maxPages);
+    const queue = [surface.baseUrl];
+    const queued = new Set(queue.map(canonicalUrl).filter(Boolean));
+    const visited = new Set();
+    const pageReports = [];
+    const aggregate = {
+      structuredPostings: 0,
+      vacancyLinks: new Set(),
+      paginationLinks: new Set(),
+      blockedPages: 0,
+      successfulPages: 0,
+    };
+    const healthSourceId = `rf-discovery:${family.id}:${surface.kind}:${surface.market ?? 'default'}`;
 
-    if (plan.stoppedByPolicy) {
-      surfaceReports.push({
-        kind: surface.kind,
-        baseUrl: surface.baseUrl,
-        scope: 'hiring-discovery',
-        blocked: true,
-        reason: 'historical-policy-stop-fresh',
-        robotsState: 'historical-policy-stop',
-        selectedStage: null,
-        finalUrl: null,
-        structuredPostings: 0,
-        vacancyLinks: 0,
-        discoveredCount: 0,
-        transportPlan: summarizePlan(plan),
-      });
-      continue;
-    }
+    while (queue.length > 0 && visited.size < maxPages) {
+      const pageUrl = queue.shift();
+      const pageKey = canonicalUrl(pageUrl);
+      if (!pageKey || visited.has(pageKey)) continue;
+      visited.add(pageKey);
 
-    const discovery = await discoverRfJobBoardSurface(family, surface, {
-      stageOrder: plan.stages,
-    });
-    if (client) {
-      await recordTransportObservation(client, {
-        sourceId: healthSourceId,
-        executionSourceId: family.id,
-        startedAt,
-        completedAt: new Date(),
-        selectedStage: discovery.selectedStage,
-        attempts: discovery.attempts,
-        records: discovery.discoveredCount,
-        stoppedByPolicy: discovery.blocked,
+      const startedAt = new Date();
+      const plan = client
+        ? await loadHistoricalTransportPlan(client, {
+          sourceId: healthSourceId,
+          configuredStages: family.transportStages,
+          now: startedAt,
+        })
+        : defaultTransportPlan(healthSourceId, family.transportStages);
+
+      if (plan.stoppedByPolicy) {
+        aggregate.blockedPages += 1;
+        pageReports.push({
+          pageUrl,
+          blocked: true,
+          reason: 'historical-policy-stop-fresh',
+          robotsState: 'historical-policy-stop',
+          selectedStage: null,
+          structuredPostings: 0,
+          vacancyLinks: 0,
+          paginationLinks: 0,
+          discoveredCount: 0,
+          transportPlan: summarizePlan(plan),
+        });
+        break;
+      }
+
+      const discovery = await discoverRfJobBoardSurface(
+        family,
+        {
+          ...surface,
+          baseUrl: pageUrl,
+          paginationBaseUrl: surface.baseUrl,
+        },
+        { stageOrder: plan.stages },
+      );
+
+      if (client) {
+        await recordTransportObservation(client, {
+          sourceId: healthSourceId,
+          executionSourceId: family.id,
+          startedAt,
+          completedAt: new Date(),
+          selectedStage: discovery.selectedStage,
+          attempts: discovery.attempts,
+          records: discovery.discoveredCount,
+          stoppedByPolicy: discovery.blocked,
+          reason: discovery.reason,
+        });
+      }
+
+      pageReports.push({
+        pageUrl,
+        blocked: discovery.blocked,
         reason: discovery.reason,
+        robotsState: discovery.robotsState,
+        selectedStage: discovery.selectedStage,
+        finalUrl: discovery.finalUrl,
+        structuredPostings: discovery.structuredPostings.length,
+        vacancyLinks: discovery.vacancyLinks.length,
+        paginationLinks: discovery.paginationLinks.length,
+        discoveredCount: discovery.discoveredCount,
+        transportPlan: summarizePlan(plan),
+        attempts: discovery.attempts,
       });
+
+      if (discovery.blocked) {
+        aggregate.blockedPages += 1;
+        if (isPolicyStop(discovery)) break;
+        continue;
+      }
+      aggregate.successfulPages += 1;
+      aggregate.structuredPostings += discovery.structuredPostings.length;
+
+      const structuredUrls = new Set();
+      for (const posting of discovery.structuredPostings) {
+        const candidate = buildRfHiringDiscoveryCandidate({ family, posting, detectedAt });
+        if (!candidate) continue;
+        structuredUrls.add(candidate.vacancyUrl);
+        aggregate.vacancyLinks.add(candidate.vacancyUrl);
+        candidateByKey.set(`${candidate.sourceFamily}|${candidate.vacancyKey}`, candidate);
+      }
+
+      for (const vacancyUrl of discovery.vacancyLinks) {
+        aggregate.vacancyLinks.add(vacancyUrl);
+        if (structuredUrls.has(vacancyUrl)) continue;
+        const candidate = buildRfHiringDiscoveryCandidate({ family, vacancyUrl, detectedAt });
+        if (!candidate) continue;
+        candidateByKey.set(`${candidate.sourceFamily}|${candidate.vacancyKey}`, candidate);
+      }
+
+      for (const paginationUrl of discovery.paginationLinks) {
+        const paginationKey = canonicalUrl(paginationUrl);
+        if (!paginationKey || visited.has(paginationKey) || queued.has(paginationKey)) continue;
+        aggregate.paginationLinks.add(paginationKey);
+        queued.add(paginationKey);
+        queue.push(paginationUrl);
+      }
     }
 
     surfaceReports.push({
       kind: surface.kind,
       baseUrl: surface.baseUrl,
+      market: surface.market ?? null,
       scope: 'hiring-discovery',
       skipped: false,
-      blocked: discovery.blocked,
-      reason: discovery.reason,
-      robotsState: discovery.robotsState,
-      selectedStage: discovery.selectedStage,
-      finalUrl: discovery.finalUrl,
-      structuredPostings: discovery.structuredPostings.length,
-      vacancyLinks: discovery.vacancyLinks.length,
-      discoveredCount: discovery.discoveredCount,
-      transportPlan: summarizePlan(plan),
-      attempts: discovery.attempts,
+      maxPages,
+      pagesAttempted: visited.size,
+      pagesSuccessful: aggregate.successfulPages,
+      pagesBlocked: aggregate.blockedPages,
+      structuredPostings: aggregate.structuredPostings,
+      vacancyLinks: aggregate.vacancyLinks.size,
+      paginationLinksDiscovered: aggregate.paginationLinks.size,
+      discoveredCount: aggregate.vacancyLinks.size,
+      pageReports,
     });
-
-    if (discovery.blocked) continue;
-
-    const structuredUrls = new Set();
-    for (const posting of discovery.structuredPostings) {
-      const candidate = buildRfHiringDiscoveryCandidate({ family, posting, detectedAt });
-      if (!candidate) continue;
-      structuredUrls.add(candidate.vacancyUrl);
-      candidateByKey.set(`${candidate.sourceFamily}|${candidate.vacancyKey}`, candidate);
-    }
-
-    for (const vacancyUrl of discovery.vacancyLinks) {
-      if (structuredUrls.has(vacancyUrl)) continue;
-      const candidate = buildRfHiringDiscoveryCandidate({ family, vacancyUrl, detectedAt });
-      if (!candidate) continue;
-      candidateByKey.set(`${candidate.sourceFamily}|${candidate.vacancyKey}`, candidate);
-    }
   }
 
   const candidates = [...candidateByKey.values()];
@@ -163,12 +213,13 @@ try {
   }, {});
   const hiringSurfaces = surfaceReports.filter((surface) => surface.scope === 'hiring-discovery');
   const report = {
-    ok: hiringSurfaces.some((surface) => surface.blocked === false && surface.discoveredCount > 0),
+    ok: hiringSurfaces.some((surface) => surface.pagesSuccessful > 0 && surface.discoveredCount > 0),
     family: family.id,
     productionState: family.productionState,
     mode: fetchOnly ? 'public-discovery-fetch-only' : 'public-discovery-stage-candidates',
     detectedAt,
     surfaces: surfaceReports,
+    pagesAttempted: hiringSurfaces.reduce((sum, surface) => sum + surface.pagesAttempted, 0),
     candidatesDiscovered: candidates.length,
     candidatesPersisted: persisted.length,
     identityCounts,
@@ -185,6 +236,42 @@ try {
 
 function isHiringDiscoverySurface(surface) {
   return typeof surface?.kind === 'string' && surface.kind.includes('vacancy');
+}
+
+function normalizePageBudget(value) {
+  return Number.isInteger(value) && value >= 1 && value <= 20 ? value : 1;
+}
+
+function canonicalUrl(value) {
+  try {
+    const url = new URL(value);
+    url.hash = '';
+    for (const name of [...url.searchParams.keys()]) {
+      if (/^(?:utm_|yclid$|gclid$|fbclid$)/i.test(name)) url.searchParams.delete(name);
+    }
+    return url.toString().replace(/\?$/, '');
+  } catch {
+    return null;
+  }
+}
+
+function isPolicyStop(discovery) {
+  if (discovery?.blocked !== true) return false;
+  return (discovery?.attempts ?? []).some((attempt) => (
+    attempt?.outcome === 'blocked' || attempt?.outcome === 'deferred'
+  ));
+}
+
+function defaultTransportPlan(sourceId, stages) {
+  return {
+    sourceId,
+    observations: 0,
+    attempts: 0,
+    stages,
+    stoppedByPolicy: false,
+    stoppedStage: null,
+    health: { degradedStages: [], policyStoppedStages: [] },
+  };
 }
 
 function summarizePlan(plan) {
