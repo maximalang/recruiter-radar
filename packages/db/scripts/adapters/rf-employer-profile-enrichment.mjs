@@ -12,6 +12,7 @@ const EXCLUDED_EXTERNAL_DOMAINS = new Set([
   'vk.com', 'vk.ru', 't.me', 'telegram.me', 'youtube.com', 'youtu.be',
   'rutube.ru', 'dzen.ru', 'ok.ru', 'instagram.com', 'facebook.com',
 ]);
+const LEGAL_TEXT_SCOPE_RADIUS = 220;
 
 export async function fetchRfEmployerProfile(family, profileUrl, {
   fetchTextImpl = fetchText,
@@ -20,6 +21,7 @@ export async function fetchRfEmployerProfile(family, profileUrl, {
   renderPool,
   fetchExtractionMarkdownImpl,
   rendered = true,
+  expectedEmployerName = null,
 } = {}) {
   const url = canonicalizePublicUrl(profileUrl, { keepTracking: true });
   if (!url || !isAllowedPlatformOrigin(url, family?.platformDomains ?? [])) {
@@ -41,11 +43,21 @@ export async function fetchRfEmployerProfile(family, profileUrl, {
     timeoutMs: 10_000,
     stageOrder,
     parseHtml: (html, pageUrl) => {
-      const profile = extractEmployerIdentityFromHtml(html, pageUrl, family);
+      const profile = extractEmployerIdentityFromHtml(
+        html,
+        pageUrl,
+        family,
+        { expectedEmployerName },
+      );
       return profile ? [profile] : [];
     },
     parseMarkdown: (markdown, pageUrl) => {
-      const profile = extractEmployerIdentityFromMarkdown(markdown, pageUrl, family);
+      const profile = extractEmployerIdentityFromMarkdown(
+        markdown,
+        pageUrl,
+        family,
+        { expectedEmployerName },
+      );
       return profile ? [profile] : [];
     },
     validateRecord: (record) => Array.isArray(record?.strongIdentityKeys) && record.strongIdentityKeys.length > 0,
@@ -69,13 +81,22 @@ export async function fetchRfEmployerProfile(family, profileUrl, {
   });
 }
 
-export function extractEmployerIdentityFromHtml(html, pageUrl, family) {
+export function extractEmployerIdentityFromHtml(
+  html,
+  pageUrl,
+  family,
+  { expectedEmployerName = null } = {},
+) {
   const text = stripHtmlToText(html);
+  const expectedName = nonEmptyText(expectedEmployerName);
   const documents = extractEmbeddedJsonDocuments(html, { maxDocuments: 50 });
-  const organizations = documents.flatMap(flattenJsonLdNodes).filter(isOrganizationNode);
+  const organizations = documents
+    .flatMap(flattenJsonLdNodes)
+    .filter(isOrganizationNode)
+    .filter((organization) => organizationMatchesExpectedEmployer(organization, expectedName));
   const strongIdentityKeys = new Set();
   const websiteCandidates = [];
-  let employerName = null;
+  let employerName = expectedName;
 
   for (const organization of organizations) {
     employerName ??= nonEmptyText(organization.legalName ?? organization.name);
@@ -83,7 +104,17 @@ export function extractEmployerIdentityFromHtml(html, pageUrl, family) {
     websiteCandidates.push(...normalizeUrlCandidates(organization.url), ...normalizeUrlCandidates(organization.sameAs));
   }
 
-  for (const identity of extractTextIdentifiers(text)) strongIdentityKeys.add(identity);
+  // Critical precision boundary: do not scan the entire job-board page for legal
+  // identifiers when the target employer is known. Board/operator footer INN or
+  // OGRN would otherwise be indistinguishable from employer identifiers. Only a
+  // tight text window around the expected employer name is eligible. Direct
+  // extractor calls without an expected name retain legacy broad parsing for
+  // tests/manual analysis, while production fetch always supplies the detail-page
+  // employer name.
+  const legalText = expectedName
+    ? extractEmployerScopedText(text, expectedName, LEGAL_TEXT_SCOPE_RADIUS)
+    : text;
+  for (const identity of extractTextIdentifiers(legalText)) strongIdentityKeys.add(identity);
   websiteCandidates.push(...extractLabelledWebsiteLinks(html));
 
   const employerWebsiteUrl = chooseEmployerWebsite(websiteCandidates, family?.platformDomains ?? []);
@@ -103,9 +134,18 @@ export function extractEmployerIdentityFromHtml(html, pageUrl, family) {
   });
 }
 
-export function extractEmployerIdentityFromMarkdown(markdown, pageUrl, family) {
+export function extractEmployerIdentityFromMarkdown(
+  markdown,
+  pageUrl,
+  family,
+  { expectedEmployerName = null } = {},
+) {
   const text = String(markdown ?? '');
-  const strongIdentityKeys = new Set(extractTextIdentifiers(text));
+  const expectedName = nonEmptyText(expectedEmployerName);
+  const legalText = expectedName
+    ? extractEmployerScopedText(stripMarkdownLinks(text), expectedName, LEGAL_TEXT_SCOPE_RADIUS)
+    : text;
+  const strongIdentityKeys = new Set(extractTextIdentifiers(legalText));
   const labelledLinks = [];
   for (const match of text.matchAll(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g)) {
     if (/(?:сайт(?:\s+компании|\s+работодателя)?|официальный\s+сайт|website)/i.test(match[1])) {
@@ -120,12 +160,73 @@ export function extractEmployerIdentityFromMarkdown(markdown, pageUrl, family) {
   const keys = [...strongIdentityKeys].sort();
   if (keys.length === 0) return null;
   return Object.freeze({
-    employerName: null,
+    employerName: expectedName,
     employerWebsiteUrl,
     strongIdentityKeys: Object.freeze(keys),
     profileUrl: canonicalizePublicUrl(pageUrl),
     extractionMethod: 'employer-profile-markdown',
   });
+}
+
+function organizationMatchesExpectedEmployer(organization, expectedEmployerName) {
+  if (!expectedEmployerName) return true;
+  const names = [organization?.legalName, organization?.name]
+    .map(nonEmptyText)
+    .filter(Boolean);
+  return names.some((name) => organizationNameMatches(name, expectedEmployerName));
+}
+
+function organizationNameMatches(left, right) {
+  const leftTokens = normalizeOrganizationName(left);
+  const rightTokens = normalizeOrganizationName(right);
+  if (!leftTokens.length || !rightTokens.length) return false;
+  const leftJoined = leftTokens.join(' ');
+  const rightJoined = rightTokens.join(' ');
+  if (leftJoined === rightJoined) return true;
+  if (leftJoined.includes(rightJoined) || rightJoined.includes(leftJoined)) return true;
+  return leftTokens.some((leftToken) => rightTokens.some((rightToken) => (
+    leftToken.length >= 4
+    && rightToken.length >= 4
+    && (leftToken.startsWith(rightToken) || rightToken.startsWith(leftToken))
+  )));
+}
+
+function normalizeOrganizationName(value) {
+  const LEGAL_FORMS = new Set([
+    'ооо', 'оао', 'пао', 'ао', 'зао', 'ип', 'нко', 'фгуп', 'муп',
+    'llc', 'ltd', 'inc', 'corp', 'corporation', 'company', 'co',
+  ]);
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[«»"'`]/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token && !LEGAL_FORMS.has(token));
+}
+
+function extractEmployerScopedText(text, expectedEmployerName, radius) {
+  const source = String(text ?? '');
+  const expected = String(expectedEmployerName ?? '').trim();
+  if (!source || !expected) return '';
+  const lowerSource = source.toLowerCase();
+  const normalizedVariants = [
+    expected.toLowerCase(),
+    normalizeOrganizationName(expected).join(' '),
+  ].filter((value, index, values) => value && values.indexOf(value) === index);
+  const windows = [];
+  for (const variant of normalizedVariants) {
+    let from = 0;
+    while (from < lowerSource.length) {
+      const index = lowerSource.indexOf(variant, from);
+      if (index < 0) break;
+      windows.push(source.slice(Math.max(0, index - radius), Math.min(source.length, index + variant.length + radius)));
+      from = index + Math.max(1, variant.length);
+      if (windows.length >= 12) break;
+    }
+    if (windows.length >= 12) break;
+  }
+  return windows.join(' ');
 }
 
 function extractOrganizationIdentifiers(organization) {
@@ -199,6 +300,10 @@ function flattenJsonLdNodes(document) {
 function isOrganizationNode(node) {
   const types = Array.isArray(node?.['@type']) ? node['@type'] : [node?.['@type']];
   return types.some((type) => /^(?:organization|corporation|localbusiness)$/i.test(String(type ?? '')));
+}
+
+function stripMarkdownLinks(value) {
+  return String(value ?? '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
 }
 
 function stripHtmlToText(html) {
