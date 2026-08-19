@@ -15,6 +15,11 @@ export interface SourceActivationResult {
   missingByMode: Readonly<Record<string, readonly string[]>>
 }
 
+/** Sources that must never become runnable from credentials alone. */
+const POLICY_UNAVAILABLE_SOURCES = new Set<SourceId>([
+  'telegram-company-channels',
+])
+
 /**
  * Runtime activation is mode-based rather than a flat list of env vars.
  * A source may have multiple accepted configurations (for example an input
@@ -98,6 +103,16 @@ export function evaluateSourceActivation(
   inheritedEnv: Readonly<Record<string, string | undefined>> = process.env,
 ): SourceActivationResult {
   const modes = getSourceActivationModes(source)
+
+  if (POLICY_UNAVAILABLE_SOURCES.has(source)) {
+    return {
+      state: 'unavailable',
+      mode: null,
+      acceptedModes: modes,
+      missingByMode: {},
+    }
+  }
+
   if (modes.length === 0) {
     return {
       state: 'configured',
