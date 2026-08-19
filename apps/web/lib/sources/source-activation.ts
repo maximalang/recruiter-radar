@@ -70,6 +70,7 @@ const SOURCE_ACTIVATION_MODES: Partial<Record<SourceId, readonly SourceActivatio
     },
   ],
   fedresurs: [
+    { id: 'official-public-export-snapshot', allOf: ['SOURCE_SNAPSHOT_ROOT'] },
     { id: 'reviewed-file', allOf: ['FEDRESURS_INPUT_FILE'] },
     {
       id: 'approved-provider',
