@@ -27,6 +27,7 @@ const componentClassSelector = /\[class(?:[*^$|~]?=)/i;
 const localEasing = /\b(?:ease(?:-in|-out|-in-out)?|linear|cubic-bezier|steps)\b/i;
 const infiniteMotion = /\binfinite\b/i;
 const transitionAll = /(?:^|[\s,])all(?:[\s,]|$)/i;
+const hoverCapabilityMedia = /\(\s*hover\s*:\s*hover\s*\)/i;
 
 function sourceFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -56,6 +57,39 @@ function withoutCanonicalMotionTokens(value) {
     .trim();
 }
 
+function ungatedHoverSelectors(content) {
+  const css = content.replace(/\/\*[\s\S]*?\*\//g, '');
+  const stack = [];
+  const failures = [];
+  let preludeStart = 0;
+
+  for (let index = 0; index < css.length; index += 1) {
+    const char = css[index];
+    if (char === ';') {
+      preludeStart = index + 1;
+      continue;
+    }
+    if (char === '{') {
+      const prelude = css.slice(preludeStart, index).trim();
+      const inheritedHoverGate = stack.some((entry) => entry.hoverGated);
+      const opensHoverGate = prelude.startsWith('@media') && hoverCapabilityMedia.test(prelude);
+      const hoverGated = inheritedHoverGate || opensHoverGate;
+      if (!prelude.startsWith('@') && prelude.includes(':hover') && !hoverGated) {
+        failures.push(prelude.replace(/\s+/g, ' ').slice(0, 180));
+      }
+      stack.push({ hoverGated });
+      preludeStart = index + 1;
+      continue;
+    }
+    if (char === '}') {
+      stack.pop();
+      preludeStart = index + 1;
+    }
+  }
+
+  return failures;
+}
+
 const failures = [];
 for (const file of sourceFiles(appRoot)) {
   const content = readFileSync(file, 'utf8');
@@ -75,6 +109,9 @@ for (const file of sourceFiles(appRoot)) {
   if (isCss) {
     for (const marker of new Set(content.match(versionedVisualMarker) ?? [])) {
       failures.push(`${label}: versioned visual marker ${marker}`);
+    }
+    for (const selector of ungatedHoverSelectors(content)) {
+      failures.push(`${label}: hover state is not capability-gated: ${selector}`);
     }
   }
 
@@ -151,4 +188,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Semantic visual contract passed: canonical namespaces, colors, radii, shadows, motion, and compatibility boundaries only.');
+console.log('Semantic visual contract passed: canonical namespaces, colors, radii, shadows, motion, interaction capability gates, and compatibility boundaries only.');
