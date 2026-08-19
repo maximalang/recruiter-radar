@@ -3,7 +3,7 @@
  *
  * POST endpoints require x-api-key matching LEAD_API_KEY (fallback DIGEST_API_KEY).
  * GET endpoints remain open (documentation only).
- * 500 responses must not leak error.message.
+ * 500 responses must not leak error.message or credential names.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 jest.mock('@/lib/lead-discovery/multi-source-lead-generator', () => ({
   MultiSourceLeadGenerator: jest.fn().mockImplementation(() => ({
     generateLeads: jest.fn().mockResolvedValue([]),
+    getLastRunSourceReport: jest.fn().mockReturnValue({}),
     getSourceAnalytics: jest.fn().mockReturnValue({ sources: [] }),
   })),
 }))
@@ -137,5 +138,31 @@ describe('T1.3: 500 responses must not leak error details', () => {
       const body = await res.json()
       expect(body.details).toBeUndefined()
     }
+  })
+
+  it('generate route does not disclose credential environment names when unconfigured', async () => {
+    process.env = { ...ORIGINAL_ENV }
+    delete process.env.LEAD_API_KEY
+    delete process.env.DIGEST_API_KEY
+
+    const res = await generatePOST(makeNextRequest({ companies: [] }))
+    const body = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(JSON.stringify(body)).not.toContain('LEAD_API_KEY')
+    expect(JSON.stringify(body)).not.toContain('DIGEST_API_KEY')
+  })
+
+  it('score route does not disclose credential environment names when unconfigured', async () => {
+    process.env = { ...ORIGINAL_ENV }
+    delete process.env.LEAD_API_KEY
+    delete process.env.DIGEST_API_KEY
+
+    const res = await scorePOST(makeNextRequest({ agencyProfile: { industries: ['IT'] } }))
+    const body = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(JSON.stringify(body)).not.toContain('LEAD_API_KEY')
+    expect(JSON.stringify(body)).not.toContain('DIGEST_API_KEY')
   })
 })
