@@ -104,13 +104,6 @@ export function extractEmployerIdentityFromHtml(
     websiteCandidates.push(...normalizeUrlCandidates(organization.url), ...normalizeUrlCandidates(organization.sameAs));
   }
 
-  // Critical precision boundary: do not scan the entire job-board page for legal
-  // identifiers when the target employer is known. Board/operator footer INN or
-  // OGRN would otherwise be indistinguishable from employer identifiers. Only a
-  // tight text window around the expected employer name is eligible. Direct
-  // extractor calls without an expected name retain legacy broad parsing for
-  // tests/manual analysis, while production fetch always supplies the detail-page
-  // employer name.
   const legalText = expectedName
     ? extractEmployerScopedText(text, expectedName, LEGAL_TEXT_SCOPE_RADIUS)
     : text;
@@ -252,10 +245,14 @@ function extractOrganizationIdentifiers(organization) {
 
 function extractTextIdentifiers(text) {
   const keys = new Set();
-  for (const match of String(text ?? '').matchAll(/\b(?:ИНН|INN)\s*[:№#-]?\s*(\d{10})\b/gi)) {
+  // JavaScript \b is ASCII-centric and is not a reliable boundary around
+  // Cyrillic labels such as ИНН/ОГРН. Use Unicode letter/digit delimiters so
+  // Russian legal identifiers are extracted consistently without matching
+  // inside longer words or digit sequences.
+  for (const match of String(text ?? '').matchAll(/(?:^|[^\p{L}\p{N}])(?:ИНН|INN)\s*[:№#-]?\s*(\d{10})(?=$|[^\d])/giu)) {
     addClassified(keys, `inn:${match[1]}`);
   }
-  for (const match of String(text ?? '').matchAll(/\b(?:ОГРН|OGRN)\s*[:№#-]?\s*(\d{13})\b/gi)) {
+  for (const match of String(text ?? '').matchAll(/(?:^|[^\p{L}\p{N}])(?:ОГРН|OGRN)\s*[:№#-]?\s*(\d{13})(?=$|[^\d])/giu)) {
     addClassified(keys, `ogrn:${match[1]}`);
   }
   return [...keys];
