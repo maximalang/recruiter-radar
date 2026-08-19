@@ -97,6 +97,8 @@ test('RF benchmark evaluates the V2 Definition of Done as measurable gates', () 
   assert.equal(report.metrics.wrongCompanyAttributionRate, 0.005);
   assert.equal(report.metrics.duplicateHiringDemandRate, 0.01);
   assert.equal(report.metrics.priorityCorroborationRate, 0.92);
+  assert.equal(report.metrics.attributionAuditCoverage, 1);
+  assert.equal(report.metrics.demandAuditCoverage, 1);
   assert.equal(report.population.splitDemands, 1);
   assert.equal(report.pass, true);
 });
@@ -113,4 +115,19 @@ test('cross-post publications collapsed into one canonical demand are not duplic
   });
   assert.equal(report.metrics.duplicateHiringDemandRate, 0);
   assert.equal(report.pass, true);
+});
+
+test('missing independently selected attribution audits fail benchmark coverage gate', () => {
+  const report = evaluateRfCoverageBenchmark({
+    benchmarkCompanies: [{ id: '1', hiringActive: true, evidenceAppearedAt: '2026-08-18T00:00:00Z', detectedAt: '2026-08-18T01:00:00Z' }],
+    attributionAudits: Array.from({ length: 90 }, () => ({ wrongCompany: false })),
+    expectedAttributionAudits: 100,
+    demandAudits: [{ groundTruthDemandId: 'd1', observedCanonicalDemandIds: ['c1'] }],
+    expectedDemandAudits: 1,
+    priorityOpportunities: [{ directEvidence: true, independentCorroboration: false }],
+  });
+
+  assert.equal(report.metrics.attributionAuditCoverage, 0.9);
+  assert.equal(report.checks.attributionAuditCoverage.pass, false);
+  assert.equal(report.pass, false);
 });
