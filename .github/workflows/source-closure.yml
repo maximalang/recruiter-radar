@@ -29,10 +29,11 @@ jobs:
         run: |
           bash -n scripts/deploy/configure-hh-runtime.sh
           bash -n scripts/deploy/configure-youtube-runtime.sh
-      - name: Verify GDELT transport and FNS projection contracts
+      - name: Verify public-source transport and projection contracts
         run: |
           node --test packages/db/scripts/adapters/gdelt-doc-client.test.mjs
           node --test packages/db/scripts/source-transparent-business-fns.test.mjs
+          node --test packages/db/scripts/sync-fedresurs-snapshot.test.mjs
           node packages/db/scripts/verify-funding-business-signals-smoke.mjs
           node packages/db/scripts/verify-rf-source-expansion-smoke.mjs
       - name: Verify source activation contracts
