@@ -10,11 +10,25 @@ export function buildRfHiringDiscoveryCandidate({ family, posting, vacancyUrl, d
   if (!canonicalVacancyUrl) return null;
 
   const externalVacancyId = nonEmptyText(posting?.externalId);
-  const employerWebsiteUrl = canonicalEmployerWebsite(posting?.employerUrl, family?.platformDomains ?? []);
+  const employerLink = classifyEmployerLink(posting?.employerUrl, family?.platformDomains ?? []);
+  const employerProfileUrl = employerLink.kind === 'platform-profile' ? employerLink.url : null;
+  const employerWebsiteUrl = employerLink.kind === 'employer-website' ? employerLink.url : null;
   const strongIdentityKeys = [];
   if (employerWebsiteUrl) {
     const domain = new URL(employerWebsiteUrl).hostname.toLowerCase().replace(/^www\./, '');
     const identity = classifyStrongIdentityKey(`domain:${domain}`);
+    if (identity) strongIdentityKeys.push(identity.key);
+  }
+  for (const [prefix, raw] of [
+    ['inn', posting?.employerInn],
+    ['ogrn', posting?.employerOgrn],
+  ]) {
+    const text = nonEmptyText(raw);
+    const identity = text ? classifyStrongIdentityKey(`${prefix}:${text.replace(/\D/g, '')}`) : null;
+    if (identity) strongIdentityKeys.push(identity.key);
+  }
+  for (const rawKey of posting?.strongIdentityKeys ?? []) {
+    const identity = classifyStrongIdentityKey(rawKey);
     if (identity) strongIdentityKeys.push(identity.key);
   }
 
@@ -27,7 +41,10 @@ export function buildRfHiringDiscoveryCandidate({ family, posting, vacancyUrl, d
     external_vacancy_id: externalVacancyId,
     job_title: nonEmptyText(posting?.title),
     employer_name: nonEmptyText(posting?.employerName),
+    employer_profile_url: employerProfileUrl,
     employer_website_url: employerWebsiteUrl,
+    employer_inn: nonEmptyText(posting?.employerInn),
+    employer_ogrn: nonEmptyText(posting?.employerOgrn),
     location: nonEmptyText(posting?.location),
     employment_type: Array.isArray(posting?.employmentType) ? posting.employmentType : [],
     published_at: normalizeDate(posting?.datePosted),
@@ -42,7 +59,7 @@ export function buildRfHiringDiscoveryCandidate({ family, posting, vacancyUrl, d
     vacancyUrl: canonicalVacancyUrl,
     jobTitle: payload.job_title,
     employerName: payload.employer_name,
-    employerProfileUrl: null,
+    employerProfileUrl,
     employerWebsiteUrl,
     location: payload.location,
     publishedAt: payload.published_at,
@@ -200,12 +217,14 @@ export async function upsertRfHiringDiscoveryCandidate(client, candidate) {
   }
 }
 
-function canonicalEmployerWebsite(value, platformDomains) {
+function classifyEmployerLink(value, platformDomains) {
   const url = canonicalHttpsUrl(value);
-  if (!url) return null;
+  if (!url) return { kind: null, url: null };
   const host = new URL(url).hostname.toLowerCase();
-  if ((platformDomains ?? []).some((domain) => host === domain || host.endsWith(`.${domain}`))) return null;
-  return url;
+  const platform = (platformDomains ?? []).some((domain) => host === domain || host.endsWith(`.${domain}`));
+  return platform
+    ? { kind: 'platform-profile', url }
+    : { kind: 'employer-website', url };
 }
 
 function canonicalHttpsUrl(value) {
