@@ -196,13 +196,6 @@
   border-right: 0;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .radioOption:hover,
-  .checkOption:hover {
-    background: var(--color-surface-secondary);
-  }
-}
-
 .radioOption:has(input:checked) {
   background: var(--color-surface-selected);
 }
@@ -259,10 +252,6 @@
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--color-signal) 34%, transparent);
   text-underline-offset: 3px;
-}
-
-.checkOption a:hover {
-  text-decoration-color: currentColor;
 }
 
 .hint,
@@ -322,16 +311,27 @@
   transition: color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.documentLinks a:hover {
-  color: var(--color-signal);
-}
-
 .radioOption input:focus-visible,
 .checkOption input:focus-visible,
 .checkOption a:focus-visible,
 .documentLinks a:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .radioOption:hover,
+  .checkOption:hover {
+    background: var(--color-surface-secondary);
+  }
+
+  .checkOption a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .documentLinks a:hover {
+    color: var(--color-signal);
+  }
 }
 
 @media (max-width: 680px) {
