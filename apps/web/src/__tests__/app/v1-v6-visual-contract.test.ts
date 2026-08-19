@@ -74,6 +74,20 @@ describe('Recruiter Radar V1-V6 visual contract', () => {
     expect(legal).toContain('outline: 2px solid var(--color-focus)')
   })
 
+  it('keeps Situations on ledger grammar instead of retired cards and metric bars', () => {
+    const situations = fs.readFileSync(
+      path.join(APP_ROOT, 'opportunities/opportunities.module.css'),
+      'utf8',
+    )
+    expect(situations).not.toMatch(/\.card\s*\{/)
+    expect(situations).not.toMatch(/\.cardHeader\b/)
+    expect(situations).not.toMatch(/\.signalMetrics\b/)
+    expect(situations).not.toMatch(/\.signalMetricBar\b/)
+    expect(situations).not.toMatch(/radial-gradient\s*\(/)
+    expect(situations).toMatch(/\.signalMetricLedger\s*\{/)
+    expect(situations).toMatch(/\.signalMetricRow\s*\{/)
+  })
+
   it('rejects legacy --c-* and --rr-* token namespaces', () => {
     const failures: string[] = []
 
