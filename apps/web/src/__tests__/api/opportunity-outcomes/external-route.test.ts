@@ -47,37 +47,41 @@ describe('external opportunity outcome route', () => {
     expect(recordOpportunityOutcome).not.toHaveBeenCalled()
   })
 
-  it('rejects a declared oversized payload before signature processing', async () => {
+  it('stays fail-closed before reading a declared oversized payload', async () => {
     enableExternalIngest()
-
-    const response = await POST(new NextRequest(
+    const request = new NextRequest(
       'https://recruiter-radar.ru/api/opportunities/outcomes/external',
       {
         method: 'POST',
         headers: { 'content-length': String((16 * 1024) + 1) },
         body: '{}',
       },
-    ))
+    )
 
-    expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toEqual({ error: 'payload_too_large' })
+    const response = await POST(request)
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({ error: 'not_found' })
+    expect(request.bodyUsed).toBe(false)
     expect(resolveOpportunityPublicReference).not.toHaveBeenCalled()
     expect(recordOpportunityOutcome).not.toHaveBeenCalled()
   })
 
-  it('rejects an oversized payload when content-length is unavailable', async () => {
+  it('stays fail-closed before reading an oversized payload without content-length', async () => {
     enableExternalIngest()
-
-    const response = await POST(new NextRequest(
+    const request = new NextRequest(
       'https://recruiter-radar.ru/api/opportunities/outcomes/external',
       {
         method: 'POST',
         body: 'x'.repeat((16 * 1024) + 1),
       },
-    ))
+    )
 
-    expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toEqual({ error: 'payload_too_large' })
+    const response = await POST(request)
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({ error: 'not_found' })
+    expect(request.bodyUsed).toBe(false)
     expect(resolveOpportunityPublicReference).not.toHaveBeenCalled()
     expect(recordOpportunityOutcome).not.toHaveBeenCalled()
   })
