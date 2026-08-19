@@ -2,23 +2,19 @@
  * SuperJob source script.
  *
  * Fetch modes:
- *   1. File mode: SUPERJOB_INPUT_FILE → read records from JSON/CSV file
- *   2. Provider mode: SUPERJOB_PROVIDER_API_URL + SUPERJOB_API_APP_ID → fetch from provider
- *   3. Live API mode: SUPERJOB_API_APP_ID + SUPERJOB_KEYWORD → direct SuperJob API
+ *   1. File mode: SUPERJOB_INPUT_FILE → reviewed JSON/CSV records
+ *   2. Provider mode: SUPERJOB_PROVIDER_API_URL + SUPERJOB_API_APP_ID
+ *   3. Live API mode: SUPERJOB_API_APP_ID → official SuperJob API
  *
- * Live API mode uses the SuperJob 2.0 REST API directly:
- *   - Endpoint: https://api.superjob.ru/2.0/vacancies/
- *   - Auth: X-Api-App-Id header
- *   - Rate limit: 120 req/min per IP
- *   - Max 500 results per search (100/page × 5 pages)
+ * Production live mode is broad incremental by default: direct employers only,
+ * no keyword, last 12 hours, adaptive time partitions around SuperJob's 500-row
+ * search ceiling. SUPERJOB_KEYWORD is optional and intended for bounded
+ * diagnostics/verifiers, not the production discovery default.
  *
- * API response shape:
- *   { objects: [...], total: number, more: boolean }
- *
- * Vacancy object fields used:
- *   - id, profession, firm_name, link, date_published (unixtime)
- *   - town.title, payment_from/payment_to, currency, type_of_work.title
- *   - experience.title, agency.title, address
+ * Native agency=2/3/4 records are rejected at the source boundary before a
+ * signal/evidence row can be created. This prevents recruiting-agency,
+ * outsourcing and aggregator publications from contaminating canonical hiring
+ * demand even if an operator explicitly runs an unfiltered diagnostic query.
  */
 
 import { dirname, resolve } from 'node:path';
@@ -44,22 +40,24 @@ const runtime = createStandardSourceRuntime({
   evidenceRole: 'primary_platform',
   sourceRecordType: 'job_posting',
   inputFileEnvName: 'SUPERJOB_INPUT_FILE',
-  usageText: 'Input: set SUPERJOB_INPUT_FILE, SUPERJOB_PROVIDER_API_URL + SUPERJOB_API_APP_ID, or SUPERJOB_API_APP_ID + SUPERJOB_KEYWORD for live API mode.',
+  usageText: 'Input: set SUPERJOB_INPUT_FILE, SUPERJOB_PROVIDER_API_URL + SUPERJOB_API_APP_ID, or SUPERJOB_API_APP_ID for official broad incremental live API mode. SUPERJOB_KEYWORD is optional.',
   extractProviderRecords: extractSuperjobRecords,
   normalizeRecord: (record, context) => normalizeSuperjobRecord(record, context),
   buildSummaryExtras: (input) => input.inputMode === 'live-public'
     ? {
       liveProvider: 'superjob-api',
       keyword: input.keyword,
+      agency: input.agency,
+      datePublishedFrom: input.datePublishedFrom,
+      datePublishedTo: input.datePublishedTo,
       apiTotal: input.apiTotal,
+      pagesFetched: input.pagesFetched,
+      partitions: input.partitions,
+      adaptiveTimePartition: input.adaptiveTimePartition,
     }
     : {},
 });
 
-/**
- * Resolve input from env vars. Returns sync input (file/provider)
- * or a pending live-input descriptor for async resolution.
- */
 export function resolveSuperjobInput() {
   const inputFilePath = process.env.SUPERJOB_INPUT_FILE?.trim();
   if (inputFilePath) return runtime.resolveFileInput(inputFilePath);
@@ -75,7 +73,6 @@ export function resolveSuperjobInput() {
     });
   }
 
-  // Live API mode — needs async resolution
   if (appId) {
     return {
       inputMode: 'public-pending',
@@ -84,12 +81,9 @@ export function resolveSuperjobInput() {
     };
   }
 
-  throw new Error('No input configured for superjob. Set SUPERJOB_INPUT_FILE, SUPERJOB_PROVIDER_API_URL + SUPERJOB_API_APP_ID, or SUPERJOB_API_APP_ID + SUPERJOB_KEYWORD for live API mode.');
+  throw new Error('No input configured for superjob. Set SUPERJOB_INPUT_FILE, SUPERJOB_PROVIDER_API_URL + SUPERJOB_API_APP_ID, or SUPERJOB_API_APP_ID for official live API mode.');
 }
 
-/**
- * Async: resolve live SuperJob API input.
- */
 export async function resolveSuperjobLiveInput({ appId, config }) {
   const fetchResult = await fetchSuperjobVacancyPages({ appId, config });
   const records = fetchResult.items;
@@ -102,22 +96,20 @@ export async function resolveSuperjobLiveInput({ appId, config }) {
     extra: {
       liveProvider: 'superjob-api',
       keyword: config.keyword,
+      agency: config.extraParams?.agency ?? null,
+      datePublishedFrom: config.extraParams?.date_published_from ?? null,
+      datePublishedTo: config.extraParams?.date_published_to ?? null,
       apiTotal: fetchResult.total,
       pagesFetched: fetchResult.pagesFetched,
+      partitions: fetchResult.partitions ?? [],
+      adaptiveTimePartition: fetchResult.adaptiveTimePartition === true,
     },
   });
 }
 
-/**
- * Async: resolve whatever input mode was configured.
- */
 export async function resolveSuperjobConfiguredInput() {
   const input = resolveSuperjobInput();
-
-  if (input.inputMode === 'public-pending') {
-    return resolveSuperjobLiveInput(input);
-  }
-
+  if (input.inputMode === 'public-pending') return resolveSuperjobLiveInput(input);
   return input;
 }
 
@@ -129,9 +121,6 @@ export async function runSuperjobCli(argv = process.argv.slice(2)) {
   });
 }
 
-/**
- * Extract records from provider response (generic wrapper).
- */
 function extractSuperjobRecords(body) {
   if (Array.isArray(body)) return body;
   if (Array.isArray(body?.objects)) return body.objects;
@@ -139,63 +128,53 @@ function extractSuperjobRecords(body) {
   return [];
 }
 
-/**
- * Normalize a SuperJob vacancy object into the standard record shape.
- * Maps SuperJob-specific field names to the generic normalizer contract.
- */
-function normalizeSuperjobRecord(record, { fetchedAt, lineNumber }) {
-  if (!record || typeof record !== 'object' || Array.isArray(record)) {
-    return null;
-  }
+export function normalizeSuperjobRecord(record, { fetchedAt, lineNumber }) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
 
-  // Map SuperJob fields to the generic normalizer's expected field names.
-  // Prefer SuperJob-native fields (live API mode), but fall back to the
-  // generic names so file mode (SUPERJOB_INPUT_FILE) and provider mode —
-  // both of which carry generically-shaped records — normalize correctly.
   const publisher = classifySuperjobPublisher(record.agency);
+  // SuperJob's native agency classifier is authoritative when present. Never
+  // create hiring demand for known agency/outsourcing/aggregator publishers.
+  if (publisher.id !== null && !publisher.candidateEligible) return null;
+  if (record.candidate_eligible === false) return null;
+
   const mapped = {
-    // Company
     company_name: record.firm_name ?? record.company_name,
     company_domain: record.company_domain ?? record.domain,
     company_website_url: record.company_website_url ?? record.website_url,
     inn: record.client ?? record.inn ?? undefined,
-    // Job
     job_title: record.profession ?? record.job_title,
     external_id: record.id ?? record.external_id,
     job_posting_url: record.link ?? record.job_posting_url,
     published_at: record.date_published
       ? new Date(record.date_published * 1000).toISOString()
       : record.published_at,
-    // Location
     location: record.town?.title ?? record.location,
-    // Salary
     salary: record.payment_from || record.payment_to
       ? [record.payment_from, record.payment_to, record.currency].filter(Boolean).join('–')
       : record.salary,
     salary_from: record.payment_from ?? record.salary_from,
     salary_to: record.payment_to ?? record.salary_to,
     currency: record.currency,
-    // Employment
     employment_type: record.type_of_work?.title ?? record.employment_type,
-    // Experience
     experience: record.experience?.title ?? record.experience,
-    // Agency (direct employer vs recruitment agency)
     publisher_type: publisher.type,
     publisher_type_id: publisher.id,
     publisher_type_label: publisher.label,
-    candidate_eligible: publisher.candidateEligible,
-    // Address
+    // Native agency=1 is direct employer. For reviewed generic snapshots where
+    // agency metadata is absent, preserve an explicit candidate_eligible value;
+    // otherwise leave the record conservative (false) downstream.
+    candidate_eligible: publisher.id !== null
+      ? publisher.candidateEligible
+      : record.candidate_eligible === true,
     address: record.address?.city ?? record.address?.street ?? record.address,
-    // Tags
     tags: record.tags,
-    // Source board marker
     source_board: record.source_board ?? 'superjob',
   };
 
   return normalizeJobPostingRecord(mapped, { fetchedAt, lineNumber, sourceId: SOURCE_ID }, { defaultBoard: 'superjob' });
 }
 
-function classifySuperjobPublisher(agency) {
+export function classifySuperjobPublisher(agency) {
   const id = Number.isInteger(Number(agency?.id)) ? Number(agency.id) : null;
   const label = typeof agency?.title === 'string' && agency.title.trim() !== ''
     ? agency.title.trim()
