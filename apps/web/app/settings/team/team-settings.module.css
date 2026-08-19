@@ -30,6 +30,7 @@
   font-size: .82rem;
   font-weight: 600;
   text-decoration: none;
+  transition: color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .subnav a::after {
@@ -41,9 +42,9 @@
   background: var(--color-signal);
   content: "";
   opacity: 0;
+  transition: opacity var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.subnav a:hover,
 .subnav a[aria-current="page"] {
   color: var(--color-text-primary);
 }
@@ -414,6 +415,12 @@
 .transferButton:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .subnav a:hover {
+    color: var(--color-text-primary);
+  }
 }
 
 @media (max-width: 960px) {
