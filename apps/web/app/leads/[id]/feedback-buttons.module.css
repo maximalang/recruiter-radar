@@ -22,7 +22,7 @@
 }
 
 .feedbackBtn {
-  min-height: 40px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -114,7 +114,7 @@
 .noteInput {
   flex: 1 1 200px;
   min-width: 0;
-  min-height: 40px;
+  min-height: 44px;
   padding: 6px 10px;
   border: 1px solid var(--color-separator);
   border-radius: var(--radius-control);
@@ -125,12 +125,16 @@
 
 .noteSave,
 .noteSkip {
-  min-height: 40px;
+  min-height: 44px;
   padding: 6px 12px;
   border-radius: var(--radius-control);
   cursor: pointer;
   font-size: var(--type-metadata-size);
   font-weight: 600;
+  transition:
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .noteSave {
@@ -139,19 +143,21 @@
   color: var(--color-text-inverse);
 }
 
-.noteSave:hover {
-  border-color: var(--color-signal-hover);
-  background-color: var(--color-signal-hover);
-}
-
 .noteSkip {
   border: 1px solid var(--color-separator);
   background-color: var(--color-surface-primary);
   color: var(--color-text-tertiary);
 }
 
-.noteSkip:hover {
-  background-color: var(--color-surface-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .noteSave:hover {
+    border-color: var(--color-signal-hover);
+    background-color: var(--color-signal-hover);
+  }
+
+  .noteSkip:hover {
+    background-color: var(--color-surface-secondary);
+  }
 }
 
 .errorText {
@@ -173,19 +179,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .feedbackBtn {
+  .feedbackBtn,
+  .noteSave,
+  .noteSkip {
     transition: none;
   }
 }
 
 @media (max-width: 640px) {
-  .feedbackBtn,
-  .noteInput,
-  .noteSave,
-  .noteSkip {
-    min-height: 44px;
-  }
-
   .feedbackBtn {
     padding: 10px 14px;
   }
