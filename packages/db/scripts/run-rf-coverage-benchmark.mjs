@@ -36,6 +36,8 @@ try {
     attributionAudits,
     demandAudits,
     priorityOpportunities,
+    expectedAttributionAudits: manifest.attributionAudits.length,
+    expectedDemandAudits: manifest.demandAudits.length,
   });
 
   const report = {
@@ -47,11 +49,13 @@ try {
     generatedAt: new Date().toISOString(),
     ...evaluation,
     auditCoverage: {
-      attributionRequested: manifest.attributionAudits?.length ?? 0,
+      attributionRequested: manifest.attributionAudits.length,
       attributionObserved: attributionAudits.length,
-      demandRequested: manifest.demandAudits?.length ?? 0,
+      attributionRate: evaluation.metrics.attributionAuditCoverage,
+      demandRequested: manifest.demandAudits.length,
       demandObserved: demandAudits.length,
-      priorityRequested: manifest.priorityOpportunities?.length ?? 0,
+      demandRate: evaluation.metrics.demandAuditCoverage,
+      priorityRequested: manifest.priorityOpportunities.length,
       priorityObserved: priorityOpportunities.length,
     },
   };
@@ -255,6 +259,8 @@ function printHuman(report) {
   console.log(`Wrong-company attribution: ${formatRate(report.metrics.wrongCompanyAttributionRate)}`);
   console.log(`Duplicate hiring demand: ${formatRate(report.metrics.duplicateHiringDemandRate)}`);
   console.log(`Priority corroboration: ${formatRate(report.metrics.priorityCorroborationRate)}`);
+  console.log(`Attribution audit coverage: ${formatRate(report.metrics.attributionAuditCoverage)}`);
+  console.log(`Demand audit coverage: ${formatRate(report.metrics.demandAuditCoverage)}`);
   console.log(`Result: ${report.pass ? 'PASS' : 'FAIL'}`);
 }
 
