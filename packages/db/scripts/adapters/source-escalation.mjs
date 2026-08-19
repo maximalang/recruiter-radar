@@ -22,6 +22,7 @@ export async function runSourceEscalation({
   stages,
   validateRecord,
   context = {},
+  stageOrder,
 }) {
   if (!stages || typeof stages !== 'object') {
     throw new TypeError('source escalation requires a stages object');
@@ -32,8 +33,9 @@ export async function runSourceEscalation({
 
   const attempts = [];
   let artifact = null;
+  const resolvedStageOrder = resolveStageOrder(stages, stageOrder);
 
-  for (const stage of SOURCE_ESCALATION_STAGES) {
+  for (const stage of resolvedStageOrder) {
     const handler = stages[stage];
     if (typeof handler !== 'function') continue;
 
@@ -113,6 +115,30 @@ export async function runSourceEscalation({
   }
 
   return emptyResult(attempts, artifact, false);
+}
+
+function resolveStageOrder(stages, stageOrder) {
+  const activeStages = SOURCE_ESCALATION_STAGES.filter((stage) => typeof stages[stage] === 'function');
+  if (stageOrder === undefined || stageOrder === null) return activeStages;
+  if (!Array.isArray(stageOrder)) throw new TypeError('source escalation stageOrder must be an array');
+
+  const normalized = [];
+  const seen = new Set();
+  for (const stage of stageOrder) {
+    if (!SOURCE_ESCALATION_STAGES.includes(stage)) {
+      throw new TypeError(`source escalation stageOrder contains unsupported stage: ${stage}`);
+    }
+    if (!seen.has(stage)) {
+      seen.add(stage);
+      normalized.push(stage);
+    }
+  }
+
+  const missing = activeStages.filter((stage) => !seen.has(stage));
+  if (missing.length > 0) {
+    throw new TypeError(`source escalation stageOrder must include every active stage: missing ${missing.join(', ')}`);
+  }
+  return normalized;
 }
 
 function normalizeResponse(value) {
