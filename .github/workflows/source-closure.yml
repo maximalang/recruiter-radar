@@ -37,6 +37,7 @@ jobs:
           node --test packages/db/scripts/adapters/gdelt-doc-client.test.mjs
           node --test packages/db/scripts/source-transparent-business-fns.test.mjs
           node --test packages/db/scripts/sync-fedresurs-snapshot.test.mjs
+          node --test packages/db/scripts/source-rabota-rossii-pagination.test.mjs
           node --test packages/db/scripts/adapters/source-escalation.test.mjs
           node --test packages/db/scripts/adapters/source-transport-health-store.test.mjs
           node --test packages/db/scripts/adapters/organization-resolution.test.mjs
