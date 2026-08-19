@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import pg from 'pg';
 
 import {
@@ -9,6 +10,7 @@ import {
 } from './adapters/rf-discovery-families.mjs';
 import { discoverRfJobBoardSurface } from './adapters/rf-job-board-discovery.mjs';
 import { fetchRfEmployerProfile } from './adapters/rf-employer-profile-enrichment.mjs';
+import { bootstrapCandidateOrganization } from './adapters/rf-candidate-org-bootstrap.mjs';
 import {
   buildRfHiringDiscoveryCandidate,
   resolveCandidateIdentity,
@@ -42,6 +44,7 @@ const stats = {
   profileFetched: 0,
   profileBlocked: 0,
   strongKeysAdded: 0,
+  organizationsBootstrapped: 0,
   resolved: 0,
   ambiguous: 0,
   pending: 0,
@@ -109,7 +112,12 @@ try {
       stats.detailBlocked += 1;
     }
 
-    const employerProfileUrl = detailCandidate?.employerProfileUrl ?? candidate.employer_profile_url;
+    const publisherType = detailCandidate?.publisherType ?? candidate.payload?.publisher_type ?? 'unknown';
+    const agencyPublisher = publisherType === 'agency';
+    const employerProfileUrl = agencyPublisher
+      ? null
+      : detailCandidate?.employerProfileUrl ?? candidate.employer_profile_url;
+
     if (employerProfileUrl) {
       const profileHealthId = `rf-enrichment:${family.id}:employer-profile`;
       const profilePlan = await loadHistoricalTransportPlan(client, {
@@ -121,6 +129,7 @@ try {
         const startedAt = new Date();
         const profileResult = await fetchRfEmployerProfile(family, employerProfileUrl, {
           stageOrder: profilePlan.stages,
+          expectedEmployerName: detailCandidate?.employerName ?? candidate.employer_name,
         });
         await recordTransportObservation(client, {
           sourceId: profileHealthId,
@@ -142,49 +151,66 @@ try {
     }
 
     const beforeKeys = new Set(candidate.strong_identity_keys ?? []);
-    const mergedKeys = [...new Set([
-      ...beforeKeys,
-      ...(detailCandidate?.strongIdentityKeys ?? []),
-      ...(profile?.strongIdentityKeys ?? []),
-    ])].sort();
+    const mergedKeys = agencyPublisher
+      ? []
+      : [...new Set([
+        ...beforeKeys,
+        ...(detailCandidate?.strongIdentityKeys ?? []),
+        ...(profile?.strongIdentityKeys ?? []),
+      ])].sort();
     stats.strongKeysAdded += mergedKeys.filter((key) => !beforeKeys.has(key)).length;
+
+    const mergedPayload = {
+      ...(candidate.payload ?? {}),
+      ...(detailCandidate?.payload ?? {}),
+      publisher_type: publisherType,
+      identity_enrichment: {
+        detail_attempted: !detailPlan.stoppedByPolicy,
+        profile_attempted: Boolean(employerProfileUrl),
+        profile_url: employerProfileUrl ?? null,
+        employer_website_url: agencyPublisher
+          ? null
+          : profile?.employerWebsiteUrl ?? detailCandidate?.employerWebsiteUrl ?? candidate.employer_website_url ?? null,
+        strong_identity_keys: mergedKeys,
+        profile_extraction_method: profile?.extractionMethod ?? null,
+        enriched_at: new Date().toISOString(),
+      },
+    };
 
     const enriched = {
       ...candidate,
+      sourceFamily: family.id,
+      publisherType,
       external_vacancy_id: detailCandidate?.externalVacancyId ?? candidate.external_vacancy_id,
       job_title: detailCandidate?.jobTitle ?? candidate.job_title,
-      employer_name: profile?.employerName ?? detailCandidate?.employerName ?? candidate.employer_name,
+      employer_name: agencyPublisher
+        ? null
+        : profile?.employerName ?? detailCandidate?.employerName ?? candidate.employer_name,
       employer_profile_url: employerProfileUrl ?? null,
-      employer_website_url: profile?.employerWebsiteUrl ?? detailCandidate?.employerWebsiteUrl ?? candidate.employer_website_url,
+      employer_website_url: agencyPublisher
+        ? null
+        : profile?.employerWebsiteUrl ?? detailCandidate?.employerWebsiteUrl ?? candidate.employer_website_url,
       location: detailCandidate?.location ?? candidate.location,
       published_at: detailCandidate?.publishedAt ?? candidate.published_at,
       strong_identity_keys: mergedKeys,
-      payload: {
-        ...(candidate.payload ?? {}),
-        ...(detailCandidate?.payload ?? {}),
-        identity_enrichment: {
-          detail_attempted: !detailPlan.stoppedByPolicy,
-          profile_attempted: Boolean(employerProfileUrl),
-          profile_url: employerProfileUrl ?? null,
-          employer_website_url: profile?.employerWebsiteUrl ?? detailCandidate?.employerWebsiteUrl ?? candidate.employer_website_url ?? null,
-          strong_identity_keys: mergedKeys,
-          profile_extraction_method: profile?.extractionMethod ?? null,
-          enriched_at: new Date().toISOString(),
-        },
-      },
-      content_fingerprint: detailCandidate?.contentFingerprint ?? candidate.content_fingerprint,
+      payload: mergedPayload,
+      content_fingerprint: fingerprint(mergedPayload),
     };
 
     await client.query('BEGIN');
     try {
-      const resolution = await resolveCandidateIdentity(client, enriched);
+      const initialResolution = await resolveCandidateIdentity(client, enriched);
+      const bootstrap = await bootstrapCandidateOrganization(client, enriched, initialResolution);
+      const resolution = bootstrap.resolution;
+      if (bootstrap.bootstrapped) stats.organizationsBootstrapped += 1;
+
       const updated = await client.query(
         `UPDATE rf_hiring_discovery_candidates_v2
          SET external_vacancy_id = COALESCE($2::TEXT, external_vacancy_id),
              job_title = COALESCE($3::TEXT, job_title),
-             employer_name = COALESCE($4::TEXT, employer_name),
-             employer_profile_url = COALESCE($5::TEXT, employer_profile_url),
-             employer_website_url = COALESCE($6::TEXT, employer_website_url),
+             employer_name = $4::TEXT,
+             employer_profile_url = $5::TEXT,
+             employer_website_url = $6::TEXT,
              location = COALESCE($7::TEXT, location),
              published_at = COALESCE($8::TIMESTAMPTZ, published_at),
              strong_identity_keys = $9::TEXT[],
@@ -195,6 +221,7 @@ try {
              content_fingerprint = $14::CHAR(64),
              updated_at = NOW()
          WHERE id = $1::BIGINT
+           AND promoted_at IS NULL
          RETURNING identity_status`,
         [
           candidate.id,
@@ -254,6 +281,18 @@ function canonical(value) {
   } catch {
     return null;
   }
+}
+
+function fingerprint(value) {
+  return createHash('sha256').update(stableStringify(value)).digest('hex');
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function normalizeLimit(value) {
