@@ -4,6 +4,8 @@ export const RF_SOURCE_INTELLIGENCE_V2_TARGETS = Object.freeze({
   wrongCompanyAttributionMax: 0.01,
   duplicateHiringDemandMax: 0.02,
   priorityCorroborationMin: 0.90,
+  attributionAuditCoverageMin: 0.95,
+  demandAuditCoverageMin: 0.95,
 });
 
 /**
@@ -18,12 +20,19 @@ export const RF_SOURCE_INTELLIGENCE_V2_TARGETS = Object.freeze({
  *   more canonical vacancy ids. Multiple source publications already collapsed
  *   into one canonical id are correctly NOT duplicates.
  * priorityOpportunities: [{ directEvidence, independentCorroboration }]
+ *
+ * expectedAttributionAudits/expectedDemandAudits preserve denominator integrity
+ * when the production runner cannot observe one of the independently selected
+ * audit items. Missing rows must reduce audit coverage instead of disappearing
+ * from the metric denominator and making precision look artificially better.
  */
 export function evaluateRfCoverageBenchmark({
   benchmarkCompanies = [],
   attributionAudits = [],
   demandAudits = [],
   priorityOpportunities = [],
+  expectedAttributionAudits = attributionAudits.length,
+  expectedDemandAudits = demandAudits.length,
   targets = RF_SOURCE_INTELLIGENCE_V2_TARGETS,
 } = {}) {
   const activeCompanies = benchmarkCompanies.filter((row) => row?.hiringActive === true);
@@ -39,6 +48,10 @@ export function evaluateRfCoverageBenchmark({
   const auditedAttributions = attributionAudits.filter((row) => typeof row?.wrongCompany === 'boolean');
   const wrongAttributions = auditedAttributions.filter((row) => row.wrongCompany).length;
   const wrongCompanyAttributionRate = ratio(wrongAttributions, auditedAttributions.length);
+  const attributionAuditCoverage = ratio(
+    auditedAttributions.length,
+    normalizeExpectedCount(expectedAttributionAudits, auditedAttributions.length),
+  );
 
   const auditedDemands = demandAudits.filter((row) => (
     nonEmptyText(row?.groundTruthDemandId)
@@ -46,6 +59,10 @@ export function evaluateRfCoverageBenchmark({
   ));
   const splitDemands = auditedDemands.filter((row) => uniqueNonEmpty(row.observedCanonicalDemandIds).length > 1);
   const duplicateHiringDemandRate = ratio(splitDemands.length, auditedDemands.length);
+  const demandAuditCoverage = ratio(
+    auditedDemands.length,
+    normalizeExpectedCount(expectedDemandAudits, auditedDemands.length),
+  );
 
   const corroboratedPriority = priorityOpportunities.filter((row) => (
     row?.directEvidence === true || row?.independentCorroboration === true
@@ -58,6 +75,8 @@ export function evaluateRfCoverageBenchmark({
     wrongCompanyAttributionRate: metricCheck(wrongCompanyAttributionRate, targets.wrongCompanyAttributionMax, 'max'),
     duplicateHiringDemandRate: metricCheck(duplicateHiringDemandRate, targets.duplicateHiringDemandMax, 'max'),
     priorityCorroborationRate: metricCheck(priorityCorroborationRate, targets.priorityCorroborationMin, 'min'),
+    attributionAuditCoverage: metricCheck(attributionAuditCoverage, targets.attributionAuditCoverageMin, 'min'),
+    demandAuditCoverage: metricCheck(demandAuditCoverage, targets.demandAuditCoverageMin, 'min'),
   });
 
   return Object.freeze({
@@ -65,8 +84,10 @@ export function evaluateRfCoverageBenchmark({
       activeCompanies: activeCompanies.length,
       detectedCompanies: detectedCompanies.length,
       attributionAudits: auditedAttributions.length,
+      expectedAttributionAudits: normalizeExpectedCount(expectedAttributionAudits, auditedAttributions.length),
       wrongAttributions,
       demandAudits: auditedDemands.length,
+      expectedDemandAudits: normalizeExpectedCount(expectedDemandAudits, auditedDemands.length),
       splitDemands: splitDemands.length,
       priorityOpportunities: priorityOpportunities.length,
     }),
@@ -76,6 +97,8 @@ export function evaluateRfCoverageBenchmark({
       wrongCompanyAttributionRate,
       duplicateHiringDemandRate,
       priorityCorroborationRate,
+      attributionAuditCoverage,
+      demandAuditCoverage,
     }),
     checks,
     pass: Object.values(checks).every((check) => check.pass === true),
@@ -102,6 +125,12 @@ function metricCheck(value, target, direction) {
 
 function ratio(numerator, denominator) {
   return denominator > 0 ? numerator / denominator : null;
+}
+
+function normalizeExpectedCount(value, observed) {
+  const numeric = Number(value);
+  if (!Number.isInteger(numeric) || numeric < observed || numeric <= 0) return observed;
+  return numeric;
 }
 
 function hoursBetween(from, to) {
