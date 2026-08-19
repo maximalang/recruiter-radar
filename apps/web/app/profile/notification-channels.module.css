@@ -85,6 +85,9 @@
   padding: 14px 12px;
   cursor: pointer;
   list-style: none;
+  transition:
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .addCard summary::-webkit-details-marker {
@@ -202,6 +205,10 @@
   font-weight: 650;
   text-decoration: none;
   cursor: pointer;
+  transition:
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .submit,
@@ -385,6 +392,25 @@
 .secondaryLink:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .addCard:not([open]) summary:hover,
+  .secondaryButton:hover,
+  .secondaryLink:hover {
+    background: var(--color-surface-selected);
+  }
+
+  .submit:hover,
+  .primaryLink:hover {
+    border-color: var(--color-signal-hover);
+    background: var(--color-signal-hover);
+  }
+
+  .dangerButton:hover {
+    border-color: var(--color-destructive);
+    background: color-mix(in srgb, var(--color-destructive) 8%, transparent);
+  }
 }
 
 @media (max-width: 920px) {
