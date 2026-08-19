@@ -6,10 +6,11 @@ on:
     - cron: '15 1 * * 0'
     - cron: '15 2 * * 0'
     - cron: '15 3 * * 0'
+    - cron: '30 4 18 * *'
   workflow_dispatch:
     inputs:
       source:
-        description: Government snapshot source to sync
+        description: Government/public snapshot source to sync
         required: true
         type: choice
         options:
@@ -17,6 +18,7 @@ on:
           - rosstat-open-data
           - fns-open-data
           - rospatent-open-data
+          - fedresurs
 
 permissions:
   contents: read
@@ -46,6 +48,7 @@ jobs:
               '15 1 * * 0') source_id='rosstat-open-data' ;;
               '15 2 * * 0') source_id='fns-open-data' ;;
               '15 3 * * 0') source_id='rospatent-open-data' ;;
+              '30 4 18 * *') source_id='fedresurs' ;;
               *) echo "Unknown schedule: $EVENT_SCHEDULE" >&2; exit 64 ;;
             esac
           fi
@@ -65,7 +68,7 @@ jobs:
         run: |
           set -euo pipefail
           case "$SOURCE_ID" in
-            fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data) ;;
+            fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data|fedresurs) ;;
             *) echo 'Resolved source is not allowlisted.' >&2; exit 64 ;;
           esac
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
@@ -74,7 +77,7 @@ jobs:
             "SOURCE_ID='$SOURCE_ID' bash -s" <<'SSH_EOF'
           set -euo pipefail
           case "$SOURCE_ID" in
-            fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data) ;;
+            fns-open-data|government-procurement|rosstat-open-data|rospatent-open-data|fedresurs) ;;
             *) exit 64 ;;
           esac
           /opt/recruiter-radar/scripts/deploy/run-government-source-sync.sh "$SOURCE_ID"

@@ -44,6 +44,7 @@ const governmentSyncScripts = [
   'sync-government-procurement-snapshot.mjs',
   'sync-rosstat-open-data-snapshot.mjs',
   'sync-rospatent-open-data-snapshot.mjs',
+  'sync-fedresurs-snapshot.mjs',
 ];
 
 const requiredMigrationFiles = [
@@ -83,6 +84,7 @@ async function verifyFilesystem() {
     check: 'filesystem',
     sources: sourceScripts.length,
     runtimeSupportScripts: runtimeSupportScripts.length,
+    governmentSyncScripts: governmentSyncScripts.length,
     status: 'passed',
   }));
 }
