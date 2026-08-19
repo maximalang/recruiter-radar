@@ -62,14 +62,6 @@
   line-height: 1.5;
 }
 
-.funnel > .funnelEmpty {
-  max-width: 66ch;
-  padding: 14px 0 16px;
-  color: var(--color-text-secondary);
-  font-size: var(--type-metadata-size);
-  line-height: var(--type-metadata-line);
-}
-
 .funnelStages {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
