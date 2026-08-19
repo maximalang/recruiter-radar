@@ -185,7 +185,7 @@ async function readBoundedBody(
       if (done) break;
       totalBytes += value.byteLength;
       if (totalBytes > maximumBytes) {
-        await reader.cancel("payload_too_large");
+        await reader.cancel("payload_too_large").catch(() => undefined);
         return null;
       }
       chunks.push(value);
