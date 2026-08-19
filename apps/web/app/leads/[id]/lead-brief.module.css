@@ -216,7 +216,8 @@
   top: 24px;
   display: grid;
   gap: 0;
-  padding-left: 24px;
+  padding: 16px 0 0 18px;
+  border-top: 2px solid var(--color-data-signal);
   border-left: 1px solid var(--color-separator);
 }
 
@@ -309,8 +310,8 @@
       "evidence"
       "confidence"
       "next"
-      "provenance"
       "action"
+      "provenance"
       "main";
     gap: 24px;
   }
@@ -325,8 +326,8 @@
 
   .rail {
     position: static;
-    padding: 24px 0 0;
-    border-top: 1px solid var(--color-separator);
+    padding: 16px 0 0;
+    border-top: 2px solid var(--color-data-signal);
     border-left: 0;
   }
 }
@@ -355,6 +356,6 @@
   }
 
   .rail {
-    padding-top: 20px;
+    padding-top: 16px;
   }
 }

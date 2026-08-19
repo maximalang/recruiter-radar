@@ -3,6 +3,12 @@ import type { OutcomeFunnelSummary } from '@/lib/opportunities/outcome-repositor
 import styles from './opportunity-funnel.module.css'
 
 export function OpportunityFunnel(props: { summary: OutcomeFunnelSummary }) {
+  const hasCommercialData =
+    props.summary.cohort.size > 0 ||
+    props.summary.effectiveActivityCounts.some((item) =>
+      item.eventCount > 0 || item.opportunityCount > 0) ||
+    props.summary.terminalOutcomes.completed > 0
+
   return (
     <section className={styles.funnel} aria-labelledby="outcome-funnel-title">
       <div className={styles.funnelHeading}>
@@ -17,83 +23,90 @@ export function OpportunityFunnel(props: { summary: OutcomeFunnelSummary }) {
           {props.summary.cohort.size} компаний
         </small>
       </div>
-      <p>
-        Наблюдение: {props.summary.cohort.observationWindowDays} дн. ·{' '}
-        {props.summary.cohort.matured
-          ? 'Когорта зрелая'
-          : 'Незрелая когорта'}
-      </p>
-      <div className={styles.funnelStages}>
-        {props.summary.cohortCounts.map((stage) => (
-          <div key={stage.eventType}>
-            <span>{stage.label}</span>
-            <strong>{stage.count}</strong>
+      {hasCommercialData ? (
+        <>
+          <p>
+            Наблюдение: {props.summary.cohort.observationWindowDays} дн. ·{' '}
+            {props.summary.cohort.matured
+              ? 'Когорта зрелая'
+              : 'Незрелая когорта'}
+          </p>
+          <div className={styles.funnelStages}>
+            {props.summary.cohortCounts.map((stage) => (
+              <div key={stage.eventType}>
+                <span>{stage.label}</span>
+                <strong>{stage.count}</strong>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <p>
-        Активность за период:{' '}
-        {props.summary.effectiveActivityCounts.map((item) =>
-          `${item.label} ${item.eventCount} ${plural(
-            item.eventCount,
-            'раз',
-            'раза',
-            'раз',
-          )} · ${item.opportunityCount} ${plural(
-            item.opportunityCount,
-            'ситуация',
-            'ситуации',
-            'ситуаций',
-          )}`).join(' · ') ||
-          'событий нет'}
-      </p>
-      <div className={styles.funnelConversions}>
-        {props.summary.conversions.map((conversion) => (
-          <div key={`${conversion.from}:${conversion.to}`}>
-            <span>
-              {label(props.summary, conversion.from)} →{' '}
-              {label(props.summary, conversion.to)}
-            </span>
-            {conversion.sampleStatus === 'ready' &&
-            conversion.rate !== null ? (
-              <strong>{Math.round(conversion.rate * 100)}%</strong>
-            ) : (
-              <strong>Недостаточно данных</strong>
-            )}
-            <small>
-              {conversion.converted} из {conversion.sampleSize}
-              {conversion.maturityStatus === 'immature'
-                ? ' · незрелая когорта'
-                : ''}
-              {conversion.medianHours !== null
-                ? ` · медиана ${formatHours(conversion.medianHours)}`
-                : ''}
-            </small>
+          <p>
+            Активность за период:{' '}
+            {props.summary.effectiveActivityCounts.map((item) =>
+              `${item.label} ${item.eventCount} ${plural(
+                item.eventCount,
+                'раз',
+                'раза',
+                'раз',
+              )} · ${item.opportunityCount} ${plural(
+                item.opportunityCount,
+                'ситуация',
+                'ситуации',
+                'ситуаций',
+              )}`).join(' · ') ||
+              'событий нет'}
+          </p>
+          <div className={styles.funnelConversions}>
+            {props.summary.conversions.map((conversion) => (
+              <div key={`${conversion.from}:${conversion.to}`}>
+                <span>
+                  {label(props.summary, conversion.from)} →{' '}
+                  {label(props.summary, conversion.to)}
+                </span>
+                {conversion.sampleStatus === 'ready' &&
+                conversion.rate !== null ? (
+                  <strong>{Math.round(conversion.rate * 100)}%</strong>
+                ) : (
+                  <strong>Недостаточно данных</strong>
+                )}
+                <small>
+                  {conversion.converted} из {conversion.sampleSize}
+                  {conversion.maturityStatus === 'immature'
+                    ? ' · незрелая когорта'
+                    : ''}
+                  {conversion.medianHours !== null
+                    ? ` · медиана ${formatHours(conversion.medianHours)}`
+                    : ''}
+                </small>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div className={styles.funnelConversions}>
-        <div>
-          <span>Завершённые циклы: выиграно / потеряно</span>
-          {props.summary.terminalOutcomes.status === 'ready' &&
-          props.summary.terminalOutcomes.winRate !== null ? (
-            <strong>
-              {Math.round(props.summary.terminalOutcomes.winRate * 100)}% побед
-            </strong>
-          ) : (
-            <strong>Недостаточно данных</strong>
-          )}
-          <small>
-            {props.summary.terminalOutcomes.won} /{' '}
-            {props.summary.terminalOutcomes.lost} из{' '}
-            {props.summary.terminalOutcomes.completed} завершённых
-          </small>
-          <small>
-            Denominator: effective won + effective lost; отменённые исходы
-            исключены.
-          </small>
-        </div>
-      </div>
+          <div className={styles.funnelConversions}>
+            <div>
+              <span>Завершённые циклы: выиграно / потеряно</span>
+              {props.summary.terminalOutcomes.status === 'ready' &&
+              props.summary.terminalOutcomes.winRate !== null ? (
+                <strong>
+                  {Math.round(props.summary.terminalOutcomes.winRate * 100)}% побед
+                </strong>
+              ) : (
+                <strong>Недостаточно данных</strong>
+              )}
+              <small>
+                {props.summary.terminalOutcomes.won} /{' '}
+                {props.summary.terminalOutcomes.lost} из{' '}
+                {props.summary.terminalOutcomes.completed} завершённых
+              </small>
+              <small>
+                Считаются только эффективные выигрыши и потери; отменённые исходы исключены.
+              </small>
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className={styles.funnelEmpty}>
+          Конверсии и зрелость появятся после первых зафиксированных коммерческих действий.
+        </p>
+      )}
     </section>
   )
 }
