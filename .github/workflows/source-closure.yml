@@ -1,0 +1,41 @@
+name: Source Closure Contracts
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-closure-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-closure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate production source secret configurators
+        run: |
+          bash -n scripts/deploy/configure-hh-runtime.sh
+          bash -n scripts/deploy/configure-youtube-runtime.sh
+      - name: Verify GDELT transport and FNS projection contracts
+        run: |
+          node --test packages/db/scripts/adapters/gdelt-doc-client.test.mjs
+          node --test packages/db/scripts/source-transparent-business-fns.test.mjs
+          node packages/db/scripts/verify-funding-business-signals-smoke.mjs
+          node packages/db/scripts/verify-rf-source-expansion-smoke.mjs
+      - name: Verify source activation contracts
+        run: npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath src/__tests__/lib/sources/source-activation.test.ts
+      - name: Verify readiness metadata contracts
+        run: npm run verify:sources:readiness
