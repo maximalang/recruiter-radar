@@ -1,4 +1,5 @@
 import sourceReadinessContract from '../source-readiness.json' with { type: 'json' };
+import sourceCredentialsContract from '../source-credentials.json' with { type: 'json' };
 
 const IMPLEMENTATION_STATES = new Set(['implemented']);
 const TEST_STATES = new Set(['tested', 'not-applicable']);
@@ -35,8 +36,9 @@ export function listEvaluatedSourceReadiness(env = process.env, now = new Date()
 }
 
 export function evaluateSourceReadiness(id, source, pipelineProfiles, env = process.env, now = new Date()) {
+  const acceptedEnvSets = resolveAcceptedEnvSets(id, source);
   const configured = source.configuration.mode === 'not-required'
-    || source.configuration.acceptedEnvSets.some((envSet) => envSet.every((name) => hasEnvValue(env, name)));
+    || acceptedEnvSets.some((envSet) => envSet.every((name) => hasEnvValue(env, name)));
   const liveReachable = source.live.state === 'reachable' || source.live.state === 'verified';
   const historicalLiveVerified = source.live.state === 'verified'
     && typeof source.live.verifiedAt === 'string'
@@ -87,7 +89,7 @@ export function evaluateSourceReadiness(id, source, pipelineProfiles, env = proc
     contractTested: source.contract === 'tested',
     configured,
     configurationMode: source.configuration.mode,
-    acceptedEnvSets: source.configuration.acceptedEnvSets.map((envSet) => [...envSet]),
+    acceptedEnvSets,
     liveState: source.live.state,
     liveReachable,
     liveVerified,
@@ -187,6 +189,26 @@ export function validateSourceReadinessContract(contract) {
   }
 
   return true;
+}
+
+function resolveAcceptedEnvSets(id, source) {
+  const readinessSets = source.configuration.acceptedEnvSets ?? [];
+  const credentialSets = sourceCredentialsContract.sources?.[id]?.credentialSets ?? [];
+  const combined = [
+    ...readinessSets,
+    ...credentialSets.map((item) => item?.names).filter(Array.isArray),
+  ];
+  const seen = new Set();
+  const result = [];
+  for (const envSet of combined) {
+    const normalized = [...new Set(envSet.map((name) => String(name).trim()).filter(Boolean))];
+    if (normalized.length === 0) continue;
+    const key = [...normalized].sort().join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(normalized);
+  }
+  return result;
 }
 
 function resolveFinalState({ source, configured, liveVerified, providerRequired, registrationRequired }) {
