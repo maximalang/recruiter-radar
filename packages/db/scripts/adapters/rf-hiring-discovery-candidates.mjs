@@ -10,26 +10,35 @@ export function buildRfHiringDiscoveryCandidate({ family, posting, vacancyUrl, d
   if (!canonicalVacancyUrl) return null;
 
   const externalVacancyId = nonEmptyText(posting?.externalId);
-  const employerLink = classifyEmployerLink(posting?.employerUrl, family?.platformDomains ?? []);
-  const employerProfileUrl = employerLink.kind === 'platform-profile' ? employerLink.url : null;
-  const employerWebsiteUrl = employerLink.kind === 'employer-website' ? employerLink.url : null;
+  const publisherType = normalizePublisherType(posting?.publisherType);
+  const publisherName = nonEmptyText(posting?.employerName);
+  const publisherLink = classifyEmployerLink(posting?.employerUrl, family?.platformDomains ?? []);
+  const publisherOnly = publisherType === 'agency';
+  const employerProfileUrl = !publisherOnly && publisherLink.kind === 'platform-profile' ? publisherLink.url : null;
+  const employerWebsiteUrl = !publisherOnly && publisherLink.kind === 'employer-website' ? publisherLink.url : null;
+  const employerName = publisherOnly ? null : publisherName;
+  const publisherProfileUrl = publisherOnly && publisherLink.kind === 'platform-profile' ? publisherLink.url : null;
+  const publisherWebsiteUrl = publisherOnly && publisherLink.kind === 'employer-website' ? publisherLink.url : null;
   const strongIdentityKeys = [];
-  if (employerWebsiteUrl) {
+
+  if (!publisherOnly && employerWebsiteUrl) {
     const domain = new URL(employerWebsiteUrl).hostname.toLowerCase().replace(/^www\./, '');
     const identity = classifyStrongIdentityKey(`domain:${domain}`);
     if (identity) strongIdentityKeys.push(identity.key);
   }
-  for (const [prefix, raw] of [
-    ['inn', posting?.employerInn],
-    ['ogrn', posting?.employerOgrn],
-  ]) {
-    const text = nonEmptyText(raw);
-    const identity = text ? classifyStrongIdentityKey(`${prefix}:${text.replace(/\D/g, '')}`) : null;
-    if (identity) strongIdentityKeys.push(identity.key);
-  }
-  for (const rawKey of posting?.strongIdentityKeys ?? []) {
-    const identity = classifyStrongIdentityKey(rawKey);
-    if (identity) strongIdentityKeys.push(identity.key);
+  if (!publisherOnly) {
+    for (const [prefix, raw] of [
+      ['inn', posting?.employerInn],
+      ['ogrn', posting?.employerOgrn],
+    ]) {
+      const text = nonEmptyText(raw);
+      const identity = text ? classifyStrongIdentityKey(`${prefix}:${text.replace(/\D/g, '')}`) : null;
+      if (identity) strongIdentityKeys.push(identity.key);
+    }
+    for (const rawKey of posting?.strongIdentityKeys ?? []) {
+      const identity = classifyStrongIdentityKey(rawKey);
+      if (identity) strongIdentityKeys.push(identity.key);
+    }
   }
 
   const vacancyKey = externalVacancyId
@@ -40,11 +49,15 @@ export function buildRfHiringDiscoveryCandidate({ family, posting, vacancyUrl, d
     vacancy_url: canonicalVacancyUrl,
     external_vacancy_id: externalVacancyId,
     job_title: nonEmptyText(posting?.title),
-    employer_name: nonEmptyText(posting?.employerName),
+    employer_name: employerName,
     employer_profile_url: employerProfileUrl,
     employer_website_url: employerWebsiteUrl,
-    employer_inn: nonEmptyText(posting?.employerInn),
-    employer_ogrn: nonEmptyText(posting?.employerOgrn),
+    employer_inn: publisherOnly ? null : nonEmptyText(posting?.employerInn),
+    employer_ogrn: publisherOnly ? null : nonEmptyText(posting?.employerOgrn),
+    publisher_type: publisherType,
+    publisher_name: publisherName,
+    publisher_profile_url: publisherProfileUrl,
+    publisher_website_url: publisherWebsiteUrl,
     location: nonEmptyText(posting?.location),
     employment_type: Array.isArray(posting?.employmentType) ? posting.employmentType : [],
     published_at: normalizeDate(posting?.datePosted),
@@ -58,9 +71,10 @@ export function buildRfHiringDiscoveryCandidate({ family, posting, vacancyUrl, d
     externalVacancyId,
     vacancyUrl: canonicalVacancyUrl,
     jobTitle: payload.job_title,
-    employerName: payload.employer_name,
+    employerName,
     employerProfileUrl,
     employerWebsiteUrl,
+    publisherType,
     location: payload.location,
     publishedAt: payload.published_at,
     detectedAt: normalizeDate(detectedAt) ?? new Date().toISOString(),
@@ -225,6 +239,14 @@ function classifyEmployerLink(value, platformDomains) {
   return platform
     ? { kind: 'platform-profile', url }
     : { kind: 'employer-website', url };
+}
+
+function normalizePublisherType(value) {
+  const type = nonEmptyText(value)?.toLowerCase();
+  if (!type) return 'unknown';
+  if (['agency', 'staffing-agency', 'recruiting-agency', 'hr-agency'].includes(type)) return 'agency';
+  if (['direct-employer', 'employer', 'company'].includes(type)) return 'direct-employer';
+  return 'unknown';
 }
 
 function canonicalHttpsUrl(value) {
