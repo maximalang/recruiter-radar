@@ -55,7 +55,7 @@ function summaryWithActivity(
 }
 
 describe('OpportunityFunnel', () => {
-  it('keeps observational-only activity compact', () => {
+  it('keeps observational-only activity compact and secondary', () => {
     render(<OpportunityFunnel summary={summaryWithActivity([
       {
         eventType: 'shown',
@@ -72,8 +72,9 @@ describe('OpportunityFunnel', () => {
     ])} />)
 
     expect(screen.getByText(
-      'Конверсии появятся после первого коммерческого действия по ситуации.',
+      'Воронка конверсий появится после первого коммерческого действия по ситуации.',
     )).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Коммерческие результаты' })).toBeNull()
     expect(screen.queryByText('Недостаточно данных')).toBeNull()
     expect(screen.queryByText('Активность за период:', { exact: false })).toBeNull()
   })
@@ -100,6 +101,8 @@ describe('OpportunityFunnel', () => {
       },
     ])} />)
 
+    expect(screen.getByRole('heading', { name: 'Коммерческие результаты' }))
+      .toBeInTheDocument()
     expect(screen.getByText('Показано')).toBeInTheDocument()
     expect(screen.getByText('4')).toBeInTheDocument()
     expect(screen.getAllByText('Недостаточно данных')).toHaveLength(2)
