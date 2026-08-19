@@ -85,6 +85,35 @@ main[data-ui-system] :where([id]) {
   scroll-margin-top: 104px;
 }
 
+/* Shared internal navigation follows the same focus, motion, and selected-surface
+   semantics as the rest of the workspace instead of inheriting legacy link states. */
+[data-product-workspace="true"] :is(
+  a[class*="topNavBrand"],
+  a[class*="topNavLink"],
+  a[class*="internalPageBackLink"],
+  a[class*="navLink"]
+) {
+  transition:
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard);
+}
+
+[data-product-workspace="true"] :is(
+  a[class*="topNavBrand"],
+  a[class*="topNavLink"],
+  a[class*="internalPageBackLink"],
+  a[class*="navLink"]
+):focus-visible {
+  outline-color: var(--color-focus);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-product-workspace="true"] a[class*="topNavLink"]:not([data-active="true"]):hover {
+    background-color: var(--color-surface-selected);
+  }
+}
+
 @media (max-width: 640px) {
   :where(input, select, textarea) {
     font-size: 16px;
@@ -110,6 +139,11 @@ main[data-ui-system] :where([id]) {
     a
   ):hover {
     transform: none;
+  }
+
+  [data-product-workspace="true"] a[class*="topNavLink"]:not([data-active="true"]):hover {
+    background-color: transparent;
+    color: var(--color-text-tertiary);
   }
 }
 
