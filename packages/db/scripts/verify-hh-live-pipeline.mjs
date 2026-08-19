@@ -23,12 +23,16 @@ if (process.env.SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK !== 'isolated') {
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const hhUserAgent = process.env.HH_USER_AGENT?.trim();
+const hhAccessToken = process.env.HH_ACCESS_TOKEN?.trim();
 const hhClientId = process.env.HH_CLIENT_ID?.trim();
 const hhClientSecret = process.env.HH_CLIENT_SECRET?.trim();
 assert.ok(databaseUrl, 'DATABASE_URL is required.');
 assert.ok(hhUserAgent, 'HH_USER_AGENT is required.');
-assert.ok(hhClientId, 'credential-not-supplied: HH_CLIENT_ID is required.');
-assert.ok(hhClientSecret, 'credential-not-supplied: HH_CLIENT_SECRET is required.');
+assert.equal(Boolean(hhClientId), Boolean(hhClientSecret), 'HH_CLIENT_ID and HH_CLIENT_SECRET must be configured together.');
+assert.ok(
+  hhAccessToken || (hhClientId && hhClientSecret),
+  'credential-not-supplied: configure HH_ACCESS_TOKEN or HH_CLIENT_ID + HH_CLIENT_SECRET.',
+);
 
 const client = new Client({ connectionString: databaseUrl });
 await client.connect();

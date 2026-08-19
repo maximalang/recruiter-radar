@@ -15,7 +15,20 @@ export class HhOAuthError extends Error {
   }
 }
 
+/**
+ * Resolve application authorization for HH API requests.
+ *
+ * HH documents application access tokens as long-lived credentials that should
+ * normally be generated once. Production may therefore provide HH_ACCESS_TOKEN
+ * directly. HH_CLIENT_ID + HH_CLIENT_SECRET remain supported as the bootstrap
+ * mode for obtaining an application token when no explicit token is configured.
+ */
 export async function resolveHhApplicationAuthorization(env = process.env, options = {}) {
+  const configuredAccessToken = toText(env.HH_ACCESS_TOKEN);
+  if (configuredAccessToken && options.ignoreConfiguredAccessToken !== true) {
+    return `Bearer ${configuredAccessToken}`;
+  }
+
   const clientId = toText(env.HH_CLIENT_ID);
   const clientSecret = toText(env.HH_CLIENT_SECRET);
 
@@ -54,6 +67,10 @@ export async function resolveHhApplicationAuthorization(env = process.env, optio
   } finally {
     pendingToken = null;
   }
+}
+
+export function hasHhApplicationClientCredentials(env = process.env) {
+  return Boolean(toText(env.HH_CLIENT_ID) && toText(env.HH_CLIENT_SECRET));
 }
 
 export function resetHhApplicationTokenCache() {
@@ -107,8 +124,8 @@ async function requestApplicationToken({ clientId, clientSecret, userAgent, fetc
   const expiresIn = Number(payload.expires_in);
   // HH application tokens have unlimited lifetime when `expires_in` is absent.
   // Re-requesting one revokes the previous token and is rate-limited, so keep it
-  // until HH explicitly rejects it with 401. Expiring token responses still use
-  // their advertised TTL and the normal refresh skew.
+  // until HH explicitly rejects it with an authorization error. Expiring token
+  // responses still use their advertised TTL and the normal refresh skew.
   // Source: https://github.com/hhru/api/blob/master/docs/authorization_for_application.md
   const expiresAt = Number.isFinite(expiresIn) && expiresIn > 0
     ? now + expiresIn * 1000
