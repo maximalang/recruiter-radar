@@ -1,12 +1,25 @@
 import type { OutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
+import {
+  isCommercialOutcomeEvent,
+  isOutcomeEventType,
+} from '@/lib/opportunities/outcome-domain'
 
 import styles from './opportunity-funnel.module.css'
 
+const COMMERCIAL_LIFECYCLE_EVENTS = new Set([
+  'meeting_completed',
+  'meeting_cancelled',
+  'meeting_no_show',
+])
+
 export function OpportunityFunnel(props: { summary: OutcomeFunnelSummary }) {
   const hasCommercialData =
-    props.summary.cohort.size > 0 ||
-    props.summary.effectiveActivityCounts.some((item) =>
-      item.eventCount > 0 || item.opportunityCount > 0) ||
+    props.summary.effectiveActivityCounts.some((item) => {
+      if (item.eventCount <= 0 && item.opportunityCount <= 0) return false
+      if (!isOutcomeEventType(item.eventType)) return false
+      return isCommercialOutcomeEvent(item.eventType) ||
+        COMMERCIAL_LIFECYCLE_EVENTS.has(item.eventType)
+    }) ||
     props.summary.terminalOutcomes.completed > 0
 
   return (
@@ -104,7 +117,7 @@ export function OpportunityFunnel(props: { summary: OutcomeFunnelSummary }) {
         </>
       ) : (
         <p className={styles.funnelEmpty}>
-          Конверсии и зрелость появятся после первых зафиксированных коммерческих действий.
+          Конверсии появятся после первого коммерческого действия по ситуации.
         </p>
       )}
     </section>
