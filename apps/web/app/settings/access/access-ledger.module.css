@@ -88,9 +88,11 @@
   text-decoration: none;
 }
 
-.primaryAction:hover {
-  border-color: var(--color-signal-hover);
-  background: var(--color-signal-hover);
+@media (hover: hover) and (pointer: fine) {
+  .primaryAction:hover {
+    border-color: var(--color-signal-hover);
+    background: var(--color-signal-hover);
+  }
 }
 
 .primaryAction:focus-visible {

@@ -71,9 +71,11 @@ body {
   box-shadow: none;
 }
 
-:is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(button[type="submit"], input[type="submit"]):hover {
-  border-color: var(--color-signal-hover);
-  background: var(--color-signal-hover);
+@media (hover: hover) and (pointer: fine) {
+  :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(button[type="submit"], input[type="submit"]):hover {
+    border-color: var(--color-signal-hover);
+    background: var(--color-signal-hover);
+  }
 }
 
 [data-product-workspace="true"] main :where(h1, h2, h3) {
@@ -120,10 +122,12 @@ body {
     color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-[data-product-workspace="true"] [data-ui="workspace-header"] nav > a:not([class]):hover {
-  border-color: var(--color-signal);
-  background: var(--color-signal-soft);
-  color: var(--color-text-primary);
+@media (hover: hover) and (pointer: fine) {
+  [data-product-workspace="true"] [data-ui="workspace-header"] nav > a:not([class]):hover {
+    border-color: var(--color-signal);
+    background: var(--color-signal-soft);
+    color: var(--color-text-primary);
+  }
 }
 
 [data-product-workspace="true"] [data-ui="workspace-header"] nav > a:not([class]):focus-visible {

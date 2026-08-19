@@ -69,8 +69,10 @@
   text-decoration: none;
 }
 
-.todayLane:hover {
-  background: color-mix(in srgb, var(--color-surface-secondary) 60%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .todayLane:hover {
+    background: color-mix(in srgb, var(--color-surface-secondary) 60%, transparent);
+  }
 }
 
 .todayLane:focus-visible {

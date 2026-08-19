@@ -77,12 +77,22 @@
   color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
 }
 
-.primaryButton:hover,
+@media (hover: hover) and (pointer: fine) {
+  .primaryButton:hover {
+    background: var(--color-signal);
+  }
+
+  .secondaryButton:hover {
+    border-color: color-mix(in srgb, var(--color-signal) 62%, transparent);
+    color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
+    opacity: 1;
+  }
+}
+
 .primaryButton:focus-visible {
   background: var(--color-signal);
 }
 
-.secondaryButton:hover,
 .secondaryButton:focus-visible {
   border-color: color-mix(in srgb, var(--color-signal) 62%, transparent);
   color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));

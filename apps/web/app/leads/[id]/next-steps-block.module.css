@@ -49,10 +49,12 @@
   font-weight: 600;
 }
 
-.nextStepsLink:hover,
-.nextStepsBtn:hover {
-  border-color: var(--color-signal);
-  color: var(--color-signal);
+@media (hover: hover) and (pointer: fine) {
+  .nextStepsLink:hover,
+  .nextStepsBtn:hover {
+    border-color: var(--color-signal);
+    color: var(--color-signal);
+  }
 }
 
 .nextStepsLink:focus-visible,

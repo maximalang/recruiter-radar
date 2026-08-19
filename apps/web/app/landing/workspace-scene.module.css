@@ -156,7 +156,13 @@
   color: var(--color-text-primary);
 }
 
-.presets a:hover,
+@media (hover: hover) and (pointer: fine) {
+  .presets a:hover {
+    border-bottom-color: color-mix(in srgb, var(--color-signal) 46%, transparent);
+    color: var(--color-text-primary);
+  }
+}
+
 .presets a:focus-visible {
   border-bottom-color: color-mix(in srgb, var(--color-signal) 46%, transparent);
   color: var(--color-text-primary);
@@ -186,8 +192,10 @@
     background-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.commandForm input:hover {
-  border-color: color-mix(in srgb, var(--color-signal) 36%, var(--color-separator-strong));
+@media (hover: hover) and (pointer: fine) {
+  .commandForm input:hover {
+    border-color: color-mix(in srgb, var(--color-signal) 36%, var(--color-separator-strong));
+  }
 }
 
 .commandForm input:focus {
@@ -209,9 +217,11 @@
     transform var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.commandForm button:hover {
-  background: var(--color-signal-hover);
-  box-shadow: none;
+@media (hover: hover) and (pointer: fine) {
+  .commandForm button:hover {
+    background: var(--color-signal-hover);
+    box-shadow: none;
+  }
 }
 
 .commandForm button:active {
@@ -270,8 +280,10 @@
     background-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.lead:not(.leadPrimary) .leadRow:hover {
-  background: var(--color-surface-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .lead:not(.leadPrimary) .leadRow:hover {
+    background: var(--color-surface-secondary);
+  }
 }
 
 .leadPrimary .leadRow {
@@ -424,10 +436,12 @@
   font-weight: 600;
 }
 
-.checkout:hover {
-  background: transparent;
-  color: var(--color-text-primary);
-  box-shadow: none;
+@media (hover: hover) and (pointer: fine) {
+  .checkout:hover {
+    background: transparent;
+    color: var(--color-text-primary);
+    box-shadow: none;
+  }
 }
 
 .footerRail small {
