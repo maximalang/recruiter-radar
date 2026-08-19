@@ -10,8 +10,8 @@ const mockIngestSource = jest.fn().mockResolvedValue({
 const mockIngestAllPrimarySources = jest.fn().mockResolvedValue([])
 
 jest.mock('@/lib/lead-discovery/source-ingest', () => ({
-  ingestSource: mockIngestSource,
-  ingestAllPrimarySources: mockIngestAllPrimarySources,
+  ingestSource: (...args: unknown[]) => mockIngestSource(...args),
+  ingestAllPrimarySources: (...args: unknown[]) => mockIngestAllPrimarySources(...args),
   isNoActiveProfiles: jest.fn().mockReturnValue(false),
 }))
 
