@@ -1,3 +1,6 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 import type { OpportunityView } from '@/lib/opportunities/repository'
@@ -14,7 +17,12 @@ type ResearchModeProps = {
 export function OpportunityResearchMode(props: ResearchModeProps & {
   children?: React.ReactNode
 }) {
-  const disclosureOpen = Boolean(props.query || props.confidenceGate)
+  const hasExplicitCriteria = Boolean(props.query || props.confidenceGate)
+  const [mobileOpen, setMobileOpen] = useState(hasExplicitCriteria)
+
+  useEffect(() => {
+    setMobileOpen(Boolean(props.query || props.confidenceGate))
+  }, [props.view, props.query, props.confidenceGate])
 
   return (
     <section
@@ -22,18 +30,27 @@ export function OpportunityResearchMode(props: ResearchModeProps & {
       aria-label="Поиск и фильтры ситуаций"
     >
       <div className={styles.researchBody}>
-        <details
-          className={disclosureStyles.researchDisclosure}
-          open={disclosureOpen || undefined}
+        <button
+          type="button"
+          className={disclosureStyles.mobileToggle}
+          aria-expanded={mobileOpen}
+          aria-controls="situation-research-controls"
+          onClick={() => setMobileOpen((open) => !open)}
         >
-          <summary>
-            <span>Поиск и фильтры</span>
-            <small>{viewLabel(props.view)}</small>
-          </summary>
-          <div className={disclosureStyles.researchControls}>
-            <ResearchControls {...props} />
-          </div>
-        </details>
+          <span>Поиск и фильтры</span>
+          <small>{viewLabel(props.view)}</small>
+          <span className={disclosureStyles.toggleMark} aria-hidden="true">
+            {mobileOpen ? '−' : '+'}
+          </span>
+        </button>
+
+        <div
+          id="situation-research-controls"
+          className={disclosureStyles.researchControls}
+          data-mobile-open={mobileOpen ? 'true' : 'false'}
+        >
+          <ResearchControls {...props} />
+        </div>
 
         {props.children}
       </div>
