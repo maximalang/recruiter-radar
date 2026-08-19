@@ -76,7 +76,10 @@ test('RF benchmark evaluates the V2 Definition of Done as measurable gates', () 
       : null,
   }));
   const attributionAudits = Array.from({ length: 200 }, (_, index) => ({ wrongCompany: index === 0 }));
-  const demandRows = Array.from({ length: 100 }, (_, index) => ({ canonicalDemandId: index === 99 ? 'demand-99' : `demand-${index + 1}` }));
+  const demandAudits = Array.from({ length: 100 }, (_, index) => ({
+    groundTruthDemandId: `demand-${index + 1}`,
+    observedCanonicalDemandIds: index === 99 ? ['canonical-99a', 'canonical-99b'] : [`canonical-${index + 1}`],
+  }));
   const priorityOpportunities = Array.from({ length: 100 }, (_, index) => ({
     directEvidence: index < 70,
     independentCorroboration: index >= 70 && index < 92,
@@ -85,7 +88,7 @@ test('RF benchmark evaluates the V2 Definition of Done as measurable gates', () 
   const report = evaluateRfCoverageBenchmark({
     benchmarkCompanies,
     attributionAudits,
-    demandRows,
+    demandAudits,
     priorityOpportunities,
   });
 
@@ -94,5 +97,20 @@ test('RF benchmark evaluates the V2 Definition of Done as measurable gates', () 
   assert.equal(report.metrics.wrongCompanyAttributionRate, 0.005);
   assert.equal(report.metrics.duplicateHiringDemandRate, 0.01);
   assert.equal(report.metrics.priorityCorroborationRate, 0.92);
+  assert.equal(report.population.splitDemands, 1);
+  assert.equal(report.pass, true);
+});
+
+test('cross-post publications collapsed into one canonical demand are not duplicates', () => {
+  const report = evaluateRfCoverageBenchmark({
+    benchmarkCompanies: [{ id: '1', hiringActive: true, evidenceAppearedAt: '2026-08-18T00:00:00Z', detectedAt: '2026-08-18T01:00:00Z' }],
+    attributionAudits: [{ wrongCompany: false }],
+    demandAudits: [{
+      groundTruthDemandId: 'real-demand-1',
+      observedCanonicalDemandIds: ['canonical-1', 'canonical-1', 'canonical-1'],
+    }],
+    priorityOpportunities: [{ directEvidence: true, independentCorroboration: false }],
+  });
+  assert.equal(report.metrics.duplicateHiringDemandRate, 0);
   assert.equal(report.pass, true);
 });
