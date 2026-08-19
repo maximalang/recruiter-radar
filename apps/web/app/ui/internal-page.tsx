@@ -1,6 +1,5 @@
 import type { ReactNode, ReactElement, SVGProps } from "react";
 import Link from "next/link";
-import { BrandLogo } from "./brand-logo";
 import { ProductWorkspaceFrame } from "./product-workspace";
 import { WorkspaceHeader } from "./intelligence-primitives";
 
@@ -53,21 +52,6 @@ export function FitIcon({ name, ...rest }: { name: string } & SVGProps<SVGSVGEle
 }
 
 export type NavItem = { href: string; label: string; active?: boolean };
-
-export function TopNav(props: { items: NavItem[] }) {
-  return (
-    <nav className={s.topNav} aria-label="Основная навигация">
-      <div className={s.topNavInner}>
-        <Link href="/" className={s.topNavBrand}><BrandLogo size="small" /></Link>
-        <div className={s.topNavLinks}>
-          {props.items.map((item) => (
-            <Link key={item.href} href={item.href} className={s.topNavLink} data-active={item.active ? "true" : undefined} aria-current={item.active ? "page" : undefined}>{item.label}</Link>
-          ))}
-        </div>
-      </div>
-    </nav>
-  );
-}
 
 export function InternalPageFrame(props: { children: ReactNode; className?: string; navItems?: NavItem[] }) {
   if (props.navItems) {
