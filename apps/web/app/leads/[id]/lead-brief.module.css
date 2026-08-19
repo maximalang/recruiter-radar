@@ -265,11 +265,6 @@
   text-decoration: none;
 }
 
-.contactValue:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 .metaList {
   display: grid;
   gap: 7px;
@@ -280,10 +275,6 @@
 .metaList a {
   color: var(--color-signal-hover);
   text-decoration: none;
-}
-
-.metaList a:hover {
-  text-decoration: underline;
 }
 
 .identifier {
@@ -298,6 +289,17 @@
   color: var(--color-text-secondary);
   font-size: .875rem;
   line-height: 1.5;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .contactValue:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .metaList a:hover {
+    text-decoration: underline;
+  }
 }
 
 @media (max-width: 1000px) {
