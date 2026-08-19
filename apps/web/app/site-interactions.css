@@ -108,6 +108,31 @@ main[data-ui-system] :where([id]) {
   outline-color: var(--color-focus);
 }
 
+/* Public/legal documents share the product interaction contract even though their
+   visual layer predates the canonical motion and focus tokens. */
+main[data-ui-system] :is(
+  a[class*="docNavLink"],
+  a[class*="docNavAction"],
+  a[class*="docLink"]
+) {
+  transition-duration: var(--motion-duration-control);
+  transition-timing-function: var(--motion-ease-standard);
+}
+
+main[data-ui-system] tr[class*="docTable"] {
+  transition-duration: var(--motion-duration-control);
+  transition-timing-function: var(--motion-ease-standard);
+}
+
+main[data-ui-system] :is(
+  a[class*="docBrandLink"],
+  a[class*="docNavLink"],
+  a[class*="docNavAction"],
+  a[class*="docLink"]
+):focus-visible {
+  outline-color: var(--color-focus);
+}
+
 @media (hover: hover) and (pointer: fine) {
   [data-product-workspace="true"] a[class*="topNavLink"]:not([data-active="true"]):hover {
     background-color: var(--color-surface-selected);
@@ -144,6 +169,25 @@ main[data-ui-system] :where([id]) {
   [data-product-workspace="true"] a[class*="topNavLink"]:not([data-active="true"]):hover {
     background-color: transparent;
     color: var(--color-text-tertiary);
+  }
+
+  main[data-ui-system] a[class*="docNavLink"]:not([aria-current="page"]):hover {
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-text-secondary);
+  }
+
+  main[data-ui-system] a[class*="docNavAction"]:hover {
+    transform: none;
+  }
+
+  main[data-ui-system] a[class*="docLink"]:hover {
+    color: var(--color-signal-hover);
+    text-decoration-color: color-mix(in srgb, var(--color-signal) 34%, transparent);
+  }
+
+  main[data-ui-system] table[class*="docTable"] tbody tr:hover {
+    background: transparent;
   }
 }
 
