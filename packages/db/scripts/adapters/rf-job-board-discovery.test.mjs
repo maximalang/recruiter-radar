@@ -65,7 +65,7 @@ test('extracts explicit vacancy detail records from public NEXT app state', () =
   const postings = extractPublicJobPostingsFromHtml(html, 'https://www.rabota.ru/vacancy', rabota);
   assert.equal(postings.length, 1);
   assert.equal(postings[0].title, 'Инженер');
-  assert.equal(postings[0].vacancyUrl, 'https://www.rabota.ru/vacancy/54263671/');
+  assert.equal(postings[0].vacancyUrl, 'https://www.rabota.ru/vacancy/54263671');
   assert.equal(postings[0].externalId, '54263671');
   assert.equal(postings[0].employerName, 'ООО Пример');
   assert.equal(postings[0].extractionMethod, 'embedded-public-app-state');
@@ -100,7 +100,7 @@ test('rabota filter URLs are listing surfaces, not vacancy detail evidence', () 
   `;
   assert.deepEqual(
     extractPublicVacancyLinks(html, 'https://www.rabota.ru/vacancy', rabota),
-    ['https://www.rabota.ru/vacancy/54263671/'],
+    ['https://www.rabota.ru/vacancy/54263671'],
   );
 });
 
