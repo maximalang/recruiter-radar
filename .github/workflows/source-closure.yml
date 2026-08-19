@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   source-closure:
+    # Keep transport, parser, activation, readiness and deployment wiring in one focused gate.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
