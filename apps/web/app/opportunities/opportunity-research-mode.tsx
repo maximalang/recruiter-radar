@@ -22,19 +22,15 @@ export function OpportunityResearchMode(props: ResearchModeProps & {
       aria-label="Поиск и фильтры ситуаций"
     >
       <div className={styles.researchBody}>
-        <div className={disclosureStyles.desktopControls}>
-          <ResearchControls {...props} />
-        </div>
-
         <details
-          className={disclosureStyles.mobileDisclosure}
+          className={disclosureStyles.researchDisclosure}
           open={disclosureOpen || undefined}
         >
           <summary>
             <span>Поиск и фильтры</span>
             <small>{viewLabel(props.view)}</small>
           </summary>
-          <div className={disclosureStyles.mobileControls}>
+          <div className={disclosureStyles.researchControls}>
             <ResearchControls {...props} />
           </div>
         </details>
