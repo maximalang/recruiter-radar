@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 import {
   HhOAuthError,
+  hasHhApplicationClientCredentials,
   resetHhApplicationTokenCache,
   resolveHhApplicationAuthorization,
 } from './adapters/hh-oauth.mjs';
@@ -39,6 +40,22 @@ assert.equal(first, 'Bearer smoke-token-1');
 assert.equal(cached, first);
 assert.equal(refreshed, 'Bearer smoke-token-2');
 assert.equal(tokenRequests, 2);
+assert.equal(hasHhApplicationClientCredentials(credentials), true);
+assert.equal(hasHhApplicationClientCredentials({ HH_CLIENT_ID: 'partial' }), false);
+
+resetHhApplicationTokenCache();
+let preIssuedTokenRequests = 0;
+const preIssued = await resolveHhApplicationAuthorization({
+  ...credentials,
+  HH_ACCESS_TOKEN: 'pre-issued-application-token',
+}, {
+  fetchImpl: async () => {
+    preIssuedTokenRequests += 1;
+    throw new Error('token endpoint must not be called for HH_ACCESS_TOKEN mode');
+  },
+});
+assert.equal(preIssued, 'Bearer pre-issued-application-token');
+assert.equal(preIssuedTokenRequests, 0);
 
 resetHhApplicationTokenCache();
 let nonExpiringTokenRequests = 0;
@@ -91,6 +108,7 @@ console.log(JSON.stringify({
   cacheVerified: true,
   expirationRefreshVerified: true,
   unlimitedLifetimeCacheVerified: true,
+  persistentAccessTokenVerified: true,
   safeOauthFailureVerified: true,
 }, null, 2));
 
