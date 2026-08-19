@@ -106,18 +106,20 @@
 
 .chips span {
   display: inline-flex;
-  min-height: 36px;
+  min-height: 44px;
   align-items: center;
   padding: 7px 11px;
   border: 1px solid var(--color-separator);
   border-radius: var(--radius-surface);
   background: var(--color-surface-primary);
   font-size: 0.84rem;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition:
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .chips input:focus-visible + span {
-  outline: 2px solid var(--color-signal);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -163,10 +165,18 @@
 }
 
 .case summary {
-  min-height: 24px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
   cursor: pointer;
   font-size: 0.86rem;
   font-weight: 600;
+}
+
+.case summary:focus-visible,
+.restrictionList button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .caseFields {
@@ -240,7 +250,7 @@
 }
 
 .restrictionList button {
-  min-height: 36px;
+  min-height: 44px;
   padding: 6px 10px;
   border: 0;
   background: transparent;
@@ -266,9 +276,10 @@
   .restrictionControls {
     grid-template-columns: 1fr;
   }
+}
 
-  .chips span,
-  .restrictionList button {
-    min-height: 44px;
+@media (prefers-reduced-motion: reduce) {
+  .chips span {
+    transition: none;
   }
 }
