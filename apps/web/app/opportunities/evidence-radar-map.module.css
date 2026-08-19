@@ -307,12 +307,12 @@
 }
 
 .semanticIdentity strong {
-  overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--color-text-primary);
   font-size: var(--type-object-size);
   font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
 }
 
 .semanticIdentity small,
