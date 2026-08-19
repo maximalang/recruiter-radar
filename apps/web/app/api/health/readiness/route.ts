@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const apiKey = process.env.CRON_API_KEY?.trim()
   if (!apiKey) {
     return NextResponse.json(
-      { ok: false, error: 'Operational readiness is unavailable: CRON_API_KEY is not configured.' },
+      { ok: false, error: 'Operational readiness is unavailable because the service is not configured.' },
       { status: 503, headers: { 'Cache-Control': 'no-store' } },
     )
   }
