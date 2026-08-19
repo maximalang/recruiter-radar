@@ -1,5 +1,11 @@
+/** @jest-environment jsdom */
+
+import React from 'react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+
+import { OpportunityResearchMode } from '@/app/opportunities/opportunity-research-mode'
 
 describe('Situation research mode mobile hierarchy', () => {
   const source = readFileSync(
@@ -37,5 +43,35 @@ describe('Situation research mode mobile hierarchy', () => {
     expect(source.match(/name="q"/g)).toHaveLength(1)
     expect(source.match(/name="gate"/g)).toHaveLength(1)
     expect(source.match(/aria-label="Представления ситуаций"/g)).toHaveLength(1)
+  })
+
+  it('toggles the mobile disclosure without duplicating search controls', () => {
+    render(React.createElement(OpportunityResearchMode, {
+      view: 'morning',
+      query: '',
+      confidenceGate: '',
+      workflowEnabled: false,
+    }))
+
+    const toggle = screen.getByRole('button', { name: /Поиск и фильтры/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getAllByRole('searchbox', { name: 'Компания или ситуация' })).toHaveLength(1)
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('starts expanded when an explicit search criterion is active', () => {
+    render(React.createElement(OpportunityResearchMode, {
+      view: 'morning',
+      query: 'Север',
+      confidenceGate: 'A',
+      workflowEnabled: false,
+    }))
+
+    expect(screen.getByRole('button', { name: /Поиск и фильтры/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
   })
 })
