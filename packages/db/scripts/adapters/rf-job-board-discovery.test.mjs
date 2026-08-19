@@ -52,6 +52,41 @@ test('extracts bounded public JobPosting evidence without evaluating scripts', (
   assert.deepEqual(postings[0].employmentType, ['FULL_TIME']);
 });
 
+test('extracts explicit vacancy detail records from public NEXT app state', () => {
+  const rabota = { id: 'rabota-ru', platformDomains: ['rabota.ru'] };
+  const html = `
+    <script id="__NEXT_DATA__" type="application/json">
+      {"props":{"pageProps":{"items":[
+        {"vacancy_id":"54263671","title":"Инженер","vacancy_url":"/vacancy/54263671/","published_at":"2026-08-19T10:00:00+03:00","employer":{"name":"ООО Пример","profile_url":"/company/example"}},
+        {"vacancy_id":"54263672","title":"Аналитик"}
+      ]}}}
+    </script>
+  `;
+  const postings = extractPublicJobPostingsFromHtml(html, 'https://www.rabota.ru/vacancy', rabota);
+  assert.equal(postings.length, 1);
+  assert.equal(postings[0].title, 'Инженер');
+  assert.equal(postings[0].vacancyUrl, 'https://www.rabota.ru/vacancy/54263671/');
+  assert.equal(postings[0].externalId, '54263671');
+  assert.equal(postings[0].employerName, 'ООО Пример');
+  assert.equal(postings[0].extractionMethod, 'embedded-public-app-state');
+});
+
+test('embedded state never synthesizes vacancy URL from an id alone', () => {
+  const rabota = { id: 'rabota-ru', platformDomains: ['rabota.ru'] };
+  const html = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+    props: { pageProps: { vacancy: { vacancy_id: '54263672', title: 'Аналитик' } } },
+  })}</script>`;
+  assert.deepEqual(extractPublicJobPostingsFromHtml(html, 'https://www.rabota.ru/vacancy', rabota), []);
+});
+
+test('embedded filter/listing URLs cannot masquerade as vacancy details', () => {
+  const rabota = { id: 'rabota-ru', platformDomains: ['rabota.ru'] };
+  const html = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+    item: { title: 'Кладовщик', vacancy_url: '/vacancy/кладовщик/75000%20руб/' },
+  })}</script>`;
+  assert.deepEqual(extractPublicJobPostingsFromHtml(html, 'https://www.rabota.ru/vacancy', rabota), []);
+});
+
 test('keeps only same-platform vacancy detail links and never stages listing pagination', () => {
   const links = extractPublicVacancyLinks(HTML, 'https://getmatch.ru/vacancies', FAMILY);
   assert.deepEqual(links, ['https://getmatch.ru/vacancies/42']);
@@ -88,6 +123,16 @@ test('extracts only pagination links belonging to the configured listing root', 
     'https://geekjob.ru/vacancies/2',
     'https://geekjob.ru/vacancies/3',
   ]);
+});
+
+test('numeric getmatch vacancy detail is never treated as pagination', () => {
+  const links = extractPublicPaginationLinks(
+    '<a href="/vacancies/42">42</a><a href="/vacancies?page=2">2</a>',
+    'https://getmatch.ru/vacancies',
+    FAMILY,
+    { baseUrl: 'https://getmatch.ru/vacancies' },
+  );
+  assert.deepEqual(links, ['https://getmatch.ru/vacancies?page=2']);
 });
 
 test('paginationBaseUrl preserves the root when crawling a later page', () => {
