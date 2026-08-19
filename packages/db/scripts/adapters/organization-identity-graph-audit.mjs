@@ -25,17 +25,18 @@ export function auditOrganizationIdentityGraph(rows = [], organizations = []) {
     if (!sourceKey || !orgId) continue;
 
     if (/^(?:inn|ogrn|domain):/i.test(sourceKey)) {
+      const rawDomain = sourceKey.toLowerCase().startsWith('domain:')
+        ? normalizeDomainText(sourceKey.slice('domain:'.length))
+        : null;
+      if (rawDomain && isPlatformDomain(rawDomain)) {
+        platformDomainRefs.push({ orgId, sourceKey: `domain:${rawDomain}`, source: nonEmptyText(row?.source) });
+        continue;
+      }
+
       const classified = classifyStrongIdentityKey(sourceKey.toLowerCase());
       if (!classified) {
         invalidStrongRefs.push({ orgId, sourceKey, source: nonEmptyText(row?.source) });
         continue;
-      }
-      if (classified.type === 'domain') {
-        const domain = classified.key.slice('domain:'.length);
-        if (isPlatformDomain(domain)) {
-          platformDomainRefs.push({ orgId, sourceKey: classified.key, source: nonEmptyText(row?.source) });
-          continue;
-        }
       }
       const owners = ownersByStrongKey.get(classified.key) ?? new Set();
       owners.add(orgId);
@@ -82,8 +83,10 @@ function auditOrgDomains(organizations, rows) {
   const mismatches = [];
   for (const organization of organizations) {
     const orgId = nonEmptyText(String(organization?.id ?? ''));
-    const domain = normalizeDomain(organization?.domain);
-    if (!orgId || !domain) continue;
+    const rawDomain = normalizeDomainText(organization?.domain);
+    const classified = rawDomain ? classifyStrongIdentityKey(`domain:${rawDomain}`) : null;
+    const domain = classified?.type === 'domain' ? classified.key.slice('domain:'.length) : rawDomain;
+    if (!orgId || !domain || isPlatformDomain(domain)) continue;
     const strongDomains = domainKeysByOrg.get(orgId);
     if (!strongDomains || strongDomains.size === 0) continue;
     if (!strongDomains.has(domain)) {
@@ -97,7 +100,7 @@ function isPlatformDomain(domain) {
   return PLATFORM_DOMAINS.has(domain) || [...PLATFORM_DOMAINS].some((item) => domain.endsWith(`.${item}`));
 }
 
-function normalizeDomain(value) {
+function normalizeDomainText(value) {
   const text = nonEmptyText(value)?.toLowerCase();
   if (!text) return null;
   return text.replace(/^www\./, '').replace(/\.$/, '');
