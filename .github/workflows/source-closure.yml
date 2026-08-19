@@ -40,6 +40,7 @@ jobs:
           node --test packages/db/scripts/source-rabota-rossii-pagination.test.mjs
           node --test packages/db/scripts/adapters/hh-incremental-coverage.test.mjs
           node --test packages/db/scripts/adapters/superjob-incremental-coverage.test.mjs
+          node --test packages/db/scripts/source-superjob-publisher-gate.test.mjs
           node --test packages/db/scripts/adapters/source-escalation.test.mjs
           node --test packages/db/scripts/adapters/source-transport-health-store.test.mjs
           node --test packages/db/scripts/adapters/organization-resolution.test.mjs
