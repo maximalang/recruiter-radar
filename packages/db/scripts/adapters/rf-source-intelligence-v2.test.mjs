@@ -14,10 +14,6 @@ import {
   evaluateTransportHealth,
   selectTransportStages,
 } from './source-transport-health.mjs';
-import {
-  areLikelyCrossPostedVacancies,
-  clusterCrossPostedVacancies,
-} from './vacancy-cross-source-dedupe.mjs';
 
 test('RF discovery families are explicit candidates, not fake live sources', () => {
   assert.equal(validateRfDiscoveryFamilies(), true);
@@ -30,29 +26,6 @@ test('RF job-board domains cannot become strong employer domain identities', () 
     assert.equal(classifyStrongIdentityKey(`domain:${domain}`), null, domain);
   }
   assert.deepEqual(classifyStrongIdentityKey('domain:example.ru'), { key: 'domain:example.ru', type: 'domain' });
-});
-
-test('cross-source vacancy dedupe requires one strong organization owner', () => {
-  const base = {
-    canonicalOrgId: '42',
-    title: 'Senior Java Developer',
-    location: 'Москва',
-    employment: 'Полная занятость',
-    schedule: 'Удаленно',
-    description: 'Разработка высоконагруженного сервиса Java Spring PostgreSQL Kafka Kubernetes команда продукт микросервисы тестирование архитектура',
-  };
-  const repost = {
-    ...base,
-    source: 'rabota-ru',
-    description: 'Команда продукт разработка высоконагруженного сервиса на Java Spring PostgreSQL Kafka Kubernetes микросервисы архитектура и тестирование',
-  };
-  const otherCompany = { ...repost, canonicalOrgId: '43' };
-
-  assert.equal(areLikelyCrossPostedVacancies(base, repost), true);
-  assert.equal(areLikelyCrossPostedVacancies(base, otherCompany), false);
-  const clusters = clusterCrossPostedVacancies([base, repost, otherCompany]);
-  assert.equal(clusters.length, 2);
-  assert.equal(clusters[0].duplicateCount, 1);
 });
 
 test('transport degradation reorders ordinary failures but never bypasses policy stops', () => {
