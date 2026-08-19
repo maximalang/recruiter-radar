@@ -82,7 +82,6 @@
     transform var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.navLink:hover,
 .navLink[data-active] {
   color: currentColor;
 }
@@ -118,10 +117,6 @@
   transition: color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.login:hover {
-  color: currentColor;
-}
-
 .cta {
   gap: .55rem;
   padding: .66rem .88rem;
@@ -138,12 +133,6 @@
     border-color var(--motion-duration-control) var(--motion-ease-standard),
     background-color var(--motion-duration-control) var(--motion-ease-standard),
     color var(--motion-duration-control) var(--motion-ease-standard);
-}
-
-.cta:hover {
-  border-color: color-mix(in srgb, var(--color-signal) 48%, currentColor);
-  background: color-mix(in srgb, var(--color-signal) 7%, transparent);
-  color: currentColor;
 }
 
 .header[data-scrolled] .cta,
@@ -284,10 +273,23 @@
   font-weight: 650;
 }
 
-.mobileActions a:last-child:hover {
-  border-color: var(--color-signal-hover);
-  background: var(--color-signal-hover);
-  color: var(--color-text-inverse);
+@media (hover: hover) and (pointer: fine) {
+  .navLink:hover,
+  .login:hover {
+    color: currentColor;
+  }
+
+  .cta:hover {
+    border-color: color-mix(in srgb, var(--color-signal) 48%, currentColor);
+    background: color-mix(in srgb, var(--color-signal) 7%, transparent);
+    color: currentColor;
+  }
+
+  .mobileActions a:last-child:hover {
+    border-color: var(--color-signal-hover);
+    background: var(--color-signal-hover);
+    color: var(--color-text-inverse);
+  }
 }
 
 @media (max-width: 959px) {
