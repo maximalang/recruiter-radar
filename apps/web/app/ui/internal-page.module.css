@@ -1,5 +1,4 @@
-/* Internal page primitives — shared styles for dashboard, leads, checkout.
-   All colors reference :root tokens from page-primitives.module.css */
+/* Internal page primitives — shared styles for detail and utility surfaces. */
 
 :global([data-product-workspace="true"]) .internalPageFrameInner {
   width: 100%;
@@ -8,129 +7,30 @@
   padding: 0;
 }
 
-/* ── Skip link (a11y) ── */
 .skipLink {
   position: absolute;
-  left: 0;
   top: 0;
+  left: 0;
   z-index: 100;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   padding: 8px 16px;
-  background-color: var(--color-signal);
-  color: var(--color-surface-elevated);
-  font-size: 0.85rem;
+  border-radius: 0 0 var(--radius-control) 0;
+  background-color: var(--color-text-primary);
+  color: var(--color-text-inverse);
+  font-size: .85rem;
   font-weight: 600;
   text-decoration: none;
-  border-radius: 0 0 var(--radius-control) 0;
   transform: translateY(-100%);
 }
 
-.skipLink:focus {
+.skipLink:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
   transform: translateY(0);
-  outline: 2px solid var(--color-surface-elevated);
-  outline-offset: 2px;
 }
 
-/* ── Top navigation bar ── */
-.topNav {
-  background-color: var(--color-surface-primary);
-  border-bottom: 1px solid var(--color-separator);
-  padding: 0 16px;
-}
-
-.topNavInner {
-  max-width: 1280px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  height: 48px;
-}
-
-.topNavBrand {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.topNavBrand:hover {
-  color: var(--color-signal);
-}
-
-.topNavBrand:focus-visible {
-  outline: 2px solid var(--color-signal);
-  outline-offset: 2px;
-}
-
-.topNavBrandAccent {
-  color: var(--color-signal);
-}
-
-.topNavLinks {
-  display: flex;
-  gap: 4px;
-}
-
-.topNavLink {
-  padding: 6px 12px;
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--color-text-tertiary);
-  text-decoration: none;
-  border-radius: var(--radius-control);
-  transition: background-color 0.15s, color 0.15s;
-}
-
-.topNavLink:hover {
-  background-color: var(--color-canvas);
-  color: var(--color-text-primary);
-}
-
-.topNavLink:focus-visible {
-  outline: 2px solid var(--color-signal);
-  outline-offset: 2px;
-}
-
-.topNavLink[data-active="true"] {
-  color: var(--color-signal);
-  background-color: color-mix(in srgb, var(--color-signal) 6%, transparent);
-  font-weight: 600;
-}
-
-@media (max-width: 640px) {
-  .topNavInner {
-    height: auto;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px 0 8px;
-  }
-  .topNavLinks {
-    width: 100%;
-    overflow-x: auto;
-    justify-content: space-between;
-    gap: 2px;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-  }
-  .topNavLinks::-webkit-scrollbar {
-    display: none;
-  }
-  .topNavLink {
-    flex: 0 0 auto;
-    min-height: 36px;
-    display: inline-flex;
-    align-items: center;
-    font-size: 0.74rem;
-    padding: 6px 7px;
-  }
-}
-
-/* ── Page frame ── */
 .internalPageFrame {
   min-height: 100vh;
   background-color: var(--color-canvas);
@@ -143,13 +43,6 @@
   padding: 32px 16px;
 }
 
-@media (max-width: 768px) {
-  .internalPageFrameInner {
-    padding: 20px 12px;
-  }
-}
-
-/* ── Page header ── */
 .internalPageHeader {
   margin-bottom: 30px;
 }
@@ -167,91 +60,75 @@
 
 .internalPageTitle {
   max-width: 760px;
-  font-size: clamp(2.35rem, 3.4vw, 3.25rem);
-  font-weight: 735;
-  color: var(--color-signal);
-  letter-spacing: -0.058em;
-  line-height: 1.02;
   margin: 0;
-}
-
-.internalPageTitle::before {
-  display: block;
-  width: 22px;
-  height: 1px;
-  margin-bottom: 14px;
-  background: var(--color-signal);
-  content: "";
+  color: var(--color-text-primary);
+  font-size: clamp(2.35rem, 3.4vw, 3.25rem);
+  font-weight: 650;
+  letter-spacing: -.045em;
+  line-height: 1.05;
 }
 
 .internalPageSubtitle {
   max-width: 680px;
-  font-size: 0.94rem;
-  color: var(--color-text-secondary);
-  line-height: 1.62;
   margin-top: 16px;
+  color: var(--color-text-secondary);
+  font-size: .94rem;
+  line-height: 1.62;
 }
 
-/* ── Back / nav link ── */
-.internalPageBackLink {
+.internalPageBackLink,
+.navLink {
   min-height: 44px;
-  font-size: 0.875rem;
-  color: var(--color-text-tertiary);
-  text-decoration: none;
   display: inline-flex;
   align-items: center;
+  color: var(--color-text-tertiary);
+  font-size: .875rem;
+  text-decoration: none;
+  transition:
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard);
+}
+
+.internalPageBackLink {
   gap: 5px;
 }
 
 .backLinkIcon {
   flex: 0 0 auto;
-  width: 0.9em;
-  height: 0.9em;
-}
-
-.internalPageBackLink:hover {
-  color: var(--color-signal);
-}
-
-.internalPageBackLink:focus-visible {
-  outline: 2px solid var(--color-signal);
-  outline-offset: 2px;
+  width: .9em;
+  height: .9em;
 }
 
 .navLink {
-  font-size: 0.875rem;
-  color: var(--color-text-tertiary);
-  text-decoration: none;
   padding: 6px 12px;
-  border-radius: var(--radius-control);
   border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
 }
 
-.navLink:hover {
-  color: var(--color-signal);
-  border-color: var(--color-signal);
-}
-
-.navLink:focus-visible {
-  outline: 2px solid var(--color-signal);
+.internalPageBackLink:focus-visible,
+.navLink:focus-visible,
+.leadLink:focus-visible,
+.sidebarLink:focus-visible {
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
-/* ── Content card (detail sections, sidebar blocks) ── */
+.leadLink:focus-visible {
+  border-radius: var(--radius-detail);
+}
+
 .contentCard {
-  background-color: var(--color-surface-primary);
-  border-radius: var(--radius-surface);
   padding: 18px;
   border: 1px solid var(--color-separator);
+  border-radius: var(--radius-surface);
+  background-color: var(--color-surface-primary);
 }
 
 .contentCard[data-tone="danger"] {
   border-color: color-mix(in srgb, var(--color-destructive) 16%, var(--color-surface-primary));
 }
 
-/* Hero: the decision-driver cards (why now, why it fits) carry visual weight —
-   a tinted left accent and brand-tinted surface lift them above the supporting
-   evidence/action cards without shouting. */
 .contentCard[data-variant="hero"] {
   border-color: color-mix(in srgb, var(--color-signal) 24%, transparent);
   border-left: 3px solid var(--color-signal);
@@ -262,27 +139,23 @@
   color: var(--color-signal);
 }
 
-/* Muted: advisory blocks (AI hint) recede — they inform but never drive the
-   decision, so they sit visually below the deterministic evidence. */
 .contentCard[data-variant="muted"] {
-  background-color: transparent;
-  border-style: dashed;
   border-color: var(--color-separator);
+  border-style: dashed;
+  background-color: transparent;
 }
 
 .contentCardTitle {
-  font-size: 0.875rem;
-  font-weight: 600;
+  margin: 0 0 12px;
   color: var(--color-text-secondary);
-  margin-bottom: 12px;
-  margin-top: 0;
+  font-size: .875rem;
+  font-weight: 600;
 }
 
 .contentCardTitle[data-tone="danger"] {
   color: var(--color-destructive);
 }
 
-/* ── Detail layout ── */
 .detailLayout {
   display: grid;
   grid-template-columns: 1fr 300px;
@@ -301,13 +174,6 @@
   gap: 16px;
 }
 
-@media (max-width: 768px) {
-  .detailLayout {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ── Data table ── */
 .dataTableWrap {
   overflow-x: auto;
 }
@@ -323,16 +189,16 @@
 
 .dataTableTh {
   padding: 8px 16px;
-  text-align: left;
-  font-size: 0.75rem;
-  font-weight: 600;
   color: var(--color-text-tertiary);
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-align: left;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .dataTableTh[scope="col"] {
-  /* explicit scope for a11y — same styles */
+  /* Explicit scope for accessibility; visual treatment is shared. */
 }
 
 .dataTableTd {
@@ -344,19 +210,16 @@
   border-bottom: 1px solid var(--color-separator);
 }
 
-/* ── Review-status badge (analyst gate: pending_review / approved / rejected) ──
-   auto_approved renders no badge. Tone mirrors the gate vocabulary: info for
-   "на проверке", success for "проверен", danger for "отклонён". */
 .reviewBadge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
+  border: 1px solid var(--color-separator);
   border-radius: var(--radius-pill);
-  font-size: 0.72rem;
+  font-size: .72rem;
   font-weight: 600;
   white-space: nowrap;
-  border: 1px solid var(--color-separator);
 }
 
 .reviewBadgeIcon {
@@ -366,91 +229,77 @@
 }
 
 .reviewBadge[data-tone="info"] {
+  border-color: var(--color-separator-strong);
   background: var(--color-signal-soft);
   color: var(--color-signal-hover);
-  border-color: var(--color-separator-strong);
 }
 
 .reviewBadge[data-tone="success"] {
+  border-color: color-mix(in srgb, var(--color-positive) 28%, var(--color-separator));
   background: color-mix(in srgb, var(--color-positive) 10%, transparent);
   color: var(--color-positive);
-  border-color: color-mix(in srgb, var(--color-positive) 28%, var(--color-separator));
 }
 
 .reviewBadge[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--color-destructive) 26%, var(--color-separator));
   background: color-mix(in srgb, var(--color-destructive) 9%, transparent);
   color: var(--color-destructive);
-  border-color: color-mix(in srgb, var(--color-destructive) 26%, var(--color-separator));
 }
 
-/* ── Feedback badge ── */
 .feedbackBadge {
   display: inline-block;
   padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary));
   border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  font-weight: 500;
   background-color: color-mix(in srgb, var(--color-signal) 10%, var(--color-surface-primary));
   color: var(--color-positive);
-  border: 1px solid color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary));
+  font-size: .75rem;
+  font-weight: 500;
 }
 
-/* ── Lead row specifics ── */
 .leadLink {
-  text-decoration: none;
   color: inherit;
-}
-
-.leadLink:hover {
-  color: var(--color-signal);
-}
-
-.leadLink:focus-visible {
-  outline: 2px solid var(--color-signal);
-  outline-offset: 2px;
-  border-radius: var(--radius-detail);
+  text-decoration: none;
+  transition: color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .leadOrgName {
-  font-weight: 600;
-  font-size: 0.9rem;
   color: var(--color-text-primary);
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.leadLocation,
+.leadDate {
+  color: var(--color-text-tertiary);
+  font-size: .75rem;
 }
 
 .leadLocation {
-  font-size: 0.75rem;
-  color: var(--color-text-tertiary);
   margin-top: 2px;
 }
 
 .leadMeta {
-  font-size: 0.8rem;
   color: var(--color-text-tertiary);
+  font-size: .8rem;
 }
 
-.leadDate {
-  font-size: 0.75rem;
-  color: var(--color-text-tertiary);
-}
-
-/* ── Filter active indicator ── */
 .filterActive {
   margin-left: 8px;
-  font-size: 0.75rem;
   color: var(--color-signal);
+  font-size: .75rem;
 }
 
-/* ── Reason / signal list ── */
 .reasonList {
-  list-style: none;
-  padding: 0;
   margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .reasonItem {
   padding: 8px 0;
-  font-size: 0.9rem;
   color: var(--color-text-primary);
+  font-size: .9rem;
 }
 
 .reasonItem + .reasonItem {
@@ -459,104 +308,90 @@
 
 .signalItem {
   padding: 6px 0;
-  font-size: 0.85rem;
   color: var(--color-destructive);
+  font-size: .85rem;
 }
 
 .signalItem + .signalItem {
   border-top: 1px solid color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary));
 }
 
-/* ── Gate description ── */
 .gateDescription {
-  font-size: 0.75rem;
-  color: var(--color-text-tertiary);
   margin-top: 8px;
+  color: var(--color-text-tertiary);
+  font-size: .75rem;
   line-height: 1.4;
 }
 
-/* ── Sidebar section ── */
 .sidebarLabel {
-  font-size: 0.75rem;
-  color: var(--color-text-tertiary);
-  font-weight: 500;
   margin-bottom: 8px;
+  color: var(--color-text-tertiary);
+  font-size: .75rem;
+  font-weight: 500;
 }
 
 .sidebarValue {
-  font-size: 0.9rem;
-  color: var(--color-text-primary);
   margin-bottom: 12px;
+  color: var(--color-text-primary);
+  font-size: .9rem;
 }
 
 .sidebarValueEmpty {
-  font-size: 0.85rem;
-  color: var(--color-text-tertiary);
   margin-bottom: 12px;
+  color: var(--color-text-tertiary);
+  font-size: .85rem;
 }
 
 .sidebarMeta {
-  font-size: 0.75rem;
-  color: var(--color-text-tertiary);
   margin-top: 4px;
+  color: var(--color-text-tertiary);
+  font-size: .75rem;
 }
 
 .sidebarLink {
-  font-size: 0.85rem;
-  color: var(--color-signal);
-  text-decoration: none;
-  display: block;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   margin-bottom: 4px;
+  color: var(--color-signal);
+  font-size: .85rem;
+  text-decoration: none;
+  transition: color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.sidebarLink:hover {
-  text-decoration: underline;
-}
-
-.sidebarLink:focus-visible {
-  outline: 2px solid var(--color-signal);
-  outline-offset: 2px;
-}
-
-/* ── Opener text ── */
 .openerText {
-  font-size: 0.9rem;
-  line-height: 1.6;
   color: var(--color-text-secondary);
+  font-size: .9rem;
+  line-height: 1.6;
   white-space: pre-wrap;
 }
 
-/* ── Muted body text ── */
 .bodyTextMuted {
-  font-size: 0.85rem;
   color: var(--color-text-tertiary);
+  font-size: .85rem;
 }
 
-/* ── Evidence stats row ── */
 .evidenceStats {
   display: flex;
   gap: 16px;
-  font-size: 0.8rem;
   color: var(--color-text-tertiary);
+  font-size: .8rem;
 }
 
-/* ── Empty / not-found states ── */
 .emptyState {
   min-height: 190px;
   box-sizing: border-box;
   display: grid;
   place-content: center;
-  text-align: center;
   padding: clamp(30px, 5vw, 48px) 24px;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: var(--color-text-secondary);
+  text-align: center;
 }
 
 .emptyStateIcon {
-  /* SVG glyph well — sized by the icon's em scale, muted to the page text tone
-     so the glyph reads as a calm visual anchor, not a loud decoration. */
   display: flex;
   justify-content: center;
   margin-bottom: 12px;
@@ -569,88 +404,67 @@
 }
 
 .emptyStateTitle {
+  margin-bottom: 7px;
   color: var(--color-text-primary);
   font-size: 1.02rem;
-  font-weight: 720;
-  margin-bottom: 7px;
+  font-weight: 650;
 }
 
 .emptyStateText {
   max-width: 620px;
-  font-size: 0.88rem;
+  font-size: .88rem;
   line-height: 1.58;
 }
 
-.emptyStateAction {
+.emptyStateAction,
+.errorStateAction {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-top: 16px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: var(--radius-surface);
+  background-color: var(--color-signal);
+  color: var(--color-text-inverse);
+  font-family: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--motion-duration-control) var(--motion-ease-standard);
+}
+
+.emptyStateAction {
   justify-self: center;
   min-width: min(240px, 100%);
-  min-height: 44px;
-  margin-top: 16px;
-  padding: 9px 18px;
-  border-radius: var(--radius-surface);
-  background-color: var(--color-signal);
-  color: var(--color-surface-elevated);
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: opacity 0.15s ease;
-}
-
-.emptyStateAction:hover {
-  opacity: 0.9;
-}
-
-/* ── Error state — a calm, recoverable data-failure moment ── */
-/* Mirrors .emptyState's centered premium styling so an error reads as a quiet
-   "something didn't load, here's what to do", not a loud crash. tone is a
-   muted danger (not a bright red alert) to keep the page calm. */
-.errorState {
-  text-align: center;
-  padding: 40px 24px;
-  color: var(--color-text-tertiary);
-  border: 1px solid var(--color-separator);
-  border-radius: var(--radius-control);
-  background-color: var(--color-surface-primary);
-}
-
-.errorStateTitle {
-  font-weight: 500;
-  color: var(--color-text-primary);
-  margin-bottom: 6px;
-}
-
-.errorStateText {
-  font-size: 0.85rem;
-  line-height: 1.5;
-}
-
-.errorStateAction {
-  display: inline-block;
-  margin-top: 16px;
-  padding: 9px 18px;
-  border-radius: var(--radius-surface);
-  background-color: var(--color-signal);
-  color: var(--color-surface-elevated);
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-  border: 0;
-  cursor: pointer;
-  font-family: inherit;
-  transition: opacity 0.15s ease;
-}
-
-.errorStateAction:hover {
-  opacity: 0.9;
 }
 
 .emptyStateAction:focus-visible,
 .errorStateAction:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+.errorState {
+  padding: 40px 24px;
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.errorStateTitle {
+  margin-bottom: 6px;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.errorStateText {
+  font-size: .85rem;
+  line-height: 1.5;
 }
 
 .notFoundState {
@@ -662,20 +476,16 @@
 }
 
 .notFoundContent {
-  text-align: center;
   color: var(--color-text-tertiary);
+  text-align: center;
 }
 
-/* ── Loading state ── */
 .loadingState {
   padding: 32px;
-  text-align: center;
   color: var(--color-text-tertiary);
+  text-align: center;
 }
 
-/* Skeleton loading — an aria-busy block with placeholder bars so a Suspense
-   gap reads as "loading this section" instead of a white flash. Calm, no
-   heavy animation: a single slow shimmer, gated by prefers-reduced-motion. */
 .loadingSkeleton {
   display: flex;
   flex-direction: column;
@@ -687,82 +497,21 @@
   height: 14px;
   border-radius: var(--radius-control);
   background-color: var(--color-separator);
-  opacity: 0.55;
-  /* Shimmer — subtle horizontal sweep. Pinned to the line, not the whole block,
-     so it reads as content shaping, not a busy spinner. */
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--color-surface-elevated) 60%, transparent) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  background-repeat: no-repeat;
-  animation: loadingShimmer 1.6s ease-in-out infinite;
+  opacity: .55;
 }
 
-@keyframes loadingShimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .loadingSkeletonLine {
-    animation: none;
-    opacity: 0.5;
-  }
-}
-
-/* Screen-reader-only utility — used by the skeleton's visible-to-AT loading
-   label. Kept here (not in dashboard.module.css) so the LoadingState primitive
-   is self-contained. */
 .srOnly {
   position: absolute;
   width: 1px;
   height: 1px;
-  padding: 0;
   margin: -1px;
+  padding: 0;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
   border: 0;
+  white-space: nowrap;
 }
 
-/* ── Responsive: tablet and below ── */
-@media (max-width: 768px) {
-  .internalPageHeaderTop {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-.evidenceStats {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-}
-
-/* ── Responsive: mobile ── */
-@media (max-width: 640px) {
-.emptyState {
-    min-height: 168px;
-    padding: 28px 16px;
-  }
-
-  /* Tap-target floor: interactive controls must be ≥44px tall for comfortable
-     touch use (WCAG 2.5.5 / Apple HIG). The full-width action button already
-     stretches horizontally; this guarantees vertical reach. */
-.dataTableWrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-/* Leads cards: stack the action under the body, collapse field labels */
-/* Rail would collapse to a 0-height nub once the body wraps to its own
-     row — re-flow it as a full-width 4px top bar so the tone stays visible. */
-}
-
-/* ── Checkout / narrow layout ── */
 .narrowLayout {
   max-width: 720px;
   margin: 0 auto;
@@ -772,15 +521,15 @@
 }
 
 .bodyText {
+  margin: 0 0 16px;
   color: var(--color-text-secondary);
   line-height: 1.6;
-  margin: 0 0 16px;
 }
 
 .fieldRow {
-  font-size: 0.85rem;
-  color: var(--color-text-tertiary);
   margin-bottom: 8px;
+  color: var(--color-text-tertiary);
+  font-size: .85rem;
 }
 
 .fieldRowStrong {
@@ -788,100 +537,85 @@
 }
 
 .bodyTextMutedBlock {
-  font-size: 0.85rem;
-  color: var(--color-text-tertiary);
   margin: 0 0 16px;
+  color: var(--color-text-tertiary);
+  font-size: .85rem;
 }
 
-/* ── Chip / tag wrapping ── */
-.chipWrap {
+.chipWrap,
+.chipWrapSm {
   display: flex;
-  gap: 8px;
   flex-wrap: wrap;
+}
+
+.chipWrap {
+  gap: 8px;
   margin-bottom: 12px;
 }
 
 .chipWrapSm {
-  display: flex;
   gap: 6px;
-  flex-wrap: wrap;
 }
 
 .chipWrapFlush {
   margin-bottom: 0;
 }
 
-/* ── Feedback note (italic muted) ── */
 .feedbackNote {
-  font-size: 0.8rem;
+  margin: 4px 0 12px;
   color: var(--color-text-tertiary);
-  margin-top: 4px;
+  font-size: .8rem;
   font-style: italic;
-  margin-bottom: 12px;
 }
 
-/* ── Fit explanation ("почему подходит") ── */
-.fitList {
-  list-style: none;
-  padding: 0;
+.fitList,
+.contactList {
   margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  list-style: none;
+}
+
+.fitItem,
+.contactItem {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--color-text-primary);
+  font-size: .9rem;
+  line-height: 1.5;
 }
 
 .fitItem {
-  display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 8px 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--color-text-primary);
 }
 
-.fitItem + .fitItem {
+.contactItem {
+  align-items: center;
+  gap: 12px;
+}
+
+.fitItem + .fitItem,
+.contactItem + .contactItem {
   border-top: 1px solid var(--color-surface-secondary);
 }
 
 .fitItemIcon {
   flex: none;
-  font-size: 0.95rem;
+  font-size: .95rem;
   line-height: 1.5;
-}
-
-/* ── Auto-discovered contacts ("Найденные контакты") ── */
-.contactList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.contactItem {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--color-text-primary);
-}
-
-.contactItem + .contactItem {
-  border-top: 1px solid var(--color-surface-secondary);
 }
 
 .contactLabel {
+  min-width: 140px;
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--color-text-secondary);
-  font-size: 0.82rem;
-  min-width: 140px;
+  font-size: .82rem;
 }
 
 .contactHiringTag {
@@ -890,18 +624,17 @@
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-signal) 12%, transparent);
   color: var(--color-signal);
-  font-size: 0.68rem;
+  font-size: .68rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: .02em;
 }
 
 .contactValue {
-  font-weight: 500;
   color: var(--color-signal);
-  word-break: break-all;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
-/* ── Company / hiring summary ── */
 .summaryBlock {
   display: flex;
   flex-direction: column;
@@ -909,10 +642,10 @@
 }
 
 .summaryLine {
-  font-size: 0.9rem;
-  line-height: 1.55;
-  color: var(--color-text-secondary);
   margin: 0;
+  color: var(--color-text-secondary);
+  font-size: .9rem;
+  line-height: 1.55;
 }
 
 .summaryLineLead {
@@ -921,10 +654,72 @@
 }
 
 .summaryStrength {
-  font-size: 0.72rem;
-  color: var(--color-text-tertiary);
   margin-top: 4px;
+  color: var(--color-text-tertiary);
+  font-size: .72rem;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .internalPageBackLink:hover,
+  .leadLink:hover {
+    color: var(--color-signal);
+  }
+
+  .navLink:hover {
+    border-color: var(--color-signal);
+    color: var(--color-signal);
+  }
+
+  .sidebarLink:hover {
+    text-decoration: underline;
+  }
+
+  .emptyStateAction:hover,
+  .errorStateAction:hover {
+    background-color: var(--color-signal-hover);
+  }
+}
+
+@media (max-width: 768px) {
+  .internalPageFrameInner {
+    padding: 20px 12px;
+  }
+
+  .detailLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .internalPageHeaderTop {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .evidenceStats {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 
 @media (max-width: 640px) {
+  .emptyState {
+    min-height: 168px;
+    padding: 28px 16px;
+  }
+
+  .dataTableWrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .internalPageBackLink,
+  .navLink,
+  .leadLink,
+  .sidebarLink,
+  .emptyStateAction,
+  .errorStateAction {
+    transition: none;
+  }
 }
