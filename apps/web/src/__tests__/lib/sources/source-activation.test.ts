@@ -39,4 +39,24 @@ describe('source activation modes', () => {
       mode: null,
     })
   })
+
+  test('transparent business can reuse the verified FNS snapshot root', () => {
+    expect(evaluateSourceActivation('transparent-business-fns', {}, {
+      SOURCE_SNAPSHOT_ROOT: '/var/lib/recruiter-radar/snapshots',
+    })).toMatchObject({
+      state: 'configured',
+      mode: 'official-fns-open-data-snapshot',
+    })
+  })
+
+  test('Telegram remains unavailable even if MTProto credentials are present', () => {
+    expect(evaluateSourceActivation('telegram-company-channels', {}, {
+      TELEGRAM_API_ID: '12345',
+      TELEGRAM_API_HASH: 'hash',
+      TELEGRAM_SESSION: 'session',
+    })).toMatchObject({
+      state: 'unavailable',
+      mode: null,
+    })
+  })
 })
