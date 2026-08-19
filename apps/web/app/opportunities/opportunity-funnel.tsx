@@ -22,15 +22,7 @@ export function OpportunityFunnel(props: { summary: OutcomeFunnelSummary }) {
     }) ||
     props.summary.terminalOutcomes.completed > 0
 
-  if (!hasCommercialData) {
-    return (
-      <section className={styles.funnel} aria-label="Коммерческие результаты">
-        <p className={styles.funnelEmpty}>
-          Воронка конверсий появится после первого коммерческого действия по ситуации.
-        </p>
-      </section>
-    )
-  }
+  if (!hasCommercialData) return null
 
   return (
     <section className={styles.funnel} aria-labelledby="outcome-funnel-title">
