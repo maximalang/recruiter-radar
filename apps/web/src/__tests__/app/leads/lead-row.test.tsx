@@ -107,4 +107,62 @@ describe('LeadRow V1-V6 decision-row contract', () => {
     expect(container.textContent).toContain('ИИ-подсказка доступна');
     expect(container.querySelector('[aria-label="Сила сигнала 80"]')).not.toBeNull();
   });
+
+  it('keeps an eight-company extreme-content working set scan-first and fully named', () => {
+    const organizationNames = [
+      'ООО Северо-Западный научно-производственный центр цифровой инфраструктуры и промышленной автоматизации',
+      'Акционерное общество Инженерные системы транспорта и городской мобильности',
+      'Группа компаний Национальная облачная платформа корпоративных данных',
+      'ООО Центр разработки медицинских информационных систем и телеметрии',
+      'АО Региональные энергетические цифровые решения',
+      'ООО Производственные технологии роботизации и машинного зрения',
+      'Компания Инфраструктура электронной коммерции и логистических сервисов',
+      'ООО Лаборатория прикладной аналитики клиентского опыта и автоматизации',
+    ];
+    const longWhyNow = 'За последние дни одновременно появились несколько связанных вакансий, повторная публикация ключевой роли и независимое подтверждение расширения команды — окно для точечного контакта ограничено по времени.';
+
+    const { container } = render(
+      <div>
+        {organizationNames.map((orgName, index) => (
+          <LeadRow
+            key={orgName}
+            lead={{
+              ...baseLead,
+              id: `stress-lead-${index + 1}`,
+              orgId: `stress-org-${index + 1}`,
+              orgName,
+              whyNow: longWhyNow,
+              score: 268 + index * 7,
+              vacanciesCount: index + 1,
+              sourceFamilies: index % 2 === 0
+                ? ['career-pages', 'hh', 'official-news']
+                : ['career-pages'],
+              evidenceTitles: [
+                'Очень длинное название подтверждённой вакансии ведущего инженера распределённых платформ',
+                'Повторная публикация роли руководителя направления разработки',
+                'Официальное сообщение о расширении продуктовой команды',
+              ],
+              locationNames: ['Москва', 'Санкт-Петербург'],
+              confidenceGate: index % 3 === 0 ? 'A' : index % 3 === 1 ? 'B' : 'C',
+            } as unknown as LeadItem}
+            fitPreview={index % 2 === 0 ? { icon: 'industry', text: 'Совпадает специализация агентства' } : null}
+            hiringMode="specialist"
+            rank={index + 1}
+          />
+        ))}
+      </div>,
+    );
+
+    const rows = container.querySelectorAll('[data-lead-row="true"]');
+    expect(rows).toHaveLength(8);
+    expect(container.querySelectorAll('details')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-ui="confidence-indicator"]')).toHaveLength(8);
+    expect(container.querySelectorAll('[aria-label^="Сила сигнала "]')).toHaveLength(8);
+    expect(container.textContent).toContain(longWhyNow);
+    for (const [index, orgName] of organizationNames.entries()) {
+      expect(container.textContent).toContain(orgName);
+      expect(rows[index]?.textContent).toContain(String(index + 1).padStart(2, '0'));
+      expect(rows[index]?.textContent).toContain('Сила ·');
+    }
+  });
 });
