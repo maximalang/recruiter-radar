@@ -16,11 +16,12 @@ jest.mock("@/lib/telegramDigestFeedback", () => ({ verifyDigestFeedbackCallback:
 
 import { POST } from "@/app/api/telegram/webhook/route";
 import { checkTelegramChatOwnsClientProfile, getPool } from "@/lib/db";
-import { getTelegramBotToken } from "@/lib/telegram";
+import { answerTelegramCallbackQuery, getTelegramBotToken } from "@/lib/telegram";
 import { verifyDigestFeedbackCallback } from "@/lib/telegramDigestFeedback";
 
 const mockGetPool = jest.mocked(getPool);
 const mockCheckOwnership = jest.mocked(checkTelegramChatOwnsClientProfile);
+const mockAnswerTelegramCallbackQuery = jest.mocked(answerTelegramCallbackQuery);
 const mockGetTelegramBotToken = jest.mocked(getTelegramBotToken);
 const mockVerifyCallback = jest.mocked(verifyDigestFeedbackCallback);
 
@@ -33,6 +34,7 @@ describe("Telegram webhook failure hardening", () => {
     jest.clearAllMocks();
     process.env.TELEGRAM_WEBHOOK_SECRET = SECRET;
     mockGetTelegramBotToken.mockReturnValue({ botToken: "1234567890:AAH1bCdEfGhIjKlMnOpQrStUvWxYz012-_3", error: null });
+    mockAnswerTelegramCallbackQuery.mockResolvedValue(undefined);
     mockVerifyCallback.mockReturnValue(null);
     consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -102,6 +104,11 @@ describe("Telegram webhook failure hardening", () => {
     expect(body).toEqual({ error: "Unable to process Telegram webhook." });
     expect(JSON.stringify(body)).not.toContain("internal-host");
     expect(query).toHaveBeenCalledTimes(2);
+    expect(mockAnswerTelegramCallbackQuery).toHaveBeenCalledWith({
+      callbackQueryId: "callback-4",
+      botToken: "1234567890:AAH1bCdEfGhIjKlMnOpQrStUvWxYz012-_3",
+      text: "Не удалось сохранить фидбек",
+    });
   });
 });
 
