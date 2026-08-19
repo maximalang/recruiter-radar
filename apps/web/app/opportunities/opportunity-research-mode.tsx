@@ -14,9 +14,7 @@ type ResearchModeProps = {
   workflowEnabled: boolean
 }
 
-export function OpportunityResearchMode(props: ResearchModeProps & {
-  children?: React.ReactNode
-}) {
+export function OpportunityResearchMode(props: ResearchModeProps) {
   const hasExplicitCriteria = Boolean(props.query || props.confidenceGate)
   const [mobileOpen, setMobileOpen] = useState(hasExplicitCriteria)
 
@@ -51,8 +49,6 @@ export function OpportunityResearchMode(props: ResearchModeProps & {
         >
           <ResearchControls {...props} />
         </div>
-
-        {props.children}
       </div>
     </section>
   )
