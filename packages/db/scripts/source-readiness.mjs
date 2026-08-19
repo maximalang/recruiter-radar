@@ -13,31 +13,53 @@ const ELIGIBILITY_STATES = new Set([
 ]);
 const LEGAL_REVIEW_STATES = new Set(['not-required', 'required', 'approved']);
 
+// A historical live proof is useful audit evidence but it is not an indefinite
+// production-health assertion. Seven days is deliberately conservative for the
+// existing registry; faster degradation is handled by runtime transport health.
+export const DEFAULT_PRODUCTION_PROOF_MAX_AGE_HOURS = 168;
+
 export function getSourceReadinessContract() {
   validateSourceReadinessContract(sourceReadinessContract);
   return sourceReadinessContract;
 }
 
-export function listEvaluatedSourceReadiness(env = process.env) {
+export function listEvaluatedSourceReadiness(env = process.env, now = new Date()) {
   const contract = getSourceReadinessContract();
   return Object.entries(contract.sources).map(([id, source]) => evaluateSourceReadiness(
     id,
     source,
     contract.pipelineProfiles,
     env,
+    now,
   ));
 }
 
-export function evaluateSourceReadiness(id, source, pipelineProfiles, env = process.env) {
+export function evaluateSourceReadiness(id, source, pipelineProfiles, env = process.env, now = new Date()) {
   const configured = source.configuration.mode === 'not-required'
     || source.configuration.acceptedEnvSets.some((envSet) => envSet.every((name) => hasEnvValue(env, name)));
   const liveReachable = source.live.state === 'reachable' || source.live.state === 'verified';
-  const liveVerified = source.live.state === 'verified'
+  const historicalLiveVerified = source.live.state === 'verified'
     && typeof source.live.verifiedAt === 'string'
     && source.live.verifiedAt.trim() !== ''
     && source.live.evidence.length > 0;
+  const liveProofMaxAgeHours = resolveLiveProofMaxAgeHours(source);
+  const liveProofAgeHours = historicalLiveVerified
+    ? calculateAgeHours(source.live.verifiedAt, now)
+    : null;
+  const liveProofFresh = historicalLiveVerified
+    && Number.isFinite(liveProofAgeHours)
+    && liveProofAgeHours >= 0
+    && liveProofAgeHours <= liveProofMaxAgeHours;
+  const liveVerified = historicalLiveVerified && liveProofFresh;
   const providerRequired = source.configuration.mode === 'provider-required';
   const registrationRequired = source.configuration.mode === 'registration-required';
+  const readinessDrift = detectSourceReadinessDrift({
+    id,
+    source,
+    configured,
+    historicalLiveVerified,
+    liveProofFresh,
+  });
   const finalState = resolveFinalState({ source, configured, liveVerified, providerRequired, registrationRequired });
   const states = [
     'implemented',
@@ -45,7 +67,11 @@ export function evaluateSourceReadiness(id, source, pipelineProfiles, env = proc
     source.contract === 'tested' ? 'contract-tested' : null,
     configured ? 'configured' : null,
     liveReachable ? 'live-reachable' : null,
+    historicalLiveVerified ? 'historically-live-verified' : null,
     liveVerified ? 'live-verified' : null,
+    historicalLiveVerified && liveProofFresh ? 'live-proof-fresh' : null,
+    historicalLiveVerified && !liveProofFresh ? 'live-proof-stale' : null,
+    readinessDrift.length > 0 ? 'readiness-drift' : null,
     source.confidence === 'approved' ? 'confidence-approved' : null,
     source.eligibility,
     providerRequired ? 'provider-required' : null,
@@ -65,8 +91,13 @@ export function evaluateSourceReadiness(id, source, pipelineProfiles, env = proc
     liveState: source.live.state,
     liveReachable,
     liveVerified,
+    historicalLiveVerified,
+    liveProofFresh,
+    liveProofAgeHours,
+    liveProofMaxAgeHours,
     liveVerifiedAt: source.live.verifiedAt,
     liveEvidence: [...source.live.evidence],
+    readinessDrift,
     confidence: source.confidence,
     confidenceApproved: source.confidence === 'approved',
     eligibility: source.eligibility,
@@ -80,6 +111,31 @@ export function evaluateSourceReadiness(id, source, pipelineProfiles, env = proc
     verification: source.verification,
     pipeline: pipelineProfiles[source.pipelineProfile],
   };
+}
+
+export function detectSourceReadinessDrift({
+  id,
+  source,
+  configured,
+  historicalLiveVerified,
+  liveProofFresh,
+}) {
+  const drift = [];
+  if (configured && source.blockers.includes('credential-not-supplied')) {
+    drift.push({
+      code: 'configured-but-credential-blocker-remains',
+      source: id,
+      detail: 'Runtime configuration satisfies an accepted credential set but the static readiness contract still declares credential-not-supplied.',
+    });
+  }
+  if (historicalLiveVerified && !liveProofFresh) {
+    drift.push({
+      code: 'production-proof-stale',
+      source: id,
+      detail: 'Historical live evidence exceeded its maximum production-proof age and must be refreshed before the source is considered live-verified.',
+    });
+  }
+  return drift;
 }
 
 export function validateSourceReadinessContract(contract) {
@@ -106,9 +162,15 @@ export function validateSourceReadinessContract(contract) {
     if (source.live.state === 'verified' && (
       typeof source.live.verifiedAt !== 'string'
       || source.live.verifiedAt.trim() === ''
+      || !Number.isFinite(Date.parse(source.live.verifiedAt))
       || source.live.evidence.length === 0
     )) {
-      throw new TypeError(`${id}.live verified state requires verifiedAt and evidence.`);
+      throw new TypeError(`${id}.live verified state requires a parseable verifiedAt and evidence.`);
+    }
+    if (source.live.maxAgeHours !== undefined && (
+      !Number.isFinite(source.live.maxAgeHours) || source.live.maxAgeHours <= 0
+    )) {
+      throw new TypeError(`${id}.live.maxAgeHours must be a positive finite number when present.`);
     }
     assertEnum(source.confidence, CONFIDENCE_STATES, `${id}.confidence`);
     assertEnum(source.eligibility, ELIGIBILITY_STATES, `${id}.eligibility`);
@@ -137,6 +199,19 @@ function resolveFinalState({ source, configured, liveVerified, providerRequired,
   if (source.requiresLiveVerification && !liveVerified) return 'blocked';
   if (source.confidence === 'pending') return 'blocked';
   return source.eligibility;
+}
+
+function resolveLiveProofMaxAgeHours(source) {
+  return Number.isFinite(source.live?.maxAgeHours) && source.live.maxAgeHours > 0
+    ? source.live.maxAgeHours
+    : DEFAULT_PRODUCTION_PROOF_MAX_AGE_HOURS;
+}
+
+function calculateAgeHours(verifiedAt, now) {
+  const verifiedMs = Date.parse(verifiedAt);
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
+  if (!Number.isFinite(verifiedMs) || !Number.isFinite(nowMs)) return null;
+  return (nowMs - verifiedMs) / 3_600_000;
 }
 
 function assertEnum(value, allowed, label) {
