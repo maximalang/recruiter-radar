@@ -6,6 +6,7 @@ export const DEFAULT_TRANSPORT_HEALTH_POLICY = Object.freeze({
   degradedFailureRate: 0.5,
   degradedConsecutiveFailures: 3,
   recoverySuccesses: 2,
+  policyStopMaxAgeHours: 24,
 });
 
 /**
@@ -14,19 +15,22 @@ export const DEFAULT_TRANSPORT_HEALTH_POLICY = Object.freeze({
  *
  * Policy-stop outcomes (robots/access-control/captcha/WAF/429) are surfaced as
  * stoppedByPolicy and MUST NOT be used as permission to bypass the control with
- * a more aggressive transport.
+ * a more aggressive transport. A historical stop expires into a fresh low-cost
+ * policy check after a bounded interval; expiry is permission to re-check the
+ * policy, never permission to skip it.
  */
-export function evaluateTransportHealth(attempts = [], policy = DEFAULT_TRANSPORT_HEALTH_POLICY) {
+export function evaluateTransportHealth(attempts = [], policy = DEFAULT_TRANSPORT_HEALTH_POLICY, now = new Date()) {
   const normalized = attempts
     .filter(Boolean)
     .map(normalizeAttempt)
     .filter((row) => row.stage && row.outcome)
     .sort((a, b) => a.atMs - b.atMs);
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
 
   const byStage = {};
   for (const stage of new Set(normalized.map((row) => row.stage))) {
     const stageAttempts = normalized.filter((row) => row.stage === stage);
-    byStage[stage] = evaluateStage(stageAttempts, policy);
+    byStage[stage] = evaluateStage(stageAttempts, policy, nowMs);
   }
 
   return Object.freeze({
@@ -53,8 +57,6 @@ export function selectTransportStages(configuredStages, health) {
     for (const stage of group.stages) {
       const stageHealth = health?.byStage?.[stage];
       if (stageHealth?.stoppedByPolicy) {
-        // Access policy is terminal for this acquisition surface. Caller must
-        // switch to another lawful surface, not a more aggressive transport.
         return Object.freeze({ stages: Object.freeze([]), stoppedByPolicy: true, stoppedStage: stage });
       }
     }
@@ -87,9 +89,8 @@ function buildDependencyGroups(stages) {
   return groups;
 }
 
-function evaluateStage(attempts, policy) {
+function evaluateStage(attempts, policy, nowMs) {
   const window = attempts.slice(-Math.max(policy.minWindowAttempts, 10));
-  const policyStops = window.filter((row) => POLICY_STOP_OUTCOMES.has(row.outcome));
   const failures = window.filter((row) => DEGRADED_OUTCOMES.has(row.outcome));
   const successes = window.filter((row) => row.outcome === 'parsed' || row.outcome === 'not-modified');
   const failureRate = window.length > 0 ? failures.length / window.length : 0;
@@ -100,6 +101,14 @@ function evaluateStage(attempts, policy) {
     failureRate >= policy.degradedFailureRate
     || consecutiveFailures >= policy.degradedConsecutiveFailures
   ) && consecutiveSuccesses < policy.recoverySuccesses;
+  const last = window.at(-1) ?? null;
+  const policyStopAgeHours = last && Number.isFinite(nowMs) && last.atMs > 0
+    ? Math.max(0, (nowMs - last.atMs) / 3_600_000)
+    : null;
+  const policyStopFresh = last
+    && POLICY_STOP_OUTCOMES.has(last.outcome)
+    && Number.isFinite(policyStopAgeHours)
+    && policyStopAgeHours <= policy.policyStopMaxAgeHours;
 
   return Object.freeze({
     attempts: window.length,
@@ -109,8 +118,10 @@ function evaluateStage(attempts, policy) {
     consecutiveFailures,
     consecutiveSuccesses,
     degraded,
-    stoppedByPolicy: policyStops.length > 0 && POLICY_STOP_OUTCOMES.has(window.at(-1)?.outcome),
-    lastOutcome: window.at(-1)?.outcome ?? null,
+    stoppedByPolicy: policyStopFresh === true,
+    policyStopAgeHours,
+    lastAt: last?.atMs ? new Date(last.atMs).toISOString() : null,
+    lastOutcome: last?.outcome ?? null,
   });
 }
 
