@@ -57,6 +57,7 @@ const SOURCE_ACTIVATION_MODES: Partial<Record<SourceId, readonly SourceActivatio
     { id: 'reviewed-file', allOf: ['EGRUL_FNS_INPUT_FILE'] },
   ],
   'transparent-business-fns': [
+    { id: 'official-fns-open-data-snapshot', allOf: ['SOURCE_SNAPSHOT_ROOT'] },
     { id: 'reviewed-file', allOf: ['TRANSPARENT_BUSINESS_FNS_INPUT_FILE'] },
     {
       id: 'approved-provider',
