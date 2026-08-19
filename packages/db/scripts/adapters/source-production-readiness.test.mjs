@@ -103,6 +103,74 @@ test('HH production access token is a configured credential set but never a live
   assert.ok(result.readinessDrift.some((item) => item.code === 'configured-but-credential-blocker-remains'));
 });
 
+test('free public Fedresurs runtime supersedes stale provider-required access without bypassing production proof', () => {
+  const source = sourceFixture({
+    configuration: {
+      mode: 'provider-required',
+      acceptedEnvSets: [
+        ['FEDRESURS_INPUT_FILE'],
+        ['FEDRESURS_PROVIDER_API_URL', 'FEDRESURS_PROVIDER_API_TOKEN'],
+      ],
+    },
+    live: {
+      state: 'blocked',
+      verifiedAt: null,
+      evidence: [],
+    },
+    requiresLiveVerification: false,
+    confidence: 'not-applicable',
+    eligibility: 'context-only',
+    blockers: ['The public site is not an approved stable runtime path; use a compliant provider or reviewed snapshot.'],
+  });
+  const result = evaluateSourceReadiness(
+    'fedresurs',
+    source,
+    profiles,
+    { SOURCE_SNAPSHOT_ROOT: '/var/lib/recruiter-radar/snapshots' },
+    new Date('2026-08-19T12:00:00Z'),
+  );
+
+  assert.equal(result.accessClass, 'A');
+  assert.equal(result.declaredConfigurationMode, 'provider-required');
+  assert.equal(result.configurationMode, 'launch-required');
+  assert.equal(result.providerRequired, false);
+  assert.equal(result.configured, true);
+  assert.equal(result.declaredLiveState, 'blocked');
+  assert.equal(result.liveState, 'unverified');
+  assert.equal(result.declaredRequiresLiveVerification, false);
+  assert.equal(result.requiresLiveVerification, true);
+  assert.equal(result.liveVerified, false);
+  assert.equal(result.finalState, 'blocked');
+  assert.ok(result.blockers.includes('production-proof-required'));
+  assert.ok(result.readinessDrift.some((item) => item.code === 'access-mode-contract-drift'));
+  assert.ok(result.readinessDrift.some((item) => item.code === 'live-state-contract-drift'));
+  assert.ok(result.readinessDrift.some((item) => item.code === 'production-proof-pending'));
+});
+
+test('free public source without its launch storage remains blocked but not provider-required', () => {
+  const source = sourceFixture({
+    configuration: {
+      mode: 'provider-required',
+      acceptedEnvSets: [['FEDRESURS_PROVIDER_API_URL', 'FEDRESURS_PROVIDER_API_TOKEN']],
+    },
+    live: { state: 'blocked', verifiedAt: null, evidence: [] },
+    requiresLiveVerification: false,
+    confidence: 'not-applicable',
+    eligibility: 'context-only',
+  });
+  const result = evaluateSourceReadiness(
+    'fedresurs',
+    source,
+    profiles,
+    {},
+    new Date('2026-08-19T12:00:00Z'),
+  );
+  assert.equal(result.configurationMode, 'launch-required');
+  assert.equal(result.providerRequired, false);
+  assert.equal(result.configured, false);
+  assert.equal(result.finalState, 'blocked');
+});
+
 test('production proof requires full live evidence-signal-lineage semantics', () => {
   const proof = {
     ok: true,
