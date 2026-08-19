@@ -8,13 +8,14 @@ import {
   SuperjobCoverageTruncationError,
 } from './superjob.mjs';
 
-test('default SuperJob source is broad 12-hour incremental discovery, not keyword sampling', () => {
+test('default SuperJob source is broad 12-hour direct-employer incremental discovery', () => {
   const config = resolveSuperjobSearchConfig({}, new Date('2026-08-19T12:00:00Z'));
   assert.equal(config.keyword, null);
   assert.equal(config.perPage, 100);
   assert.equal(config.pages, 5);
   assert.equal(config.adaptiveTimePartition, true);
   assert.equal(config.lookbackHours, 12);
+  assert.equal(config.extraParams.agency, '1');
   assert.equal(config.extraParams.date_published_from, String(Date.parse('2026-08-19T00:00:00Z') / 1000));
   assert.equal(config.extraParams.date_published_to, String(Date.parse('2026-08-19T12:00:00Z') / 1000));
   assert.equal(config.extraParams.order_field, 'date');
@@ -24,9 +25,10 @@ test('default SuperJob source is broad 12-hour incremental discovery, not keywor
   assert.equal(url.searchParams.has('keyword'), false);
   assert.equal(url.searchParams.get('count'), '100');
   assert.equal(url.searchParams.get('page'), '0');
+  assert.equal(url.searchParams.get('agency'), '1');
 });
 
-test('explicit SuperJob keyword preserves diagnostic search without implicit time partition', () => {
+test('explicit SuperJob keyword preserves diagnostic search without implicit employer filter or time partition', () => {
   const config = resolveSuperjobSearchConfig({
     SUPERJOB_KEYWORD: 'recruiter',
     SUPERJOB_PER_PAGE: '2',
@@ -36,6 +38,26 @@ test('explicit SuperJob keyword preserves diagnostic search without implicit tim
   assert.equal(config.adaptiveTimePartition, false);
   assert.equal(config.lookbackHours, null);
   assert.equal(config.extraParams.date_published_from, undefined);
+  assert.equal(config.extraParams.agency, undefined);
+});
+
+test('operator can explicitly override SuperJob agency filter', () => {
+  const config = resolveSuperjobSearchConfig({
+    SUPERJOB_DATE_PUBLISHED_FROM: '1787097600',
+    SUPERJOB_DATE_PUBLISHED_TO: '1787140800',
+    SUPERJOB_AGENCY: '2',
+  });
+  assert.equal(config.keyword, null);
+  assert.equal(config.extraParams.agency, '2');
+});
+
+test('no-keyword explicit temporal search still defaults to direct employers', () => {
+  const config = resolveSuperjobSearchConfig({
+    SUPERJOB_DATE_PUBLISHED_FROM: '1787097600',
+    SUPERJOB_DATE_PUBLISHED_TO: '1787140800',
+  });
+  assert.equal(config.keyword, null);
+  assert.equal(config.extraParams.agency, '1');
 });
 
 test('SuperJob adaptive discovery splits a >500 result window and dedupes the boundary', async () => {
@@ -51,6 +73,7 @@ test('SuperJob adaptive discovery splits a >500 result window and dedupes the bo
     fetchJsonImpl: async (url) => {
       const parsed = new URL(url);
       requests.push(parsed);
+      assert.equal(parsed.searchParams.get('agency'), '1');
       const start = Number(parsed.searchParams.get('date_published_from'));
       const end = Number(parsed.searchParams.get('date_published_to'));
       if (start === from && end === to) {
@@ -80,6 +103,7 @@ test('SuperJob refuses silent truncation at the minimum date partition', async (
     ...resolveSuperjobSearchConfig({}, new Date('2026-08-19T00:10:00Z')),
     minPartitionMinutes: 10,
     extraParams: {
+      agency: '1',
       date_published_from: String(Math.floor(Date.parse('2026-08-19T00:00:00Z') / 1000)),
       date_published_to: String(Math.floor(Date.parse('2026-08-19T00:10:00Z') / 1000)),
       order_field: 'date',
@@ -113,6 +137,7 @@ test('bounded explicit keyword search can still be used for a production transpo
     fetchJsonImpl: async (url) => {
       const parsed = new URL(url);
       assert.equal(parsed.searchParams.get('keyword'), 'recruiter');
+      assert.equal(parsed.searchParams.has('agency'), false);
       return { total: 1000, more: true, objects: [{ id: 1 }, { id: 2 }] };
     },
   });
