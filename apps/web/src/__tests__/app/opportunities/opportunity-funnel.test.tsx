@@ -1,5 +1,7 @@
 /** @jest-environment jsdom */
 
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { render, screen } from '@testing-library/react'
 
 import { OpportunityFunnel } from '@/app/opportunities/opportunity-funnel'
@@ -55,8 +57,8 @@ function summaryWithActivity(
 }
 
 describe('OpportunityFunnel', () => {
-  it('keeps observational-only activity compact and secondary', () => {
-    render(<OpportunityFunnel summary={summaryWithActivity([
+  it('does not spend attention on observational-only empty analytics', () => {
+    const { container } = render(<OpportunityFunnel summary={summaryWithActivity([
       {
         eventType: 'shown',
         label: 'Показано',
@@ -71,12 +73,11 @@ describe('OpportunityFunnel', () => {
       },
     ])} />)
 
-    expect(screen.getByText(
+    expect(container).toBeEmptyDOMElement()
+    expect(screen.queryByText(
       'Воронка конверсий появится после первого коммерческого действия по ситуации.',
-    )).toBeInTheDocument()
+    )).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Коммерческие результаты' })).toBeNull()
-    expect(screen.queryByText('Недостаточно данных')).toBeNull()
-    expect(screen.queryByText('Активность за период:', { exact: false })).toBeNull()
   })
 
   it('shows absolute counts without invented percentages once commercial work starts', () => {
@@ -113,5 +114,16 @@ describe('OpportunityFunnel', () => {
       { exact: false },
     )).toBeInTheDocument()
     expect(screen.queryByText('25%')).toBeNull()
+  })
+
+  it('keeps conversion analytics after the situation ledger in page composition', () => {
+    const page = readFileSync(
+      resolve(process.cwd(), 'app/opportunities/page.tsx'),
+      'utf8',
+    )
+
+    expect(page.indexOf('<SituationRow')).toBeGreaterThan(-1)
+    expect(page.indexOf('{funnel ? <OpportunityFunnel summary={funnel} /> : null}'))
+      .toBeGreaterThan(page.indexOf('<SituationRow'))
   })
 })
