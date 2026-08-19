@@ -14,7 +14,7 @@ Use this application identity for production requests:
 HH_USER_AGENT=RecruiterRadar/1.0 (support@recruiter-radar.ru)
 ```
 
-`HH_USER_AGENT` is not a secret. HH expects an application name and a monitored developer contact. Do not append the Client ID to this value.
+`HH_USER_AGENT` is not a secret and is not issued by HH. It is the application identity we choose for API requests. HH expects an application name and a monitored developer contact. Do not append the Client ID to this value.
 
 HH supports two runtime modes in Recruiter Radar:
 
@@ -39,7 +39,34 @@ Recruiter Radar can request the application token itself when no `HH_ACCESS_TOKE
 
 For production, prefer the pre-issued token because HH application tokens have unlimited lifetime and requesting a new one revokes the previous token. Keep Client ID and Client Secret in the secret store for controlled bootstrap/recovery, not in git.
 
-To issue the token manually without putting credentials in shell history as command arguments:
+The current HH OpenAPI token endpoint is `https://api.hh.ru/token`. The legacy `https://hh.ru/oauth/token` endpoint is deprecated.
+
+##### Windows PowerShell
+
+Open **PowerShell** and paste this block. It prompts for the values instead of requiring you to edit the command. The secret input is hidden:
+
+```powershell
+$clientId = Read-Host "HH_CLIENT_ID"
+$secureSecret = Read-Host "HH_CLIENT_SECRET" -AsSecureString
+$clientSecret = (New-Object System.Net.NetworkCredential("", $secureSecret)).Password
+
+$response = Invoke-RestMethod `
+  -Method Post `
+  -Uri "https://api.hh.ru/token" `
+  -Headers @{ "HH-User-Agent" = "RecruiterRadar/1.0 (support@recruiter-radar.ru)" } `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body @{
+    grant_type = "client_credentials"
+    client_id = $clientId
+    client_secret = $clientSecret
+  }
+
+$response.access_token
+```
+
+The final line prints only the application access token. Store that value as `HH_ACCESS_TOKEN`.
+
+##### Linux / macOS shell
 
 ```bash
 read -r -p 'HH_CLIENT_ID: ' HH_CLIENT_ID
