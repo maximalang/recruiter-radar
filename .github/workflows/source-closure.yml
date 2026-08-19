@@ -25,10 +25,12 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Validate production source secret configurators
+      - name: Validate production source runtime scripts
         run: |
           bash -n scripts/deploy/configure-hh-runtime.sh
           bash -n scripts/deploy/configure-youtube-runtime.sh
+          bash -n scripts/deploy/run-government-source-sync.sh
+          bash scripts/test/government-source-sync-runner.sh
       - name: Verify public-source transport and projection contracts
         run: |
           node --test packages/db/scripts/adapters/gdelt-doc-client.test.mjs
