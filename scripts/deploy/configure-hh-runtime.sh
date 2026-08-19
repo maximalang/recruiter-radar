@@ -67,6 +67,9 @@ hh_access_token="$(printf '%s' "$encoded_token" | base64 -d 2>/dev/null || true)
 unset encoded_token
 [ -n "$hh_access_token" ] || { echo 'Staged HH token could not be decoded.' >&2; exit 1; }
 
+# Keep the production dotenv serialization deterministic and safe. HH application
+# access tokens are opaque, so reject whitespace/shell-sensitive characters rather
+# than trying to reinterpret them while writing the production env file.
 if ! [[ "$hh_access_token" =~ ^[A-Za-z0-9._~+/=-]+$ ]]; then
   echo 'HH_ACCESS_TOKEN contains unsupported dotenv characters.' >&2
   exit 1
@@ -77,6 +80,36 @@ if [ ! -f "$source_env" ]; then
   source_env="/dev/null"
 fi
 
+configured_compose_files="$(read_env_value COMPOSE_FILE "$source_env")"
+if [ -n "$configured_compose_files" ]; then
+  case ":$configured_compose_files:" in
+    *":$HH_OVERRIDE:"* | *":.rr-hh.compose.yml:"*) : ;;
+    *) configured_compose_files="${configured_compose_files}:$HH_OVERRIDE" ;;
+  esac
+else
+  base_compose=""
+  for candidate in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
+    if [ -f "$candidate" ]; then
+      base_compose="$candidate"
+      break
+    fi
+  done
+  [ -n "$base_compose" ] || { echo "No Docker Compose file found in $APP_DIR" >&2; exit 1; }
+  configured_compose_files="$base_compose"
+
+  standard_override=""
+  case "$base_compose" in
+    compose.yaml) standard_override="compose.override.yaml" ;;
+    compose.yml) standard_override="compose.override.yml" ;;
+    docker-compose.yaml) standard_override="docker-compose.override.yaml" ;;
+    docker-compose.yml) standard_override="docker-compose.override.yml" ;;
+  esac
+  if [ -n "$standard_override" ] && [ -f "$standard_override" ]; then
+    configured_compose_files="${configured_compose_files}:$standard_override"
+  fi
+  configured_compose_files="${configured_compose_files}:$HH_OVERRIDE"
+fi
+
 env_tmp="$(mktemp "$APP_DIR/.env.hh.XXXXXX")"
 override_tmp="$(mktemp "$APP_DIR/.rr-hh.compose.XXXXXX")"
 cleanup() {
@@ -85,12 +118,14 @@ cleanup() {
 trap cleanup EXIT
 
 awk '
+  /^COMPOSE_FILE=/ { next }
   /^HH_USER_AGENT=/ { next }
   /^HH_ACCESS_TOKEN=/ { next }
   /^HH_CLIENT_ID=/ { next }
   /^HH_CLIENT_SECRET=/ { next }
   { print }
 ' "$source_env" > "$env_tmp"
+printf 'COMPOSE_FILE=%s\n' "$configured_compose_files" >> "$env_tmp"
 printf 'HH_USER_AGENT="%s"\n' "$HH_USER_AGENT_VALUE" >> "$env_tmp"
 printf 'HH_ACCESS_TOKEN=%s\n' "$hh_access_token" >> "$env_tmp"
 chmod 600 "$env_tmp"
@@ -113,39 +148,14 @@ rm -f "$TOKEN_FILE"
 TOKEN_FILE=""
 
 compose_args=()
-configured_compose_files="$(read_env_value COMPOSE_FILE "$ENV_FILE")"
-if [ -n "$configured_compose_files" ]; then
-  IFS=':' read -r -a compose_files <<< "$configured_compose_files"
-  for compose_file in "${compose_files[@]}"; do
-    compose_args+=(-f "$compose_file")
-  done
-else
-  base_compose=""
-  for candidate in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
-    if [ -f "$candidate" ]; then
-      base_compose="$candidate"
-      break
-    fi
-  done
-  [ -n "$base_compose" ] || { echo "No Docker Compose file found in $APP_DIR" >&2; exit 1; }
-  compose_args+=(-f "$base_compose")
-
-  standard_override=""
-  case "$base_compose" in
-    compose.yaml) standard_override="compose.override.yaml" ;;
-    compose.yml) standard_override="compose.override.yml" ;;
-    docker-compose.yaml) standard_override="docker-compose.override.yaml" ;;
-    docker-compose.yml) standard_override="docker-compose.override.yml" ;;
-  esac
-  if [ -n "$standard_override" ] && [ -f "$standard_override" ]; then
-    compose_args+=(-f "$standard_override")
-  fi
-fi
+IFS=':' read -r -a compose_files <<< "$configured_compose_files"
+for compose_file in "${compose_files[@]}"; do
+  compose_args+=(-f "$compose_file")
+done
 
 if [ -f "$NOTIFICATION_OVERRIDE" ]; then
   compose_args+=(-f "$NOTIFICATION_OVERRIDE")
 fi
-compose_args+=(-f "$HH_OVERRIDE")
 
 docker compose --env-file "$ENV_FILE" "${compose_args[@]}" config >/dev/null
 docker compose --env-file "$ENV_FILE" "${compose_args[@]}" up -d --force-recreate web
