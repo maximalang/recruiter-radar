@@ -21,7 +21,7 @@
   border: 1px solid color-mix(in srgb, var(--color-text-primary) 18%, transparent);
   border-radius: var(--radius-surface);
   background: var(--color-surface-primary);
-  box-shadow: 0 1rem 2.5rem color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+  box-shadow: var(--shadow-float);
 }
 
 .previewHeader {
