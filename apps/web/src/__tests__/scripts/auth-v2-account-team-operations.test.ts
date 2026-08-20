@@ -89,6 +89,9 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("/settings/team");
     expect(runner).toContain("verifyAuthenticatedProductSurfaces");
     expect(runner).toContain("seedProductSurfaceFixtures");
+    expect(runner).toContain("reviewFixtureCount: 8");
+    expect(runner).toContain("Review fixture did not render 8 evidence-first rows");
+    expect(runner).toContain("Review decision did not settle the acted-on row");
     expect(runner).toContain("'funding-hiring-recruiter'");
     expect(runner).toContain("ARRAY['hh','official-news']");
     expect(runner).toContain("radarCorrelation.rows[0].id");

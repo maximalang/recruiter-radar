@@ -319,7 +319,7 @@ async function seedProductSurfaceFixtures(owner) {
        source_display_name, source_families, vacancies_count,
        distinct_vacancy_names_count, latest_published_at, total_score,
        reasons, opener, payload, lead_confidence, next_action_kind,
-       next_action_hint
+       next_action_hint, review_status
      )
      VALUES (
        $1, $2, $3, 'browser-fixture-company',
@@ -328,11 +328,97 @@ async function seedProductSurfaceFixtures(owner) {
        '["Рост продуктовой команды","Повторный найм"]'::JSONB,
        'Предложить точечный подбор продуктовой команды.',
        '{"confidenceGate":"A","locationNames":["Москва"],"evidenceTitles":["Открыты продуктовые вакансии"]}'::JSONB,
-       'high', 'outreach', 'Проверить корпоративную форму и подготовить черновик.'
+       'high', 'outreach', 'Проверить корпоративную форму и подготовить черновик.',
+       'pending_review'
      )
      RETURNING id::TEXT AS id`,
     [digestRun.rows[0].id, profileId, organizationId],
   )
+  const reviewFixtures = [
+    {
+      name: 'Очень длинное название международной технологической компании с распределённой продуктовой командой',
+      sources: ['hh'], gate: 'C', foreign: true, age: '3 hours', score: 84,
+      locations: ['Москва', 'Санкт-Петербург', 'Казань'],
+      reasons: ['Одновременно открыты роли в трёх городах', 'Команда расширяет несколько продуктовых направлений'],
+      evidence: 'Карьерная страница подтверждает одновременный набор продуктовых аналитиков и инженеров',
+    },
+    {
+      name: 'Северная логистика', sources: ['career-pages'], gate: 'C', foreign: false, age: '6 hours', score: 78,
+      locations: ['Архангельск'], reasons: ['Открыт новый блок логистических вакансий'],
+      evidence: 'На официальной карьерной странице опубликованы семь новых вакансий',
+    },
+    {
+      name: 'Atlas Commerce', sources: ['greenhouse'], gate: 'B', foreign: true, age: '1 day', score: 76,
+      locations: ['Удалённо', 'Москва'], reasons: ['Зарубежный ATS требует проверки работодателя'],
+      evidence: 'Greenhouse показывает повторный набор в коммерческую команду',
+    },
+    {
+      name: 'Волга Энерго Системы', sources: ['company-newsrooms', 'career-pages'], gate: 'C', foreign: false, age: '2 days', score: 73,
+      locations: ['Самара', 'Тольятти'], reasons: ['Инвестиционная программа совпала с ростом найма'],
+      evidence: 'Пресс-релиз об инвестиционной программе подтверждён карьерными вакансиями',
+    },
+    {
+      name: 'МедТех Лаборатория', sources: ['hh'], gate: 'B', foreign: false, age: '5 days', score: 69,
+      locations: ['Новосибирск'], reasons: ['Единственный источник требует ручной верификации'],
+      evidence: 'HH показывает устойчивый повторный найм инженеров медицинских систем',
+    },
+    {
+      name: 'Уральские цифровые решения', sources: ['career-pages', 'hh'], gate: 'C', foreign: false, age: '9 days', score: 65,
+      locations: ['Екатеринбург', 'Пермь'], reasons: ['Сигнал старше недели, но подтверждён двумя источниками'],
+      evidence: 'Карьерная страница и HH подтверждают набор региональной команды внедрения',
+    },
+    {
+      name: 'Тихоокеанский производственный холдинг', sources: ['company-site'], gate: 'C', foreign: false, age: '18 days', score: 61,
+      locations: ['Владивосток'], reasons: ['Давний одиночный сигнал требует повторной проверки свежести'],
+      evidence: 'Корпоративный сайт сохраняет вакансию директора производственной площадки',
+    },
+  ]
+  for (const [index, fixture] of reviewFixtures.entries()) {
+    const reviewOrganization = await database.query(
+      `INSERT INTO orgs (name, domain, website_url, career_page_url)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id::TEXT AS id`,
+      [
+        fixture.name,
+        `review-${index + 1}.example.invalid`,
+        `https://review-${index + 1}.example.invalid`,
+        `https://review-${index + 1}.example.invalid/careers`,
+      ],
+    )
+    await database.query(
+      `INSERT INTO digest_candidates (
+         digest_run_id, client_profile_id, org_id, source_external_id,
+         source_display_name, source_families, vacancies_count,
+         distinct_vacancy_names_count, latest_published_at, total_score,
+         reasons, opener, payload, lead_confidence, next_action_kind,
+         next_action_hint, review_status
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6::JSONB, $7, $8,
+         NOW() - $9::INTERVAL, $10, $11::JSONB,
+         'Проверить доказательства до доставки.', $12::JSONB,
+         'medium', 'review', 'Сверить источник и свежесть.', 'pending_review'
+       )`,
+      [
+        digestRun.rows[0].id,
+        profileId,
+        reviewOrganization.rows[0].id,
+        `review-browser-fixture-${index + 1}`,
+        fixture.name,
+        JSON.stringify(fixture.sources),
+        8 - index,
+        Math.max(1, 4 - Math.floor(index / 2)),
+        fixture.age,
+        fixture.score,
+        JSON.stringify(fixture.reasons),
+        JSON.stringify({
+          confidenceGate: fixture.gate,
+          isForeignEmployer: fixture.foreign,
+          locationNames: fixture.locations,
+          evidenceTitles: [fixture.evidence],
+        }),
+      ],
+    )
+  }
   await database.query(
     `INSERT INTO client_digest_org_state (
        client_profile_id, org_id, last_digest_run_id,
@@ -658,6 +744,7 @@ async function seedProductSurfaceFixtures(owner) {
   return {
     candidateId: candidate.rows[0].id,
     opportunityId: opportunity.rows[0].id,
+    reviewFixtureCount: 8,
   }
 }
 
@@ -1641,6 +1728,25 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
     screenshots.review,
     ['heading', 'link'],
   )
+  const reviewRows = page.locator('[data-review-row]')
+  assert(
+    await reviewRows.count() === owner.productSurfaces.reviewFixtureCount,
+    'Review fixture did not render 8 evidence-first rows',
+  )
+  assert(
+    await page.locator('[data-review-evidence-title]').count()
+      === owner.productSurfaces.reviewFixtureCount,
+    'Review rows do not expose a strongest evidence title.',
+  )
+  if (suffix === '390') {
+    const actedRow = reviewRows.first()
+    await actedRow.getByRole('button', { name: 'Отклонить' }).click()
+    await actedRow.getByText('Отклонено', { exact: true }).waitFor({ state: 'visible' })
+    assert(
+      await actedRow.getByRole('button', { name: 'Отклонить' }).count() === 0,
+      'Review decision did not settle the acted-on row',
+    )
+  }
 
   await inspectSurface(
     page,

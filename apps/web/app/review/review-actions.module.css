@@ -42,20 +42,21 @@
   background-color: color-mix(in srgb, var(--color-signal) 10%, var(--color-surface-primary));
 }
 
-.btn[data-tone="danger"] {
-  color: var(--color-destructive);
-  border-color: color-mix(in srgb, var(--color-destructive) 16%, var(--color-surface-primary));
-  background-color: color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary));
-}
-
 @media (hover: hover) and (pointer: fine) {
   .btn[data-tone="success"]:hover {
     background-color: color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary));
   }
 
   .btn[data-tone="danger"]:hover {
+    color: var(--color-destructive);
+    border-color: color-mix(in srgb, var(--color-destructive) 24%, var(--color-surface-primary));
     background-color: color-mix(in srgb, var(--color-destructive) 16%, var(--color-surface-primary));
   }
+}
+
+.btn[data-tone="danger"]:focus-visible {
+  color: var(--color-destructive);
+  border-color: color-mix(in srgb, var(--color-destructive) 24%, var(--color-surface-primary));
 }
 
 .btnIcon {

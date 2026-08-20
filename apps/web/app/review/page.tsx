@@ -1,10 +1,11 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { headers } from 'next/headers';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import { getSession } from '@/lib/auth-v2/authorization';
 import { getEffectiveEntitlement } from '@/lib/entitlements';
+import { getPool } from '@/lib/db';
+import { listPendingReviewCandidates, type ReviewCandidate } from '@/lib/review-data';
 import { createSignalContract, type SignalConfidence } from '@/lib/intelligence/signal-contract';
 import {
   InternalPageFrame,
@@ -30,53 +31,8 @@ export const metadata: Metadata = {
 
 const REVIEW_NAV = buildAccountNavigation('review');
 
-interface ReviewCandidate {
-  id: string;
-  orgId: string;
-  orgName: string;
-  score: number;
-  confidenceGate: string;
-  isForeignEmployer?: boolean;
-  vacanciesCount: number;
-  distinctVacancyNamesCount: number;
-  latestPublishedAt: string | null;
-  reasons: string[];
-  sourceFamilies: string[];
-  evidenceTitles: string[];
-  locationNames: string[];
-  createdAt: string;
-}
-
 function StateLink({ href, label }: { href: string; label: string }) {
   return <Link href={href}>{label}</Link>;
-}
-
-async function getReviewCandidates(
-  clientProfileId: string,
-  limit: number,
-  offset: number,
-  cookieHeader: string | null,
-): Promise<{ items: ReviewCandidate[]; total: number; error?: boolean }> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  const url = new URL('/api/review', baseUrl);
-  url.searchParams.set('clientProfileId', clientProfileId);
-  url.searchParams.set('limit', String(limit));
-  url.searchParams.set('offset', String(offset));
-
-  try {
-    const res = await fetch(url.toString(), {
-      cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(cookieHeader ? { cookie: cookieHeader } : {}),
-      },
-    });
-    if (!res.ok) return { items: [], total: 0, error: true };
-    const data = await res.json();
-    return { items: data.items ?? [], total: data.total ?? 0 };
-  } catch {
-    return { items: [], total: 0, error: true };
-  }
 }
 
 const REVIEW_REASON_LABEL: Record<string, string> = {
@@ -106,6 +62,7 @@ function ReviewRow({ candidate, clientProfileId }: { candidate: ReviewCandidate;
   });
   const freshness = formatSignalFreshness(candidate.latestPublishedAt)?.label ?? 'дата сигнала не определена';
   const reasonLabel = reason ? (REVIEW_REASON_LABEL[reason.key] ?? reason.key) : 'Требует ручной проверки';
+  const strongestEvidence = candidate.evidenceTitles[0] ?? 'Название подтверждения не указано';
   const signal = createSignalContract({
     signal: String(candidate.score),
     whyNow: candidate.reasons.slice(0, 2).join('; ') || reasonLabel,
@@ -129,8 +86,8 @@ function ReviewRow({ candidate, clientProfileId }: { candidate: ReviewCandidate;
         {candidate.reasons.length > 0 ? <span>{signal.whyNow}</span> : null}
       </div>
       <div className={styles.proof}>
-        <strong>{candidate.vacanciesCount} вакансий · {candidate.sourceFamilies.length} источн.</strong>
-        <span>{freshness}</span>
+        <strong data-review-evidence-title>{strongestEvidence}</strong>
+        <span>{candidate.sourceFamilies.length} источн. · {freshness}</span>
       </div>
       <div className={styles.signal}>
         <strong aria-label={`Сила сигнала ${signal.signal}`}>{signal.signal}</strong>
@@ -228,10 +185,18 @@ export default async function ReviewPage({
   const limit = Math.min(Number(params.limit ?? 50), 200);
   const offset = Math.max(Number(params.offset ?? 0), 0);
 
-  const cookieHeader = activeProfileId ? (await headers()).get('cookie') : null;
-  const reviewData = activeProfileId
-    ? await getReviewCandidates(activeProfileId, limit, offset, cookieHeader)
-    : { items: [], total: 0 };
+  const pool = getPool();
+  const reviewData: { items: ReviewCandidate[]; total: number; error?: boolean } = activeProfileId && pool
+    ? await listPendingReviewCandidates({
+        pool,
+        clientProfileId: activeProfileId,
+        ownerId,
+        limit,
+        offset,
+      }).catch(() => ({ items: [], total: 0, error: true as const }))
+    : activeProfileId
+      ? { items: [], total: 0, error: true as const }
+      : { items: [], total: 0 };
 
   return (
     <InternalPageFrame navItems={REVIEW_NAV}>
