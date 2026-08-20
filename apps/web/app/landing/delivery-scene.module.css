@@ -47,7 +47,7 @@
   gap: 1rem;
   align-items: start;
   padding: 1.2rem;
-  border-radius: 1rem;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-secondary);
 }
 
@@ -95,7 +95,7 @@
   gap: .8rem;
   align-items: start;
   padding: 1rem;
-  border-radius: .9rem;
+  border-radius: var(--radius-surface);
   background: var(--color-surface-primary);
 }
 
@@ -148,9 +148,9 @@
   width: min(32rem, 82vw);
   gap: .55rem;
   padding: .65rem;
-  border-radius: 1rem;
+  border-radius: var(--radius-overlay);
   background: var(--color-surface-primary);
-  box-shadow: 0 18px 44px color-mix(in srgb, var(--color-information) 12%, transparent);
+  box-shadow: var(--shadow-float);
 }
 
 @media (max-width: 820px) {
