@@ -180,14 +180,15 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
 function WorkspaceResultsContent(
   props: Pick<WorkspaceProps, "previewInput" | "checkoutHref"> & { embedded?: boolean; previewState: PreviewState },
 ) {
+  const previewState = props.previewState;
   const appliedProfile = [
     props.previewInput.specialization,
     props.previewInput.targetCity,
     props.previewInput.includeKeywords,
   ].filter(Boolean);
-  const visibleItems = props.previewState.items.slice(0, 5);
-  const statusLabel = props.previewState.isPersonalized
-    ? `Выдача по вашему профилю · ${props.previewState.isLive ? "свежие данные" : "демо"}`
+  const visibleItems = previewState.items.slice(0, 5);
+  const statusLabel = previewState.isPersonalized
+    ? `Выдача по вашему профилю · ${previewState.isLive ? "свежие данные" : "демо"}`
     : "Пример сегодняшней выдачи · демо";
 
   return (
@@ -198,19 +199,19 @@ function WorkspaceResultsContent(
       data-preview-results-ready
     >
       <PreviewGeneratedEvent
-        generated={props.previewState.isLive && props.previewState.isPersonalized}
+        generated={previewState.isLive && previewState.isPersonalized}
         context={LANDING_ANALYTICS_CONTEXT.preview}
       />
       <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
         <div>
           <strong>{statusLabel}</strong>
-          {!props.previewState.isLive ? (
+          {!previewState.isLive ? (
             <small className={sceneStyles.demoDisclosure}>
               <strong>Обезличенный пример.</strong> Названия и часть фактов изменены; логика приоритета и типы источников сохранены.
             </small>
           ) : null}
         </div>
-        <span data-live={props.previewState.isLive || undefined}>{props.previewState.items.length} компаний</span>
+        <span data-live={previewState.isLive || undefined}>{previewState.items.length} компаний</span>
       </div>
 
       {props.previewState.isPersonalized && appliedProfile.length > 0 ? (
@@ -220,14 +221,14 @@ function WorkspaceResultsContent(
         </div>
       ) : null}
 
-      {props.previewState.items.length === 0 ? (
+      {previewState.items.length === 0 ? (
         <div className={styles.workspaceEmpty} role="status">
           <span>Сегодня по этому профилю ничего не найдено.</span>
           <strong>Измените специализацию или географию.</strong>
         </div>
       ) : (
         <div>
-          {props.previewState.isPersonalized && !props.previewState.hasExactMatches ? (
+          {previewState.isPersonalized && !previewState.hasExactMatches ? (
             <p className={styles.workspaceMatchNote}>Точного совпадения не нашлось — показываем ближайшие компании по вашему профилю.</p>
           ) : null}
           <WorkspaceLeadList>
@@ -250,7 +251,7 @@ function WorkspaceResultsContent(
           data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
           data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
         >
-          {props.previewState.items.length > 0 ? "Запустить радар на 7 дней →" : "Попробовать неделю →"}
+          {previewState.items.length > 0 ? "Запустить радар на 7 дней →" : "Попробовать неделю →"}
         </Link>
         <span>7 дней · без автопродления</span>
       </div>
