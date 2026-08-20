@@ -27,12 +27,10 @@ const viewportMatrix = [
 
 const requiredSelectors = [
   "#scene-detection",
-  "#scene-signal-timeline",
   "#scene-workspace",
   "#preview-configurator",
   "#preview-results",
   "#scene-evidence",
-  "#scene-radar",
   "#scene-delivery",
   "#pricing",
   "#faq",
@@ -44,7 +42,6 @@ const hashSpecs = [
   { name: "hash-preview-configurator-1440x900", hash: "preview-configurator", target: "#preview-configurator" },
   { name: "hash-preview-results-1440x900", hash: "preview-results", target: "#preview-results" },
   { name: "hash-evidence-1440x900", hash: "scene-evidence", target: "#scene-evidence" },
-  { name: "hash-radar-1440x900", hash: "scene-radar", target: "#scene-radar" },
   { name: "hash-delivery-1440x900", hash: "scene-delivery", target: "#scene-delivery" },
   { name: "hash-pricing-1440x900", hash: "pricing", target: "#pricing" },
   { name: "hash-faq-1440x900", hash: "faq", target: "#faq" },
@@ -121,12 +118,12 @@ async function assertRequiredSurface(page, label) {
   }
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
-  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
+  assert.match(await page.locator("h1").innerText(), /Находите компании, которым стоит написать сейчас\./);
   assert.match(await page.locator("#scene-workspace").innerText(), /пример сегодняшней выдачи|приоритет по вашему профилю/i);
-  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
-  assert.match(await page.locator("#scene-radar").innerText(), /свежесть|подтвержден/i);
-  assert.equal(await page.locator("#scene-radar [data-radar-spatial-model]").getAttribute("data-radar-spatial-model"), "recency-confidence");
-  assert.equal(await page.locator("#scene-radar [data-radar-semantic-list]").count(), 1);
+  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
+  assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
+  assert.ok(await page.locator("#scene-evidence [data-proof-event]").count() >= 3);
+  assert.equal(await page.locator("#scene-evidence [data-proof-brief]").count(), 1);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const pricingText = await page.locator("#pricing").innerText();
   assert.match(pricingText, /Проверьте радар на своей нише за 7 дней/i);
@@ -194,7 +191,7 @@ async function assertNoOverlapOrClipping(page, label) {
       "#preview-configurator",
       "#preview-results",
       "#scene-evidence",
-      "#scene-radar",
+      "#scene-evidence [data-proof-brief] *",
       "#scene-delivery",
       "#pricing",
       "#faq",
@@ -218,7 +215,6 @@ async function assertKeyHeadingBounds(page, label) {
       "#scene-detection h1",
       "#scene-workspace h2",
       "#scene-evidence h2",
-      "#scene-radar h2",
       "#scene-delivery h2",
       "#pricing h2",
       "#faq h2",
@@ -378,13 +374,6 @@ async function revealAllMotionSections(page, label) {
   }));
   assert.deepEqual(invisible, [], `${label}: hidden motion sections: ${JSON.stringify(invisible)}`);
 
-  const timeline = page.locator("#scene-signal-timeline");
-  await timeline.waitFor({ state: "visible" });
-  const timelineBox = await timeline.boundingBox();
-  assert.ok(
-    timelineBox && timelineBox.width >= 44 && timelineBox.height >= 44,
-    `${label}: signal timeline is missing from the rendered page`,
-  );
 }
 
 async function assertResponsiveSurface(browser, viewport) {
@@ -515,16 +504,20 @@ async function assertActiveNavigationAndTone(browser) {
   const { page, assertCleanConsole } = await preparePage(context, "active-navigation-tone");
   const brandHeader = page.locator('header[data-brand-header="recruiter-radar"]');
   await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
-  await page.waitForTimeout(180);
+  await page.evaluate(() => {
+    const evidence = document.querySelector("#scene-evidence");
+    if (evidence) window.scrollTo(0, window.scrollY + evidence.getBoundingClientRect().top - 48);
+  });
+  await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark");
   assert.match(await brandHeader.locator("a[aria-current='location']").first().innerText(), /Как работает/);
-  assert.equal(await brandHeader.getAttribute("data-tone"), "light");
-  await page.locator("#scene-radar").scrollIntoViewIfNeeded();
-  await page.waitForTimeout(180);
   assert.equal(await brandHeader.getAttribute("data-tone"), "dark");
-  assert.equal(await page.locator("#scene-radar [data-radar-spatial-model]").getAttribute("data-radar-spatial-model"), "recency-confidence");
-  assert.equal(await page.locator("#scene-radar [data-radar-semantic-list]").count(), 1);
+  assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
   await page.locator("#scene-delivery").scrollIntoViewIfNeeded();
-  await page.waitForTimeout(180);
+  await page.evaluate(() => {
+    const delivery = document.querySelector("#scene-delivery");
+    if (delivery) window.scrollTo(0, window.scrollY + delivery.getBoundingClientRect().top - 48);
+  });
+  await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light");
   assert.equal(await brandHeader.getAttribute("data-tone"), "light");
   assertCleanConsole();
   await context.close();
@@ -657,7 +650,7 @@ async function assertNoJs(browser) {
   for (const selector of requiredSelectors) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
-  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
+  assert.match(await page.locator("h1").innerText(), /Находите компании, которым стоит написать сейчас\./);
   const noJsWorkspaceText = await page.locator("#scene-workspace").innerText();
   assert.match(noJsWorkspaceText, /интерактивный пример/i);
   assert.match(noJsWorkspaceText, /показать компании/i);

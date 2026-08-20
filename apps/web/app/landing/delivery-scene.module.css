@@ -285,109 +285,6 @@
   animation: none;
 }
 
-.outreachSequence {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(20rem, .9fr);
-  gap: clamp(2rem, 5vw, 5rem);
-  margin-top: clamp(3.4rem, 6vw, 5.5rem);
-  padding: 1.4rem 0;
-  border-top: 1px solid var(--color-separator);
-  border-bottom: 1px solid var(--color-separator);
-}
-
-.outreachSequence::before {
-  content: none;
-}
-
-.outreachFacts {
-  display: grid;
-  gap: .55rem;
-}
-
-.outreachFacts > strong {
-  font-size: clamp(1.55rem, 2.4vw, 2.25rem);
-  font-weight: 590;
-  letter-spacing: -.045em;
-}
-
-.outreachFacts dl {
-  display: grid;
-  gap: 0;
-  margin: 1rem 0 0;
-}
-
-.outreachFacts dl > div {
-  display: grid;
-  grid-template-columns: minmax(8rem, .42fr) minmax(0, 1fr);
-  gap: 1rem;
-  padding: .75rem 0;
-  border-top: 1px solid var(--color-separator-subtle);
-}
-
-.outreachFacts dt {
-  color: var(--color-text-tertiary);
-  font-family: var(--font-sans);
-  font-size: .68rem;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.outreachFacts dd {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: .78rem;
-  line-height: 1.5;
-}
-
-.outreachDraft {
-  position: relative;
-  align-self: start;
-  padding: 1.15rem 0 1.2rem clamp(1rem, 2.2vw, 1.8rem);
-  border: 0;
-  border-left: 2px solid var(--color-signal);
-  background: transparent;
-  box-shadow: none;
-}
-
-.outreachDraft::before {
-  content: none;
-}
-
-.outreachDraft > div {
-  display: flex;
-  align-items: center;
-  gap: .7rem;
-  color: var(--color-text-tertiary);
-  font-family: var(--font-sans);
-  font-size: .68rem;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-.outreachDraft > div svg {
-  color: var(--color-signal);
-}
-
-.outreachDraft p {
-  margin: 1rem 0;
-  color: var(--color-text-primary);
-  font-size: clamp(.96rem, 1.25vw, 1.08rem);
-  line-height: 1.62;
-  text-wrap: pretty;
-}
-
-.outreachDraft > strong {
-  color: var(--color-text-secondary);
-  font-family: var(--font-sans);
-  font-size: .68rem;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
 @media (hover: hover) and (pointer: fine) {
   .channelRoute:hover {
     background: var(--color-surface-secondary);
@@ -407,13 +304,6 @@
     min-height: 15rem;
   }
 
-  .outreachSequence {
-    grid-template-columns: 1fr;
-  }
-
-  .outreachDraft {
-    max-width: 44rem;
-  }
 }
 
 @media (max-width: 620px) {
@@ -465,18 +355,6 @@
     margin-left: 0;
   }
 
-  .outreachSequence {
-    margin-top: 3.6rem;
-  }
-
-  .outreachFacts dl > div {
-    grid-template-columns: 1fr;
-    gap: .3rem;
-  }
-
-  .outreachDraft {
-    padding: 1rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

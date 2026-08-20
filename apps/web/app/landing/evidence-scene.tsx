@@ -4,40 +4,39 @@ import styles from "./landing.module.css";
 
 export default function EvidenceScene() {
   return (
-    <section id="scene-evidence" className={`${styles.scene} ${styles.lightScene} ${styles.evidenceScene} ${sceneStyles.section}`} style={{ scrollMarginTop: "calc(72px + 32px)" }} aria-labelledby="evidence-title" data-header-tone="light" data-motion-reveal="section">
+    <section id="scene-evidence" className={`${styles.scene} ${styles.evidenceScene} ${sceneStyles.section}`} style={{ scrollMarginTop: "calc(72px + 32px)" }} aria-labelledby="evidence-title" data-header-tone="dark" data-theme="inverse" data-motion-reveal="section" data-proof-story="why-now">
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.intro}>
-          <p className={styles.sceneLabel}>Подтверждения</p>
-          <h2 id="evidence-title" className={styles.sceneHeading}>По каждой компании видно, <em>на чём основана рекомендация.</em></h2>
-          <p className={styles.sceneLead}>Радар показывает, что изменилось в найме, когда это произошло и где найдено. Факты можно проверить до первого сообщения.</p>
+          <p className={sceneStyles.label}>Почему эта компания сейчас</p>
+            <h2 id="evidence-title" className={sceneStyles.heading}>Не один сигнал, а <em>цепочка фактов.</em></h2>
+          <p className={sceneStyles.lead}>Радар связывает изменения во времени, показывает источники и отделяет подтверждённый повод от обычного шума вакансий.</p>
         </div>
 
-        <div className={sceneStyles.proofSummary} aria-label="Уровень подтверждения компании">
-          <span>Уровень подтверждения</span>
-          <strong>Высокий</strong>
-          <p>Несколько независимых фактов подтверждают активное расширение команды.</p>
-        </div>
-
-        <div className={sceneStyles.ledger}>
-          <header className={sceneStyles.ledgerHeading}>
-            <div><span>Компания</span><strong>{DEMO_COMPANY.name}</strong></div>
-            <p>Источник · факт · дата · статус</p>
-          </header>
-          <ul className={sceneStyles.records}>
+        <ol className={sceneStyles.timeline} aria-label="Последовательность подтверждающих фактов">
             {DEMO_EVIDENCE_SOURCES.map((row, index) => (
-              <li key={row.source} className={sceneStyles.record} tabIndex={0} data-evidence-row aria-label={`${row.source}: ${row.fact}. ${row.confidence}`}>
-                <span className={sceneStyles.recordIndex}>{String(index + 1).padStart(2, "0")}</span>
-                <div className={sceneStyles.recordFact}><span>{row.source}</span><strong>{row.fact}</strong></div>
-                <span className={sceneStyles.recordDate}>{row.eventDate}</span>
-                <span className={sceneStyles.recordStatus}>{row.confidence}</span>
+              <li key={row.source} data-proof-event>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <time>{row.eventDate}</time>
+                <div><small>{row.source}</small><strong>{row.fact}</strong></div>
+                <em>{row.confidence}</em>
               </li>
             ))}
-          </ul>
-          <div className={sceneStyles.conclusion} data-evidence-conclusion="source-fact-conclusion">
-            <div><span>Источник</span><i aria-hidden="true">→</i><span>Факт</span><i aria-hidden="true">→</i><strong>Вывод</strong></div>
-            <p>Подтверждения объясняют «почему сейчас»; сила сигнала помогает сортировать, но не заменяет факты.</p>
+        </ol>
+
+        <aside className={sceneStyles.brief} data-proof-brief>
+          <div className={sceneStyles.briefTopline}><span>Компания</span><strong>Приоритет 01</strong></div>
+          <h3>{DEMO_COMPANY.name}</h3>
+          <p>{DEMO_COMPANY.whyNow}</p>
+          <dl>
+            <div><dt>Уровень подтверждения</dt><dd>Высокий</dd></div>
+            <div><dt>Свежесть</dt><dd>{DEMO_COMPANY.freshness}</dd></div>
+            <div><dt>Корпоративный контакт</dt><dd>Карьерная страница</dd></div>
+          </dl>
+          <div className={sceneStyles.action}>
+            <span>Следующий ход</span>
+            <strong>Проверить факты и предложить точечный инженерный подбор.</strong>
           </div>
-        </div>
+        </aside>
       </div>
     </section>
   );

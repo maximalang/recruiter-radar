@@ -74,7 +74,7 @@ describe("landing runtime truth contract", () => {
       ]),
     );
 
-    expect(evidence).toContain("почему сейчас");
+    expect(evidence).toContain("Почему эта компания сейчас");
     expect(evidence).toContain("DEMO_EVIDENCE_SOURCES.map");
     expect(evidence).toContain('from "./landing-copy"');
     expect(landingCopy).toContain("Карьерная страница");

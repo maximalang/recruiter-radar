@@ -15,8 +15,8 @@ describe("landing final production contract", () => {
     const page = source("app/landing/landing-page.tsx");
 
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
-    expect(hero).toContain('data-hero-layout="signal-spine"');
-    expect(hero).toContain("Компании, которым стоит написать сегодня.");
+    expect(hero).toContain('data-hero-layout="company-brief"');
+    expect(hero).toContain("Находите компании, которым стоит написать сейчас.");
     expect(hero).toContain("Посмотреть пример");
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain("Почему сейчас");
@@ -78,41 +78,26 @@ describe("landing final production contract", () => {
     expect(visual).toMatch(/#faq details\[open\] p[\s\S]*?animation\s*:\s*none\s*(?:;|})/);
   });
 
-  test("preserves the manual outreach boundary and the full signal journey", () => {
+  test("preserves the manual outreach boundary in one consolidated proof journey", () => {
     const page = source("app/landing/landing-page.tsx");
-    const timeline = source("app/landing/signal-timeline-scene.tsx");
     const delivery = source("app/landing/delivery-scene.tsx");
     const evidence = source("app/landing/evidence-scene.tsx");
-    const radar = source("app/landing/radar-scene.tsx");
-    const radarStyles = source("app/landing/radar-scene.module.css");
 
     expect(page).not.toContain("<OutreachScene");
-    expect(page).toContain("<SignalTimelineScene");
-    expect(page).toContain("<RadarScene");
-    expect(page.indexOf("<EvidenceScene")).toBeLessThan(page.indexOf("<RadarScene"));
-    expect(page.indexOf("<RadarScene")).toBeLessThan(page.indexOf("<DeliveryScene"));
-    expect(timeline).toContain('id="scene-signal-timeline"');
-    expect(timeline).toContain("data-timeline-event");
-    expect(timeline).toContain('data-opportunity-lock="true"');
+    expect(page).not.toContain("<SignalTimelineScene");
+    expect(page).not.toContain("<RadarScene");
+    expect(page.indexOf("<EvidenceScene")).toBeLessThan(page.indexOf("<DeliveryScene"));
     expect(delivery).toContain("Сообщения компаниям не отправляются автоматически.");
     expect(delivery).toContain('data-delivery-routes="connected"');
     expect(delivery).toContain("PRIMARY_ROUTES.map");
     expect(delivery).toContain("EXTRA_ROUTES.map");
     expect(delivery).toContain('data-manual-outreach-boundary="true"');
-    expect(evidence).toContain("почему сейчас");
-    expect(evidence).toContain('data-evidence-conclusion="source-fact-conclusion"');
-    expect(evidence).toContain("Источник</span><i aria-hidden=\"true\">→</i><span>Факт");
-    expect(evidence).not.toContain("открыть факт");
-    expect(evidence).not.toContain("SOURCE_ROLES");
-    expect(radar).toContain('id="scene-radar"');
-    expect(radar).toContain('data-theme="inverse"');
-    expect(radar).toContain('data-radar-spatial-model="recency-confidence"');
-    expect(radar).toContain("География остаётся фильтром и контекстом");
-    expect(radar).toContain("data-radar-semantic-list");
-    expect(radar).toContain("DEMO_COMPANY.name");
-    expect(radarStyles).not.toMatch(/#[0-9a-f]{3,8}/i);
-    expect(radarStyles).not.toContain("infinite");
-    expect(radarStyles).not.toContain("glow");
+    expect(evidence).toContain('data-proof-story="why-now"');
+    expect(evidence).toContain("data-proof-event");
+    expect(evidence).toContain("data-proof-brief");
+    expect(evidence).toContain("Уровень подтверждения");
+    expect(evidence).toContain("Свежесть");
+    expect(evidence).toContain("Следующий ход");
   });
 
   test("keeps FAQ copy professional and free of internal delivery terminology", () => {

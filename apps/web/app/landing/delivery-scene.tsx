@@ -1,6 +1,5 @@
-import { ArrowGlyph, RouteGlyph, SignalGlyph } from "./brand-glyphs";
+import { ArrowGlyph, RouteGlyph } from "./brand-glyphs";
 import sceneStyles from "./delivery-scene.module.css";
-import { DEMO_COMPANY } from "./landing-copy";
 import styles from "./landing.module.css";
 
 const DELIVERY_STEPS = [
@@ -112,6 +111,7 @@ export default function DeliveryScene() {
       aria-labelledby="delivery-title"
       data-header-tone="light"
       data-motion-reveal="section"
+      data-delivery-summary="compact"
     >
       <div className={styles.deliveryLayout}>
         <div className={styles.deliveryIntro}>
@@ -120,7 +120,7 @@ export default function DeliveryScene() {
             Радар находит повод. <em>Пишете вы.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Recruiter Radar следит за изменениями в найме, выбирает наиболее релевантные компании и готовит контекст для первого обращения. Финальное решение всегда остаётся за вами.
+            Задайте нишу, получите подтверждённый повод и выберите корпоративный путь контакта. Финальное решение всегда остаётся за вами.
           </p>
         </div>
 
@@ -138,9 +138,9 @@ export default function DeliveryScene() {
           <div className={sceneStyles.capabilityHeader}>
             <div>
               <span>Доставка</span>
-              <strong>Получайте выдачу там, где удобно работать.</strong>
+              <strong>Работайте в кабинете. Уведомления приходят туда, где удобно.</strong>
             </div>
-            <p>Полная информация всегда доступна в веб-кабинете. При необходимости подключите дополнительные уведомления.</p>
+            <p>Полная карточка и доказательства остаются в веб-кабинете; остальные каналы сообщают о новом сигнале.</p>
           </div>
           <div className={sceneStyles.channelHierarchy}>
             <article className={sceneStyles.coreChannel} data-channel={CORE_CHANNEL.key} data-delivery-core="workspace">
@@ -166,24 +166,7 @@ export default function DeliveryScene() {
           </div>
         </div>
 
-        <div className={sceneStyles.outreachSequence} data-manual-outreach-boundary="true">
-          <div className={sceneStyles.outreachFacts}>
-            <span className={sceneStyles.groupLabel}>Контекст для первого обращения</span>
-            <strong>{DEMO_COMPANY.name}</strong>
-            <dl>
-              <div><dt>Что изменилось</dt><dd>{DEMO_COMPANY.whyNow}</dd></div>
-              <div><dt>Что можно предложить</dt><dd>Точечный подбор инженеров и руководителей направления.</dd></div>
-              <div><dt>Где искать контакт</dt><dd>Карьерная страница и официальный рабочий канал компании.</dd></div>
-            </dl>
-          </div>
-          <div className={sceneStyles.outreachDraft}>
-            <div><SignalGlyph size={30} /><span>ПРИМЕР СООБЩЕНИЯ / НЕ ОТПРАВЛЕНО</span></div>
-            <p>«Вижу, что вы расширяете инженерную команду: за неделю открыли несколько новых позиций, а часть сложных ролей появилась повторно. Если по некоторым вакансиям нужен внешний поиск, можем подключиться точечно.»</p>
-            <strong>Проверьте факты и адаптируйте сообщение под свой стиль.</strong>
-          </div>
-        </div>
-
-        <aside className={styles.deliveryBoundary}>
+        <aside className={styles.deliveryBoundary} data-manual-outreach-boundary="true">
           <span>Контроль остаётся у вас</span>
           <strong>Сообщения компаниям не отправляются автоматически.</strong>
         </aside>

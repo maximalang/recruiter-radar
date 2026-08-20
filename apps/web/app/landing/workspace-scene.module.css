@@ -8,15 +8,16 @@
 }
 
 .intro {
-  grid-template-columns: minmax(20rem, .9fr) minmax(24rem, 1.1fr);
+  grid-template-columns: minmax(24rem, 1fr) minmax(24rem, 1fr);
   grid-template-areas: "label label" "title lead";
   gap: .9rem clamp(2.5rem, 5vw, 5rem);
   padding-bottom: 1.8rem;
 }
 
 .intro :global(h2) {
-  max-width: 13ch;
-  font-size: clamp(2.55rem, 4.1vw, 4.2rem);
+  max-width: 15ch;
+  padding-inline: .08em;
+  font-size: clamp(2.55rem, 4.1vw, 4rem);
   text-wrap: balance;
 }
 
@@ -35,52 +36,40 @@
   box-shadow: none;
 }
 
-.productRail {
-  display: flex;
+.previewHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   min-height: 3rem;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  gap: .65rem 1.25rem;
   padding: .7rem .95rem;
   border-bottom: 1px solid var(--color-separator-subtle);
   background: transparent;
   color: var(--color-text-primary);
-}
-
-.railIdentity {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: .45rem .75rem;
   font-family: var(--font-sans);
   font-size: .68rem;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
 }
 
-.railIdentity strong {
+.previewHeader strong {
   color: var(--color-text-primary);
+  font-size: .74rem;
+  font-weight: 600;
+}
+
+.previewHeader > span {
+  color: var(--color-signal-hover);
   font-weight: 650;
 }
 
-.railIdentity span {
-  color: var(--color-text-tertiary);
-  font-weight: 500;
-}
-
-.railStatus {
+.previewHeader small {
   display: inline-flex;
   align-items: center;
   gap: .45rem;
   color: var(--color-text-tertiary);
-  font-family: var(--font-sans);
   font-size: .68rem;
-  font-weight: 550;
-  text-transform: none;
 }
 
-.railStatus::before {
+.previewHeader small::before {
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -475,15 +464,20 @@
     border-radius: 0;
   }
 
-  .productRail {
+  .previewHeader {
+    grid-template-columns: 1fr auto;
     align-items: flex-start;
-    flex-direction: column;
-    gap: .3rem;
+    gap: .35rem .75rem;
   }
 
-  .railIdentity,
-  .railStatus {
-    font-size: .7rem;
+  .previewHeader strong {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .previewHeader small {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .controls {

@@ -25,22 +25,22 @@ describe("landing visual and login reliability polish", () => {
     expect(visual).toContain(':global(#faq summary)');
   });
 
-  test("uses the final static Signal Spine hero without an ambient radar runtime", () => {
+  test("uses a static company brief hero without an ambient radar runtime", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const heroScene = source("app/landing/detection-scene.module.css");
     const visual = source("app/landing/landing-visual-system.module.css");
     const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
     const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(hero).toContain('data-hero-layout="signal-spine"');
-    expect(hero).toContain("Компания");
+    expect(hero).toContain('data-hero-layout="company-brief"');
+    expect(hero).toContain('data-hero-company-brief="true"');
     expect(hero).toContain("Почему сейчас");
     expect(hero).toContain("Подтверждения");
     expect(hero).toContain("Следующий ход");
     expect(hero).not.toContain("HeroRadar");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);
-    expect(heroScene).toContain("var(--color-canvas)");
+    expect(heroScene).toContain("var(--color-text-primary)");
     expect(heroScene).toContain("var(--color-signal)");
     expect(heroScene).not.toMatch(/animation\s*:/);
     expect(heroScene).not.toContain("#c8f36a");

@@ -45,7 +45,8 @@ describe("landing sales production pass", () => {
 
   it("keeps the pricing hierarchy and closing trust points concise", () => {
     const panel = source("app/landing/conversion-panel.tsx");
-    expect(panel).toContain("data-recommended={plan.isPrimary || undefined}");
+    expect(panel).toContain('data-pilot-entry="primary"');
+    expect(panel).not.toContain("data-recommended={plan.isPrimary");
     expect(panel).toContain("990 ₽ / 7 дней");
     expect(panel).toContain("Без автопродления");
     expect(panel).toContain("Факты по каждой компании");

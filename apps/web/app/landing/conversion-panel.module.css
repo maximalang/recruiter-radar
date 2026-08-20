@@ -72,23 +72,6 @@
     opacity var(--motion-duration-context) var(--motion-ease-standard);
 }
 
-.secondaryOffers :global(article[data-recommended="true"]) {
-  margin-inline: -.85rem;
-  padding-inline: .85rem;
-  border-top-color: color-mix(in srgb, var(--color-signal) 42%, transparent);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--color-signal) 5.5%, transparent), transparent 78%);
-}
-
-.secondaryOffers :global(article[data-recommended="true"]::before) {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 1px;
-  background: color-mix(in srgb, var(--color-signal) 52%, transparent);
-  content: "";
-}
-
 .pricing [data-pricing-secondary="true"] :global(article) > :global(a) {
   margin-top: auto;
 }
@@ -347,11 +330,6 @@
 
   .secondaryOffers :global(article) {
     opacity: 1;
-  }
-
-  .secondaryOffers :global(article[data-recommended="true"]) {
-    margin-inline: -.55rem;
-    padding-inline: .55rem;
   }
 
   .pricing [data-consent-safe-copy] {

@@ -42,13 +42,15 @@ export default function WorkspaceScene(props: WorkspaceProps) {
       <div className={styles.workspaceLayout} data-preview-section-content>
         <LandingPreviewInteractions />
         <WorkspaceIntro />
-        <div className={sceneStyles.productFrame} data-product-preview="live-radar">
-          <div className={sceneStyles.productRail} aria-label="Состояние предпросмотра выдачи">
-            <div className={sceneStyles.railIdentity}>
-              <strong>RECRUITER RADAR</strong>
-              <span>/ ПРИМЕР</span>
-            </div>
-            <span className={sceneStyles.railStatus}>готов к настройке</span>
+        <div
+          className={sceneStyles.productFrame}
+          data-product-preview="live-radar"
+          data-preview-editorial="true"
+        >
+          <div className={sceneStyles.previewHeader} aria-label="Состояние интерактивного примера">
+            <span>Живой пример выдачи</span>
+            <strong>Настройте профиль — рекомендации обновятся</strong>
+            <small>готов к настройке</small>
           </div>
           <PreviewConfigurator previewInput={props.previewInput} hasPreview={props.hasPreview} />
           <div
@@ -76,10 +78,10 @@ function WorkspaceIntro() {
     <div className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
       <p className={styles.sceneLabel}>Интерактивный пример</p>
       <h2 id="workspace-title" className={styles.sceneHeading}>
-        Настройте нишу — <em>посмотрите, какие компании радар поставит в приоритет.</em>
+        Посмотрите результат на своей нише — <em>и разберите первую рекомендацию.</em>
       </h2>
       <p className={styles.sceneLead}>
-        Выберите специализацию и географию. Радар покажет компании, которые сейчас активнее нанимают в вашем сегменте, и объяснит почему.
+        Выберите специализацию и географию. Радар покажет приоритетные компании, факты и объяснение, почему стоит действовать сейчас.
       </p>
     </div>
   );

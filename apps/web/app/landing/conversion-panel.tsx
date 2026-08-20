@@ -9,10 +9,8 @@ import {
   buildCheckoutHref,
   type PublicPreviewInput,
 } from "../../lib/publicProduct";
-import { TargetIcon } from "../ui/icons";
 import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
 import panelStyles from "./conversion-panel.module.css";
-import finalStyles from "./final-radar.module.css";
 import styles from "./landing.module.css";
 
 const PILOT_BULLETS = [
@@ -56,7 +54,11 @@ export default function ConversionPanel(props: {
           </p>
         </div>
 
-        <div className={`${styles.pilotOffer} ${panelStyles.pilotOffer}`} data-pricing-primary="true">
+        <div
+          className={`${styles.pilotOffer} ${panelStyles.pilotOffer}`}
+          data-pricing-primary="true"
+          data-pilot-entry="primary"
+        >
           <div className={styles.pilotMeta}>
             <span>Неделя</span>
             <strong>{pilotPlan.cadence}</strong>
@@ -86,7 +88,7 @@ export default function ConversionPanel(props: {
           {secondaryPlans.map((plan) => {
             const quarterly = plan.code === "quarterly";
             return (
-              <article key={plan.code} data-plan-code={plan.code} data-recommended={plan.isPrimary || undefined}>
+              <article key={plan.code} data-plan-code={plan.code}>
                 <div className={panelStyles.offerTopline}>
                   <span>{plan.name}</span>
                   <b>{plan.cadence}</b>
@@ -152,9 +154,6 @@ export default function ConversionPanel(props: {
           <li>Факты по каждой компании</li>
           <li>Сообщения отправляете вы</li>
         </ul>
-        <div className={finalStyles.radar} data-final-radar-composition="signal-lock" aria-hidden="true">
-          <TargetIcon className={finalStyles.glyph} />
-        </div>
         <div className={styles.finalActions}>
           <Link
             prefetch={false}
