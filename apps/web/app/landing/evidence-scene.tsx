@@ -11,7 +11,13 @@ export default function EvidenceScene() {
     .map((part) => part.trim());
 
   return (
-    <section id="scene-evidence" className={styles.section} data-header-tone="dark" data-proof-story="why-now">
+    <section
+      id="scene-evidence"
+      className={styles.section}
+      aria-label="Почему эта компания сейчас"
+      data-header-tone="dark"
+      data-proof-story="why-now"
+    >
       <div className={styles.layout}>
         <header className={styles.intro}>
           <div>
@@ -24,7 +30,7 @@ export default function EvidenceScene() {
         </header>
 
         <div className={styles.evidenceChain}>
-          <ol className={styles.timeline} aria-label="Цепочка подтверждений">
+          <ol className={styles.timeline} aria-label="Последовательность подтверждающих фактов">
             {DEMO_EVIDENCE_SOURCES.map((event, index) => (
               <li key={event.source} data-proof-event>
                 <span className={styles.index}>{String(index + 1).padStart(2, "0")}</span>
@@ -37,7 +43,7 @@ export default function EvidenceScene() {
 
           <aside className={styles.resolution} data-proof-brief>
             <span className={styles.resolutionLabel}>Вывод</span>
-            <div className={styles.confidenceBlock}>
+            <div className={styles.confidenceBlock} aria-label="Уровень подтверждения">
               <span>Уверенность</span>
               <strong>{capitalize(confidenceText)}</strong>
               <small>Класс {confidenceGrade} · {DEMO_COMPANY.freshness} · {DEMO_COMPANY.score} / 100</small>
