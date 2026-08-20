@@ -319,7 +319,7 @@ async function seedProductSurfaceFixtures(owner) {
        source_display_name, source_families, vacancies_count,
        distinct_vacancy_names_count, latest_published_at, total_score,
        reasons, opener, payload, lead_confidence, next_action_kind,
-       next_action_hint
+       next_action_hint, review_status
      )
      VALUES (
        $1, $2, $3, 'browser-fixture-company',
@@ -328,11 +328,97 @@ async function seedProductSurfaceFixtures(owner) {
        '["Рост продуктовой команды","Повторный найм"]'::JSONB,
        'Предложить точечный подбор продуктовой команды.',
        '{"confidenceGate":"A","locationNames":["Москва"],"evidenceTitles":["Открыты продуктовые вакансии"]}'::JSONB,
-       'high', 'outreach', 'Проверить корпоративную форму и подготовить черновик.'
+       'high', 'outreach', 'Проверить корпоративную форму и подготовить черновик.',
+       'pending_review'
      )
      RETURNING id::TEXT AS id`,
     [digestRun.rows[0].id, profileId, organizationId],
   )
+  const reviewFixtures = [
+    {
+      name: 'Очень длинное название международной технологической компании с распределённой продуктовой командой',
+      sources: ['hh'], gate: 'C', foreign: true, age: '3 hours', score: 84,
+      locations: ['Москва', 'Санкт-Петербург', 'Казань'],
+      reasons: ['Одновременно открыты роли в трёх городах', 'Команда расширяет несколько продуктовых направлений'],
+      evidence: 'Карьерная страница подтверждает одновременный набор продуктовых аналитиков и инженеров',
+    },
+    {
+      name: 'Северная логистика', sources: ['career-pages'], gate: 'C', foreign: false, age: '6 hours', score: 78,
+      locations: ['Архангельск'], reasons: ['Открыт новый блок логистических вакансий'],
+      evidence: 'На официальной карьерной странице опубликованы семь новых вакансий',
+    },
+    {
+      name: 'Atlas Commerce', sources: ['greenhouse'], gate: 'B', foreign: true, age: '1 day', score: 76,
+      locations: ['Удалённо', 'Москва'], reasons: ['Зарубежный ATS требует проверки работодателя'],
+      evidence: 'Greenhouse показывает повторный набор в коммерческую команду',
+    },
+    {
+      name: 'Волга Энерго Системы', sources: ['company-newsrooms', 'career-pages'], gate: 'C', foreign: false, age: '2 days', score: 73,
+      locations: ['Самара', 'Тольятти'], reasons: ['Инвестиционная программа совпала с ростом найма'],
+      evidence: 'Пресс-релиз об инвестиционной программе подтверждён карьерными вакансиями',
+    },
+    {
+      name: 'МедТех Лаборатория', sources: ['hh'], gate: 'B', foreign: false, age: '5 days', score: 69,
+      locations: ['Новосибирск'], reasons: ['Единственный источник требует ручной верификации'],
+      evidence: 'HH показывает устойчивый повторный найм инженеров медицинских систем',
+    },
+    {
+      name: 'Уральские цифровые решения', sources: ['career-pages', 'hh'], gate: 'C', foreign: false, age: '9 days', score: 65,
+      locations: ['Екатеринбург', 'Пермь'], reasons: ['Сигнал старше недели, но подтверждён двумя источниками'],
+      evidence: 'Карьерная страница и HH подтверждают набор региональной команды внедрения',
+    },
+    {
+      name: 'Тихоокеанский производственный холдинг', sources: ['company-site'], gate: 'C', foreign: false, age: '18 days', score: 61,
+      locations: ['Владивосток'], reasons: ['Давний одиночный сигнал требует повторной проверки свежести'],
+      evidence: 'Корпоративный сайт сохраняет вакансию директора производственной площадки',
+    },
+  ]
+  for (const [index, fixture] of reviewFixtures.entries()) {
+    const reviewOrganization = await database.query(
+      `INSERT INTO orgs (name, domain, website_url, career_page_url)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id::TEXT AS id`,
+      [
+        fixture.name,
+        `review-${index + 1}.example.invalid`,
+        `https://review-${index + 1}.example.invalid`,
+        `https://review-${index + 1}.example.invalid/careers`,
+      ],
+    )
+    await database.query(
+      `INSERT INTO digest_candidates (
+         digest_run_id, client_profile_id, org_id, source_external_id,
+         source_display_name, source_families, vacancies_count,
+         distinct_vacancy_names_count, latest_published_at, total_score,
+         reasons, opener, payload, lead_confidence, next_action_kind,
+         next_action_hint, review_status
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6::JSONB, $7, $8,
+         NOW() - $9::INTERVAL, $10, $11::JSONB,
+         'Проверить доказательства до доставки.', $12::JSONB,
+         'medium', 'review', 'Сверить источник и свежесть.', 'pending_review'
+       )`,
+      [
+        digestRun.rows[0].id,
+        profileId,
+        reviewOrganization.rows[0].id,
+        `review-browser-fixture-${index + 1}`,
+        fixture.name,
+        JSON.stringify(fixture.sources),
+        8 - index,
+        Math.max(1, 4 - Math.floor(index / 2)),
+        fixture.age,
+        fixture.score,
+        JSON.stringify(fixture.reasons),
+        JSON.stringify({
+          confidenceGate: fixture.gate,
+          isForeignEmployer: fixture.foreign,
+          locationNames: fixture.locations,
+          evidenceTitles: [fixture.evidence],
+        }),
+      ],
+    )
+  }
   await database.query(
     `INSERT INTO client_digest_org_state (
        client_profile_id, org_id, last_digest_run_id,
@@ -658,6 +744,7 @@ async function seedProductSurfaceFixtures(owner) {
   return {
     candidateId: candidate.rows[0].id,
     opportunityId: opportunity.rows[0].id,
+    reviewFixtureCount: 8,
   }
 }
 
@@ -931,6 +1018,20 @@ async function inspectCurrentSurface(
     () => document.documentElement.scrollWidth - window.innerWidth,
   )
   assert(overflow <= 0, `${pathname} overflows horizontally by ${overflow}px.`)
+  const mobileNavOverlap = await page.evaluate(() => {
+    if (window.innerWidth > 767) return 0
+    const main = document.querySelector('main')
+    const nav = document.querySelector('nav[aria-label="Мобильная навигация"]')
+    if (!(main instanceof HTMLElement) || !(nav instanceof HTMLElement)) return 0
+    return Math.max(
+      0,
+      Math.ceil(main.getBoundingClientRect().bottom - nav.getBoundingClientRect().top),
+    )
+  })
+  assert(
+    mobileNavOverlap === 0,
+    `${pathname} mobile navigation overlaps content by ${mobileNavOverlap}px.`,
+  )
   const unlabeledControls = await page.evaluate(() => {
     const visible = (element) => {
       const style = window.getComputedStyle(element)
@@ -988,6 +1089,11 @@ async function inspectCurrentSurface(
     () => document.activeElement !== document.body,
   )
   assert(focusMoved, `${pathname} did not expose a keyboard focus target.`)
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+  })
   const screenshotPath = resolve(artifactsDirectory, screenshotName)
   await page.screenshot({
     path: screenshotPath,
@@ -1002,13 +1108,26 @@ async function inspectCurrentSurface(
   report.responsive[key] = {
     viewport: page.viewportSize(),
     overflowPixels: overflow,
+    mobileNavigationOverlapPixels: mobileNavOverlap,
   }
   report.screenshots[key] = screenshotPath
 }
 
-async function inspectSurface(page, key, pathname, screenshotName) {
+async function inspectSurface(
+  page,
+  key,
+  pathname,
+  screenshotName,
+  expectedSemantics = ['heading', 'button'],
+) {
   await page.goto(`${baseUrl}${pathname}`, { waitUntil: 'domcontentloaded' })
-  await inspectCurrentSurface(page, key, pathname, screenshotName)
+  await inspectCurrentSurface(
+    page,
+    key,
+    pathname,
+    screenshotName,
+    expectedSemantics,
+  )
 }
 
 async function waitForOutboxToken(email, pathname, excludedToken = null) {
@@ -1225,8 +1344,10 @@ const authenticatedProductViewports = [
     width: 1440,
     height: 1000,
     screenshots: {
+      dashboard: 'auth-v2-account-team-e2e-shot-dashboard-data-1440.png',
       leads: 'auth-v2-account-team-e2e-shot-leads-data-1440.png',
       leadDetail: 'auth-v2-account-team-e2e-shot-lead-detail-data-1440.png',
+      review: 'auth-v2-account-team-e2e-shot-review-data-1440.png',
       opportunities: 'auth-v2-account-team-e2e-shot-opportunities-data-1440.png',
       evidenceRadar: 'auth-v2-account-team-e2e-shot-evidence-radar-data-1440.png',
     },
@@ -1236,13 +1357,305 @@ const authenticatedProductViewports = [
     width: 390,
     height: 844,
     screenshots: {
+      dashboard: 'auth-v2-account-team-e2e-shot-dashboard-data-390.png',
       leads: 'auth-v2-account-team-e2e-shot-leads-data-390.png',
       leadDetail: 'auth-v2-account-team-e2e-shot-lead-detail-data-390.png',
+      review: 'auth-v2-account-team-e2e-shot-review-data-390.png',
       opportunities: 'auth-v2-account-team-e2e-shot-opportunities-data-390.png',
       evidenceRadar: 'auth-v2-account-team-e2e-shot-evidence-radar-data-390.png',
     },
   },
 ]
+
+const mobileMoreViewports = [
+  {
+    suffix: '320',
+    width: 320,
+    height: 568,
+    screenshot: 'auth-v2-account-team-e2e-shot-mobile-more-open-320.png',
+  },
+  {
+    suffix: '390',
+    width: 390,
+    height: 844,
+    screenshot: 'auth-v2-account-team-e2e-shot-mobile-more-open-390.png',
+  },
+]
+
+const companyBriefActionViewports = [
+  { suffix: '640', width: 640, height: 900 },
+  { suffix: '768', width: 768, height: 1024 },
+  { suffix: '900', width: 900, height: 1000 },
+  { suffix: '1000', width: 1000, height: 900 },
+  { suffix: '1024', width: 1024, height: 768 },
+]
+
+const companyFilterViewports = [
+  { suffix: '320', width: 320, height: 568 },
+  { suffix: '390', width: 390, height: 844 },
+]
+
+async function verifyMobileMoreNavigation(
+  page,
+  { suffix, width, height, screenshot },
+) {
+  await page.setViewportSize({ width, height })
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(
+    () => document.querySelectorAll('main').length === 1,
+  )
+
+  const mobileNavigation = page.getByRole('navigation', {
+    name: 'Мобильная навигация',
+  })
+  const moreDisclosure = mobileNavigation.locator('details').filter({
+    hasText: 'Ещё',
+  })
+  const moreSummary = moreDisclosure.locator('summary')
+  const moreMenu = moreDisclosure.locator('div').filter({
+    has: page.getByRole('link', { name: 'Настройки', exact: true }),
+  })
+  const layoutBeforeOpen = await page.evaluate(() => {
+    const main = document.querySelector('main')
+    const nav = document.querySelector('nav[aria-label="Мобильная навигация"]')
+    if (!(main instanceof HTMLElement)) {
+      throw new Error('Authenticated mobile main surface is missing.')
+    }
+    if (!(nav instanceof HTMLElement)) {
+      throw new Error('Authenticated mobile navigation is missing.')
+    }
+    const mainRect = main.getBoundingClientRect()
+    const navRect = nav.getBoundingClientRect()
+    return {
+      mainBottom: mainRect.bottom,
+      mainHeight: mainRect.height,
+      mainScrollHeight: main.scrollHeight,
+      navTop: navRect.top,
+    }
+  })
+
+  await moreSummary.click()
+  await moreMenu.waitFor({ state: 'visible' })
+  assert(
+    await moreDisclosure.getAttribute('open') === '',
+    `Mobile More disclosure did not open at ${suffix}px.`,
+  )
+
+  for (const label of [
+    'Настройки',
+    'Команда',
+    'Безопасность',
+    'Доступ и оплата',
+    'Поддержка',
+    'Документы',
+    'Конфиденциальность',
+  ]) {
+    await moreMenu.getByRole('link', { name: label, exact: true }).waitFor({
+      state: 'visible',
+    })
+  }
+
+  const openLayout = await page.evaluate(() => {
+    const main = document.querySelector('main')
+    const nav = document.querySelector('nav[aria-label="Мобильная навигация"]')
+    const menu = nav?.querySelector('details[open] > div')
+    if (!(main instanceof HTMLElement)) {
+      throw new Error('Authenticated mobile main surface is missing.')
+    }
+    if (!(nav instanceof HTMLElement)) {
+      throw new Error('Authenticated mobile navigation is missing.')
+    }
+    if (!(menu instanceof HTMLElement)) {
+      throw new Error('Authenticated mobile More menu is missing.')
+    }
+    const mainRect = main.getBoundingClientRect()
+    const navRect = nav.getBoundingClientRect()
+    const menuRect = menu.getBoundingClientRect()
+    return {
+      mainBottom: mainRect.bottom,
+      mainHeight: mainRect.height,
+      mainScrollHeight: main.scrollHeight,
+      navTop: navRect.top,
+      menu: {
+        top: menuRect.top,
+        right: menuRect.right,
+        bottom: menuRect.bottom,
+        left: menuRect.left,
+      },
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+    }
+  })
+  assert(
+    openLayout.menu.top >= 0
+      && openLayout.menu.left >= 0
+      && openLayout.menu.right <= openLayout.viewport.width
+      && openLayout.menu.bottom <= openLayout.viewport.height,
+    `Mobile More menu is outside the ${suffix}px viewport: ${JSON.stringify(openLayout.menu)}.`,
+  )
+  assert(
+    Math.abs(openLayout.mainBottom - layoutBeforeOpen.mainBottom) < 1
+      && Math.abs(openLayout.mainHeight - layoutBeforeOpen.mainHeight) < 1
+      && openLayout.mainScrollHeight === layoutBeforeOpen.mainScrollHeight,
+    `Opening Mobile More resized the main scroll area at ${suffix}px.`,
+  )
+  assert(
+    openLayout.mainBottom <= openLayout.navTop
+      && layoutBeforeOpen.mainBottom <= layoutBeforeOpen.navTop,
+    `Mobile navigation overlaps authenticated content at ${suffix}px.`,
+  )
+
+  const screenshotPath = resolve(artifactsDirectory, screenshot)
+  await page.screenshot({
+    path: screenshotPath,
+    fullPage: false,
+    caret: 'initial',
+  })
+  report.screenshots[`mobile-more-open-${suffix}`] = screenshotPath
+
+  await moreMenu.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/settings')
+  assert(
+    new URL(page.url()).pathname === '/settings',
+    `Mobile More internal route did not activate at ${suffix}px.`,
+  )
+}
+
+async function verifyCompanyBriefActionHierarchy(page, owner, viewport) {
+  const { suffix, width, height } = viewport
+  await page.setViewportSize({ width, height })
+  const pathname = `/leads/${owner.productSurfaces.candidateId}`
+  await page.goto(`${baseUrl}${pathname}`, { waitUntil: 'domcontentloaded' })
+  await page.locator('[data-company-brief-next-move]').waitFor({
+    state: 'visible',
+  })
+
+  const recommendationMatches = await page.evaluate(() => {
+    const nextMove = document.querySelector(
+      '[data-company-brief-next-move] p',
+    )?.textContent?.trim()
+    const railMove = document.querySelector(
+      '[data-company-brief-action] [data-company-brief-primary-action]',
+    )?.previousElementSibling?.textContent?.trim()
+    return Boolean(nextMove && railMove && nextMove === railMove)
+  })
+  assert(
+    recommendationMatches,
+    `Company Brief recommendation diverged from its action model at ${suffix}px.`,
+  )
+
+  const visibleActions = page.locator(
+    '[data-company-brief-primary-action]:visible',
+  )
+  assert(
+    await visibleActions.count() === 1,
+    `Company Brief must expose exactly one dominant primary action at ${suffix}px.`,
+  )
+  const visibleAction = visibleActions.first()
+  const placement = await visibleAction.evaluate((element) => ({
+    inline: Boolean(element.closest('[data-company-brief-next-move]')),
+    rail: Boolean(element.closest('[data-company-brief-action]')),
+  }))
+  if (width <= 1000) {
+    assert(
+      placement.inline && !placement.rail,
+      `Company Brief inline primary action is not next to Next move at ${suffix}px.`,
+    )
+  } else {
+    assert(
+      placement.rail && !placement.inline,
+      `Company Brief desktop primary action is not in the Decision Rail at ${suffix}px.`,
+    )
+  }
+
+  await visibleAction.scrollIntoViewIfNeeded()
+  const screenshotPath = resolve(
+    artifactsDirectory,
+    `auth-v2-account-team-e2e-shot-company-brief-action-${suffix}.png`,
+  )
+  await page.screenshot({
+    path: screenshotPath,
+    fullPage: false,
+    caret: 'initial',
+  })
+  report.screenshots[`company-brief-action-${suffix}`] = screenshotPath
+}
+
+async function verifyCompanyFilters(page, viewport) {
+  const { suffix, width, height } = viewport
+  await page.setViewportSize({ width, height })
+  await page.goto(
+    `${baseUrl}/leads?q=${encodeURIComponent('Очень длинный поисковый запрос по компании')}`,
+    { waitUntil: 'domcontentloaded' },
+  )
+
+  let toggle = page.getByRole('button', { name: /^Фильтры/ })
+  assert(
+    await toggle.getAttribute('aria-expanded') === 'false',
+    `Search-only Companies state must keep filters closed at ${suffix}px.`,
+  )
+  const statusLayout = await page.locator(
+    '[aria-label="Фильтры компаний"] [role="status"][data-motion-status]',
+  ).evaluate(
+    (element) => ({
+      display: getComputedStyle(element).display,
+      position: getComputedStyle(element).position,
+    }),
+  )
+  assert(
+    statusLayout.display === 'none' && statusLayout.position === 'static',
+    `Companies pending status reserves or escapes layout flow at ${suffix}px.`,
+  )
+
+  await toggle.click()
+  await page.getByRole('combobox', { name: 'Уровень подтверждения' }).selectOption('C')
+  await page.waitForURL((url) => url.searchParams.get('gate') === 'C')
+  await page.getByRole('combobox', { name: 'Статус работы' }).selectOption('none')
+  await page.waitForURL((url) => url.searchParams.get('feedback') === 'none')
+  toggle = page.getByRole('button', { name: /^Фильтры/ })
+  assert(
+    await toggle.getAttribute('aria-expanded') === 'true',
+    `Companies active filters collapsed unexpectedly at ${suffix}px.`,
+  )
+
+  const filterLayout = await page.evaluate(() => {
+    const controls = [...document.querySelectorAll(
+      '[aria-label="Фильтры компаний"] input, [aria-label="Фильтры компаний"] select, [aria-label="Фильтры компаний"] button',
+    )].filter((element) => {
+      const rect = element.getBoundingClientRect()
+      return getComputedStyle(element).display !== 'none'
+        && rect.width > 0
+        && rect.height > 0
+    })
+    return {
+      minTargetHeight: Math.min(
+        ...controls.map((element) => element.getBoundingClientRect().height),
+      ),
+      overflow: document.documentElement.scrollWidth - window.innerWidth,
+    }
+  })
+  assert(
+    filterLayout.minTargetHeight >= 44,
+    `Companies filters expose a sub-44px target at ${suffix}px.`,
+  )
+  assert(
+    filterLayout.overflow <= 0,
+    `Companies active filters overflow by ${filterLayout.overflow}px at ${suffix}px.`,
+  )
+
+  const screenshotPath = resolve(
+    artifactsDirectory,
+    `auth-v2-account-team-e2e-shot-leads-active-filters-${suffix}.png`,
+  )
+  await page.screenshot({ path: screenshotPath, fullPage: false, caret: 'initial' })
+  report.screenshots[`leads-active-filters-${suffix}`] = screenshotPath
+
+  await page.getByRole('button', { name: 'Сбросить' }).click()
+  await page.waitForURL((url) => (
+    !url.searchParams.has('q')
+      && !url.searchParams.has('gate')
+      && !url.searchParams.has('feedback')
+  ))
+}
 
 async function verifyAuthenticatedProductSurfacesAtViewport(
   page,
@@ -1251,20 +1664,38 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
 ) {
   await inspectSurface(
     page,
+    `dashboard-data-${suffix}`,
+    '/dashboard',
+    screenshots.dashboard,
+    ['heading', 'link'],
+  )
+
+  await inspectSurface(
+    page,
     `leads-data-${suffix}`,
     '/leads',
     screenshots.leads,
   )
-  const leadDisclosure = page.locator('details[data-motion-disclosure]').first()
-  await leadDisclosure.waitFor({ state: 'visible' })
-  await leadDisclosure.locator('summary').click()
+  const leadRows = page.locator('article[data-lead-row="true"]')
+  await leadRows.first().waitFor({ state: 'visible' })
+  assert(await leadRows.count() >= 1, 'Authenticated company rows are missing.')
   assert(
-    await leadDisclosure.getAttribute('open') === '',
-    'Authenticated lead disclosure did not open.',
+    await leadRows.first().locator('details').count() === 0,
+    'Company rows must stay scan-first without per-row evidence accordions.',
   )
   const todayFilter = page.locator('button[data-motion-interactive]').filter({
     hasText: 'Сегодня в работе',
   })
+  if (suffix === '390') {
+    const mobileFilterToggle = page.getByRole('button', {
+      name: /^Фильтры/,
+    })
+    await mobileFilterToggle.click()
+    assert(
+      await mobileFilterToggle.getAttribute('aria-expanded') === 'true',
+      'Mobile company filters did not expand.',
+    )
+  }
   await todayFilter.click()
   await page.waitForURL((url) => url.pathname === '/leads' && url.searchParams.get('today') === '1')
   assert(
@@ -1278,10 +1709,44 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
     `/leads/${owner.productSurfaces.candidateId}`,
     screenshots.leadDetail,
   )
-  assert(
-    await page.locator('[data-motion-disclosure]').count() >= 1,
-    'Authenticated lead detail disclosure is missing.',
+  const companyBriefOrder = await page.evaluate(() => {
+    const decision = document.querySelector('[data-company-brief-decision]')
+    const evidence = document.querySelector('[data-company-brief-evidence]')
+    const action = document.querySelector('[data-company-brief-action]')
+    if (!decision || !evidence || !action) return false
+    return Boolean(
+      decision.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING
+      && evidence.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING
+    )
+  })
+  assert(companyBriefOrder, 'Company Brief must keep Decision -> Evidence -> Action in DOM order.')
+
+  await inspectSurface(
+    page,
+    `review-data-${suffix}`,
+    '/review',
+    screenshots.review,
+    ['heading', 'link'],
   )
+  const reviewRows = page.locator('[data-review-row]')
+  assert(
+    await reviewRows.count() === owner.productSurfaces.reviewFixtureCount,
+    'Review fixture did not render 8 evidence-first rows',
+  )
+  assert(
+    await page.locator('[data-review-evidence-title]').count()
+      === owner.productSurfaces.reviewFixtureCount,
+    'Review rows do not expose a strongest evidence title.',
+  )
+  if (suffix === '390') {
+    const actedRow = reviewRows.first()
+    await actedRow.getByRole('button', { name: 'Отклонить' }).click()
+    await actedRow.getByText('Отклонено', { exact: true }).waitFor({ state: 'visible' })
+    assert(
+      await actedRow.getByRole('button', { name: 'Отклонить' }).count() === 0,
+      'Review decision did not settle the acted-on row',
+    )
+  }
 
   await inspectSurface(
     page,
@@ -1307,13 +1772,22 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
     screenshots.evidenceRadar,
   )
   await page.locator('[data-evidence-radar-map]').waitFor({ state: 'visible' })
+  assert(
+    await page.locator('[data-sparse-evidence-strip][data-density="sparse"]').count() === 1,
+    'Sparse Evidence Radar did not switch to the evidence strip.',
+  )
+  assert(
+    await page.getByText('X — свежесть', { exact: true }).count() === 0
+      && await page.getByText('Y — подтверждение', { exact: true }).count() === 0,
+    'Sparse Evidence Radar still exposes comparison axes.',
+  )
   const marker = page.locator('[data-evidence-radar-map] button[data-motion-interactive]').first()
   await marker.click()
   assert(
     await marker.getAttribute('aria-pressed') === 'true',
     'Evidence Radar marker selection did not become active.',
   )
-  await page.locator('[data-evidence-lead-card]').waitFor({ state: 'visible' })
+  await page.locator('[data-evidence-lead-detail]').waitFor({ state: 'visible' })
   assert(
     await page.locator('[data-motion-status]').filter({ hasText: 'Выбрано:' }).count() === 1,
     'Evidence Radar selected-marker status is missing.',
@@ -1334,15 +1808,30 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
       { suffix, screenshots },
     )
   }
+  for (const viewport of mobileMoreViewports) {
+    await verifyMobileMoreNavigation(page, viewport)
+  }
+  for (const viewport of companyBriefActionViewports) {
+    await verifyCompanyBriefActionHierarchy(page, owner, viewport)
+  }
+  for (const viewport of companyFilterViewports) {
+    await verifyCompanyFilters(page, viewport)
+  }
+  await page.setViewportSize({ width: 390, height: 844 })
   report.flows.authenticatedProductSurfaces = {
     desktop1440: true,
     mobile390: true,
+    dashboard: true,
     leadsWithData: true,
     leadDetail: true,
-    filterDisclosureStatusInteractions: true,
+    review: true,
+    filterAndDecisionFlowInteractions: true,
     opportunities: true,
     commercialSignalCard: true,
     evidenceRadarMarkerSelection: true,
+    mobileMoreNavigation320And390: true,
+    companyBriefActionHierarchy640Through1024: true,
+    companyFilters320And390: true,
   }
 }
 

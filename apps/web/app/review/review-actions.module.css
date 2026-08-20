@@ -1,5 +1,5 @@
 /* Review actions — approve / reject inline on a review card.
-   Uses the shared --c-* tokens; tone is encoded via data-tone so the active
+   Uses the shared semantic tokens; tone is encoded via data-tone so the active
    state reads as a decision (green approve, red reject) without emoji. */
 
 .row {
@@ -9,21 +9,25 @@
 
 .btn {
   display: inline-flex;
+  min-height: 44px;
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-secondary);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-secondary);
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .btn:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -33,23 +37,26 @@
 }
 
 .btn[data-tone="success"] {
-  color: #047857;
-  border-color: #a7f3d0;
-  background-color: #ecfdf5;
+  color: var(--color-signal);
+  border-color: var(--color-signal);
+  background-color: color-mix(in srgb, var(--color-signal) 10%, var(--color-surface-primary));
 }
 
-.btn[data-tone="success"]:hover {
-  background-color: #d1fae5;
+@media (hover: hover) and (pointer: fine) {
+  .btn[data-tone="success"]:hover {
+    background-color: color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary));
+  }
+
+  .btn[data-tone="danger"]:hover {
+    color: var(--color-destructive);
+    border-color: color-mix(in srgb, var(--color-destructive) 24%, var(--color-surface-primary));
+    background-color: color-mix(in srgb, var(--color-destructive) 16%, var(--color-surface-primary));
+  }
 }
 
-.btn[data-tone="danger"] {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background-color: #fef2f2;
-}
-
-.btn[data-tone="danger"]:hover {
-  background-color: #fee2e2;
+.btn[data-tone="danger"]:focus-visible {
+  color: var(--color-destructive);
+  border-color: color-mix(in srgb, var(--color-destructive) 24%, var(--color-surface-primary));
 }
 
 .btnIcon {
@@ -67,19 +74,19 @@
   font-size: 0.82rem;
   font-weight: 500;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 .verdict[data-tone="success"] {
-  color: #047857;
-  background-color: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  color: var(--color-signal);
+  background-color: color-mix(in srgb, var(--color-signal) 10%, var(--color-surface-primary));
+  border: 1px solid var(--color-signal);
 }
 
 .verdict[data-tone="danger"] {
-  color: #b91c1c;
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
+  color: var(--color-destructive);
+  background-color: color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary));
+  border: 1px solid color-mix(in srgb, var(--color-destructive) 16%, var(--color-surface-primary));
 }
 
 .error {
@@ -87,13 +94,11 @@
   align-items: center;
   gap: 8px;
   font-size: 0.82rem;
-  color: #b91c1c;
+  color: var(--color-destructive);
 }
 
 @media (max-width: 640px) {
-  /* Tap-target floor: review decision buttons must be ≥44px tall on touch. */
   .btn {
-    min-height: 44px;
     padding: 10px 14px;
   }
 }

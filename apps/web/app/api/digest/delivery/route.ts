@@ -9,11 +9,11 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const digestApiKey = process.env.DIGEST_API_KEY;
-  if (!digestApiKey) return NextResponse.json({ error: "DIGEST_API_KEY is not configured." }, { status: 500 });
+  if (!digestApiKey) return NextResponse.json({ error: "Service is not configured." }, { status: 500 });
   if (request.headers.get("x-api-key") !== digestApiKey) return NextResponse.json({ error: "Invalid or missing x-api-key header." }, { status: 401 });
 
   const pool = getPool();
-  if (!pool) return NextResponse.json({ error: "DATABASE_URL is not set." }, { status: 500 });
+  if (!pool) return NextResponse.json({ error: "Service is unavailable." }, { status: 500 });
 
   let payload: { clientProfileId?: string; digestRunId?: string } = {};
   try { payload = (await request.json()) as { clientProfileId?: string; digestRunId?: string }; } catch {}
@@ -42,7 +42,6 @@ export async function POST(request: Request) {
       resolvedClientProfileId = runResult.clientProfile.id;
     }
 
-    // Deliver candidates using shared logic
     const delivery = await deliverCandidatesForRun(runId!);
 
     return NextResponse.json({
@@ -55,7 +54,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to deliver digest.";
     const status = message.includes("Invalid") ? 400 : message.includes("inactive") || message.includes("No active subscription") || message.includes("entitlement") ? 403 : message.includes("not found") ? 404 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const publicMessage = status === 500 ? "Failed to deliver digest." : message;
+    return NextResponse.json({ error: publicMessage }, { status });
   }
 }
 

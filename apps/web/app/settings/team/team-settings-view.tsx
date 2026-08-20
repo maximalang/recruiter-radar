@@ -5,6 +5,7 @@ import type {
   WorkspaceTeamMember,
 } from "@/lib/auth-v2/workspace-team";
 import type { WorkspaceRole } from "@/lib/auth-v2/workspaces";
+import { pluralForm } from "@/lib/format/plural";
 import {
   changeMemberRoleAction,
   inviteMemberAction,
@@ -152,7 +153,7 @@ export function TeamSettingsView(props: {
         </div>
         <div className={styles.heroMetric}>
           <strong>{props.team.members.length}</strong>
-          <span>участников</span>
+          <span>{pluralForm(props.team.members.length, ["участник", "участника", "участников"])}</span>
         </div>
       </section>
 

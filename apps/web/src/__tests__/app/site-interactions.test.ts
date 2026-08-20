@@ -26,11 +26,23 @@ describe('cross-route interaction hardening', () => {
     expect(interactions).toContain('scroll-margin-top: 104px');
   });
 
+  it('keeps touch feedback on the final semantic token system without dead sidebar selectors', () => {
+    expect(interactions).toContain('-webkit-tap-highlight-color: var(--color-selection)');
+    expect(interactions).not.toContain('rgba(35, 128, 111');
+    expect(interactions).not.toContain('sidebarBrand');
+  });
+
+  it('keeps structural loading placeholders static instead of running ambient shimmer', () => {
+    expect(interactions).toContain('[data-skeleton="true"]');
+    expect(interactions).toContain('animation: none !important');
+    expect(interactions).toContain('background-image: none !important');
+  });
+
   it('audits the complete public and product route families', () => {
     for (const route of [
       "'/opportunities'",
       "'/opportunities/radar'",
-      "'/opportunities/sources'",
+      "'/settings/diagnostics/sources'",
       "'/admin/payments'",
       "'/settings/access'",
       "'/settings/delivery'",
@@ -58,6 +70,10 @@ describe('cross-route interaction hardening', () => {
     expect(responsiveAudit).toContain('const disclosureWasOpen = await firstDisclosure.evaluate');
     expect(responsiveAudit).toContain('if (!disclosureWasOpen) await firstDisclosure.click()');
     expect(responsiveAudit).toContain('navigationDurationMs');
-    expect(responsiveAudit).toContain("waitForLoadState('networkidle'");
+    expect(responsiveAudit).toContain('async function waitForVisualReadiness(page)');
+    expect(responsiveAudit).toContain("waitForLoadState('load'");
+    expect(responsiveAudit).toContain('document.fonts?.ready');
+    expect(responsiveAudit).toContain('requestAnimationFrame(() => requestAnimationFrame(resolve))');
+    expect(responsiveAudit).not.toContain("waitForLoadState('networkidle'");
   });
 });

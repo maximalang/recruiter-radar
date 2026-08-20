@@ -9,7 +9,7 @@ export default function OpportunitiesLoading() {
   return (
     <InternalPageFrame navItems={buildOpportunityNavigation()}>
       <InternalPageHeader
-        title="Сегодня"
+        title="Ситуации"
         subtitle="Собираем очереди действий и проверяем актуальность доказательств."
       />
       <LoadingState variant="skeleton" />

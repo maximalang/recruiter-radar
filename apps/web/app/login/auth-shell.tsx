@@ -6,17 +6,13 @@ import styles from "./login.module.css";
 
 export function AuthShell(props: { children: ReactNode }) {
   return (
-    <main className={styles.shell} data-ui-system="recruiter-radar-v6">
+    <main className={styles.shell} data-ui-system="recruiter-radar">
       <div className={styles.frame}>
-        <aside className={styles.story} aria-label="О Recruiter Radar">
+        <aside className={styles.story} data-theme="inverse" aria-label="О Recruiter Radar">
           <Link href="/" className={styles.brand}>
-            <BrandLogo size="small" tone="dark" />
+            <BrandLogo size="small" />
           </Link>
-          <div
-            className={styles.compass}
-            data-auth-compass="true"
-            aria-hidden="true"
-          >
+          <div className={styles.compass} data-auth-compass="true" aria-hidden="true">
             <span className={styles.compassRing} />
             <span className={styles.compassRing} />
             <span className={styles.compassRing} />
@@ -24,16 +20,9 @@ export function AuthShell(props: { children: ReactNode }) {
             <span className={styles.signalCluster} data-signal-cluster="secondary" />
           </div>
           <div className={styles.storyCopy}>
-            <p className={styles.storyEyebrow}>Рабочий контекст агентства</p>
-            <h2 className={styles.storyTitle}>Рабочее пространство Recruiter Radar</h2>
-            <p className={styles.storyLead}>
-              Сигналы, доказательства и история работы агентства в одном месте.
-            </p>
-            <ul className={styles.valueList}>
-              <li>Доказательства рядом с каждой рекомендацией</li>
-              <li>Единый рабочий контекст команды</li>
-              <li>Безопасный вход без паролей</li>
-            </ul>
+            <p className={styles.storyEyebrow}>Recruiter Radar</p>
+            <h2 className={styles.storyTitle}>Сигнал → доказательство → действие</h2>
+            <p className={styles.storyLead}>Рабочий контекст агентства остаётся рядом с подтверждённым следующим ходом.</p>
           </div>
         </aside>
         <section className={styles.card}>{props.children}</section>

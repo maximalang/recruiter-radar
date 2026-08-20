@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const digestApiKey = process.env.DIGEST_API_KEY;
 
   if (!digestApiKey) {
-    return NextResponse.json({ error: "DIGEST_API_KEY is not configured." }, { status: 500 });
+    return NextResponse.json({ error: "Service is not configured." }, { status: 500 });
   }
 
   const providedApiKey = request.headers.get("x-api-key");
@@ -74,7 +74,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update digest feedback state.";
     const status = message.startsWith("Invalid ") || message.includes("is required") ? 400 : 500;
+    const publicMessage = status === 500 ? "Failed to update digest feedback state." : message;
 
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: publicMessage }, { status });
   }
 }

@@ -1,7 +1,7 @@
 import { buildAccountNavigation } from "@/app/ui/account-navigation";
 
 describe("buildAccountNavigation", () => {
-  it("keeps one active item and uses the unified Radar settings route", () => {
+  it("uses the final Today / Companies / Situations / Radar information architecture", () => {
     const items = buildAccountNavigation("settings");
 
     expect(items.filter((item) => item.active)).toEqual([
@@ -10,15 +10,22 @@ describe("buildAccountNavigation", () => {
     expect(items.map((item) => item.href)).toEqual([
       "/dashboard",
       "/leads",
-      "/review",
-      "/settings/radar",
+      "/opportunities",
+      "/opportunities/radar",
       "/settings",
     ]);
-    expect(items).toContainEqual(
-      expect.objectContaining({ href: "/leads", label: "Возможности" }),
-    );
-    expect(items).toContainEqual(
-      expect.objectContaining({ href: "/settings/radar", label: "Радар" }),
-    );
+    expect(items.slice(0, 4).map((item) => item.label)).toEqual([
+      "Сегодня",
+      "Компании",
+      "Ситуации",
+      "Радар",
+    ]);
+    expect(items.map((item) => item.label)).not.toContain("Возможности");
+    expect(items.map((item) => item.label)).not.toContain("Проверка");
+  });
+
+  it("maps review into Today and profile configuration into Settings", () => {
+    expect(buildAccountNavigation("review").find((item) => item.active)?.href).toBe("/dashboard");
+    expect(buildAccountNavigation("profile").find((item) => item.active)?.href).toBe("/settings");
   });
 });

@@ -8,6 +8,8 @@ import { logError } from '@/lib/runtime'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const PUBLIC_CONFIGURATION_ERROR = 'Commercial Signal enrichment service is not configured.'
+
 export async function GET(request: NextRequest) {
   const authError = authorizeCron(request)
   if (authError) return authError
@@ -63,7 +65,7 @@ function authorizeCron(request: NextRequest): NextResponse | null {
   const expectedKey = process.env.CRON_API_KEY?.trim()
   if (!expectedKey) {
     return NextResponse.json(
-      { success: false, error: 'CRON_API_KEY is not configured.' },
+      { success: false, error: PUBLIC_CONFIGURATION_ERROR },
       { status: 503 },
     )
   }

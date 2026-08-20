@@ -18,12 +18,13 @@ const STATUS_LABELS: Record<CommercialSignalCardStatus, string> = {
 export function OpportunityCommercialSignalCard(props: {
   opportunityId: string
   card: CommercialSignalCard
+  showDiagnostics?: boolean
 }) {
   return (
     <div className={styles.commercialSignalBrief}>
       <div className={styles.commercialSignalHeading}>
         <div>
-          <span>Коммерческая возможность</span>
+          <span>Коммерческая ситуация</span>
           <strong>{STATUS_LABELS[props.card.status]}</strong>
         </div>
       </div>
@@ -68,22 +69,22 @@ export function OpportunityCommercialSignalCard(props: {
         <h3 id={`signal-metrics-${props.opportunityId}`}>
           Почему лид в приоритете
         </h3>
-        <div className={styles.signalMetrics}>
+        <dl className={styles.signalMetricLedger}>
           <Metric
             heading="Вероятность внешнего подбора"
             metric={props.card.metrics.externalAgencyPropensity}
           />
           <Metric heading="Соответствие вашему профилю" metric={props.card.metrics.agencyFit} />
           <Metric
-            heading="Сила возможности"
+            heading="Сила ситуации"
             metric={props.card.metrics.opportunityQuality}
           />
           <Metric
             heading="Готовность к контакту"
             metric={props.card.metrics.actionability}
           />
-        </div>
-        <SignalDiagnostics card={props.card} />
+        </dl>
+        {props.showDiagnostics === false ? null : <OpportunitySignalDiagnostics card={props.card} />}
       </section>
 
       <div className={styles.decisionGrid}>
@@ -172,19 +173,18 @@ function Metric(props: {
 }) {
   const level = metricLevel(props.metric.value)
   return (
-    <section className={styles.signalMetric} data-level={level.key}>
-      <h3>{props.heading}</h3>
-      <strong>{level.label}</strong>
-      <span className={styles.signalMetricBar} aria-hidden="true" />
-    </section>
+    <div className={styles.signalMetricRow} data-level={level.key}>
+      <dt>{props.heading}</dt>
+      <dd>{level.label}</dd>
+    </div>
   )
 }
 
-function SignalDiagnostics({ card }: { card: CommercialSignalCard }) {
+export function OpportunitySignalDiagnostics({ card }: { card: CommercialSignalCard }) {
   const diagnostics = [
     ['Вероятность внешнего подбора', card.metrics.externalAgencyPropensity.reasonCodes],
     ['Соответствие вашему профилю', card.metrics.agencyFit.reasonCodes],
-    ['Сила возможности', card.metrics.opportunityQuality.reasonCodes],
+    ['Сила ситуации', card.metrics.opportunityQuality.reasonCodes],
     ['Готовность к контакту', card.metrics.actionability.reasonCodes],
   ] as const
 

@@ -5,6 +5,16 @@ import type { MultiSourceLead } from '@/lib/lead-discovery/multi-source-lead-gen
 import type { ScoredLead } from '@/lib/lead-discovery/lead-scoring-service'
 import { logEvent, logError } from '@/lib/runtime'
 
+const DEFAULT_MAX_RESULTS = 100
+const MAX_RESULTS_LIMIT = 500
+
+function parseMaxResults(value: unknown): number | null {
+  if (value === undefined) return DEFAULT_MAX_RESULTS
+  if (typeof value !== 'number' || !Number.isInteger(value)) return null
+  if (value < 1 || value > MAX_RESULTS_LIMIT) return null
+  return value
+}
+
 // Module-level singletons — one instance per process
 let _generator: MultiSourceLeadGenerator | null = null
 function getLeadGenerator(): MultiSourceLeadGenerator {
@@ -27,7 +37,7 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.LEAD_API_KEY || process.env.DIGEST_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { success: false, error: 'LEAD_API_KEY is not configured.' },
+      { success: false, error: 'Lead generation service is not configured.' },
       { status: 500 }
     )
   }
@@ -48,10 +58,21 @@ export async function POST(request: NextRequest) {
       minScore = 1.0,
       sources,
       enableRealTime = false,
-      maxResults = 100,
+      maxResults: rawMaxResults,
       clientProfileId,
       agencyProfile,
     } = body
+
+    const maxResults = parseMaxResults(rawMaxResults)
+    if (maxResults === null) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `maxResults must be an integer between 1 and ${MAX_RESULTS_LIMIT}`,
+        },
+        { status: 400 }
+      )
+    }
 
     // Get singleton lead generator
     const generator = getLeadGenerator()
@@ -166,7 +187,7 @@ export async function GET() {
           enableRealTime: 'Enable real-time crawling (default: false)',
           clientProfileId: 'Client profile ID for scoped digest (optional)',
           agencyProfile: 'Agency ICP for FIUR scoring — when provided, leads are scored via FIUR pipeline (optional)',
-          maxResults: 'Maximum number of results (default: 100)'
+          maxResults: `Maximum number of results (default: ${DEFAULT_MAX_RESULTS}, maximum: ${MAX_RESULTS_LIMIT})`
         },
         response: {
           leads: 'Array of scored leads (FIUR-scored if agencyProfile provided)',

@@ -42,7 +42,7 @@ export default function WorkspaceScene(props: WorkspaceProps) {
       <div className={styles.workspaceLayout} data-preview-section-content>
         <LandingPreviewInteractions />
         <WorkspaceIntro />
-        <div className={`${styles.workspaceProductFrame} ${sceneStyles.productFrame}`} data-product-preview="live-radar">
+        <div className={sceneStyles.productFrame} data-product-preview="live-radar">
           <div className={sceneStyles.productRail} aria-label="Состояние предпросмотра выдачи">
             <div className={sceneStyles.railIdentity}>
               <strong>RECRUITER RADAR</strong>
@@ -208,8 +208,9 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
 
         <div className={sceneStyles.footerRail}>
           <Link
+            prefetch={false}
             href={props.checkoutHref}
-            className={`${styles.workspaceCheckout} ${sceneStyles.checkout}`}
+            className={sceneStyles.checkout}
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
           >
@@ -243,8 +244,9 @@ function WorkspaceResultsFailure({ checkoutHref, embedded }: { checkoutHref: str
       </div>
       <div className={sceneStyles.footerRail}>
         <Link
+          prefetch={false}
           href={checkoutHref}
-          className={`${styles.workspaceCheckout} ${sceneStyles.checkout}`}
+          className={sceneStyles.checkout}
           data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
           data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
         >

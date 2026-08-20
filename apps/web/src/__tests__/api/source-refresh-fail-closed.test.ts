@@ -26,6 +26,10 @@ describe('standalone Source Refresh fail-closed contract', () => {
     isNoActiveProfiles.mockReturnValue(false)
   })
 
+  afterEach(() => {
+    process.env.CRON_API_KEY = 'cron-test-key'
+  })
+
   afterAll(() => {
     delete process.env.CRON_API_KEY
   })
@@ -60,5 +64,16 @@ describe('standalone Source Refresh fail-closed contract', () => {
         failed: 1,
       },
     })
+  })
+
+  test('does not expose the cron secret configuration name when the service is unconfigured', async () => {
+    delete process.env.CRON_API_KEY
+
+    const response = await POST(request())
+    const body = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(body).toEqual({ success: false, error: 'Source refresh service is not configured.' })
+    expect(JSON.stringify(body)).not.toContain('CRON_API_KEY')
   })
 })

@@ -1,206 +1,102 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
-import { headers } from 'next/headers';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import { getSession } from '@/lib/auth-v2/authorization';
 import { getEffectiveEntitlement } from '@/lib/entitlements';
+import { getPool } from '@/lib/db';
+import { listPendingReviewCandidates, type ReviewCandidate } from '@/lib/review-data';
+import { createSignalContract, type SignalConfidence } from '@/lib/intelligence/signal-contract';
 import {
   InternalPageFrame,
   InternalPageHeader,
-  MetricGrid,
-  MetricCard,
-  GateBadgeInline,
-  ScoreBar,
-  ScoreBandChip,
-  SignalFreshnessChip,
-  ForeignEmployerBadge,
-  EvidenceTag,
-  SourceChip,
-  TableCard,
-  EmptyState,
-  ContentCard,
+  formatSignalFreshness,
   LoadingState,
-  ErrorState,
 } from '../ui/internal-page';
+import { ProductErrorState } from '../ui/product-error-state';
+import { StaticEmptyState } from '../ui/static-empty-state';
 import { buildAccountNavigation } from '../ui/account-navigation';
-import { internalPageClasses as ipStyles } from '../ui/internal-page';
-import { PinIcon, BriefcaseIcon, FileIcon, CheckIcon, TargetIcon } from '../ui/icons';
+import { CheckIcon, TargetIcon } from '../ui/icons';
 import ReviewActions from './review-actions';
 import { deriveReviewReason } from './review-reason';
+import { parseReviewPagePagination } from './review-query';
 import { pluralizeLeads } from '../leads/page-helpers';
+import styles from './review.module.css';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Ревью — Recruiter Radar',
+  title: 'На проверке — Recruiter Radar',
   description: 'Кандидаты, требующие проверки перед отправкой в подборку.',
 };
 
 const REVIEW_NAV = buildAccountNavigation('review');
 
-interface ReviewCandidate {
-  id: string;
-  orgId: string;
-  orgName: string;
-  score: number;
-  confidenceGate: string;
-  /**
-   * Derived from the candidate payload (extractPayloadFields) — no new SQL.
-   * T4.5: the review card shows the foreign reason chip + foreign badge from
-   * this flag, instead of the previous hardcoded `isForeign={false}`.
-   */
-  isForeignEmployer?: boolean;
-  vacanciesCount: number;
-  distinctVacancyNamesCount: number;
-  latestPublishedAt: string | null;
-  reasons: string[];
-  sourceFamilies: string[];
-  evidenceTitles: string[];
-  locationNames: string[];
-  createdAt: string;
-}
-
-async function getReviewCandidates(
-  clientProfileId: string,
-  limit: number,
-  offset: number,
-  cookieHeader: string | null,
-): Promise<{ items: ReviewCandidate[]; total: number; error?: boolean }> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  const url = new URL('/api/review', baseUrl);
-  url.searchParams.set('clientProfileId', clientProfileId);
-  url.searchParams.set('limit', String(limit));
-  url.searchParams.set('offset', String(offset));
-
-  try {
-    const res = await fetch(url.toString(), {
-      cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(cookieHeader ? { cookie: cookieHeader } : {}),
-      },
-    });
-    if (!res.ok) return { items: [], total: 0, error: true };
-    const data = await res.json();
-    return { items: data.items ?? [], total: data.total ?? 0 };
-  } catch {
-    // Genuine fetch failure → flag it so the page shows an ErrorState instead
-    // of a silent empty queue that reads as "очередь пуста".
-    return { items: [], total: 0, error: true };
-  }
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>;
 }
 
 const REVIEW_REASON_LABEL: Record<string, string> = {
   foreign: 'Зарубежный ATS',
-  'gate-c': 'Только платформа (C)',
+  'gate-c': 'Только платформенный источник',
   'single-source': 'Один источник',
 };
 
-/**
- * The single reason a candidate is in the review queue — one semantic chip so
- * the analyst sees *why* it's here at a glance (foreign / gate-C / single-
- * source), not just "на проверке". Rendered with the reason's SVG icon.
- */
-function ReviewReasonChip(props: { reason: { key: string; icon: (p: SVGProps<SVGSVGElement>) => ReactElement } }) {
-  const { reason } = props;
-  const Icon = reason.icon;
-  const label = REVIEW_REASON_LABEL[reason.key] ?? reason.key;
-  return (
-    <span className={ipStyles.reviewReasonChip} data-reason={reason.key} title={`Причина проверки: ${label}`}>
-      <Icon className={ipStyles.chipIcon} aria-hidden="true" /> {label}
-    </span>
-  );
+function confidenceLabel(gate: string): string {
+  if (gate === 'A') return 'высокая';
+  if (gate === 'B') return 'достаточная';
+  if (gate === 'C') return 'требует проверки';
+  return 'недостаточно';
 }
 
-/**
- * One review candidate — rendered with the SAME vocabulary as a /leads card
- * (gate badge, score band, evidence chips, freshness, foreign badge) so the
- * analyst sees the same lead shape they triage on /leads. The whole card links
- * to the lead detail so evidence can be reviewed before deciding; approve/
- * reject live in a footer row so they never trigger on an accidental card click.
- */
-function ReviewCard({
-  candidate,
-  clientProfileId,
-}: {
-  candidate: ReviewCandidate;
-  clientProfileId: string;
-}) {
-  // T4.5 — derive the single reason this candidate is in the queue, from
-  // already-available fields. Falls back to null when no reason applies.
+function confidenceGate(gate: string): SignalConfidence['gate'] {
+  return gate === 'A' || gate === 'B' || gate === 'C' || gate === 'D'
+    ? gate
+    : undefined;
+}
+
+function ReviewRow({ candidate, clientProfileId }: { candidate: ReviewCandidate; clientProfileId: string }) {
   const reason = deriveReviewReason({
     confidenceGate: candidate.confidenceGate,
     isForeignEmployer: candidate.isForeignEmployer ?? false,
     sourceCount: candidate.sourceFamilies.length,
   });
+  const freshness = formatSignalFreshness(candidate.latestPublishedAt)?.label ?? 'дата сигнала не определена';
+  const reasonLabel = reason ? (REVIEW_REASON_LABEL[reason.key] ?? reason.key) : 'Требует ручной проверки';
+  const strongestEvidence = candidate.evidenceTitles[0] ?? 'Название подтверждения не указано';
+  const signal = createSignalContract({
+    signal: String(candidate.score),
+    whyNow: candidate.reasons.slice(0, 2).join('; ') || reasonLabel,
+    evidence: candidate.evidenceTitles.map((proof) => ({ proof })),
+    confidence: {
+      gate: confidenceGate(candidate.confidenceGate),
+      label: confidenceLabel(candidate.confidenceGate),
+    },
+    action: 'Проверить подтверждения',
+    timestamp: candidate.latestPublishedAt ?? candidate.createdAt,
+  });
 
   return (
-    <article className={ipStyles.leadCard}>
-      <div className={ipStyles.leadCardRail} data-tone="neutral" aria-hidden="true" />
-      <div className={ipStyles.leadCardBody}>
-        <div className={ipStyles.leadCardHead}>
-          <div className={ipStyles.leadCardHeadMain}>
-            <Link href={`/leads/${candidate.id}`} className={ipStyles.leadLink}>
-              <span className={ipStyles.leadCardOrg}>{candidate.orgName}</span>
-            </Link>
-            <div className={ipStyles.leadCardTags}>
-              <ScoreBandChip score={candidate.score} />
-              <GateBadgeInline gate={candidate.confidenceGate} />
-              <ForeignEmployerBadge isForeign={candidate.isForeignEmployer ?? false} />
-              {reason ? <ReviewReasonChip reason={reason} /> : null}
-            </div>
-          </div>
-          <div className={ipStyles.leadCardHeadAside}>
-            <div className={ipStyles.leadCardScore}>
-              <ScoreBar score={candidate.score} />
-            </div>
-          </div>
-        </div>
-
-        {candidate.reasons.length > 0 && (
-          <div className={ipStyles.leadFieldRow} data-kind="why">
-            <span className={ipStyles.leadFieldLabel}>Почему кандидат</span>
-            <span className={ipStyles.leadFieldValue}>
-              {candidate.reasons.slice(0, 2).join('; ')}
-            </span>
-          </div>
-        )}
-
-        <div className={ipStyles.leadCardFooter}>
-          <SignalFreshnessChip latestPublishedAt={candidate.latestPublishedAt} />
-          {candidate.locationNames.length > 0 && (
-            <span className={ipStyles.leadMetaChip}>
-              <PinIcon className={ipStyles.chipIcon} /> {candidate.locationNames.slice(0, 2).join(', ')}
-            </span>
-          )}
-          {candidate.vacanciesCount > 0 && (
-            <span className={ipStyles.leadMetaChip}><BriefcaseIcon className={ipStyles.chipIcon} /> {candidate.vacanciesCount} вакансий</span>
-          )}
-          {candidate.evidenceTitles.length > 0 && (
-            <span className={ipStyles.leadMetaChip}>
-              <FileIcon className={ipStyles.chipIcon} /> {candidate.evidenceTitles.slice(0, 2).join(' · ')}
-            </span>
-          )}
-        </div>
-
-        {candidate.sourceFamilies.length > 0 && (
-          <div className={ipStyles.chipWrapSm}>
-            {candidate.sourceFamilies.map((src) => (
-              <SourceChip key={src}>{src}</SourceChip>
-            ))}
-          </div>
-        )}
+    <article className={styles.row} data-review-row>
+      <div className={styles.identity}>
+        <Link href={`/leads/${candidate.id}`} className={styles.company}>{candidate.orgName}</Link>
+        <span>{candidate.locationNames.slice(0, 2).join(', ') || 'география не указана'}</span>
       </div>
-      <div className={ipStyles.leadCardAction}>
-        <Link href={`/leads/${candidate.id}`} className={ipStyles.leadOpenBtn}>
-          Смотреть доказательства →
-        </Link>
-        <ReviewActions
-          candidateId={candidate.id}
-          clientProfileId={clientProfileId}
-        />
+      <div className={styles.reason}>
+        <strong>{reasonLabel}</strong>
+        {candidate.reasons.length > 0 ? <span>{signal.whyNow}</span> : null}
+      </div>
+      <div className={styles.proof}>
+        <strong data-review-evidence-title>{strongestEvidence}</strong>
+        <span>{candidate.sourceFamilies.length} источн. · {freshness}</span>
+      </div>
+      <div className={styles.signal}>
+        <strong aria-label={`Сила сигнала ${signal.signal}`}>{signal.signal}</strong>
+        <span>{signal.confidence.label}</span>
+      </div>
+      <div className={styles.actions}>
+        <Link href={`/leads/${candidate.id}`}>{signal.action}</Link>
+        <ReviewActions candidateId={candidate.id} clientProfileId={clientProfileId} />
       </div>
     </article>
   );
@@ -216,14 +112,16 @@ export default async function ReviewPage({
   }>;
 }) {
   const params = await searchParams;
-  // Keep authentication, canonical entitlement, and data failures distinct.
-  // A missing session must never look like an account with zero profiles.
   const authorization = await getSession({ permission: 'leads:read' });
   if (!authorization) {
     return (
       <InternalPageFrame navItems={REVIEW_NAV}>
-        <InternalPageHeader title="Очередь проверки" subtitle="Защищённое рабочее пространство" />
-        <EmptyState title="Нужен вход в аккаунт" text="Войдите, чтобы открыть очередь проверки своего workspace." action={{ href: '/login?returnTo=/review', label: 'Войти' }} />
+        <InternalPageHeader title="На проверке" subtitle="Защищённое рабочее пространство" />
+        <StaticEmptyState
+          title="Нужен вход в аккаунт"
+          description="Войдите, чтобы открыть очередь проверки своего workspace."
+          action={<StateLink href="/login?returnTo=/review" label="Войти" />}
+        />
       </InternalPageFrame>
     );
   }
@@ -235,8 +133,13 @@ export default async function ReviewPage({
   if (!entitlement) {
     return (
       <InternalPageFrame navItems={REVIEW_NAV}>
-        <InternalPageHeader title="Очередь проверки" subtitle="Проверка доступа" />
-        <ErrorState title="Не удалось проверить доступ" description="Мы не загружаем очередь, пока сервер не подтвердит права аккаунта." action={{ href: '/settings/access', label: 'Доступ и оплата' }} />
+        <InternalPageHeader title="На проверке" subtitle="Проверка доступа" />
+        <ProductErrorState
+          title="Не удалось проверить доступ"
+          description="Мы не загружаем очередь, пока сервер не подтвердит права аккаунта."
+        >
+          <StateLink href="/settings/access" label="Доступ и оплата" />
+        </ProductErrorState>
       </InternalPageFrame>
     );
   }
@@ -247,8 +150,12 @@ export default async function ReviewPage({
   ) {
     return (
       <InternalPageFrame navItems={REVIEW_NAV}>
-        <InternalPageHeader title="Очередь проверки" subtitle="Доступ не активен" />
-        <EmptyState title="Нужен активный доступ" text="Очередь и история сохранены. После активации проверка снова станет доступна." action={{ href: '/settings/access', label: 'Проверить доступ' }} />
+        <InternalPageHeader title="На проверке" subtitle="Доступ не активен" />
+        <StaticEmptyState
+          title="Нужен активный доступ"
+          description="Очередь и история сохранены. После активации проверка снова станет доступна."
+          action={<StateLink href="/settings/access" label="Проверить доступ" />}
+        />
       </InternalPageFrame>
     );
   }
@@ -259,8 +166,13 @@ export default async function ReviewPage({
   } catch {
     return (
       <InternalPageFrame navItems={REVIEW_NAV}>
-        <InternalPageHeader title="Очередь проверки" subtitle="Radar" />
-        <ErrorState title="Не удалось загрузить профили Radar" description="Это временная ошибка данных, а не пустая очередь." action={{ href: '/settings/radar', label: 'Открыть настройки Radar' }} />
+        <InternalPageHeader title="На проверке" subtitle="Радар" />
+        <ProductErrorState
+          title="Не удалось загрузить профили радара"
+          description="Это временная ошибка данных, а не пустая очередь."
+        >
+          <StateLink href="/settings/radar" label="Открыть настройки радара" />
+        </ProductErrorState>
       </InternalPageFrame>
     );
   }
@@ -271,98 +183,83 @@ export default async function ReviewPage({
       ? params.clientProfileId ?? ''
       : profiles[0]?.id?.toString() ?? '';
 
-  const limit = Math.min(Number(params.limit ?? 50), 200);
-  const offset = Math.max(Number(params.offset ?? 0), 0);
+  const { limit, offset } = parseReviewPagePagination(params);
 
-  const cookieHeader = activeProfileId ? (await headers()).get('cookie') : null;
-  const reviewData = activeProfileId
-    ? await getReviewCandidates(activeProfileId, limit, offset, cookieHeader)
-    : { items: [], total: 0 };
+  const pool = getPool();
+  const reviewData: { items: ReviewCandidate[]; total: number; error?: boolean } = activeProfileId && pool
+    ? await listPendingReviewCandidates({
+        pool,
+        clientProfileId: activeProfileId,
+        ownerId,
+        limit,
+        offset,
+      }).catch(() => ({ items: [], total: 0, error: true as const }))
+    : activeProfileId
+      ? { items: [], total: 0, error: true as const }
+      : { items: [], total: 0 };
 
   return (
     <InternalPageFrame navItems={REVIEW_NAV}>
       <InternalPageHeader
-        title="Очередь проверки"
-        subtitle="Кандидаты с уверенностью C, иностранные работодатели и одиночный источник — проверьте доказательства перед доставкой как лид"
+        title="На проверке"
+        subtitle="Кандидаты с уровнем подтверждения C, иностранные работодатели и одиночный источник — проверьте доказательства перед доставкой как лид"
       />
 
       {profiles.length === 0 && allProfiles.length > 0 ? (
-        <EmptyState
+        <StaticEmptyState
           icon={TargetIcon}
-          title="Профиль Radar приостановлен"
-          text="Настройки и решения сохранены, но очередь не обновляется. Включите профиль, чтобы продолжить проверку новых кандидатов."
-          action={{ href: '/settings/radar', label: 'Включить профиль Radar' }}
+          title="Профиль радара приостановлен"
+          description="Настройки и решения сохранены, но очередь не обновляется. Включите профиль, чтобы продолжить проверку новых кандидатов."
+          action={<StateLink href="/settings/radar" label="Включить профиль радара" />}
         />
       ) : profiles.length === 0 ? (
-        <EmptyState
+        <StaticEmptyState
           icon={TargetIcon}
           title="Нет клиентских профилей"
-          text="Создайте профиль в онбординге, чтобы увидеть очередь проверки."
-          action={{ href: '/onboarding', label: 'Настроить Radar' }}
+          description="Создайте профиль в онбординге, чтобы увидеть очередь проверки."
+          action={<StateLink href="/onboarding" label="Настроить радар" />}
         />
       ) : (
         <>
-          {profiles.length > 1 && (
-            <ContentCard>
-              <div className={ipStyles.filterBar}>
-                <label className={ipStyles.filterLabel}>
-                  Профиль клиента:{' '}
-                  <select
-                    className={ipStyles.filterSelect}
-                    defaultValue={activeProfileId}
-                    onChange={(e) => {
-                      const url = new URL(window.location.href);
-                      url.searchParams.set('clientProfileId', e.target.value);
-                      window.location.href = url.toString();
-                    }}
-                  >
-                    {profiles.map((p: ClientProfile) => (
-                      <option key={p.id} value={p.id}>
-                        {p.agencyName ?? `Профиль #${p.id}`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </ContentCard>
-          )}
+          {profiles.length > 1 ? (
+            <form method="GET" className={styles.filters}>
+              <label>Профиль клиента
+                <select name="clientProfileId" defaultValue={activeProfileId}>
+                  {profiles.map((profile: ClientProfile) => (
+                    <option key={profile.id} value={profile.id}>{profile.agencyName ?? `Профиль #${profile.id}`}</option>
+                  ))}
+                </select>
+              </label>
+              <button type="submit">Показать</button>
+            </form>
+          ) : null}
 
-          <MetricGrid>
-            <MetricCard label="На проверке" value={reviewData.total} tone="info" />
-          </MetricGrid>
+          <p className={styles.summary}><strong>{reviewData.total}</strong> на проверке</p>
 
           {reviewData.error ? (
-            <ErrorState
-              title="Очередь проверки не загрузилась"
-              description="Кандидаты с уверенностью C и одиночным источником собираются из доказательств. Повторите через минуту — если очередь не появится, напишите поддержку."
+            <ProductErrorState
+              title="На проверке не загрузилась"
+              description="Кандидаты с уровнем подтверждения C и одиночным источником собираются из доказательств. Повторите через минуту — если очередь не появится, напишите поддержку."
             />
           ) : (
-          <Suspense fallback={<LoadingState variant="skeleton" />}>
-            {reviewData.items.length === 0 ? (
-              <EmptyState
-                icon={CheckIcon}
-                title="Очередь пуста"
-                text="Нет кандидатов, требующих проверки. Новые карьерные страницы и платформенные сигналы появляются ежедневно — кандидаты с уверенностью C или одиночным источником появятся здесь автоматически."
-              />
-            ) : (
-              <TableCard>
-                <div className={ipStyles.leadsListToolbar}>
-                  <div className={ipStyles.leadsListCount}>
+            <Suspense fallback={<LoadingState variant="skeleton" />}>
+              {reviewData.items.length === 0 ? (
+                <StaticEmptyState
+                  icon={CheckIcon}
+                  title="Очередь пуста"
+                  description="Нет кандидатов, требующих проверки. Новые карьерные страницы и платформенные сигналы появляются ежедневно — кандидаты с уровнем подтверждения C или одиночным источником появятся здесь автоматически."
+                />
+              ) : (
+                <div className={styles.list} role="list">
+                  <div className={styles.listHeader}>
                     <strong>{reviewData.items.length}</strong> {pluralizeLeads(reviewData.items.length)} на проверке
                   </div>
-                </div>
-                <div className={ipStyles.leadsList}>
                   {reviewData.items.map((candidate) => (
-                    <ReviewCard
-                      key={candidate.id}
-                      candidate={candidate}
-                      clientProfileId={activeProfileId}
-                    />
+                    <ReviewRow key={candidate.id} candidate={candidate} clientProfileId={activeProfileId} />
                   ))}
                 </div>
-              </TableCard>
-            )}
-          </Suspense>
+              )}
+            </Suspense>
           )}
         </>
       )}

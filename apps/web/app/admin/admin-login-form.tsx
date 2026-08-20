@@ -15,7 +15,7 @@ export default function AdminLoginForm() {
   return (
     <form action={formAction} style={{ display: "grid", gap: "12px", maxWidth: "380px" }}>
       <label style={{ display: "grid", gap: "6px" }}>
-        <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--c-text-secondary, #475569)" }}>
+        <span style={{ fontSize: "var(--type-metadata-size)", fontWeight: 600, color: "var(--color-text-secondary)" }}>
           Пароль оператора
         </span>
         <input
@@ -26,17 +26,17 @@ export default function AdminLoginForm() {
           autoComplete="current-password"
           placeholder="••••••••"
           style={{
-            fontSize: "var(--fs-base)",
+            fontSize: "var(--type-body-size)",
             padding: "12px 16px",
-            border: "1px solid var(--c-border, #e2e8f0)",
-            borderRadius: "12px",
+            border: "1px solid var(--color-separator)",
+            borderRadius: "var(--radius-surface)",
             width: "100%",
           }}
         />
       </label>
 
       {state.error ? (
-        <div style={{ padding: "10px 12px", borderRadius: "10px", background: "#fee4e2", color: "#b42318", fontSize: "0.86rem" }}>
+        <div style={{ padding: "10px 12px", borderRadius: "var(--radius-surface)", background: "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))", color: "var(--color-destructive)", fontSize: "0.86rem" }}>
           {state.error}
         </div>
       ) : null}
@@ -45,12 +45,12 @@ export default function AdminLoginForm() {
         type="submit"
         disabled={pending}
         style={{
-          background: "var(--c-brand, #1d4ed8)",
-          color: "#fff",
+          background: "var(--color-signal)",
+          color: "var(--color-surface-elevated)",
           padding: "12px 22px",
-          borderRadius: "12px",
+          borderRadius: "var(--radius-surface)",
           fontWeight: 600,
-          fontSize: "var(--fs-base)",
+          fontSize: "var(--type-body-size)",
           border: "none",
           cursor: pending ? "wait" : "pointer",
           opacity: pending ? 0.7 : 1,

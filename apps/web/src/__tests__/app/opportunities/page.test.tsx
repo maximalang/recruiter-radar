@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 
 jest.mock('@/lib/auth-v2/authorization', () => {
   const getAuthorizedOwnerId = jest.fn()
@@ -132,20 +132,20 @@ describe('opportunities page', () => {
   it('shows the four Morning Brief counters and evidence-first empty state', async () => {
     render(await OpportunitiesPage({ searchParams: Promise.resolve({}) }))
 
-    expect(screen.getByRole('heading', { name: 'Сегодня' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ситуации' })).toBeInTheDocument()
     for (const label of [
-      'Новые возможности',
+      'Новые',
       'В работе',
-      'Коммерческий pipeline',
+      'Активная работа',
       'Отложены',
     ]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0)
     }
     expect(screen.getByText(
-      'Радар пока не обнаружил достаточно подтверждённых коммерческих возможностей под ваш профиль.',
+      'Подтверждённых ситуаций пока нет',
     )).toBeInTheDocument()
     expect(screen.getByText(
-      'Мы не показываем компании только потому, что у них есть одна вакансия.',
+      'Новая ситуация появится, когда сигналы сложатся в достаточно подтверждённое коммерческое окно.',
     )).toBeInTheDocument()
   })
 
@@ -178,7 +178,7 @@ describe('opportunities page', () => {
       view: 'morning',
       morningBriefOnly: true,
     }))
-    expect(screen.queryByText('Коммерческий pipeline')).toBeNull()
+    expect(screen.queryByText('Рабочий контур')).toBeNull()
   })
 
   it('loads the Phase 7 Today queue and tenant-scoped assignees for Phase 10', async () => {
@@ -224,24 +224,22 @@ describe('opportunities page', () => {
 
     render(await OpportunitiesPage({ searchParams: Promise.resolve({}) }))
 
-    expect(screen.getByRole('heading', { name: 'Сегодня' })).toBeInTheDocument()
-    const lanes = screen.getByRole('navigation', { name: 'Действия на сегодня' })
+    expect(screen.getByRole('heading', { name: 'Ситуации' })).toBeInTheDocument()
+    const lanes = screen.getByRole('navigation', { name: 'Рабочий контур ситуаций' })
     for (const [label, value, href] of [
-      ['Новые возможности', '2', '/opportunities?view=morning'],
-      ['Нужно связаться', '3', '/opportunities?view=accepted'],
-      ['Ожидают follow-up', '4', '/opportunities?view=follow_up'],
+      ['Новые ситуации', '2', '/opportunities?view=morning'],
+      ['Связаться', '3', '/opportunities?view=accepted'],
+      ['Повторный контакт', '4', '/opportunities?view=follow_up'],
       ['Просрочено', '5', '/opportunities?view=overdue'],
-      ['Активный pipeline', '7', '/opportunities?view=pipeline'],
+      ['Активная работа', '7', '/opportunities?view=pipeline'],
     ]) {
       const link = within(lanes).getByRole('link', { name: new RegExp(label) })
       expect(link).toHaveAttribute('href', href)
       expect(within(link).getByText(value)).toBeInTheDocument()
     }
 
-    const researchToggle = screen.getByText('Режим исследования')
-    fireEvent.click(researchToggle)
     expect(screen.getByRole('searchbox', {
-      name: 'Компания или возможность',
+      name: 'Компания или ситуация',
     })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Найти' })).toBeInTheDocument()
   })
@@ -325,7 +323,7 @@ describe('opportunities page', () => {
 
     render(await OpportunitiesPage({ searchParams: Promise.resolve({}) }))
 
-    expect(screen.getByText('Нет доступа к возможностям')).toBeInTheDocument()
+    expect(screen.getByText('Нет доступа к ситуациям')).toBeInTheDocument()
     expect(listOpportunities).not.toHaveBeenCalled()
     expect(getOpportunityOutcomeOperationalSummary).not.toHaveBeenCalled()
   })
@@ -338,10 +336,10 @@ describe('opportunities page', () => {
     }))
 
     expect(screen.getByText(
-      'В выбранной очереди пока нет возможностей.',
+      'В выбранном срезе пока нет ситуаций',
     )).toBeInTheDocument()
     expect(screen.queryByText(
-      /Радар пока не обнаружил достаточно подтверждённых/,
+      /Подтверждённых ситуаций пока нет/,
     )).toBeNull()
   })
 })

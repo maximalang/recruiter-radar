@@ -7,7 +7,7 @@ const DASHBOARD_NAV = buildAccountNavigation("dashboard");
 export default function DashboardLoading() {
   return (
     <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
-      <ProductWorkspaceHeader eyebrow="Dashboard" title="Загружаем командный центр" subtitle="Проверяем доступ и собираем актуальные возможности." />
+      <ProductWorkspaceHeader title="Сегодня" subtitle="Проверяем доступ и собираем приоритетные компании и изменения." />
       <LoadingState variant="skeleton" />
     </ProductWorkspaceFrame>
   );

@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { readCurrentAuthSession } from "@/lib/auth-v2/current-session";
 import { getWorkspaceTeam } from "@/lib/auth-v2/workspace-team";
 import { buildAccountNavigation } from "../../ui/account-navigation";
 import {
-  ContentCard,
-  EmptyState,
   InternalPageFrame,
   InternalPageHeader,
 } from "../../ui/internal-page";
+import { StaticEmptyState } from "../../ui/static-empty-state";
 import {
   TeamSettingsView,
   type TeamSettingsStatus,
@@ -24,6 +24,10 @@ export const dynamic = "force-dynamic";
 
 function scalar(value: string | string[] | undefined): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>;
 }
 
 export default async function TeamSettingsPage(props: {
@@ -51,13 +55,11 @@ export default async function TeamSettingsPage(props: {
           title="Команда"
           subtitle="Управление участниками доступно владельцу и администраторам."
         />
-        <ContentCard>
-          <EmptyState
-            title="Недостаточно прав"
-            text="Ваш доступ к рабочему пространству не позволяет управлять командой."
-            action={{ href: "/settings/security", label: "Открыть безопасность" }}
-          />
-        </ContentCard>
+        <StaticEmptyState
+          title="Недостаточно прав"
+          description="Ваш доступ к рабочему пространству не позволяет управлять командой."
+          action={<StateLink href="/settings/security" label="Открыть безопасность" />}
+        />
       </InternalPageFrame>
     );
   }

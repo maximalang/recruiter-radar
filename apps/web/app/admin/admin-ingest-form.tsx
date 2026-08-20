@@ -72,10 +72,10 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
             value={source}
             onChange={(e) => setSource(e.target.value)}
             style={{
-              fontSize: "var(--fs-base)",
+              fontSize: "var(--type-body-size)",
               padding: "8px 12px",
-              border: "1px solid var(--c-border, #e2e8f0)",
-              borderRadius: "10px",
+              border: "1px solid var(--color-separator)",
+              borderRadius: "var(--radius-surface)",
             }}
           >
             {sources.map((s) => (
@@ -88,7 +88,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
       </div>
 
       {mode === "single" && sources.find((s) => s.id === source && !s.isPrimary) ? (
-        <p style={{ fontSize: "0.78rem", color: "var(--c-text-muted, #667085)", margin: 0 }}>
+        <p style={{ fontSize: "0.78rem", color: "var(--color-text-tertiary)", margin: 0 }}>
           Не-primary источники обогащают и подтверждают уже собранные лиды — они не
           создают лиды сами и не входят в ежедневный автоинжест.
         </p>
@@ -98,12 +98,12 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
         type="submit"
         disabled={pending}
         style={{
-          background: "var(--c-brand, #1d4ed8)",
-          color: "#fff",
+          background: "var(--color-signal)",
+          color: "var(--color-surface-elevated)",
           padding: "12px 22px",
-          borderRadius: "12px",
+          borderRadius: "var(--radius-surface)",
           fontWeight: 600,
-          fontSize: "var(--fs-base)",
+          fontSize: "var(--type-body-size)",
           border: "none",
           cursor: pending ? "wait" : "pointer",
           opacity: pending ? 0.7 : 1,
@@ -119,9 +119,9 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
           aria-live="polite"
           style={{
             padding: "10px 12px",
-            borderRadius: "10px",
-            background: state.ok ? "#d1fae5" : "#fee4e2",
-            color: state.ok ? "#065f46" : "#b42318",
+            borderRadius: "var(--radius-surface)",
+            background: state.ok ? "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))" : "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))",
+            color: state.ok ? "var(--color-signal)" : "var(--color-destructive)",
             fontSize: "0.86rem",
           }}
         >
@@ -140,15 +140,15 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
                 gap: "12px",
                 alignItems: "center",
                 padding: "8px 12px",
-                border: "1px solid var(--c-border, #e2e8f0)",
-                borderRadius: "10px",
+                border: "1px solid var(--color-separator)",
+                borderRadius: "var(--radius-surface)",
                 fontSize: "0.82rem",
               }}
             >
               <strong>{r.source}</strong>
               <span>{r.fetched ?? 0} fetched</span>
               <span>{r.upserted ?? 0} upserted</span>
-              <span style={{ color: r.success ? "#065f46" : "#b42318", fontWeight: 700 }}>
+              <span style={{ color: r.success ? "var(--color-signal)" : "var(--color-destructive)", fontWeight: 700 }}>
                 {r.success ? "ok" : r.error ?? "fail"}
               </span>
             </div>

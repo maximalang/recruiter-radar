@@ -34,9 +34,7 @@ describe("cross-route visual layer contract", () => {
       "ui/brand-logo.module.css",
       "ui/internal-page.module.css",
       "ui/page-primitives.module.css",
-      "dashboard/dashboard.module.css",
-      "dashboard/dashboard-analytics.tsx",
-      "dashboard/dashboard-quality.tsx",
+      "dashboard/dashboard-workspace.module.css",
       "opportunities/opportunities.module.css",
       "profile/agency-dna-form.module.css",
       "profile/profile-form.module.css",
@@ -44,7 +42,7 @@ describe("cross-route visual layer contract", () => {
       "login/login.module.css",
       "leads/[id]/next-steps-block.module.css",
       "leads/[id]/feedback-buttons.module.css",
-      "settings/settings-overview.module.css",
+      "settings/settings-document-summary.module.css",
       "settings/security/security-settings.module.css",
       "settings/team/team-settings.module.css",
     ];
@@ -53,6 +51,52 @@ describe("cross-route visual layer contract", () => {
     for (const path of productStyles) {
       expect(readAppFile(path).match(legacyBlue)).toBeNull();
     }
+  });
+
+  it("keeps pending auth actions on the paper/ink semantic foundation without a floating SaaS card", () => {
+    const pendingAuth = readAppFile("auth/pending-auth-action.module.css");
+
+    expect(pendingAuth).toContain("background: var(--color-canvas)");
+    expect(pendingAuth).toContain("outline: 2px solid var(--color-focus)");
+    expect(pendingAuth).toContain("color: var(--color-text-inverse)");
+    expect(pendingAuth).toMatch(/\.card \{[\s\S]*?border-radius: 0;[\s\S]*?background: transparent;[\s\S]*?box-shadow: none;/);
+    expect(pendingAuth).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
+    expect(pendingAuth).not.toMatch(/rgba\(/gi);
+  });
+
+  it("keeps Company Brief feedback states on semantic roles instead of a local rainbow palette", () => {
+    const feedback = readAppFile("leads/[id]/feedback-buttons.module.css");
+
+    for (const token of [
+      "--color-positive",
+      "--color-warning",
+      "--color-information",
+      "--color-destructive",
+      "--color-focus",
+      "--color-text-inverse",
+    ]) {
+      expect(feedback).toContain(token);
+    }
+    expect(feedback).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
+    expect(feedback).not.toMatch(/rgba\(/gi);
+    expect(feedback).not.toContain("text-transform: uppercase");
+  });
+
+  it("keeps Company Brief next actions on semantic motion, focus and target-size contracts", () => {
+    const nextSteps = readAppFile("leads/[id]/next-steps-block.module.css");
+
+    expect(nextSteps).toContain("var(--motion-duration-control)");
+    expect(nextSteps).toContain("var(--motion-ease-standard)");
+    expect(nextSteps).toContain("outline: 2px solid var(--color-focus)");
+    expect(nextSteps).toContain('.nextStepsLink[data-variant="primary"]');
+    expect(nextSteps).toContain("background-color: var(--color-signal)");
+    expect(nextSteps).toContain("color: var(--color-text-inverse)");
+    expect(nextSteps).toContain("color: var(--color-destructive)");
+    expect(nextSteps).toContain("min-height: 44px");
+    expect(nextSteps).not.toContain("min-height: 40px");
+    expect(nextSteps).not.toContain("transition: all");
+    expect(nextSteps).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
+    expect(nextSteps).not.toMatch(/rgba\(/gi);
   });
 
   it("keeps the authenticated shell addressable after the frame migration", () => {
@@ -66,27 +110,41 @@ describe("cross-route visual layer contract", () => {
     expect(internalPage).not.toContain("footer={props.footer}");
   });
 
-  it("switches portrait tablets to the intentional bottom navigation", () => {
+  it("keeps compact top navigation at 768px and switches sub-768 widths to the five-destination bottom navigation", () => {
     const workspaceStyles = readAppFile("ui/product-workspace.module.css");
 
-    expect(workspaceStyles).toContain("@media (max-width: 800px)");
-    expect(workspaceStyles).toMatch(/\.mobileNav \{[\s\S]*?position: fixed/);
-    expect(workspaceStyles).toContain("grid-template-columns: repeat(4, minmax(0, 1fr))");
-    expect(workspaceStyles).toContain("padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom))");
+    expect(workspaceStyles).toContain("@media (max-width: 767px)");
+    expect(workspaceStyles).toMatch(/\.workspaceBody \{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden/);
+    expect(workspaceStyles).toMatch(/\.content \{[\s\S]*?overflow-y: auto/);
+    expect(workspaceStyles).toMatch(/\.mobileNav \{[\s\S]*?position: static/);
+    expect(workspaceStyles).toMatch(/\.mobileMore \{[\s\S]*?position: relative/);
+    expect(workspaceStyles).toMatch(/\.mobileMoreMenu \{[\s\S]*?position: absolute/);
+    expect(workspaceStyles).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
+    expect(workspaceStyles).toContain("padding: 24px 16px calc(32px + env(safe-area-inset-bottom))");
+    const briefStyles = readAppFile("leads/[id]/lead-brief.module.css");
+    expect(briefStyles).toContain("@media (max-width: 1000px)");
+    expect(briefStyles).toMatch(/@media \(max-width: 1000px\)[\s\S]*?\.mobilePrimaryAction \{[\s\S]*?display: inline-flex/);
+    expect(briefStyles).toMatch(/@media \(min-width: 1001px\)[\s\S]*?\.railPrimaryAction \{[\s\S]*?display: inline-flex/);
   });
 
   it("uses continuous decision rails instead of nested card stacks on core product surfaces", () => {
     const internalPage = readAppFile("ui/internal-page.module.css");
     const opportunities = readAppFile("opportunities/opportunities.module.css");
     const radar = readAppFile("opportunities/evidence-radar-map.module.css");
+    const leads = readAppFile("leads/leads-workspace.module.css");
 
-    expect(internalPage).toContain(".leadDetailContainer .detailMain > .contentCard");
-    expect(internalPage).toContain(".leadDetailContainer .detailSidebar > .contentCard");
-    expect(internalPage).toMatch(/\.signalCardList \{[\s\S]*?gap: 0;[\s\S]*?background: transparent;/);
-    expect(internalPage).toMatch(/\.signalLeadSections \{[\s\S]*?gap: 0;/);
+    expect(internalPage).not.toContain(".leadDetailContainer");
+    expect(internalPage).not.toContain(".detailMain > .contentCard");
+    expect(internalPage).not.toContain(".detailSidebar > .contentCard");
+    expect(leads).toContain(".list{display:grid}");
+    expect(leads).toMatch(/\.row\{[\s\S]*?border-bottom:1px solid var\(--color-separator\)/);
+    expect(leads).not.toContain(".disclosure");
+    expect(internalPage).not.toContain("signalLeadSections");
+    expect(internalPage).not.toContain("scoreGauge");
+    expect(internalPage).not.toContain("scoreBar");
     expect(opportunities).toMatch(/\.cardList \{[\s\S]*?gap: 0;/);
     expect(opportunities).toMatch(/\.decisionGrid \{[\s\S]*?border-radius: 0;/);
-    expect(radar).toMatch(/\.layout \{[\s\S]*?gap: 0;[\s\S]*?background: #080d0c;/);
-    expect(radar).toContain("border-left: 1px solid rgba(255, 255, 255, .09)");
+    expect(radar).toMatch(/\.detailPanel \{[\s\S]*?border-left: 1px solid var\(--color-separator-strong\);[\s\S]*?background: var\(--color-surface-secondary\);/);
+    expect(radar).toMatch(/\.canvas \{[\s\S]*?background: var\(--radar-field\);/);
   });
 });

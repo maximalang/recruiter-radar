@@ -19,7 +19,7 @@ function isAuthorized(request: NextRequest): boolean {
 export async function GET(request: NextRequest) {
   if (!process.env.CRON_API_KEY?.trim()) {
     return NextResponse.json(
-      { ok: false, error: 'Payment readiness is unavailable: CRON_API_KEY is not configured.' },
+      { ok: false, error: 'Payment readiness is unavailable because the service is not configured.' },
       { status: 503, headers: { 'Cache-Control': 'no-store' } },
     )
   }

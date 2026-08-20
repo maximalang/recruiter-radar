@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.CRON_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { success: false, error: 'CRON_API_KEY is not configured.' },
+      { success: false, error: 'Source refresh service is not configured.' },
       { status: 500 },
     )
   }

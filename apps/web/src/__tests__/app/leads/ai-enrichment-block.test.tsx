@@ -60,7 +60,7 @@ describe('AiEnrichmentBlock', () => {
     render(<AiEnrichmentBlock enrichment={enrichment()} />);
 
     // Labelled explicitly as an AI hint, not source-of-truth.
-    expect(screen.getByText(/AI-подсказка по найму/i)).toBeInTheDocument();
+    expect(screen.getByText(/ИИ-подсказка по найму/i)).toBeInTheDocument();
     expect(screen.getByText(/не влияет на/i)).toBeInTheDocument();
 
     // Signals are shown.
@@ -69,7 +69,8 @@ describe('AiEnrichmentBlock', () => {
     expect(screen.getByText('Активный найм в инженерную команду.')).toBeInTheDocument();
     expect(screen.getByText('Высокая')).toBeInTheDocument(); // urgency
     expect(screen.getByText(/Москва, Удалённо/)).toBeInTheDocument(); // geo
-    expect(screen.getByText(/Уверенность ИИ: средняя/)).toBeInTheDocument();
+    expect(screen.getByText('Уверенность ИИ')).toBeInTheDocument();
+    expect(screen.getByText(/средняя · scrapegraph/)).toBeInTheDocument();
   });
 
   it('omits a role department when it is null', () => {

@@ -23,11 +23,7 @@ import {
   EmptyState,
   NotFoundState,
   LoadingState,
-  MetricCard,
-  MetricGrid,
-  GateBadgeInline,
 } from '@/app/ui/internal-page';
-import { ProductErrorState, StaticEmptyState } from '@/app/ui/product-state';
 import { SearchIcon, CheckIcon } from '@/app/ui/icons';
 
 type IconCmp = (p: SVGProps<SVGSVGElement>) => ReactElement;
@@ -90,49 +86,6 @@ describe('EmptyState (T0.2 — SVG icon API)', () => {
   });
 });
 
-describe('Product state primitives', () => {
-  it('supports repeated instances without duplicate document ids', () => {
-    const { container } = render(
-      <>
-        <StaticEmptyState title="Нет лидов" />
-        <StaticEmptyState title="Нет возможностей" />
-        <ProductErrorState title="Ошибка профиля" />
-        <ProductErrorState title="Ошибка доставки" />
-      </>,
-    );
-
-    expect(container.querySelectorAll('[id]')).toHaveLength(0);
-    expect(screen.getByRole('region', { name: 'Нет лидов' })).toBeTruthy();
-    expect(screen.getByRole('region', { name: 'Нет возможностей' })).toBeTruthy();
-    expect(screen.getByRole('alert', { name: 'Ошибка профиля' })).toBeTruthy();
-    expect(screen.getByRole('alert', { name: 'Ошибка доставки' })).toBeTruthy();
-  });
-});
-
-describe('MetricGrid', () => {
-  it('exposes the metric strip as a list of related values', () => {
-    render(
-      <MetricGrid>
-        <MetricCard label="Новые" value="3" />
-        <MetricCard label="На проверке" value="2" tone="info" />
-      </MetricGrid>,
-    );
-
-    expect(screen.getByRole('list')).toBeTruthy();
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
-  });
-});
-
-describe('GateBadgeInline', () => {
-  it('presents the evidence confirmation grade separately from score or automation', () => {
-    render(<GateBadgeInline gate="A" />);
-
-    expect(screen.getByText('Подтверждение A')).toHaveAccessibleName(
-      'Уровень подтверждения доказательствами: A',
-    );
-    expect(screen.queryByText('Авто (A)')).toBeNull();
-  });
-});
 
 describe('NotFoundState (T0.2 — SVG icon API)', () => {
   it('renders the SVG icon when provided, plus a back link', () => {

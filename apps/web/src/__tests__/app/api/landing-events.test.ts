@@ -119,6 +119,10 @@ describe("POST /api/landing-events", () => {
       name: "preview_started",
       context: "x".repeat(5_000),
     })));
+    const declaredOversized = await POST(request(
+      JSON.stringify({ name: "landing_viewed" }),
+      { "content-length": "1025" },
+    ));
     const malformed = await POST(request("{"));
     const crossOrigin = await POST(request(
       JSON.stringify({ name: "landing_viewed" }),
@@ -126,6 +130,7 @@ describe("POST /api/landing-events", () => {
     ));
 
     expect(oversized.status).toBe(413);
+    expect(declaredOversized.status).toBe(413);
     expect(malformed.status).toBe(400);
     expect(crossOrigin.status).toBe(403);
     await expect(malformed.text()).resolves.not.toContain("SyntaxError");

@@ -3,6 +3,16 @@ import { LeadScoringService } from '@/lib/lead-discovery/lead-scoring-service'
 import type { LeadScoringOptions, ScoredLead } from '@/lib/lead-discovery/lead-scoring-service'
 import { logEvent, logError } from '@/lib/runtime'
 
+const DEFAULT_MAX_RESULTS = 100
+const MAX_RESULTS_LIMIT = 500
+
+function parseMaxResults(value: unknown): number | null {
+  if (value === undefined) return DEFAULT_MAX_RESULTS
+  if (typeof value !== 'number' || !Number.isInteger(value)) return null
+  if (value < 1 || value > MAX_RESULTS_LIMIT) return null
+  return value
+}
+
 // Module-level singleton — one instance per process
 let _scoringService: LeadScoringService | null = null
 function getLeadScoringService(): LeadScoringService {
@@ -17,7 +27,7 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.LEAD_API_KEY || process.env.DIGEST_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { success: false, error: 'LEAD_API_KEY is not configured.' },
+      { success: false, error: 'Lead scoring service is not configured.' },
       { status: 500 }
     )
   }
@@ -37,7 +47,7 @@ export async function POST(request: NextRequest) {
       minScore = 1.0,
       enableRealTime = false,
       marketContext,
-      maxResults = 100,
+      maxResults: rawMaxResults,
       clientProfileId
     } = body
 
@@ -47,6 +57,17 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'Agency profile with industries is required'
+        },
+        { status: 400 }
+      )
+    }
+
+    const maxResults = parseMaxResults(rawMaxResults)
+    if (maxResults === null) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `maxResults must be an integer between 1 and ${MAX_RESULTS_LIMIT}`,
         },
         { status: 400 }
       )
@@ -119,7 +140,7 @@ export async function GET() {
           minScore: 'Minimum score threshold (default: 1.0)',
           enableRealTime: 'Enable real-time crawling (default: false)',
           marketContext: 'Market conditions and competitive landscape (optional)',
-          maxResults: 'Maximum number of results (default: 100)'
+          maxResults: `Maximum number of results (default: ${DEFAULT_MAX_RESULTS}, maximum: ${MAX_RESULTS_LIMIT})`
         },
         requestExample: {
           agencyProfile: {

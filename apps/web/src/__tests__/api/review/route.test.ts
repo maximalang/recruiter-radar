@@ -65,6 +65,18 @@ describe('GET /api/review', () => {
     expect(mockGetPool).not.toHaveBeenCalled();
   });
 
+  it('does not expose database error details', async () => {
+    makeMockPool();
+    mockQuery.mockRejectedValueOnce(new Error('connect ECONNREFUSED postgres.internal:5432 user=radar'));
+
+    const res = await makeRequest('1');
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Failed to fetch review queue.' });
+    expect(JSON.stringify(body)).not.toContain('postgres.internal');
+  });
+
   it('formats ScoringReason[] objects as Russian strings', async () => {
     makeMockPool();
 
@@ -241,12 +253,12 @@ describe('POST /api/review', () => {
     );
   });
 
-  it('reject still returns ok when suppression fails (review_status already persisted)', async () => {
+  it('reject still returns ok when suppression fails without exposing internal details', async () => {
     makeMockPool();
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: '1', org_id: '10', review_status: 'rejected' }],
     });
-    mockSuppress.mockRejectedValueOnce(new Error('boom'));
+    mockSuppress.mockRejectedValueOnce(new Error('connect ETIMEDOUT postgres.internal:5432 password=secret'));
 
     const res = await POST(
       new Request('http://localhost/api/review', {
@@ -258,7 +270,9 @@ describe('POST /api/review', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.warning).toMatch(/suppression failed/);
+    expect(body.warning).toBe('Rejected, but suppression failed.');
+    expect(JSON.stringify(body)).not.toContain('postgres.internal');
+    expect(JSON.stringify(body)).not.toContain('secret');
   });
 
   it('returns 404 when the candidate is not pending_review', async () => {
@@ -272,5 +286,23 @@ describe('POST /api/review', () => {
       }),
     );
     expect(res.status).toBe(404);
+  });
+
+  it('does not expose database error details when updating review status', async () => {
+    makeMockPool();
+    mockQuery.mockRejectedValueOnce(new Error('relation digest_candidates does not exist at postgres.internal'));
+
+    const res = await POST(
+      new Request('http://localhost/api/review', {
+        method: 'POST',
+        body: JSON.stringify({ candidateId: '1', action: 'approve', clientProfileId: '1' }),
+      }),
+    );
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Failed to update review status.' });
+    expect(JSON.stringify(body)).not.toContain('digest_candidates');
+    expect(JSON.stringify(body)).not.toContain('postgres.internal');
   });
 });

@@ -15,6 +15,12 @@ export const DEMO_COMPANY = {
   score: 87,
 } as const;
 
+export const DEMO_EVIDENCE_SOURCES = [
+  { source: "Карьерная страница", fact: "8 инженерных позиций", eventDate: "4 августа", confidence: "Прямой источник" },
+  { source: "Публичные вакансии", fact: "Новая руководящая роль", eventDate: "1 августа", confidence: "Подтверждено" },
+  { source: "Повторная публикация", fact: "3 роли появились снова", eventDate: "сегодня", confidence: "Свежий сигнал" },
+] as const;
+
 export const DEMO_EVIDENCE = [
   {
     label: "Сила сигнала",

@@ -12,6 +12,7 @@ import LandingMotion from "./landing-motion";
 import motionStyles from "./landing-motion.module.css";
 import styles from "./landing.module.css";
 import visualStyles from "./landing-visual-system.module.css";
+import RadarScene from "./radar-scene";
 import SignalTimelineScene from "./signal-timeline-scene";
 import WorkspaceScene from "./workspace-scene";
 
@@ -43,6 +44,7 @@ export default function LandingPage(props: {
           checkoutHref={props.checkoutHref}
         />
         <EvidenceScene />
+        <RadarScene />
         <DeliveryScene />
         <ConversionPanel
           previewInput={props.previewInput}

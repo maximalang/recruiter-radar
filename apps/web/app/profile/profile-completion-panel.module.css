@@ -16,30 +16,30 @@
 .title {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--c-text-primary);
+  color: var(--color-text-primary);
 }
 
 .count {
   font-size: 0.85rem;
-  color: var(--c-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .barTrack {
   height: 8px;
-  border-radius: 999px;
-  background: #eef0f4;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary));
   overflow: hidden;
 }
 
 .barFill {
   height: 100%;
-  border-radius: 999px;
-  background: var(--c-brand);
-  transition: width 0.3s ease;
+  border-radius: var(--radius-pill);
+  background: var(--color-signal);
+  transition: width var(--motion-duration-context) var(--motion-ease-standard);
 }
 
 .barFill[data-complete] {
-  background: #16a34a;
+  background: var(--color-signal);
 }
 
 .checklist {
@@ -56,11 +56,11 @@
   align-items: center;
   gap: 6px;
   font-size: 0.85rem;
-  color: var(--c-text-muted);
+  color: var(--color-text-tertiary);
 }
 
 .checkItem[data-filled] {
-  color: var(--c-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 /* Checklist icon — inline-SVG, sized to the item text, tone via currentColor.
@@ -72,7 +72,7 @@
   flex: 0 0 auto;
   width: 0.95em;
   height: 0.95em;
-  color: #c0c4cc;
+  color: var(--color-separator-strong);
 }
 
 .checkIcon svg {
@@ -81,7 +81,7 @@
 }
 
 .checkItem[data-filled] .checkIcon {
-  color: #16a34a;
+  color: var(--color-signal);
 }
 
 /* Match-count preview leading icon — semantic SearchIcon ("проверка радара"),
@@ -91,29 +91,29 @@
   width: 0.95em;
   height: 0.95em;
   vertical-align: -0.1em;
-  color: var(--c-text-muted);
+  color: var(--color-text-tertiary);
   margin-right: 2px;
 }
 
 .preview {
   padding-top: 10px;
-  border-top: 1px solid #f0f1f4;
+  border-top: 1px solid var(--color-separator-subtle);
 }
 
 .previewText {
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.5;
-  color: var(--c-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .previewText strong {
-  color: var(--c-text-primary);
+  color: var(--color-text-primary);
 }
 
 .previewEmpty {
   margin: 0;
   font-size: 0.88rem;
   line-height: 1.5;
-  color: var(--c-text-muted);
+  color: var(--color-text-tertiary);
 }

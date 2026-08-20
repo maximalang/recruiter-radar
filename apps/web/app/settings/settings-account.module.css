@@ -1,0 +1,33 @@
+.accountSection {
+  width: min(100%, 720px);
+  display: grid;
+  gap: 12px;
+  margin-top: 32px;
+  padding: 24px 0 0;
+  border-top: 1px solid var(--color-separator);
+}
+
+.accountSection h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--type-subsection-size);
+  font-weight: 620;
+  letter-spacing: -.018em;
+}
+
+.accountSection p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: 1.53;
+}
+
+.accountSection form {
+  width: fit-content;
+}
+
+.emptySection {
+  width: min(100%, 720px);
+  padding: 24px 0;
+  border-top: 1px solid var(--color-separator);
+}

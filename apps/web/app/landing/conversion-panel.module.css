@@ -5,7 +5,7 @@
 .pricing,
 .faq {
   padding-block: clamp(4.75rem, 7vw, 7.5rem);
-  border-top: 1px solid rgba(221, 233, 227, .1);
+  border-top: 1px solid color-mix(in srgb, var(--color-signal) 10%, transparent);
 }
 
 .viewportSurface {
@@ -24,8 +24,8 @@
   position: relative;
   align-self: start;
   border: 0;
-  border-top: 1px solid rgba(141, 217, 193, .52);
-  background: linear-gradient(145deg, rgba(255,255,255,.035), rgba(141,217,193,.025));
+  border-top: 1px solid color-mix(in srgb, var(--color-signal) 52%, transparent);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-surface-elevated) 3.5%, transparent), color-mix(in srgb, var(--color-signal) 2.5%, transparent));
 }
 
 .pricing [data-pricing-primary="true"]::before {
@@ -34,27 +34,22 @@
   right: 54%;
   left: 0;
   height: 1px;
-  background: #8dd9c1;
+  background: var(--color-signal);
   content: "";
   opacity: .75;
 }
 
 .pilotOffer {
-  transition: background-color .22s ease, border-color .22s ease, transform .22s ease;
-}
-
-.pilotOffer:hover {
-  background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(141,217,193,.04));
-  transform: translateY(-2px);
+  transition:
+    background-color var(--motion-duration-context) var(--motion-ease-standard),
+    border-color var(--motion-duration-context) var(--motion-ease-standard);
 }
 
 .pricing [data-pricing-primary="true"] > :global(a) {
   margin-top: auto;
-  transition: transform .18s ease, background-color .18s ease;
-}
-
-.pricing [data-pricing-primary="true"] > :global(a):hover {
-  transform: translateY(-1px);
+  transition:
+    transform var(--motion-duration-disclosure) var(--motion-ease-standard),
+    background-color var(--motion-duration-disclosure) var(--motion-ease-standard);
 }
 
 .pricing [data-pricing-primary="true"] > :global(a):active {
@@ -71,18 +66,17 @@
   position: relative;
   align-content: start;
   min-height: 0;
-  transition: background-color .2s ease, border-color .2s ease, opacity .2s ease;
-}
-
-.secondaryOffers:has(:global(article:hover)) :global(article:not(:hover)) {
-  opacity: .68;
+  transition:
+    background-color var(--motion-duration-context) var(--motion-ease-standard),
+    border-color var(--motion-duration-context) var(--motion-ease-standard),
+    opacity var(--motion-duration-context) var(--motion-ease-standard);
 }
 
 .secondaryOffers :global(article[data-recommended="true"]) {
   margin-inline: -.85rem;
   padding-inline: .85rem;
-  border-top-color: rgba(141, 217, 193, .42);
-  background: linear-gradient(90deg, rgba(141, 217, 193, .055), transparent 78%);
+  border-top-color: color-mix(in srgb, var(--color-signal) 42%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-signal) 5.5%, transparent), transparent 78%);
 }
 
 .secondaryOffers :global(article[data-recommended="true"]::before) {
@@ -91,7 +85,7 @@
   bottom: 0;
   left: 0;
   width: 1px;
-  background: rgba(141, 217, 193, .52);
+  background: color-mix(in srgb, var(--color-signal) 52%, transparent);
   content: "";
 }
 
@@ -107,8 +101,8 @@
 }
 
 .offerTopline > span {
-  color: var(--copper);
-  font-family: var(--mono);
+  color: var(--color-copper);
+  font-family: var(--font-mono);
   font-size: .55rem;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -116,9 +110,9 @@
 
 .offerTopline > b {
   padding: .26rem .4rem;
-  border: 1px solid rgba(141, 217, 193, .25);
-  color: #b5ead8;
-  font-family: var(--mono);
+  border: 1px solid color-mix(in srgb, var(--color-signal) 25%, transparent);
+  color: var(--color-signal);
+  font-family: var(--font-mono);
   font-size: .5rem;
   font-weight: 650;
   letter-spacing: .055em;
@@ -127,8 +121,8 @@
 
 .planEquivalent {
   margin-top: -.35rem;
-  color: rgba(242, 239, 231, .52);
-  font-family: var(--mono);
+  color: color-mix(in srgb, var(--color-copper) 52%, transparent);
+  font-family: var(--font-mono);
   font-size: .52rem;
 }
 
@@ -136,14 +130,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: .35rem .65rem;
-  color: rgba(242, 239, 231, .55);
-  font-family: var(--mono);
+  color: color-mix(in srgb, var(--color-copper) 55%, transparent);
+  font-family: var(--font-mono);
   font-size: .51rem;
   text-transform: uppercase;
 }
 
 .planProof span:first-child {
-  color: #b5ead8;
+  color: var(--color-signal);
 }
 
 .secondaryOffers :global(ul) {
@@ -158,7 +152,7 @@
   display: flex;
   align-items: flex-start;
   gap: .45rem;
-  color: rgba(242, 239, 231, .7);
+  color: color-mix(in srgb, var(--color-copper) 70%, transparent);
   font-size: .66rem;
   line-height: 1.4;
 }
@@ -166,55 +160,53 @@
 .secondaryOffers :global(li svg) {
   flex: 0 0 auto;
   margin-top: .1rem;
-  color: var(--signal-strong);
+  color: var(--color-signal);
 }
 
 .faq :global(details) {
-  border-color: rgba(221, 233, 227, .12);
-  transition: background-color .18s ease, border-color .18s ease;
-}
-
-.faq :global(details:hover),
-.faq :global(details[open]) {
-  background: rgba(255, 255, 255, .018);
+  border-color: color-mix(in srgb, var(--color-signal) 12%, transparent);
+  transition:
+    background-color var(--motion-duration-disclosure) var(--motion-ease-standard),
+    border-color var(--motion-duration-disclosure) var(--motion-ease-standard);
 }
 
 .faq :global(details[open]) {
-  border-color: rgba(141,217,193,.22);
+  border-color: color-mix(in srgb, var(--color-signal) 22%, transparent);
+  background: color-mix(in srgb, var(--color-surface-elevated) 1.8%, transparent);
 }
 
 .faq :global(summary) {
   min-height: 56px;
-  transition: color .18s ease;
+  transition: color var(--motion-duration-disclosure) var(--motion-ease-standard);
 }
 
 .faq :global(details[open] summary) {
-  color: rgba(242, 239, 231, .98);
+  color: color-mix(in srgb, var(--color-copper) 98%, transparent);
 }
 
 .faq :global(details p) {
   max-width: 54rem;
-  color: rgba(242,239,231,.7);
+  color: color-mix(in srgb, var(--color-copper) 70%, transparent);
 }
 
 .final {
   border: 0;
-  border-top: 1px solid rgba(141, 217, 193, .28);
+  border-top: 1px solid color-mix(in srgb, var(--color-signal) 28%, transparent);
   background:
-    radial-gradient(circle at 82% 18%, rgba(141, 217, 193, .1), transparent 32%),
-    radial-gradient(circle at 18% 110%, rgba(180,124,92,.04), transparent 30%),
-    linear-gradient(135deg, rgba(255,255,255,.018), transparent 48%),
-    var(--slate-900);
-  color: #f2efe7;
+    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--color-signal) 10%, transparent), transparent 32%),
+    radial-gradient(circle at 18% 110%, color-mix(in srgb, var(--color-copper) 4%, transparent), transparent 30%),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface-elevated) 1.8%, transparent), transparent 48%),
+    var(--color-text-primary);
+  color: color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary));
 }
 
 .final > span {
-  color: #8dd9c1;
+  color: var(--color-signal);
 }
 
 .final h2,
 .final p {
-  color: #f2efe7;
+  color: color-mix(in srgb, var(--color-copper) 10%, var(--color-surface-primary));
 }
 
 .final h2 {
@@ -224,7 +216,7 @@
 
 .final p {
   max-width: 40rem;
-  color: rgba(242, 239, 231, .7);
+  color: color-mix(in srgb, var(--color-copper) 70%, transparent);
   text-wrap: pretty;
 }
 
@@ -233,18 +225,20 @@
 }
 
 .final a:first-child {
-  border-color: #8dd9c1;
-  background: #8dd9c1;
-  color: var(--slate-900);
+  border-color: var(--color-signal);
+  background: var(--color-signal);
+  color: var(--color-text-primary);
   box-shadow: none;
-  transition: transform .18s ease, border-color .18s ease, background-color .18s ease;
+  transition:
+    transform var(--motion-duration-disclosure) var(--motion-ease-standard),
+    border-color var(--motion-duration-disclosure) var(--motion-ease-standard),
+    background-color var(--motion-duration-disclosure) var(--motion-ease-standard);
 }
 
-.final a:first-child:hover,
 .final a:first-child:focus-visible {
-  border-color: #b5ead8;
-  background: #b5ead8;
-  transform: translateY(-1px);
+  border-color: var(--color-signal);
+  background: var(--color-signal);
+  transform: none;
 }
 
 .final a:first-child:active {
@@ -252,11 +246,13 @@
 }
 
 .final a:last-child {
-  color: rgba(242, 239, 231, .66);
-  transition: color .18s ease;
+  color: color-mix(in srgb, var(--color-copper) 66%, transparent);
+  transition: color var(--motion-duration-disclosure) var(--motion-ease-standard);
 }
-.final a:last-child:hover,
-.final a:last-child:focus-visible { color: rgba(242,239,231,.92); }
+
+.final a:last-child:focus-visible {
+  color: color-mix(in srgb, var(--color-copper) 92%, transparent);
+}
 
 .finalTrust {
   position: relative;
@@ -274,8 +270,8 @@
   display: inline-flex;
   align-items: center;
   gap: .45rem;
-  color: rgba(242, 239, 231, .68);
-  font-family: var(--mono);
+  color: color-mix(in srgb, var(--color-copper) 68%, transparent);
+  font-family: var(--font-mono);
   font-size: .56rem;
   letter-spacing: .015em;
 }
@@ -284,9 +280,37 @@
   width: .3rem;
   height: .3rem;
   border-radius: 50%;
-  background: #8dd9c1;
+  background: var(--color-signal);
   content: "";
   opacity: .8;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pilotOffer:hover {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--color-surface-elevated) 4.5%, transparent), color-mix(in srgb, var(--color-signal) 4%, transparent));
+  }
+
+  .pricing [data-pricing-primary="true"] > :global(a):hover {
+    transform: none;
+  }
+
+  .secondaryOffers:has(:global(article:hover)) :global(article:not(:hover)) {
+    opacity: .68;
+  }
+
+  .faq :global(details:hover) {
+    background: color-mix(in srgb, var(--color-surface-elevated) 1.8%, transparent);
+  }
+
+  .final a:first-child:hover {
+    border-color: var(--color-signal);
+    background: var(--color-signal);
+    transform: none;
+  }
+
+  .final a:last-child:hover {
+    color: color-mix(in srgb, var(--color-copper) 92%, transparent);
+  }
 }
 
 @media (min-width: 1180px) {
@@ -313,8 +337,6 @@
     padding-block: 4.25rem;
   }
 
-  .pilotOffer:hover { transform: none; }
-
   .pricing [data-pricing-secondary="true"] {
     grid-template-rows: none;
   }
@@ -323,7 +345,9 @@
     margin-top: .35rem;
   }
 
-  .secondaryOffers:has(:global(article:hover)) :global(article:not(:hover)) { opacity: 1; }
+  .secondaryOffers :global(article) {
+    opacity: 1;
+  }
 
   .secondaryOffers :global(article[data-recommended="true"]) {
     margin-inline: -.55rem;

@@ -790,7 +790,7 @@ function outcomeErrorMessage(error: unknown): string {
     return 'Повторный запрос отличается от исходного. Начните действие заново.'
   }
   if (code === 'opportunity_superseded') {
-    return 'Эта версия возможности уже заменена новой.'
+    return 'Эта версия ситуации уже заменена новой.'
   }
   if (
     code === 'outcome_contact_privacy_unavailable' ||

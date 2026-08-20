@@ -313,7 +313,7 @@ jobs:
               fi
 
               if printf '%s' "$landing_html" \
-                | grep -q 'data-brand-header="recruiter-radar-v3"'; then
+                | grep -q 'data-brand-header="recruiter-radar"'; then
                 brand_layout_ok=true
               fi
 

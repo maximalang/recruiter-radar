@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readBoundedRequestText } from "@/lib/http/read-bounded-request-text";
 import {
   writePendingAuthActionToken,
   type PendingAuthAction,
@@ -16,17 +17,9 @@ export async function preparePendingAuthAction(
   if (!isAuthSameOriginRequest(request)) {
     return json({ ok: false }, 403);
   }
-  const declaredLength = Number(request.headers.get("content-length") ?? "0");
-  if (
-    !Number.isFinite(declaredLength)
-    || declaredLength < 0
-    || declaredLength > MAX_BODY_BYTES
-  ) {
-    return json({ ok: false }, 400);
-  }
 
-  const rawBody = await request.text().catch(() => "");
-  if (Buffer.byteLength(rawBody, "utf8") > MAX_BODY_BYTES) {
+  const rawBody = await readBoundedRequestText(request, MAX_BODY_BYTES).catch(() => null);
+  if (rawBody === null) {
     return json({ ok: false }, 400);
   }
   const body = (() => {

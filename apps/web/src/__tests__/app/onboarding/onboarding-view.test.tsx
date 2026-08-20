@@ -1,5 +1,7 @@
 /** @jest-environment jsdom */
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 
 import {
@@ -46,7 +48,7 @@ describe("auth v2 onboarding view", () => {
       data: { fullName: "Анна", agencyName: "North Star", teamRole: "leader" },
     }} />);
 
-    expect(screen.getByRole("heading", { level: 2, name: "Как получать новые возможности" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Как получать новые компании" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Telegram/ })).toBeInTheDocument();
     expect(screen.getByLabelText(/Email для дайджеста/)).toHaveAttribute("type", "email");
     expect(screen.getByText(/доставка останется выключенной/i)).toBeInTheDocument();
@@ -75,12 +77,14 @@ describe("auth v2 onboarding view", () => {
     );
   });
 
-  test("keeps market targeting in a separate third step", () => {
+  test("keeps market targeting in a separate third step with final Radar terminology", () => {
     render(<OnboardingView snapshot={{ ...baseSnapshot, step: "market", data: { fullName: "Анна", agencyName: "North Star", teamRole: "leader" } }} />);
     expect(screen.getByRole("heading", { level: 2, name: "Где искать клиентов" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Отрасли" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Размер компаний" })).toBeInTheDocument();
     expect(screen.getByLabelText("Россия и регионы")).toBeInTheDocument();
+    expect(screen.getByText(/расширенных настройках Радара/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("настройках Radar");
   });
 
   test("summarizes readiness without promising immediate delivery", () => {
@@ -103,8 +107,21 @@ describe("auth v2 onboarding view", () => {
       level: 2,
       name: "Основа радара готова",
     })).toBeInTheDocument();
+    expect(screen.getByText("Радар готов")).toBeInTheDocument();
     expect(screen.getByText(/Доставка работает только при активном доступе/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Перейти в кабинет" }))
       .toBeInTheDocument();
+  });
+
+  test("keeps onboarding on semantic tokens without a local inverse palette or micro metadata", () => {
+    const styles = readFileSync(
+      resolve(process.cwd(), "app", "onboarding", "onboarding.module.css"),
+      "utf8",
+    );
+
+    expect(styles).toContain("background:var(--color-text-primary)");
+    expect(styles).toContain("font-size:var(--type-metadata-size)");
+    expect(styles).not.toMatch(/#[0-9a-f]{3,8}\b/gi);
+    expect(styles).not.toMatch(/font-size:\.(?:6|7)\d*rem/gi);
   });
 });

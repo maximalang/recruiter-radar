@@ -57,7 +57,7 @@ describe("landing sales production pass", () => {
     const motionCss = source("app/landing/landing-motion.module.css");
     expect(motion).toContain("IntersectionObserver");
     expect(motion).toContain("prefers-reduced-motion: reduce");
-    expect(motionCss).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(motionCss).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)/);
     expect(motionCss).not.toMatch(/filter:\s*blur/i);
   });
 });

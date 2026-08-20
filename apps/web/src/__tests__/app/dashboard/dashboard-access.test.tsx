@@ -6,13 +6,11 @@ import { render, screen } from "@testing-library/react";
 jest.mock("@/lib/account-auth", () => ({ getAccountById: jest.fn() }));
 jest.mock("@/lib/auth-v2/authorization", () => ({ getSession: jest.fn() }));
 jest.mock("@/lib/clientProfiles", () => ({ getClientProfileByOwnerId: jest.fn() }));
-jest.mock("@/lib/dashboard-data", () => ({ getDashboardTodayRadar: jest.fn() }));
-jest.mock("@/lib/deliveryPreferences", () => ({ getDeliveryPreferencesByOwnerId: jest.fn() }));
-jest.mock("@/lib/entitlements", () => ({ getEffectiveEntitlement: jest.fn() }));
-jest.mock("@/app/dashboard/dashboard-account-overview", () => ({
-  __esModule: true,
-  default: () => <section>account overview</section>,
+jest.mock("@/lib/dashboard-data", () => ({
+  getDashboardTodayRadar: jest.fn(),
+  getDashboardSourceHealth: jest.fn(),
 }));
+jest.mock("@/lib/entitlements", () => ({ getEffectiveEntitlement: jest.fn() }));
 jest.mock("@/app/dashboard/dashboard-today-radar", () => ({
   __esModule: true,
   default: () => <section>today radar</section>,
@@ -31,8 +29,7 @@ import { getAccountById } from "@/lib/account-auth";
 import { getSession } from "@/lib/auth-v2/authorization";
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
 import { getEffectiveEntitlement } from "@/lib/entitlements";
-import { getDashboardTodayRadar } from "@/lib/dashboard-data";
-import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";
+import { getDashboardSourceHealth, getDashboardTodayRadar } from "@/lib/dashboard-data";
 
 describe("dashboard canonical access states", () => {
   beforeEach(() => {
@@ -40,14 +37,14 @@ describe("dashboard canonical access states", () => {
     jest.mocked(getSession).mockResolvedValue({ userId: "84", dataOwnerId: "42", workspaceId: "ws-1" } as never);
     jest.mocked(getAccountById).mockResolvedValue({ id: "84" } as never);
     jest.mocked(getDashboardTodayRadar).mockResolvedValue({ topLeads: [], pendingReview: 0, hiringModeByProfileId: {}, lastRunAt: null });
-    jest.mocked(getDeliveryPreferencesByOwnerId).mockResolvedValue(null);
+    jest.mocked(getDashboardSourceHealth).mockResolvedValue([]);
   });
 
   test("denies premium dashboard before loading tenant product data", async () => {
     jest.mocked(getEffectiveEntitlement).mockResolvedValue({ status: "inactive", features: [], activeSources: [], source: null, plan: null, startsAt: null, expiresAt: null, reason: "no_active_entitlement" });
     const page = await DashboardPage();
     render(page);
-    expect(screen.getByText(/Нужен активный доступ/)).toBeInTheDocument();
+    expect(screen.getByText(/Доступ к Радару не активен/)).toBeInTheDocument();
     expect(getEffectiveEntitlement).toHaveBeenCalledWith("42", { workspaceId: "ws-1" });
     expect(getClientProfileByOwnerId).not.toHaveBeenCalled();
   });
@@ -67,7 +64,7 @@ describe("dashboard canonical access states", () => {
     const page = await DashboardPage();
     render(page);
 
-    expect(screen.getByText(/Не удалось загрузить аккаунт/)).toBeInTheDocument();
+    expect(screen.getByText(/Данные аккаунта временно недоступны/)).toBeInTheDocument();
     expect(screen.queryByText(/Нужен вход в аккаунт/)).not.toBeInTheDocument();
   });
 
@@ -78,21 +75,8 @@ describe("dashboard canonical access states", () => {
     const page = await DashboardPage();
     render(page);
 
-    expect(screen.getByText(/Не удалось загрузить профиль Radar/)).toBeInTheDocument();
+    expect(screen.getByText(/Профиль радара временно недоступен/)).toBeInTheDocument();
     expect(screen.queryByText(/Радар ещё не настроен/)).not.toBeInTheDocument();
-  });
-
-  test("surfaces unavailable delivery settings without hiding available radar results", async () => {
-    jest.mocked(getEffectiveEntitlement).mockResolvedValue({ status: "active", source: "admin", plan: "radar-admin", startsAt: "2026-08-09T00:00:00.000Z", expiresAt: null, features: ["dashboard"], activeSources: ["admin"] });
-    jest.mocked(getClientProfileByOwnerId).mockResolvedValue({ id: "7", isActive: true } as never);
-    jest.mocked(getDeliveryPreferencesByOwnerId).mockRejectedValue(new Error("database unavailable"));
-
-    const page = await DashboardPage();
-    render(page);
-
-    expect(screen.getByText(/Не удалось проверить готовность доставки/)).toBeInTheDocument();
-    expect(screen.getByText("today radar")).toBeInTheDocument();
-    expect(screen.queryByText("account overview")).not.toBeInTheDocument();
   });
 
   test("links a radar data failure to the canonical radar settings route", async () => {
@@ -113,6 +97,6 @@ describe("dashboard canonical access states", () => {
     const page = await DashboardPage();
     render(page);
 
-    expect(screen.getByRole("link", { name: "Проверить настройки Radar" })).toHaveAttribute("href", "/settings/radar");
+    expect(screen.getByRole("link", { name: "Проверить профиль радара" })).toHaveAttribute("href", "/settings/radar");
   });
 });

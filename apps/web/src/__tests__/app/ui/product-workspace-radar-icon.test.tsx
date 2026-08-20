@@ -1,26 +1,44 @@
 /** @jest-environment jsdom */
 
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
 import { ProductWorkspaceFrame } from "@/app/ui/product-workspace";
+import { buildAccountNavigation } from "@/app/ui/account-navigation";
 
-describe("ProductWorkspace radar navigation icon", () => {
-  it("uses the minimalist concentric-circle glyph for the Radar settings route", () => {
+describe("ProductWorkspace final navigation shell", () => {
+  it("keeps desktop navigation textual and exposes the four stable product modes", () => {
     const { container } = render(
-      <ProductWorkspaceFrame
-        navItems={[{ href: "/settings/radar", label: "Радар", active: true }]}
-      >
+      <ProductWorkspaceFrame navItems={buildAccountNavigation("radar")}>
         Workspace
       </ProductWorkspaceFrame>,
     );
 
-    const radarLink = container.querySelector('aside a[href="/settings/radar"]');
-    expect(radarLink).not.toBeNull();
+    const primary = screen.getByRole("navigation", { name: "Основные разделы" });
+    expect(primary).toHaveTextContent("Сегодня");
+    expect(primary).toHaveTextContent("Компании");
+    expect(primary).toHaveTextContent("Ситуации");
+    expect(primary).toHaveTextContent("Радар");
+    expect(primary.querySelectorAll("svg")).toHaveLength(0);
 
-    const icon = radarLink?.querySelector('[data-motion-icon="navigation"] svg');
-    expect(icon).not.toBeNull();
-    expect(icon?.querySelectorAll("circle")).toHaveLength(3);
-    expect(icon?.querySelectorAll("path")).toHaveLength(0);
-    expect(icon?.querySelector('circle[r="0.6"]')).toHaveAttribute("fill", "currentColor");
+    const radarLink = primary.querySelector('a[href="/opportunities/radar"]');
+    expect(radarLink).toHaveAttribute("aria-current", "page");
+    expect(container.querySelector("aside")).toBeNull();
+  });
+
+  it("keeps all four core modes plus More in mobile navigation", () => {
+    render(
+      <ProductWorkspaceFrame navItems={buildAccountNavigation("leads")}>
+        Workspace
+      </ProductWorkspaceFrame>,
+    );
+
+    const mobile = screen.getByRole("navigation", { name: "Мобильная навигация" });
+    expect(mobile).toHaveTextContent("Сегодня");
+    expect(mobile).toHaveTextContent("Компании");
+    expect(mobile).toHaveTextContent("Ситуации");
+    expect(mobile).toHaveTextContent("Радар");
+    expect(mobile).toHaveTextContent("Ещё");
+    expect(mobile.querySelectorAll(':scope > a')).toHaveLength(4);
+    expect(mobile.querySelector('a[href="/leads"]')).toHaveAttribute("aria-current", "page");
   });
 });

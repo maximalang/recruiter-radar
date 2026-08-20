@@ -1,208 +1,252 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 0;
 }
 
 .group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  border: none;
-  padding: 0;
+  gap: 14px;
   margin: 0;
-  /* Anchor links (#fine-tuning etc.) land with the group title visible below
-     the sticky top nav, not hidden under it. */
-  scroll-margin-top: 80px;
+  padding: 28px 0;
+  border: 0;
+  border-top: 1px solid var(--color-separator);
+  scroll-margin-top: 88px;
+}
+
+.form > .group:first-of-type {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .groupHead {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
 }
 
 .groupTitle {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.98rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  font-size: var(--type-object-size);
+  font-weight: 650;
+  letter-spacing: -.012em;
+  line-height: 1.35;
 }
 
-/* Semantic channel/group glyph — inline-SVG, scales with the title font-size,
-   inherits tone via currentColor. Marks the channel (push/email) at a glance. */
 .groupTitleIcon {
   flex: 0 0 auto;
   width: 1em;
   height: 1em;
-  color: var(--c-text-muted, #667085);
+  color: var(--color-text-tertiary);
 }
 
-.groupHint {
-  font-size: 0.82rem;
-  color: var(--c-text-muted, #667085);
-  line-height: 1.4;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.groupHint,
+.groupEmptyHint,
+.radioOptionHint,
+.modeSummarySource,
+.modeNote {
+  color: var(--color-text-tertiary);
+  font-size: var(--type-metadata-size);
+  line-height: 1.5;
 }
 
 .groupEmptyHint {
-  font-size: 0.8rem;
-  color: var(--c-text-muted, #667085);
-  font-style: italic;
-  margin-top: 6px;
+  margin-top: 2px;
+}
+
+.chips,
+.radioOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 20px;
+  border-top: 1px solid var(--color-separator-subtle);
+}
+
+.chip,
+.radioOption {
+  min-height: 48px;
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--color-separator-subtle);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-size: var(--type-body-size);
+  transition: background-color var(--motion-duration-control) var(--motion-ease-standard);
+  user-select: none;
 }
 
 .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.86rem;
-  padding: 6px 10px;
-  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
-  border-radius: 10px;
-  cursor: pointer;
-  user-select: none;
-  background: var(--c-bg-card, #fff);
-  transition: border-color 0.12s ease, background 0.12s ease;
+  grid-template-columns: 20px minmax(0, 1fr);
 }
 
-.chip:hover {
-  border-color: rgba(15, 23, 42, 0.12);
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover,
+  .radioOption:hover {
+    background: var(--color-surface-secondary);
+  }
 }
 
-.chip:has(input:checked) {
-  border-color: var(--c-brand, #153f35);
-  background: rgba(35, 128, 111, 0.08);
+.chip:has(input:focus-visible),
+.radioOption:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
 }
 
-.radioCards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
+.chip:has(input:checked),
+.radioOption:has(input:checked) {
+  background: var(--color-surface-selected);
+  color: var(--color-text-primary);
+  box-shadow: none;
 }
 
-.radioCard {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
-  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
-  border-radius: 12px;
-  cursor: pointer;
-  user-select: none;
-  background: var(--c-bg-card, #fff);
-  transition: border-color 0.12s ease, background 0.12s ease;
+.chip input,
+.radioOption > input {
+  position: static;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  opacity: 1;
+  accent-color: var(--color-signal);
 }
 
-.radioCard:hover {
-  border-color: rgba(15, 23, 42, 0.12);
+.radioOptions {
+  grid-template-columns: 1fr;
 }
 
-.radioCard:has(input:checked) {
-  border-color: var(--c-brand, #153f35);
-  background: rgba(35, 128, 111, 0.08);
+.radioOption {
+  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-areas:
+    "input title"
+    ". hint";
+  column-gap: 10px;
+  row-gap: 3px;
+  padding: 12px 2px;
 }
 
-.radioCard > input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
+.radioOption > input {
+  grid-area: input;
+  align-self: start;
+  margin-top: 2px;
 }
 
-.radioCardTitle {
-  font-size: 0.9rem;
+.radioOptionTitle {
+  grid-area: title;
+  font-size: var(--type-body-size);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -.002em;
 }
 
-.radioCardHint {
-  font-size: 0.8rem;
-  color: var(--c-text-muted, #667085);
-  line-height: 1.4;
+.radioOptionHint {
+  grid-area: hint;
 }
 
-.modeBadgeRow {
+.modeSummary {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--color-separator-subtle);
+  border-bottom: 1px solid var(--color-separator-subtle);
 }
 
-.modeBadge {
+.modeSummaryValue {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--type-metadata-size);
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
-  background: var(--c-bg-card, #fff);
-  color: var(--c-text-primary, #0f172a);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
-/* Resolved-mode glyph — inline-SVG, scales with the badge font-size, inherits
-   tone via currentColor. Semantic only (marks the active practice). */
-.modeBadgeIcon {
+.modeSummaryIcon {
   flex: 0 0 auto;
-  width: 0.95em;
-  height: 0.95em;
-}
-
-.modeBadgeSource {
-  font-size: 0.78rem;
-  color: var(--c-text-muted, #667085);
+  width: 15px;
+  height: 15px;
+  color: var(--color-signal);
 }
 
 .modeNote {
-  font-size: 0.8rem;
-  color: var(--c-text-muted, #667085);
-  line-height: 1.45;
-  margin: 4px 0 0;
+  margin: 0;
+  max-width: 68ch;
 }
 
 .twoCol {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
 .threeCol {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
 .toggle {
+  min-height: 44px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
+  gap: 10px;
+  color: var(--color-text-primary);
+  font-size: var(--type-body-size);
   cursor: pointer;
 }
 
+.toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-signal);
+}
+
 .submitRow {
+  position: sticky;
+  bottom: 12px;
+  z-index: 4;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 14px;
+  margin-top: 28px;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-separator-strong);
+  background: color-mix(in srgb, var(--color-canvas) 94%, transparent);
+  backdrop-filter: blur(10px);
 }
 
-@media (max-width: 640px) {
-  /* Tap-target floor: interactive chips must be ≥44px tall for comfortable touch use */
-  .chip,
-  .radioCard {
-    min-height: 44px;
-    padding-top: 10px;
-    padding-bottom: 10px;
+@media (max-width: 760px) {
+  .group {
+    padding: 24px 0;
+  }
+
+  .chips,
+  .twoCol,
+  .threeCol {
+    grid-template-columns: 1fr;
+  }
+
+  .submitRow {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    justify-content: stretch;
+  }
+
+  .submitRow > * {
+    flex: 1 1 auto;
   }
 }

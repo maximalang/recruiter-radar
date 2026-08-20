@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { getAccountById } from "@/lib/account-auth";
 import { getSession } from "@/lib/auth-v2/authorization";
@@ -11,16 +12,22 @@ import {
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { logoutAction } from "../login/actions";
-import { ContentCard, ContentCardTitle, EmptyState, InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
+import { InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
 import ppStyles from "../ui/page-primitives.module.css";
-import SettingsOverview from "./settings-overview";
+import { StaticEmptyState } from "../ui/static-empty-state";
+import SettingsDocumentSummary from "./settings-document-summary";
+import styles from "./settings-account.module.css";
 
 export const metadata: Metadata = {
   title: "Настройки — Recruiter Radar",
-  description: "Профиль поиска, расписание и каналы доставки радара.",
+  description: "Аккаунт, профиль радара, расписание и каналы доставки.",
 };
 
 export const dynamic = "force-dynamic";
+
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>;
+}
 
 export default async function SettingsIndexPage() {
   const authorization = await getSession({
@@ -35,14 +42,14 @@ export default async function SettingsIndexPage() {
   if (!authorization || !account) {
     return (
       <InternalPageFrame navItems={buildAccountNavigation("settings")}>
-        <InternalPageHeader title="Настройки аккаунта" subtitle="Для доступа к настройкам нужен вход." />
-        <ContentCard variant="hero">
-          <EmptyState
+        <InternalPageHeader title="Настройки" subtitle="Для доступа к настройкам нужен вход." />
+        <div className={styles.emptySection}>
+          <StaticEmptyState
             title="Сессия не найдена"
-            text="Восстановите доступ по данным заказа — после входа здесь появятся профиль и каналы доставки."
-            action={{ href: "/login", label: "Войти в аккаунт" }}
+            description="Восстановите доступ — после входа здесь появятся профиль радара и каналы доставки."
+            action={<StateLink href="/login" label="Войти в аккаунт" />}
           />
-        </ContentCard>
+        </div>
       </InternalPageFrame>
     );
   }
@@ -55,19 +62,21 @@ export default async function SettingsIndexPage() {
   if (!profile) {
     return (
       <InternalPageFrame navItems={buildAccountNavigation("settings")}>
-        <InternalPageHeader title="Настройки аккаунта" />
-        <ContentCard variant="hero">
-          <EmptyState
+        <InternalPageHeader title="Настройки" subtitle="Аккаунт активен, профиль радара ещё не создан." />
+        <div className={styles.emptySection}>
+          <StaticEmptyState
             title="Профиль ещё не создан"
-            text="Сначала активируйте радар, затем настройте поиск и доставку."
-            action={{ href: "/checkout", label: "Активировать радар" }}
+            description="Сначала активируйте Радар, затем настройте практику и доставку."
+            action={<StateLink href="/checkout" label="Активировать Радар" />}
           />
-        </ContentCard>
-        <ContentCard>
-          <ContentCardTitle>Аккаунт</ContentCardTitle>
-          <p>Вы вошли как {account.email}.</p>
-          <form action={logoutAction}><button className={ppStyles.secondaryAction} type="submit">Выйти из аккаунта</button></form>
-        </ContentCard>
+        </div>
+        <section className={styles.accountSection} aria-labelledby="account-title">
+          <h2 id="account-title">Аккаунт</h2>
+          <p>Рабочий email: {account.email}.</p>
+          <form action={logoutAction}>
+            <button className={ppStyles.secondaryAction} type="submit">Выйти из аккаунта</button>
+          </form>
+        </section>
       </InternalPageFrame>
     );
   }
@@ -83,9 +92,9 @@ export default async function SettingsIndexPage() {
     <InternalPageFrame navItems={buildAccountNavigation("settings")}>
       <InternalPageHeader
         title="Настройки"
-        subtitle="Проверьте готовность профиля и каналов. Изменения сохраняются в соответствующем разделе редактора."
+        subtitle="Аккаунт, профиль радара и доставка — в одном спокойном контуре конфигурации."
       />
-      <SettingsOverview
+      <SettingsDocumentSummary
         agencyName={profile.agencyName}
         completionPercent={completionPercent}
         deliveryEnabled={preferences?.deliveryEnabled ?? false}
@@ -98,11 +107,13 @@ export default async function SettingsIndexPage() {
           && isAuthWorkspacesV2EnabledForUser(account.id)
         }
       />
-      <ContentCard>
-        <ContentCardTitle>Доступ к аккаунту</ContentCardTitle>
+      <section className={styles.accountSection} aria-labelledby="account-access-title">
+        <h2 id="account-access-title">Доступ к аккаунту</h2>
         <p>Рабочий email: {account.email}. Вход выполняется одноразовой ссылкой, без хранения пароля.</p>
-        <form action={logoutAction}><button className={ppStyles.secondaryAction} type="submit">Выйти из аккаунта</button></form>
-      </ContentCard>
+        <form action={logoutAction}>
+          <button className={ppStyles.secondaryAction} type="submit">Выйти из аккаунта</button>
+        </form>
+      </section>
     </InternalPageFrame>
   );
 }

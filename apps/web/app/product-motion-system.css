@@ -1,125 +1,47 @@
-/*
- * Product Motion System
- *
- * A restrained, opt-in motion vocabulary for authenticated product surfaces.
- * Components declare intent with data-motion-* attributes; idle content stays
- * static and the global interaction-safety layer remains the final authority.
- */
-
+/* Recruiter Radar motion language: state transition, not decoration. */
 :root {
-  --rr-motion-duration-fast: 120ms;
-  --rr-motion-duration-control: 160ms;
-  --rr-motion-duration-disclosure: 180ms;
-  --rr-motion-duration-emphasis: 220ms;
-  --rr-motion-ease-standard: cubic-bezier(0.2, 0.75, 0.25, 1);
-  --rr-motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
-  --rr-motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
-  --rr-motion-distance-hover: 1px;
-  --rr-motion-distance-short: 4px;
-  --rr-motion-press-scale: 0.99;
+  --motion-duration-instant: 90ms;
+  --motion-duration-fast: 90ms;
+  --motion-duration-control: 140ms;
+  --motion-duration-disclosure: 180ms;
+  --motion-duration-context: 220ms;
+  --motion-duration-navigation: var(--motion-duration-context);
+  --motion-duration-emphasis: 260ms;
+  --motion-duration-signal: 520ms;
+  --motion-duration-scan: 760ms;
+  --motion-ease-standard: cubic-bezier(.2, .75, .25, 1);
+  --motion-ease-enter: cubic-bezier(.22, 1, .36, 1);
+  --motion-ease-exit: cubic-bezier(.4, 0, 1, 1);
+  --motion-ease-signal: cubic-bezier(.2, .8, .2, 1);
+  --motion-distance-short: 4px;
 }
 
 [data-motion-interactive] {
   transition:
-    color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    border-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    box-shadow var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    transform var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    opacity var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  [data-motion-interactive]:where(:hover, :focus-visible) {
-    transform: translateY(calc(-1 * var(--rr-motion-distance-hover)));
-  }
-}
-
-[data-motion-interactive]:active {
-  transform: translateY(1px) scale(var(--rr-motion-press-scale));
-  transition-duration: var(--rr-motion-duration-fast);
-}
-
-[data-motion-list] [data-motion-item] {
-  opacity: 1;
-  transform: translateY(0);
-  transition:
-    opacity var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter),
-    transform var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter);
-}
-
-@starting-style {
-  [data-motion-list] [data-motion-item] {
-    opacity: 0;
-    transform: translateY(var(--rr-motion-distance-short));
-  }
-}
-
+/* Status feedback may enter quietly, but ordinary list rows never receive
+ * automatic page-load choreography or positional animation. */
 [data-motion-status] {
   opacity: 1;
-  transform: translateY(0);
-  transition:
-    opacity var(--rr-motion-duration-control) var(--rr-motion-ease-enter),
-    transform var(--rr-motion-duration-control) var(--rr-motion-ease-enter);
+  transition: opacity var(--motion-duration-disclosure) var(--motion-ease-enter);
 }
 
 @starting-style {
   [data-motion-status] {
     opacity: 0;
-    transform: translateY(var(--rr-motion-distance-short));
   }
 }
 
 [data-motion-disclosure] {
   opacity: 1;
   transition:
-    opacity var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter),
-    content-visibility var(--rr-motion-duration-disclosure) allow-discrete;
-}
-
-[data-motion-icon] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transform: translateY(0) rotate(0deg) scale(1);
-  transform-origin: center;
-  transition: transform var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
-}
-
-[data-motion-icon] > svg {
-  width: 100%;
-  height: 100%;
-}
-
-[data-motion-icon][data-motion-state="active"] {
-  transform: translateY(-1px);
-}
-
-[data-motion-icon][data-motion-state="pending"] {
-  animation: rr-motion-icon-progress 720ms linear infinite;
-}
-
-[data-motion-icon][data-motion-state="success"] {
-  animation: rr-motion-icon-confirm var(--rr-motion-duration-emphasis) var(--rr-motion-ease-enter) both;
-}
-
-[data-motion-icon][data-motion-state="error"] {
-  animation: rr-motion-icon-error var(--rr-motion-duration-emphasis) var(--rr-motion-ease-standard) both;
-}
-
-@keyframes rr-motion-icon-progress {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes rr-motion-icon-confirm {
-  0% { transform: scale(0.88); }
-  70% { transform: scale(1.08); }
-  100% { transform: scale(1); }
-}
-
-@keyframes rr-motion-icon-error {
-  0%, 100% { transform: translateX(0); }
-  35% { transform: translateX(-2px); }
-  70% { transform: translateX(2px); }
+    opacity var(--motion-duration-disclosure) var(--motion-ease-enter),
+    content-visibility var(--motion-duration-disclosure) allow-discrete;
 }
 
 @starting-style {
@@ -128,14 +50,86 @@
   }
 }
 
+[data-motion-icon] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  transition:
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    opacity var(--motion-duration-control) var(--motion-ease-standard);
+}
+
+[data-motion-icon] > svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Rotation is reserved for a real pending/processing state. */
+[data-motion-icon][data-motion-state="pending"] {
+  animation: rr-motion-icon-progress var(--motion-duration-scan) linear infinite;
+}
+
+/* Success and error are communicated by semantic state/content, never by
+ * bounce or shake decoration. */
+[data-motion-icon][data-motion-state="success"],
+[data-motion-icon][data-motion-state="error"] {
+  animation: none;
+}
+
+[data-motion-signal] {
+  position: relative;
+}
+
+[data-motion-signal]::after {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(.65);
+}
+
+[data-motion-signal][data-motion-state="acquired"]::after {
+  animation: rr-signal-acquired var(--motion-duration-signal) var(--motion-ease-signal) both;
+}
+
+[data-motion-relationship] {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+[data-motion-relationship][data-motion-state="revealed"] {
+  animation: rr-relationship-reveal var(--motion-duration-emphasis) var(--motion-ease-enter) both;
+}
+
+@keyframes rr-motion-icon-progress {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes rr-signal-acquired {
+  0% { opacity: .35; transform: translate(-50%, -50%) scale(.65); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2.75); }
+}
+
+@keyframes rr-relationship-reveal {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-motion-interactive],
-  [data-motion-list] [data-motion-item],
   [data-motion-status],
   [data-motion-disclosure],
-  [data-motion-icon] {
-    animation: none;
-    transform: none;
-    transition-duration: 0.01ms;
+  [data-motion-icon],
+  [data-motion-signal]::after,
+  [data-motion-relationship] {
+    animation: none !important;
+    transform: none !important;
+    transition-duration: .01ms !important;
   }
 }

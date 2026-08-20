@@ -50,7 +50,7 @@ export async function loginOperator(_prev: LoginState, formData: FormData): Prom
   const expected = (process.env.ADMIN_OPERATOR_PASSWORD ?? "").trim();
 
   if (!expected) {
-    return { ok: false, error: "ADMIN_OPERATOR_PASSWORD не задан на сервере." };
+    return { ok: false, error: "Панель оператора не настроена. Обратитесь к администратору." };
   }
   if (!password) {
     return { ok: false, error: "Введите пароль оператора." };

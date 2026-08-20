@@ -139,7 +139,7 @@ export function isOperatorPanelConfigured(): boolean {
 export function operatorLockedReason(reason: "missing-config" | "missing-credentials" | "invalid"): string {
   switch (reason) {
     case "missing-config":
-      return "ADMIN_OPERATOR_PASSWORD не задан на сервере. Панель оператора недоступна, пока администратор не задаст пароль.";
+      return "Панель оператора не настроена. Обратитесь к администратору.";
     case "missing-credentials":
       return "Войдите как оператор, чтобы открыть панель.";
     case "invalid":

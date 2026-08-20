@@ -10,48 +10,43 @@ function source(path: string) {
 }
 
 describe("polished unified landing visual contract", () => {
-  it("keeps one hero layout owner with a lightweight ambient radar", () => {
+  it("uses the final warm-paper hero with an unboxed Signal Spine", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
-    const radar = source("app/landing/hero-radar.tsx");
-    const radarStyles = source("app/landing/hero-radar.module.css");
     const landingStyles = source("app/landing/landing.module.css");
     const visualStyles = source("app/landing/landing-visual-system.module.css");
     const obsoleteResponsiveStyles = resolve(WEB_ROOT, "app/landing/detection-responsive.module.css");
-    const compatibilityRadar = source("app/landing/brand-glyphs.tsx");
+    const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
+    const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(heroScene).toContain('data-hero-layout="ambient-radar"');
-    expect(heroScene).toContain("<HeroRadar />");
-    expect(radar).toContain('data-hero-radar="premium"');
-    expect(radarStyles).toMatch(/\.ringLayer\s+circle\s*\{/);
-    expect(radarStyles).not.toContain("sweep");
+    expect(heroScene).toContain('data-hero-layout="signal-spine"');
+    expect(heroScene).toContain('data-hero-visual');
+    expect(heroScene).toContain("Компания");
+    expect(heroScene).toContain("Почему сейчас");
+    expect(heroScene).toContain("Подтверждения");
+    expect(heroScene).toContain("Следующий ход");
+    expect(heroScene).not.toContain("HeroRadar");
     expect(heroScene).not.toContain("HeroInstrument");
-    expect(heroScene).not.toContain("data-hero-signal-card");
-    expect(heroScene).not.toContain("detectionFooter");
-    expect(sceneStyles).toContain("grid-template-columns: minmax(0, 1fr);");
-    expect(sceneStyles).toMatch(/\.fieldFigure\s*\{[\s\S]*?position:\s*absolute;/);
-    expect(sceneStyles).not.toContain("grid-template-columns: minmax(0, 47%) minmax(0, 53%);");
-    expect(sceneStyles).toContain("@media (max-width: 959px)");
-    expect(sceneStyles).toContain("@media (max-width: 480px)");
+    expect(existsSync(retiredRadar)).toBe(false);
+    expect(existsSync(retiredRadarStyles)).toBe(false);
+    expect(sceneStyles).toContain("var(--color-canvas)");
+    expect(sceneStyles).toContain("var(--color-signal)");
+    expect(sceneStyles).not.toMatch(/animation\s*:/);
+    expect(sceneStyles).not.toContain("translateY(-1px)");
     expect(landingStyles).not.toMatch(/\.(detectionScene|detectionField|detectionCopy|detectionLock|detectionFooter|instrumentCaption)\b/);
     expect(visualStyles).not.toContain('#scene-detection [class*=');
     expect(existsSync(obsoleteResponsiveStyles)).toBe(false);
-    expect(compatibilityRadar).not.toContain("styles.instrumentCore");
-    expect(landingStyles).not.toContain(".instrumentGuides");
-    expect(landingStyles).not.toContain(".instrumentConnection");
-    expect(landingStyles).not.toContain(".instrumentCore");
   });
 
-  it("uses the same ambient radar marker on mobile without exposing tablet hotspots", () => {
+  it("keeps the same Signal Spine readable on mobile without a separate radar runtime", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
-    const radarStyles = source("app/landing/hero-radar.module.css");
 
     expect(heroScene).toContain("data-mobile-hero-signal");
-    expect(heroScene).toContain("<HeroRadar />");
-    expect(sceneStyles).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.fieldFigure\s*\{/);
-    expect(radarStyles).toMatch(/@media \(max-width: 1100px\)[\s\S]*?\.clusterTargets\s*\{\s*display:\s*none;/);
-    expect(sceneStyles).not.toMatch(/@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?bottom:\s*-12rem;/);
+    expect(heroScene).toContain('className={sceneStyles.signalSpine}');
+    expect(sceneStyles).toContain("@media(max-width:600px)");
+    expect(sceneStyles).toContain(".signalStep{padding-bottom:24px}");
+    expect(sceneStyles).not.toContain("HeroRadar");
   });
 
   it("keeps the compact signal timeline between detection and workspace", () => {
@@ -103,7 +98,7 @@ describe("polished unified landing visual contract", () => {
     const landingIndex = home.indexOf("{landing}");
     const cookieSettingsIndex = home.indexOf("<YandexMetrika />");
 
-    expect(home).toContain('<PageFrame as="div"');
+    expect(home).toMatch(/<PageFrame[\s\S]*?\bas="div"/);
     expect(skipLinkIndex).toBeGreaterThan(-1);
     expect(analyticsIndex).toBeGreaterThan(skipLinkIndex);
     expect(landingIndex).toBeGreaterThan(analyticsIndex);
@@ -158,8 +153,8 @@ describe("polished unified landing visual contract", () => {
     const productCss = source("app/product-visual-system.css");
     const landingCss = source("app/landing/landing-visual-system.module.css");
 
-    expect(productCss).toContain('[data-ui-system="recruiter-radar-v6"]');
-    expect(productCss).toContain('[data-ui-system="recruiter-radar-v7"]');
+    expect(productCss).toContain('[data-ui-system="recruiter-radar"]');
+    expect(productCss).not.toMatch(/recruiter-radar-v\d+/);
     expect(productCss).toContain('[data-product-workspace="true"]');
     expect(productCss).not.toContain('[class*=');
     expect(productCss).not.toContain("!important");
@@ -179,7 +174,7 @@ describe("polished unified landing visual contract", () => {
     expect(responsiveAudit).toContain("'/payment-and-refund'");
     expect(productionAudit).toContain('LANDING_REQUIRE_ANALYTICS_CONSENT === "true"');
     expect(productionAudit).toContain("analytics consent control is required for this audit");
-    expect(productionAudit).toContain('name: "mobile-320x700"');
+    expect(productionAudit).toContain('name: "mobile-320x568"');
     expect(productionAudit).toContain('async function revealAllMotionSections');
     expect(productionAudit).toContain('[data-motion-reveal="section"]');
     expect(productionAudit).toContain('data-motion-state');

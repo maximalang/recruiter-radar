@@ -1,4 +1,5 @@
 import { getPool } from "@/lib/db";
+import { readBoundedRequestText } from "@/lib/http/read-bounded-request-text";
 import { processPaymentWebhook } from "@/lib/payments";
 import { logError, logEvent, logWarn } from "@/lib/runtime";
 
@@ -6,6 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PROCESSING_RECLAIM_TIMEOUT_MINUTES = 10;
+const MAX_BODY_BYTES = 16 * 1024;
 const HEADERS = {
   "Cache-Control": "no-store",
   "Content-Type": "text/plain; charset=utf-8",
@@ -24,9 +26,13 @@ async function handle(request: Request): Promise<Response> {
   let params: URLSearchParams;
 
   try {
-    params = request.method.toUpperCase() === "GET"
-      ? new URL(request.url).searchParams
-      : new URLSearchParams(await request.text());
+    if (request.method.toUpperCase() === "GET") {
+      params = new URL(request.url).searchParams;
+    } else {
+      const rawBody = await readBoundedRequestText(request, MAX_BODY_BYTES);
+      if (rawBody === null) return text("Invalid notification.", 413);
+      params = new URLSearchParams(rawBody);
+    }
   } catch {
     return text("Invalid notification.", 400);
   }
@@ -48,53 +54,63 @@ async function handle(request: Request): Promise<Response> {
     return text("Temporary processing error.", 503);
   }
 
-  await pool.query(
-    `INSERT INTO billing_webhook_events (
-       provider,
-       external_event_id,
-       idempotency_key,
-       payload
-     )
-     VALUES ($1, $2, $3, $4::jsonb)
-     ON CONFLICT (provider, idempotency_key) DO NOTHING`,
-    [provider, externalEventId, idempotencyKey, JSON.stringify(payload)],
-  );
-
   const claimToken = crypto.randomUUID();
-  const claimed = await pool.query(
-    `UPDATE billing_webhook_events
-     SET status = 'processing',
-         error_message = NULL,
-         processed_at = NULL,
-         claimed_at = NOW(),
-         claim_token = $3
-     WHERE provider = $1
-       AND idempotency_key = $2
-       AND (
-         status IN ('received', 'failed')
-         OR (
-           status = 'processing'
-           AND (
-             claimed_at IS NULL
-             OR claimed_at <= NOW() - ($4::int * INTERVAL '1 minute')
-           )
-         )
+  let claimed: { rowCount: number | null };
+  try {
+    await pool.query(
+      `INSERT INTO billing_webhook_events (
+         provider,
+         external_event_id,
+         idempotency_key,
+         payload
        )
-     RETURNING id`,
-    [provider, idempotencyKey, claimToken, PROCESSING_RECLAIM_TIMEOUT_MINUTES],
-  );
-
-  if (claimed.rowCount === 0) {
-    const existing = await pool.query<{ status: string }>(
-      `SELECT status
-       FROM billing_webhook_events
-       WHERE provider = $1 AND idempotency_key = $2
-       LIMIT 1`,
-      [provider, idempotencyKey],
+       VALUES ($1, $2, $3, $4::jsonb)
+       ON CONFLICT (provider, idempotency_key) DO NOTHING`,
+      [provider, externalEventId, idempotencyKey, JSON.stringify(payload)],
     );
 
-    if (existing.rows[0]?.status === "processed") {
-      return text(`OK${invId}`, 200);
+    claimed = await pool.query(
+      `UPDATE billing_webhook_events
+       SET status = 'processing',
+           error_message = NULL,
+           processed_at = NULL,
+           claimed_at = NOW(),
+           claim_token = $3
+       WHERE provider = $1
+         AND idempotency_key = $2
+         AND (
+           status IN ('received', 'failed')
+           OR (
+             status = 'processing'
+             AND (
+               claimed_at IS NULL
+               OR claimed_at <= NOW() - ($4::int * INTERVAL '1 minute')
+             )
+           )
+         )
+       RETURNING id`,
+      [provider, idempotencyKey, claimToken, PROCESSING_RECLAIM_TIMEOUT_MINUTES],
+    );
+  } catch (error) {
+    logError("payments.webhook_persistence_failed", error, { provider });
+    return text("Temporary processing error.", 503);
+  }
+
+  if (claimed.rowCount === 0) {
+    try {
+      const existing = await pool.query<{ status: string }>(
+        `SELECT status
+         FROM billing_webhook_events
+         WHERE provider = $1 AND idempotency_key = $2
+         LIMIT 1`,
+        [provider, idempotencyKey],
+      );
+
+      if (existing.rows[0]?.status === "processed") {
+        return text(`OK${invId}`, 200);
+      }
+    } catch (error) {
+      logError("payments.webhook_persistence_failed", error, { provider });
     }
 
     return text("Notification is already processing.", 503);
@@ -129,17 +145,21 @@ async function handle(request: Request): Promise<Response> {
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "reconciliation_error";
 
-    await pool.query(
-      `UPDATE billing_webhook_events
-       SET status = 'failed',
-           error_message = $3,
-           processed_at = NOW(),
-           claim_token = NULL
-       WHERE provider = $1
-         AND idempotency_key = $2
-         AND claim_token = $4`,
-      [provider, idempotencyKey, message, claimToken],
-    );
+    try {
+      await pool.query(
+        `UPDATE billing_webhook_events
+         SET status = 'failed',
+             error_message = $3,
+             processed_at = NOW(),
+             claim_token = NULL
+         WHERE provider = $1
+           AND idempotency_key = $2
+           AND claim_token = $4`,
+        [provider, idempotencyKey, message, claimToken],
+      );
+    } catch (persistenceError) {
+      logError("payments.webhook_failure_persistence_failed", persistenceError, { provider });
+    }
 
     logError("payments.webhook_failed", error, { provider });
 

@@ -1,4 +1,5 @@
-import { Children, isValidElement, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 jest.mock("@/lib/auth-v2/authorization", () => ({ getSession: jest.fn() }));
 jest.mock("@/lib/entitlements", () => ({ getEffectiveEntitlement: jest.fn() }));
@@ -13,6 +14,10 @@ import { getEffectiveEntitlement } from "@/lib/entitlements";
 import { listCheckoutOrdersForAccess, listCheckoutOrdersForOwner } from "@/lib/paymentsRepo";
 
 describe("access settings page", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test("loads canonical access and only the signed-in user's orders", async () => {
     jest.mocked(getSession).mockResolvedValue({
       userId: "84", dataOwnerId: "42", workspaceId: "9",
@@ -29,7 +34,7 @@ describe("access settings page", () => {
     jest.mocked(listCheckoutOrdersForAccess).mockResolvedValue([]);
 
     const page = await AccessSettingsPage();
-    const text = collectText(page);
+    const text = collectRenderedText(page);
     expect(text).toContain("Текущий доступ");
     expect(text).toContain("radar-admin-7");
     expect(text).toContain("Выдан оператором");
@@ -46,6 +51,41 @@ describe("access settings page", () => {
     });
   });
 
+  test("localizes known payment states and uses Russian day pluralization", async () => {
+    jest.spyOn(Date, "now").mockReturnValue(Date.parse("2026-08-18T10:00:00.000Z"));
+    jest.mocked(getSession).mockResolvedValue({
+      userId: "84", dataOwnerId: "42", workspaceId: "9",
+    } as never);
+    jest.mocked(getEffectiveEntitlement).mockResolvedValue({
+      status: "active",
+      source: "payment",
+      plan: "radar-7",
+      startsAt: "2026-08-18T10:00:00.000Z",
+      expiresAt: "2026-08-19T10:00:00.000Z",
+      features: ["dashboard"],
+      activeSources: ["payment"],
+    });
+    jest.mocked(listCheckoutOrdersForAccess).mockResolvedValue([
+      {
+        id: "123",
+        productCode: "radar-7",
+        amountMinor: 99000,
+        currency: "RUB",
+        status: "paid",
+        provider: "robokassa",
+        createdAt: "2026-08-18T09:00:00.000Z",
+      } as never,
+    ]);
+
+    const page = await AccessSettingsPage();
+    const text = collectRenderedText(page);
+
+    expect(text).toContain("1 день");
+    expect(text).not.toContain("1 дн.");
+    expect(text).toContain("Оплачен");
+    expect(text).not.toMatch(/\bpaid\b/);
+  });
+
   test("shows an explicit unavailable state when order history cannot be loaded", async () => {
     jest.mocked(getSession).mockResolvedValue({
       userId: "84", dataOwnerId: "42", workspaceId: "9",
@@ -57,15 +97,13 @@ describe("access settings page", () => {
     jest.mocked(listCheckoutOrdersForAccess).mockRejectedValue(new Error("database unavailable"));
 
     const page = await AccessSettingsPage();
+    const text = collectRenderedText(page);
 
-    expect(collectText(page)).toContain("История заказов временно недоступна");
-    expect(collectText(page)).not.toContain("Заказов пока нет");
+    expect(text).toContain("История заказов временно недоступна");
+    expect(text).not.toContain("Заказов пока нет");
   });
 });
 
-function collectText(node: ReactNode): string {
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (!isValidElement<Record<string, unknown>>(node)) return "";
-  const children = (node.props as { children?: ReactNode }).children;
-  return Children.toArray(children).map(collectText).join(" ");
+function collectRenderedText(node: ReactNode): string {
+  return renderToStaticMarkup(node).replace(/<[^>]+>/g, " ");
 }

@@ -75,7 +75,7 @@ export function OpportunityActions(props: {
 
   return (
     <div className={styles.actions}>
-      <div className={styles.actionButtons} aria-label="Действия с возможностью">
+      <div className={styles.actionButtons} aria-label="Действия с ситуацией">
         {ACTIONS.map((item) => (
           <button
             key={item.action}
