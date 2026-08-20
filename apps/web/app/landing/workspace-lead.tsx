@@ -1,6 +1,5 @@
 import { formatLawfulContactPath, deriveWhyNow } from "../../lib/leads-data";
 import { formatVacanciesCount } from "../../lib/format/plural";
-import { formatScorePoints } from "../../lib/scoring/score-display";
 import type { getPublicSampleDigestState } from "../../lib/publicProduct";
 import {
   buildPreviewEvidenceItems,
@@ -21,14 +20,13 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
   const location = formatLocationCaption(item.location_names);
   const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
   const employerName = cleanEmployerName(item.employer_name);
-  const points = formatScorePoints(item.total_score);
   const freshness = formatVacancyFreshness(item.latest_published_at);
   const evidence = buildPreviewEvidenceItems({
     whyNow,
     vacanciesCaption,
-    evidenceTitles: pickEvidenceTitles(item.evidence_titles, 5),
+    evidenceTitles: pickEvidenceTitles(item.evidence_titles, 4),
     sourceFamilies: item.source_families,
-    limit: 3,
+    limit: 2,
   });
 
   return (
@@ -51,35 +49,29 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
 
       {defaultOpen ? (
         <div className={`${styles.workspaceLeadBody} ${sceneStyles.leadBody}`} data-selected-lead-detail>
-          <div className={sceneStyles.proofStack}>
-            <div className={sceneStyles.proofBlock} data-primary-proof>
-              <span>Почему сейчас</span>
-              <p>{freshness ? `${whyNow} Последнее изменение — ${freshness}.` : whyNow}</p>
+          <div className={sceneStyles.primaryReason} data-primary-proof>
+            <span>Почему сейчас</span>
+            <p>{freshness ? `${whyNow} Последнее подтверждение — ${freshness}.` : whyNow}</p>
+          </div>
+
+          <div className={`${styles.workspaceEvidence} ${sceneStyles.evidenceBlock}`}>
+            <span>Два сильных факта</span>
+            <ul>{evidence.map((fact) => <li key={fact}><RouteGlyph size={14} />{fact}</li>)}</ul>
+          </div>
+
+          <div className={sceneStyles.outcomeGrid}>
+            <div>
+              <span>Официальный контакт</span>
+              <p>{contactPath}</p>
             </div>
-            <div className={sceneStyles.proofBlock}>
+            <div>
               <span>Следующий ход</span>
               <p>{item.opener?.trim() || "Проверить факты и выбрать безопасный путь обращения"}</p>
             </div>
-            <div className={sceneStyles.proofBlock}>
-              <span>Безопасный контакт</span>
-              <p>{contactPath}</p>
+            <div>
+              <span>Confidence</span>
+              <p><strong>{item.confidenceLabel}</strong></p>
             </div>
-          </div>
-
-          <div className={sceneStyles.sideProof}>
-            <div className={`${styles.workspaceEvidence} ${sceneStyles.evidenceBlock}`}>
-              <span>Подтверждения и источники</span>
-              <ul>{evidence.map((fact) => <li key={fact}><RouteGlyph size={14} />{fact}</li>)}</ul>
-            </div>
-            <div className={sceneStyles.proofBlock}>
-              <span>Уровень подтверждения</span>
-              <p>{item.confidenceLabel}. Сила сигнала используется для сортировки, а решение опирается на подтверждения выше.</p>
-            </div>
-          </div>
-
-          <div className={`${styles.workspaceLeadFooter} ${sceneStyles.leadFooter}`}>
-            <span>Сила сигнала {points} · {item.confidenceLabel}</span>
-            <strong>Сообщения не отправляются автоматически</strong>
           </div>
         </div>
       ) : null}
