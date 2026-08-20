@@ -51,17 +51,8 @@
 .headerBrand :global(svg) { max-width: 10.8rem; color: currentColor; }
 
 /* Layout shell only. Section modules own typography scale and composition. */
-.scene {
-  position: relative;
-  isolation: isolate;
-}
-
-.lightScene {
-  padding-inline: var(--scene-pad);
-  background: var(--color-canvas);
-  color: var(--color-text-primary);
-}
-
+.scene { position: relative; isolation: isolate; }
+.lightScene { padding-inline: var(--scene-pad); background: var(--color-canvas); color: var(--color-text-primary); }
 .workspaceScene { background: var(--color-surface-secondary); }
 .workspaceLayout { display: grid; gap: 1rem; width: min(var(--content), 100%); margin: auto; }
 .workspaceIntro { display: grid; }
@@ -75,21 +66,11 @@
   text-transform: uppercase;
 }
 
-.sceneHeading {
-  margin: 0;
-  font-weight: 580;
-  letter-spacing: -.04em;
-}
-
-.sceneLead {
-  margin: 0;
-  color: var(--color-text-secondary);
-}
-
+.sceneHeading { margin: 0; font-weight: 580; letter-spacing: -.04em; }
+.sceneLead { margin: 0; color: var(--color-text-secondary); }
 .workspaceControls { display: grid; }
 .presetStrip { display: flex; }
 .workspaceForm { display: grid; }
-
 .workspaceResults { min-width: 0; }
 
 .workspaceResultsHeader {
@@ -136,15 +117,9 @@
 
 .workspaceEmpty span { color: var(--color-text-tertiary); font-size: .82rem; }
 .workspaceEmpty strong { color: var(--color-text-primary); font-size: 1rem; }
-
 .workspaceLeadList { margin-top: .2rem; }
 .workspaceLead { min-width: 0; }
-
-.workspaceLeadRow {
-  display: grid;
-  align-items: center;
-}
-
+.workspaceLeadRow { display: grid; align-items: center; }
 .workspaceRank { color: var(--color-text-tertiary); font-size: .72rem; font-variant-numeric: tabular-nums; }
 .workspaceCompany { display: grid; gap: .22rem; min-width: 0; }
 .workspaceCompany strong { color: var(--color-text-primary); font-weight: 650; }
@@ -152,20 +127,9 @@
 .workspaceSignal { min-width: 0; }
 .workspaceScore { display: flex; justify-content: flex-end; }
 .workspaceLeadBody { min-width: 0; }
-
-.workspaceEvidence ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
+.workspaceEvidence ul { margin: 0; padding: 0; list-style: none; }
 .workspaceSkeleton { display: grid; gap: .65rem; padding: 1rem 0; }
-.workspaceSkeleton span {
-  display: block;
-  height: 4.5rem;
-  border-radius: .8rem;
-  background: color-mix(in srgb, var(--color-information) 6%, transparent);
-}
+.workspaceSkeleton span { display: block; height: 4.5rem; border-radius: var(--radius-surface); background: color-mix(in srgb, var(--color-information) 6%, transparent); }
 
 .landingFooter {
   width: 100%;
@@ -183,9 +147,7 @@
   .workspaceResultsHeader { align-items: flex-start; flex-direction: column; gap: .55rem; }
 }
 
-@media (max-width: 480px) {
-  .landingPage { margin: -20px -14px -48px; }
-}
+@media (max-width: 480px) { .landingPage { margin: -20px -14px -48px; } }
 
 @media (prefers-reduced-motion: reduce) {
   .landingPage *,
