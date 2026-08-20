@@ -117,6 +117,8 @@ describe("cross-route visual layer contract", () => {
     expect(workspaceStyles).toMatch(/\.workspaceBody \{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden/);
     expect(workspaceStyles).toMatch(/\.content \{[\s\S]*?overflow-y: auto/);
     expect(workspaceStyles).toMatch(/\.mobileNav \{[\s\S]*?position: static/);
+    expect(workspaceStyles).toMatch(/\.mobileMore \{[\s\S]*?position: relative/);
+    expect(workspaceStyles).toMatch(/\.mobileMoreMenu \{[\s\S]*?position: absolute/);
     expect(workspaceStyles).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
     expect(workspaceStyles).toContain("padding: 24px 16px calc(32px + env(safe-area-inset-bottom))");
   });

@@ -96,6 +96,11 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("/opportunities/radar");
     expect(runner).toContain('[data-semantic-mode="v3"]');
     expect(runner).toContain("Evidence Radar marker selection did not become active");
+    expect(runner).toContain("const mobileMoreViewports = [");
+    expect(runner).toMatch(/suffix:\s*'320'[\s\S]{0,120}width:\s*320[\s\S]{0,120}height:\s*568/);
+    expect(runner).toContain("Mobile More menu is outside the ${suffix}px viewport");
+    expect(runner).toContain("Opening Mobile More resized the main scroll area");
+    expect(runner).toContain("Mobile More internal route did not activate");
     expect(runner).toContain("const authenticatedProductViewports = [");
     expect(runner).toMatch(/suffix:\s*'1440'[\s\S]{0,120}width:\s*1440[\s\S]{0,120}height:\s*1000/);
     expect(runner).toMatch(/suffix:\s*'390'[\s\S]{0,120}width:\s*390[\s\S]{0,120}height:\s*844/);

@@ -28,6 +28,7 @@ Authenticated E2E/accessibility evidence covers the decision flow and operationa
 
 ## Required states and interaction invariants
 
+- Mobile More open state is captured at 320×568 and 390×844; the authenticated browser gate verifies that the menu remains inside the viewport, exposes every secondary destination, activates an internal route and does not resize or overlap the main scroll area.
 - loading and pending states do not use decorative ambient animation;
 - reduced-motion mode suppresses non-essential transitions and animation;
 - hover-only behavior is capability-gated;

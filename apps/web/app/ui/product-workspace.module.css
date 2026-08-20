@@ -359,6 +359,11 @@
     text-decoration: none;
   }
 
+  .mobileMore {
+    position: relative;
+    min-width: 0;
+  }
+
   .mobileNavItem[data-active="true"],
   .mobileMore[data-active="true"] summary,
   .mobileMore[open] summary {
@@ -393,8 +398,8 @@
 
   .mobileMoreMenu {
     position: absolute;
-    right: 8px;
-    bottom: calc(100% + 8px);
+    inset-inline-end: 8px;
+    inset-block-end: calc(100% + 8px);
     width: min(250px, calc(100vw - 16px));
     display: grid;
     padding: 8px;

@@ -1280,6 +1280,146 @@ const authenticatedProductViewports = [
   },
 ]
 
+const mobileMoreViewports = [
+  {
+    suffix: '320',
+    width: 320,
+    height: 568,
+    screenshot: 'auth-v2-account-team-e2e-shot-mobile-more-open-320.png',
+  },
+  {
+    suffix: '390',
+    width: 390,
+    height: 844,
+    screenshot: 'auth-v2-account-team-e2e-shot-mobile-more-open-390.png',
+  },
+]
+
+async function verifyMobileMoreNavigation(
+  page,
+  { suffix, width, height, screenshot },
+) {
+  await page.setViewportSize({ width, height })
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(
+    () => document.querySelectorAll('main').length === 1,
+  )
+
+  const mobileNavigation = page.getByRole('navigation', {
+    name: 'Мобильная навигация',
+  })
+  const moreDisclosure = mobileNavigation.locator('details').filter({
+    hasText: 'Ещё',
+  })
+  const moreSummary = moreDisclosure.locator('summary')
+  const moreMenu = moreDisclosure.locator('div').filter({
+    has: page.getByRole('link', { name: 'Настройки', exact: true }),
+  })
+  const layoutBeforeOpen = await page.evaluate(() => {
+    const main = document.querySelector('main')
+    const nav = document.querySelector('nav[aria-label="Мобильная навигация"]')
+    if (!(main instanceof HTMLElement)) {
+      throw new Error('Authenticated mobile main surface is missing.')
+    }
+    if (!(nav instanceof HTMLElement)) {
+      throw new Error('Authenticated mobile navigation is missing.')
+    }
+    const mainRect = main.getBoundingClientRect()
+    const navRect = nav.getBoundingClientRect()
+    return {
+      mainBottom: mainRect.bottom,
+      mainHeight: mainRect.height,
+      mainScrollHeight: main.scrollHeight,
+      navTop: navRect.top,
+    }
+  })
+
+  await moreSummary.click()
+  await moreMenu.waitFor({ state: 'visible' })
+  assert(
+    await moreDisclosure.getAttribute('open') === '',
+    `Mobile More disclosure did not open at ${suffix}px.`,
+  )
+
+  for (const label of [
+    'Настройки',
+    'Команда',
+    'Безопасность',
+    'Доступ и оплата',
+    'Поддержка',
+    'Документы',
+    'Конфиденциальность',
+  ]) {
+    await moreMenu.getByRole('link', { name: label, exact: true }).waitFor({
+      state: 'visible',
+    })
+  }
+
+  const openLayout = await page.evaluate(() => {
+    const main = document.querySelector('main')
+    const nav = document.querySelector('nav[aria-label="Мобильная навигация"]')
+    const menu = nav?.querySelector('details[open] > div')
+    if (!(main instanceof HTMLElement)) {
+      throw new Error('Authenticated mobile main surface is missing.')
+    }
+    if (!(nav instanceof HTMLElement)) {
+      throw new Error('Authenticated mobile navigation is missing.')
+    }
+    if (!(menu instanceof HTMLElement)) {
+      throw new Error('Authenticated mobile More menu is missing.')
+    }
+    const mainRect = main.getBoundingClientRect()
+    const navRect = nav.getBoundingClientRect()
+    const menuRect = menu.getBoundingClientRect()
+    return {
+      mainBottom: mainRect.bottom,
+      mainHeight: mainRect.height,
+      mainScrollHeight: main.scrollHeight,
+      navTop: navRect.top,
+      menu: {
+        top: menuRect.top,
+        right: menuRect.right,
+        bottom: menuRect.bottom,
+        left: menuRect.left,
+      },
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+    }
+  })
+  assert(
+    openLayout.menu.top >= 0
+      && openLayout.menu.left >= 0
+      && openLayout.menu.right <= openLayout.viewport.width
+      && openLayout.menu.bottom <= openLayout.viewport.height,
+    `Mobile More menu is outside the ${suffix}px viewport: ${JSON.stringify(openLayout.menu)}.`,
+  )
+  assert(
+    Math.abs(openLayout.mainBottom - layoutBeforeOpen.mainBottom) < 1
+      && Math.abs(openLayout.mainHeight - layoutBeforeOpen.mainHeight) < 1
+      && openLayout.mainScrollHeight === layoutBeforeOpen.mainScrollHeight,
+    `Opening Mobile More resized the main scroll area at ${suffix}px.`,
+  )
+  assert(
+    openLayout.mainBottom <= openLayout.navTop
+      && layoutBeforeOpen.mainBottom <= layoutBeforeOpen.navTop,
+    `Mobile navigation overlaps authenticated content at ${suffix}px.`,
+  )
+
+  const screenshotPath = resolve(artifactsDirectory, screenshot)
+  await page.screenshot({
+    path: screenshotPath,
+    fullPage: false,
+    caret: 'initial',
+  })
+  report.screenshots[`mobile-more-open-${suffix}`] = screenshotPath
+
+  await moreMenu.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/settings')
+  assert(
+    new URL(page.url()).pathname === '/settings',
+    `Mobile More internal route did not activate at ${suffix}px.`,
+  )
+}
+
 async function verifyAuthenticatedProductSurfacesAtViewport(
   page,
   owner,
@@ -1403,6 +1543,9 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
       { suffix, screenshots },
     )
   }
+  for (const viewport of mobileMoreViewports) {
+    await verifyMobileMoreNavigation(page, viewport)
+  }
   report.flows.authenticatedProductSurfaces = {
     desktop1440: true,
     mobile390: true,
@@ -1414,6 +1557,7 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
     opportunities: true,
     commercialSignalCard: true,
     evidenceRadarMarkerSelection: true,
+    mobileMoreNavigation320And390: true,
   }
 }
 
