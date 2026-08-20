@@ -22,19 +22,22 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
     <section
       id="scene-detection"
       className={styles.hero}
+      aria-labelledby="detection-title"
       data-header-tone="dark"
       data-hero-layout="company-brief"
       data-art-direction="evidence-first"
       data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}
     >
       <div className={styles.heroInner}>
-        <div className={styles.heroHeading}>
+        <div className={styles.heroHeading} data-hero-copy>
           <div>
             <p className={styles.serviceLabel}>Клиентский радар для рекрутинговых агентств</p>
-            <h1 className={styles.title}>Находите компании, которым стоит написать сейчас.</h1>
+            <h1 id="detection-title" className={styles.title} data-hero-title>
+              Находите компании, которым стоит написать сейчас.
+            </h1>
           </div>
           <div className={styles.promiseColumn}>
-            <p className={styles.promise}>
+            <p className={styles.promise} data-hero-description>
               Recruiter Radar замечает свежие изменения в найме, проверяет их по источникам
               и показывает конкретный повод для первого контакта.
             </p>
@@ -58,7 +61,12 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
         </div>
 
         <div className={styles.companyBrief} data-hero-company-brief="true">
-          <div className={styles.resolutionChain} aria-label="От сигнала к решению">
+          <div
+            className={styles.resolutionChain}
+            data-hero-visual
+            data-mobile-hero-signal
+            aria-label="От сигнала к решению"
+          >
             <article className={`${styles.node} ${styles.signalNode}`} data-hero-stage="signal">
               <span className={styles.stageLabel}>Сигнал</span>
               <small>Сегодня · изменение в компании</small>
