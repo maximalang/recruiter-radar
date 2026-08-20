@@ -188,7 +188,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
             <strong>{statusLabel}</strong>
             {!previewState.isLive ? (
               <small className={sceneStyles.demoDisclosure}>
-                <strong>Обезличенный пример:</strong> названия и часть фактов изменены.
+                <strong>Обезличенный пример.</strong> Названия и часть фактов изменены; логика приоритета и типы источников сохранены.
               </small>
             ) : null}
           </div>
@@ -226,6 +226,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
 
         <div className={sceneStyles.productFooter}>
           <Link
+            className={sceneStyles.checkout}
             prefetch={false}
             href={props.checkoutHref}
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
@@ -261,6 +262,7 @@ function WorkspaceResultsFailure({ checkoutHref, embedded }: { checkoutHref: str
       </div>
       <div className={sceneStyles.productFooter}>
         <Link
+          className={sceneStyles.checkout}
           prefetch={false}
           href={checkoutHref}
           data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
