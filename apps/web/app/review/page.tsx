@@ -19,6 +19,7 @@ import { buildAccountNavigation } from '../ui/account-navigation';
 import { CheckIcon, TargetIcon } from '../ui/icons';
 import ReviewActions from './review-actions';
 import { deriveReviewReason } from './review-reason';
+import { parseReviewPagePagination } from './review-query';
 import { pluralizeLeads } from '../leads/page-helpers';
 import styles from './review.module.css';
 
@@ -182,8 +183,7 @@ export default async function ReviewPage({
       ? params.clientProfileId ?? ''
       : profiles[0]?.id?.toString() ?? '';
 
-  const limit = Math.min(Number(params.limit ?? 50), 200);
-  const offset = Math.max(Number(params.offset ?? 0), 0);
+  const { limit, offset } = parseReviewPagePagination(params);
 
   const pool = getPool();
   const reviewData: { items: ReviewCandidate[]; total: number; error?: boolean } = activeProfileId && pool
