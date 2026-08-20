@@ -99,6 +99,8 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("/opportunities/radar");
     expect(runner).toContain('[data-semantic-mode="v3"]');
     expect(runner).toContain("Evidence Radar marker selection did not become active");
+    expect(runner).toContain("Sparse Evidence Radar did not switch to the evidence strip");
+    expect(runner).toContain("Sparse Evidence Radar still exposes comparison axes");
     expect(runner).toContain("const mobileMoreViewports = [");
     expect(runner).toMatch(/suffix:\s*'320'[\s\S]{0,120}width:\s*320[\s\S]{0,120}height:\s*568/);
     expect(runner).toContain("Mobile More menu is outside the ${suffix}px viewport");

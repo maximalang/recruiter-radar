@@ -1772,6 +1772,15 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
     screenshots.evidenceRadar,
   )
   await page.locator('[data-evidence-radar-map]').waitFor({ state: 'visible' })
+  assert(
+    await page.locator('[data-sparse-evidence-strip][data-density="sparse"]').count() === 1,
+    'Sparse Evidence Radar did not switch to the evidence strip.',
+  )
+  assert(
+    await page.getByText('X — свежесть', { exact: true }).count() === 0
+      && await page.getByText('Y — подтверждение', { exact: true }).count() === 0,
+    'Sparse Evidence Radar still exposes comparison axes.',
+  )
   const marker = page.locator('[data-evidence-radar-map] button[data-motion-interactive]').first()
   await marker.click()
   assert(

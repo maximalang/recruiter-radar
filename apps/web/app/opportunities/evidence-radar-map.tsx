@@ -43,21 +43,32 @@ export function EvidenceRadarMap(props: {
       <section className={styles.radarPanel} aria-labelledby="evidence-radar-title">
         <header className={styles.radarHeader}>
           <div>
-            <span className={styles.radarEyebrow}>Поле доказательств</span>
-            <h2 id="evidence-radar-title">Свежесть, подтверждение и релевантность</h2>
+            <span className={styles.radarEyebrow}>{density === 'sparse' ? 'Подтверждённые сигналы' : 'Поле доказательств'}</span>
+            <h2 id="evidence-radar-title">{density === 'sparse' ? 'Свежесть и сила подтверждений' : 'Свежесть, подтверждение и релевантность'}</h2>
           </div>
-          <div className={styles.radarLegend} aria-label="Как читать Радар">
-            <span>X — свежесть</span>
-            <span>Y — подтверждение</span>
-            <span>Размер — релевантность</span>
-          </div>
+          {density !== 'sparse' ? (
+            <div className={styles.radarLegend} aria-label="Как читать Радар">
+              <span>X — свежесть</span>
+              <span>Y — подтверждение</span>
+              <span>Размер — релевантность</span>
+            </div>
+          ) : null}
         </header>
 
         <p className={styles.selectedStatus} data-motion-status role="status" aria-live="polite">
           {selected ? `Выбрано: ${selected.organizationName}, ${selected.location.city}` : ''}
         </p>
 
-        <div className={styles.canvas} data-evidence-radar-map data-density={density}>
+        {density === 'sparse' ? (
+          <SparseEvidenceStrip
+            leads={rankedLeads}
+            selectedCardId={selected?.cardId ?? null}
+            onSelect={setSelectedCardId}
+            referenceTimestamp={props.referenceTimestamp}
+          />
+        ) : (
+          <>
+            <div className={styles.canvas} data-evidence-radar-map data-density={density}>
           <div className={styles.axisY} aria-hidden="true">
             <span>сильнее подтверждено</span>
             <span>слабее подтверждено</span>
@@ -79,9 +90,9 @@ export function EvidenceRadarMap(props: {
               referenceTimestamp={props.referenceTimestamp}
             />
           ))}
-        </div>
+            </div>
 
-        <div className={styles.semanticListWrap}>
+            <div className={styles.semanticListWrap}>
           <div className={styles.semanticListHeader}>
             <h3>Сигналы по приоритету</h3>
             <span>{rankedLeads.length} {pluralCompanies(rankedLeads.length)}</span>
@@ -107,13 +118,68 @@ export function EvidenceRadarMap(props: {
               )
             })}
           </ol>
-        </div>
+            </div>
+          </>
+        )}
       </section>
 
       <aside className={styles.detailPanel} aria-label="Контекст выбранной компании">
         {selected ? <EvidenceLeadDetail key={selected.cardId} lead={selected} /> : null}
       </aside>
     </div>
+  )
+}
+
+function SparseEvidenceStrip(props: {
+  leads: readonly EvidenceRadarLead[]
+  selectedCardId: string | null
+  onSelect: (cardId: string) => void
+  referenceTimestamp: number
+}) {
+  return (
+    <section
+      className={styles.sparseStrip}
+      data-sparse-evidence-strip
+      data-evidence-radar-map
+      data-density="sparse"
+      aria-label="Подтверждённые компании"
+    >
+      <header className={styles.sparseHeader}>
+        <h3>Сигналы в фокусе</h3>
+        <span>{props.leads.length} {pluralCompanies(props.leads.length)}</span>
+      </header>
+      <div className={styles.sparseSignals}>
+        {props.leads.map((lead) => {
+          const confidence = radarConfidence(lead)
+          return (
+            <button
+              key={lead.cardId}
+              type="button"
+              className={styles.sparseSignal}
+              data-motion-interactive
+              aria-pressed={lead.cardId === props.selectedCardId}
+              aria-label={`${lead.organizationName}, ${lead.location.city}`}
+              onClick={() => props.onSelect(lead.cardId)}
+            >
+              <span className={styles.sparseIdentity}>
+                <strong>{lead.organizationName}</strong>
+                <small>{lead.location.city} · {freshnessLabel(lead, props.referenceTimestamp)}</small>
+              </span>
+              <span className={styles.sparseEvidence} aria-label={`${lead.evidence.length} подтверждений`}>
+                {lead.evidence.slice(0, 3).map((event) => (
+                  <i key={event.id} data-evidence-source aria-hidden="true" />
+                ))}
+              </span>
+              <span className={styles.sparseConfidence} data-level={confidence.level}>
+                <strong>{confidence.label}</strong>
+                <small>релевантность {Math.round(lead.score.opportunityScore)}</small>
+              </span>
+              <span className={styles.sparseWhy}>{lead.whyNow}</span>
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 

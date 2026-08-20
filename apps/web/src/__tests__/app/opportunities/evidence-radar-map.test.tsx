@@ -104,22 +104,39 @@ describe('EvidenceRadarMap V1-V6 contract', () => {
     expect(positions).toEqual([...positions].sort((left, right) => left - right))
   })
 
-  it('uses recency × evidence confidence while keeping geographic data as metadata only', () => {
+  it('uses recency × evidence confidence in compact and full comparison modes', () => {
     const alphaLead = lead('77', 'Альфа', 'Москва')
     alphaLead.evidence = [evidence('alpha-evidence', '2026-08-15T00:00:00.000Z')]
     const betaLead = lead('78', 'Бета', 'Казань')
     betaLead.evidence = [evidence('beta-evidence', '2026-08-10T00:00:00.000Z')]
+    const gammaLead = lead('79', 'Гамма', 'Самара')
+    gammaLead.evidence = [evidence('gamma-evidence', '2026-08-12T00:00:00.000Z')]
 
-    const { container } = render(<EvidenceRadarMap leads={[alphaLead, betaLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
+    const { container } = render(<EvidenceRadarMap leads={[alphaLead, betaLead, gammaLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
 
     expect(screen.getByText('Свежесть, подтверждение и релевантность')).toBeInTheDocument()
     expect(screen.getByText('X — свежесть')).toBeInTheDocument()
     expect(screen.getByText('Y — подтверждение')).toBeInTheDocument()
-    expect(container.querySelector('[data-evidence-radar-map]')).toHaveAttribute('data-density', 'sparse')
-    expect(screen.getAllByText(/релевантность 80/)).toHaveLength(2)
+    expect(container.querySelector('[data-evidence-radar-map]')).toHaveAttribute('data-density', 'compact')
+    expect(screen.getAllByText(/релевантность 80/)).toHaveLength(3)
     expect(container.querySelector('[data-recency]')).not.toBeNull()
     expect(container.querySelector('[data-confidence]')).not.toBeNull()
     expect(container.querySelector('[data-region-code]')).toBeNull()
+  })
+
+  it('uses a compact evidence strip without axes or a duplicate ranked list for sparse data', () => {
+    const radarLead = lead('77', 'Альфа', 'Москва')
+    radarLead.evidence = [evidence('evidence-1', '2026-08-15T00:00:00.000Z')]
+
+    const { container } = render(<EvidenceRadarMap leads={[radarLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
+
+    expect(container.querySelector('[data-sparse-evidence-strip]')).not.toBeNull()
+    expect(container.querySelector('[data-evidence-radar-map]')).toHaveAttribute('data-density', 'sparse')
+    expect(screen.queryByText('X — свежесть')).not.toBeInTheDocument()
+    expect(screen.queryByText('Y — подтверждение')).not.toBeInTheDocument()
+    expect(screen.queryByText('Сигналы по приоритету')).not.toBeInTheDocument()
+    expect(screen.getByText('1 компания')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Альфа, Москва' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('selects the first Radar-priority company rather than the repository input order', () => {

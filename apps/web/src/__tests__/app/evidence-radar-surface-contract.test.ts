@@ -26,6 +26,8 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
     expect(map).toContain("props.leads.length <= 2 ? 'sparse'")
     expect(map).toContain("props.leads.length <= 5 ? 'compact' : 'full'")
     expect(mapCss).toContain('.canvas[data-density="sparse"]')
+    expect(map).toContain('data-sparse-evidence-strip')
+    expect(map).toContain("density === 'sparse'")
     expect(map).toContain('Свежесть, подтверждение и релевантность')
     expect(map).toContain('Подтверждённых сигналов пока нет')
   })
