@@ -51,6 +51,8 @@
   line-height: 1.55;
 }
 
+.companyBrief { display: contents; }
+
 .resolutionChain {
   display: grid;
   grid-template-columns: minmax(15rem, 1.05fr) auto minmax(16rem, .98fr) auto minmax(11rem, .68fr) auto minmax(16rem, .98fr);
@@ -72,11 +74,19 @@
 }
 
 .companyNode h2 {
-  margin: 1.2rem 0 .8rem;
+  margin: 1.2rem 0 .65rem;
   font-size: clamp(1.65rem, 2.15vw, 2rem);
   font-weight: 650;
   letter-spacing: -.045em;
   line-height: 1.06;
+}
+
+.whyLabel {
+  display: block;
+  margin-bottom: .3rem;
+  color: var(--color-signal-hover);
+  font-size: .72rem;
+  font-weight: 700;
 }
 
 .companyNode > strong {
@@ -93,9 +103,7 @@
 }
 
 .evidenceNode,
-.moveNode {
-  background: color-mix(in srgb, var(--color-text-inverse) 5%, transparent);
-}
+.moveNode { background: color-mix(in srgb, var(--color-text-inverse) 5%, transparent); }
 
 .evidenceNode ul {
   display: grid;
@@ -105,31 +113,16 @@
   list-style: none;
 }
 
-.evidenceNode li {
-  display: grid;
-  gap: .25rem;
-}
-
-.evidenceNode li > span {
-  color: color-mix(in srgb, var(--color-text-inverse) 44%, transparent);
-  font-size: .72rem;
-}
-
-.evidenceNode li > strong {
-  color: var(--color-text-inverse);
-  font-size: .92rem;
-  font-weight: 620;
-  line-height: 1.35;
-}
+.evidenceNode li { display: grid; gap: .25rem; }
+.evidenceNode li > span { color: color-mix(in srgb, var(--color-text-inverse) 44%, transparent); font-size: .72rem; }
+.evidenceNode li > strong { color: var(--color-text-inverse); font-size: .92rem; font-weight: 620; line-height: 1.35; }
 
 .confidenceNode {
   background: var(--color-signal);
   color: var(--color-text-primary);
 }
 
-.confidenceNode .nodeLabel {
-  color: color-mix(in srgb, var(--color-text-primary) 62%, transparent);
-}
+.confidenceNode .nodeLabel { color: color-mix(in srgb, var(--color-text-primary) 62%, transparent); }
 
 .confidenceValue {
   display: block;
@@ -140,21 +133,8 @@
   line-height: .9;
 }
 
-.confidenceNode > small {
-  display: block;
-  margin-top: .75rem;
-  font-size: .8rem;
-  font-weight: 650;
-}
-
-.moveNode > strong {
-  display: block;
-  margin-top: 1.8rem;
-  font-size: clamp(1.25rem, 1.7vw, 1.55rem);
-  font-weight: 620;
-  letter-spacing: -.03em;
-  line-height: 1.22;
-}
+.confidenceNode > small { display: block; margin-top: .75rem; font-size: .8rem; font-weight: 650; }
+.moveNode > strong { display: block; margin-top: 1.8rem; font-size: clamp(1.25rem, 1.7vw, 1.55rem); font-weight: 620; letter-spacing: -.03em; line-height: 1.22; }
 
 .chainArrow {
   display: grid;
@@ -171,11 +151,7 @@
   margin-top: 1.25rem;
 }
 
-.actions {
-  display: flex;
-  align-items: center;
-  gap: .65rem;
-}
+.actions { display: flex; align-items: center; gap: .65rem; }
 
 .primaryButton,
 .loginLink {
@@ -189,17 +165,8 @@
   text-decoration: none;
 }
 
-.primaryButton {
-  padding: .72rem 1rem;
-  background: var(--color-text-inverse);
-  color: var(--color-text-primary);
-}
-
-.loginLink {
-  padding: .72rem .9rem;
-  border: 1px solid color-mix(in srgb, var(--color-text-inverse) 28%, transparent);
-  color: var(--color-text-inverse);
-}
+.primaryButton { padding: .72rem 1rem; background: var(--color-text-inverse); color: var(--color-text-primary); }
+.loginLink { padding: .72rem .9rem; border: 1px solid color-mix(in srgb, var(--color-text-inverse) 28%, transparent); color: var(--color-text-inverse); }
 
 .microcopy {
   margin: 0;
@@ -247,26 +214,21 @@
   .companyNode h2 { margin-top: .8rem; font-size: 1.45rem; }
   .companyNode > strong { font-size: .98rem; }
   .companyNode > small { margin-top: .6rem; font-size: .72rem; }
-  .evidenceNode ul {
-    grid-template-columns: 1fr 1fr;
-    gap: .75rem;
-    margin-top: .8rem;
-  }
+  .evidenceNode ul { grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .8rem; }
   .evidenceNode li:last-child { grid-column: 1 / -1; }
   .evidenceNode li > span { font-size: .68rem; }
   .evidenceNode li > strong { font-size: .84rem; }
-  .confidenceNode {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    gap: .2rem 1rem;
-  }
+  .confidenceNode { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .2rem 1rem; }
   .confidenceNode .nodeLabel { grid-column: 1; }
   .confidenceValue { grid-column: 2; grid-row: 1 / 3; margin: 0; font-size: 2.3rem; }
   .confidenceNode > small { margin: 0; font-size: .74rem; }
   .moveNode > strong { margin-top: .65rem; font-size: 1.08rem; }
   .heroFooter { align-items: flex-start; flex-direction: column; gap: .85rem; }
   .microcopy { font-size: .72rem; text-align: left; }
+}
+
+@media (max-width: 600px) {
+  .companyBrief { display: contents; }
 }
 
 @media (max-width: 430px) {
