@@ -33,6 +33,11 @@ export default function LandingPage(props: {
       <LandingMotion />
       <LandingHashNavigation />
       <LandingHeader previewHref="#preview-configurator" />
+      <noscript>
+        <div className={styles.noScriptNotice} data-noscript-disclosure role="note">
+          Интерактивная настройка примера требует JavaScript. Основная информация о продукте, тарифах и условиях остаётся доступна без него.
+        </div>
+      </noscript>
       <main id="main-content">
         <DetectionScene previewHref="#preview-configurator" paymentConfigured={props.paymentConfigured} />
         <WorkspaceScene
