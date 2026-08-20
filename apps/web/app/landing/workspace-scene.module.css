@@ -108,7 +108,7 @@
 }
 
 .results { padding: 0 1rem .55rem; }
-.resultsHeader { padding: .78rem 0 .6rem; }
+.resultsHeader { padding: .62rem 0 .5rem; }
 .demoDisclosure {
   display: block;
   max-width: 48rem;
@@ -255,10 +255,12 @@
 }
 
 @media (max-width: 820px) {
-  .section { padding-block: 2.75rem; }
-  .intro { grid-template-columns: 1fr; gap: .85rem; }
+  .section { padding-block: 2.5rem; }
+  .intro { grid-template-columns: 1fr; gap: .72rem; }
   .intro > p { justify-self: start; }
   .productFrame { border-radius: var(--radius-surface); }
+  .presetStrip { flex-wrap: wrap; overflow-x: visible; }
+  .presetStrip > span { width: 100%; }
   .workspaceForm { grid-template-columns: 1fr; }
   .workspaceForm label:nth-of-type(3),
   .workspaceForm button { grid-column: auto; }
@@ -271,16 +273,13 @@
 }
 
 @media (max-width: 520px) {
-  .previewHeader { padding-inline: .8rem; }
-  .controls { padding-inline: .8rem; }
-  .presetStrip {
-    flex-wrap: wrap;
-    overflow-x: visible;
-    margin-inline: -.1rem;
-  }
-  .presetStrip > span { width: 100%; }
+  .section { padding-block: 2.15rem; }
+  .intro { gap: .55rem; }
+  .intro > div { gap: .4rem; }
+  .controls { gap: .6rem; padding: .72rem .8rem .78rem; }
+  .presetStrip { margin-inline: -.1rem; }
   .results { padding-inline: .8rem; }
-  .resultsHeader { gap: .35rem; }
+  .resultsHeader { gap: .28rem; padding-top: .55rem; }
   .leadRow { grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: .45rem; }
   .leadSecondary .leadSignal { display: none; }
   .leadSignal { font-size: .73rem; }
