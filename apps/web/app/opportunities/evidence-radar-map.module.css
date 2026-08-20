@@ -72,10 +72,6 @@
   color: var(--radar-ink);
 }
 
-.canvas[data-density="sparse"] {
-  min-height: 300px;
-}
-
 .canvas[data-density="compact"] {
   min-height: clamp(380px, 42vw, 480px);
 }
@@ -823,10 +819,6 @@
 
   .canvas {
     min-height: 220px;
-  }
-
-  .canvas[data-density="sparse"] {
-    min-height: 210px;
   }
 
   .canvas[data-density="compact"] {
