@@ -89,7 +89,6 @@
   border: 2px solid var(--color-text-primary);
   border-radius: 50%;
   background: var(--color-signal);
-  box-shadow: 0 0 0 2px var(--color-signal);
   content: "";
 }
 
@@ -126,7 +125,7 @@
 .confidenceBlock,
 .action {
   padding: 1.15rem 1.2rem;
-  border-radius: 1rem;
+  border-radius: var(--radius-surface);
 }
 
 .confidenceBlock {
@@ -175,18 +174,8 @@
   .section { padding: 3.5rem 1rem; }
   .heading { max-width: 15ch; font-size: clamp(2rem, 9vw, 2.6rem); }
   .lead { font-size: .94rem; }
-  .timeline {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    padding-left: 1.2rem;
-  }
-  .timeline::before {
-    top: .45rem;
-    bottom: .45rem;
-    left: .28rem;
-    width: 2px;
-    height: auto;
-  }
+  .timeline { grid-template-columns: 1fr; gap: 1rem; padding-left: 1.2rem; }
+  .timeline::before { top: .45rem; bottom: .45rem; left: .28rem; width: 2px; height: auto; }
   .timeline li { padding: 0 0 0 .75rem; }
   .timeline li::before { top: .3rem; left: -.98rem; }
   .timeline strong { max-width: none; }
