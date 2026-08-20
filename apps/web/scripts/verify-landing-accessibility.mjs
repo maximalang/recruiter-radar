@@ -177,8 +177,10 @@ async function assertContrast(locator, label, minimum = 4.5) {
   return measurement;
 }
 
-async function assertFocus(locator, label) {
+async function assertFocus(page, locator, label) {
   await locator.focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Shift+Tab");
   const focus = await locator.evaluate((element) => {
     function parseChannel(value) {
       const token = value.trim();
@@ -288,7 +290,7 @@ async function auditContrast(browser) {
   await heroCta.hover();
   await assertContrast(heroCta, "Hero primary CTA hover");
   await page.mouse.move(0, 0);
-  await assertFocus(heroCta, "Hero primary CTA focus");
+  await assertFocus(page, heroCta, "Hero primary CTA focus");
 
   const decision = page.locator('#scene-detection [data-hero-stage="decision"]');
   await assertContrast(decision.locator(":scope > span:first-child"), "Hero decision label");
@@ -305,7 +307,7 @@ async function auditContrast(browser) {
   await pilotCta.hover();
   await assertContrast(pilotCta, "Pilot primary CTA hover");
   await page.mouse.move(0, 0);
-  await assertFocus(pilotCta, "Pilot primary CTA focus");
+  await assertFocus(page, pilotCta, "Pilot primary CTA focus");
 
   const final = page.locator("#conversion-final");
   await assertContrast(final.locator(":scope > div:first-child > span"), "Final CTA eyebrow");
@@ -317,7 +319,7 @@ async function auditContrast(browser) {
   await finalCta.hover();
   await assertContrast(finalCta, "Final primary CTA hover");
   await page.mouse.move(0, 0);
-  await assertFocus(finalCta, "Final primary CTA focus");
+  await assertFocus(page, finalCta, "Final primary CTA focus");
   await assertContrast(final.getByRole("link", { name: "Сначала посмотреть пример", exact: true }), "Final secondary link");
 
   assertCleanConsole();
