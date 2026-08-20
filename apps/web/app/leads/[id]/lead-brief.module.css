@@ -217,7 +217,7 @@
   display: grid;
   gap: 0;
   padding: 16px 0 0 18px;
-  border-top: 2px solid var(--color-data-signal);
+  border-top: 2px solid var(--color-signal);
   border-left: 1px solid var(--color-separator);
 }
 
@@ -327,7 +327,7 @@
   .rail {
     position: static;
     padding: 16px 0 0;
-    border-top: 2px solid var(--color-data-signal);
+    border-top: 2px solid var(--color-signal);
     border-left: 0;
   }
 }

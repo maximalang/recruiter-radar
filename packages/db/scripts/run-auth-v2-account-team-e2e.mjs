@@ -988,6 +988,11 @@ async function inspectCurrentSurface(
     () => document.activeElement !== document.body,
   )
   assert(focusMoved, `${pathname} did not expose a keyboard focus target.`)
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+  })
   const screenshotPath = resolve(artifactsDirectory, screenshotName)
   await page.screenshot({
     path: screenshotPath,
@@ -1006,9 +1011,21 @@ async function inspectCurrentSurface(
   report.screenshots[key] = screenshotPath
 }
 
-async function inspectSurface(page, key, pathname, screenshotName) {
+async function inspectSurface(
+  page,
+  key,
+  pathname,
+  screenshotName,
+  expectedSemantics = ['heading', 'button'],
+) {
   await page.goto(`${baseUrl}${pathname}`, { waitUntil: 'domcontentloaded' })
-  await inspectCurrentSurface(page, key, pathname, screenshotName)
+  await inspectCurrentSurface(
+    page,
+    key,
+    pathname,
+    screenshotName,
+    expectedSemantics,
+  )
 }
 
 async function waitForOutboxToken(email, pathname, excludedToken = null) {
@@ -1225,8 +1242,10 @@ const authenticatedProductViewports = [
     width: 1440,
     height: 1000,
     screenshots: {
+      dashboard: 'auth-v2-account-team-e2e-shot-dashboard-data-1440.png',
       leads: 'auth-v2-account-team-e2e-shot-leads-data-1440.png',
       leadDetail: 'auth-v2-account-team-e2e-shot-lead-detail-data-1440.png',
+      review: 'auth-v2-account-team-e2e-shot-review-data-1440.png',
       opportunities: 'auth-v2-account-team-e2e-shot-opportunities-data-1440.png',
       evidenceRadar: 'auth-v2-account-team-e2e-shot-evidence-radar-data-1440.png',
     },
@@ -1236,8 +1255,10 @@ const authenticatedProductViewports = [
     width: 390,
     height: 844,
     screenshots: {
+      dashboard: 'auth-v2-account-team-e2e-shot-dashboard-data-390.png',
       leads: 'auth-v2-account-team-e2e-shot-leads-data-390.png',
       leadDetail: 'auth-v2-account-team-e2e-shot-lead-detail-data-390.png',
+      review: 'auth-v2-account-team-e2e-shot-review-data-390.png',
       opportunities: 'auth-v2-account-team-e2e-shot-opportunities-data-390.png',
       evidenceRadar: 'auth-v2-account-team-e2e-shot-evidence-radar-data-390.png',
     },
@@ -1249,6 +1270,14 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
   owner,
   { suffix, screenshots },
 ) {
+  await inspectSurface(
+    page,
+    `dashboard-data-${suffix}`,
+    '/dashboard',
+    screenshots.dashboard,
+    ['heading', 'link'],
+  )
+
   await inspectSurface(
     page,
     `leads-data-${suffix}`,
@@ -1289,6 +1318,14 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
     )
   })
   assert(companyBriefOrder, 'Company Brief must keep Decision -> Evidence -> Action in DOM order.')
+
+  await inspectSurface(
+    page,
+    `review-data-${suffix}`,
+    '/review',
+    screenshots.review,
+    ['heading', 'link'],
+  )
 
   await inspectSurface(
     page,
@@ -1344,8 +1381,10 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
   report.flows.authenticatedProductSurfaces = {
     desktop1440: true,
     mobile390: true,
+    dashboard: true,
     leadsWithData: true,
     leadDetail: true,
+    review: true,
     filterAndDecisionFlowInteractions: true,
     opportunities: true,
     commercialSignalCard: true,

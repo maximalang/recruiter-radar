@@ -133,11 +133,22 @@ describe('Recruiter Radar V1-V6 visual contract', () => {
       '--color-confidence-high',
       '--color-confidence-medium',
       '--color-confidence-low',
+      '--type-button-size',
     ]
 
     for (const token of required) {
       expect(globals).toContain(`${token}:`)
     }
+  })
+
+  it('keeps product surfaces on defined semantic signal tokens', () => {
+    const leadBrief = fs.readFileSync(
+      path.join(APP_ROOT, 'leads/[id]/lead-brief.module.css'),
+      'utf8',
+    )
+
+    expect(leadBrief).not.toContain('--color-data-signal')
+    expect(leadBrief).toContain('var(--color-signal)')
   })
 
   it('provides the core intelligence primitives without a universal Card primitive', () => {

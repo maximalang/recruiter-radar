@@ -101,14 +101,18 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toMatch(/suffix:\s*'390'[\s\S]{0,120}width:\s*390[\s\S]{0,120}height:\s*844/);
     expect(runner).toContain("await page.setViewportSize({ width, height })");
     for (const surface of [
+      "dashboard-data",
       "leads-data",
       "lead-detail-data",
+      "review-data",
       "opportunities-data",
       "evidence-radar-data",
     ]) {
       expect(runner).toContain(`${surface}-1440`);
       expect(runner).toContain(`${surface}-390`);
     }
+    expect(runner).toContain("document.activeElement.blur()");
+    expect(runner).toContain("expectedSemantics,");
     expect(runner).toContain("AUTH_V2_DISPOSABLE_DB_CONFIRMED");
     expect(runner).toContain("/auth/invite#");
     expect(runner).toContain("/auth/change-email#");
