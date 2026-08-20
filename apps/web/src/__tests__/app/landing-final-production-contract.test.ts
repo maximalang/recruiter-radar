@@ -13,69 +13,62 @@ describe("landing final production contract", () => {
   test("keeps the hero compact, payment-aware and connected to analytics", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const page = source("app/landing/landing-page.tsx");
+    const heroCss = source("app/landing/detection-scene.module.css");
 
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
-    expect(hero).toContain('data-hero-layout="company-brief"');
     expect(hero).toContain("Находите компании, которым стоит написать сейчас.");
+    expect(hero).toContain('data-art-direction="evidence-first"');
+    expect(hero).toContain('data-payment-offer={paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
     expect(hero).toContain("Посмотреть пример");
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain("Почему сейчас");
     expect(hero).toContain("Подтверждения");
     expect(hero).toContain("Следующий ход");
-    expect(hero).not.toContain("HeroRadar");
-    expect(hero).not.toContain("HeroInstrument");
     expect(hero).toContain("data-hero-trust-line");
-    expect(hero).toContain("заявка без списания");
-    expect(hero).toContain("990 ₽");
+    expect(hero).toContain("Проверяемые факты · официальный контакт · без авторассылки");
     expect(hero).toContain("LANDING_ANALYTICS_EVENT.previewStarted");
-    expect(hero).not.toContain("Компании подают сигнал.");
+    expect(hero).not.toContain("HeroRadar");
+    expect(heroCss).toMatch(/\.title\s*\{[\s\S]*?font-size:\s*clamp\(3\.5rem,\s*4\.6vw,\s*4\.25rem\)/);
   });
 
-  test("renders pricing and FAQ as continuous editorial scenes with explicit structure", () => {
+  test("uses one Pilot decision, centered FAQ, and compact closing CTA", () => {
     const conversion = source("app/landing/conversion-panel.tsx");
     const browserAudit = source("scripts/verify-landing-production.mjs");
+    const conversionCss = source("app/landing/conversion-panel.module.css");
     const landing = source("app/landing/landing.module.css");
     const visual = source("app/landing/landing-visual-system.module.css");
 
     expect(conversion).toContain('data-conversion-scenes="continuous"');
-    expect(conversion).toContain('data-pricing-layout="unified-grid"');
-    expect(conversion).toContain('data-faq-layout="editorial"');
-    expect(conversion).toContain("Попробуйте на своей нише");
-    expect(conversion).toContain("Проверьте радар на своей нише за 7 дней.");
+    expect(conversion).toContain('data-pricing-layout="pilot-decision"');
+    expect(conversion).toContain('data-faq-layout="centered"');
+    expect(conversion).toContain("Попробовать 7 дней —");
+    expect(conversion).toContain("Проверьте радар на своей нише за 7 дней");
     expect(browserAudit).toContain("Проверьте радар на своей нише за 7 дней");
-    expect(browserAudit).not.toContain("7 дней за 990 ₽ — проверьте качество клиентских возможностей");
     expect(conversion).toContain("Запустить на 7 дней");
     expect(conversion).toContain("Разовая оплата · без автопродления");
-    expect(conversion).toContain("Подключить месяц");
-    expect(conversion).toContain("Подключить квартал");
-    expect(conversion).not.toContain("<span>{pilotPlan.cadence}</span>");
+    expect(conversion).toContain("После пилота");
     expect(conversion).toContain("Коротко о главном");
-    expect(conversion).not.toContain("Ответы раскрываются без перехода");
 
+    expect(conversionCss).toContain(".pricingDecision");
+    expect(conversionCss).toContain(".faqHeading");
+    expect(conversionCss).toContain("width: min(58rem, 100%)");
+    expect(conversionCss).toContain("min-height: 26rem");
+    expect(landing).not.toContain("--title:");
+    expect(landing).not.toMatch(/\.sceneHeading\s*\{[^}]*font-size/s);
     expect(visual).toContain("--page-gutter:");
     expect(visual).toContain("--content-max:");
-    expect(visual).toContain("--section-pad-y:");
-    expect(conversion).toContain("data-conversion-panel");
-    expect(conversion).toContain("data-pricing-intro");
-    expect(conversion).toContain("data-faq-heading");
-    expect(conversion).toContain("data-faq-list");
-    expect(visual).toContain(":global([data-conversion-panel])");
+    expect(visual).not.toContain(":global(#pricing [data-pricing-intro] h2)");
+    expect(visual).not.toContain(":global(#faq [data-faq-heading] h2)");
     expect(visual).not.toContain("[class*=");
-    expect(visual).toMatch(/\.visualSystem\s*:global\(#pricing\),/);
-    expect(visual).toMatch(/\.visualSystem\s*:global\(#faq\)\s*\{/);
-    expect(visual).toMatch(/max-width\s*:\s*none\s*;/);
-    expect(landing).toMatch(/font-size\s*:\s*clamp\(2\.35rem,\s*12vw,\s*3\.25rem\)\s*;/);
-    expect(visual).toContain(":global(#faq details)");
-    expect(visual).toMatch(/background\s*:\s*transparent\s*;/);
   });
 
   test("keeps FAQ motion restrained and removable", () => {
-    const visual = source("app/landing/landing-visual-system.module.css");
+    const conversionCss = source("app/landing/conversion-panel.module.css");
 
-    expect(visual).toContain("@keyframes faqReveal");
-    expect(visual).not.toContain("@keyframes signalBreath");
-    expect(visual).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)/);
-    expect(visual).toMatch(/#faq details\[open\] p[\s\S]*?animation\s*:\s*none\s*(?:;|})/);
+    expect(conversionCss).toContain("@keyframes faqReveal");
+    expect(conversionCss).not.toContain("@keyframes signalBreath");
+    expect(conversionCss).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)/);
+    expect(conversionCss).toMatch(/\.faqList details\[open\] p[\s\S]*?animation:\s*none/);
   });
 
   test("preserves the manual outreach boundary in one consolidated proof journey", () => {
@@ -107,7 +100,6 @@ describe("landing final production contract", () => {
     expect(faq).toContain("Где я получаю результаты?");
     expect(faq).not.toContain("HTTPS-webhook");
     expect(faq).not.toContain("n8n");
-    expect(faq).not.toContain("Куда приходит выдача?");
     expect(faq).not.toContain("email digest");
     expect(faq).not.toContain("browser push");
     expect(faq).not.toContain("signed HTTPS webhook");
