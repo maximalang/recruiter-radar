@@ -6,6 +6,7 @@ import { resolveAuditScriptPath } from "./landing-audit-path.mjs";
 const auditScript = resolveAuditScriptPath(import.meta.url);
 const reviewCaptureScript = new URL("./capture-landing-review.mjs", import.meta.url).pathname;
 const accessibilityAuditScript = new URL("./verify-landing-accessibility.mjs", import.meta.url).pathname;
+const keyboardAuditScript = new URL("./verify-landing-keyboard.mjs", import.meta.url).pathname;
 const maxAttempts = 2;
 
 function wait(milliseconds) {
@@ -84,6 +85,14 @@ if (accessibilityAudit.code !== 0) {
     process.stderr.write(`Landing accessibility audit stopped by ${accessibilityAudit.signal}.\n`);
   }
   process.exit(accessibilityAudit.code);
+}
+
+const keyboardAudit = await runScript(keyboardAuditScript);
+if (keyboardAudit.code !== 0) {
+  if (keyboardAudit.signal) {
+    process.stderr.write(`Landing keyboard audit stopped by ${keyboardAudit.signal}.\n`);
+  }
+  process.exit(keyboardAudit.code);
 }
 
 process.exit(0);
