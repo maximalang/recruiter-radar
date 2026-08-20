@@ -11,7 +11,7 @@ export default function EvidenceScene() {
     .map((part) => part.trim());
 
   return (
-    <section id="scene-evidence" className={styles.section} data-header-tone="light" data-proof-story="why-now">
+    <section id="scene-evidence" className={styles.section} data-header-tone="dark" data-proof-story="why-now">
       <div className={styles.layout}>
         <header className={styles.intro}>
           <div>
