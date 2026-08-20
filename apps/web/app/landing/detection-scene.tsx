@@ -15,6 +15,7 @@ export default function DetectionScene({ previewHref, paymentConfigured }: { pre
       data-hero-layout="company-brief"
       data-art-direction="evidence-first"
       data-payment-ready={paymentConfigured || undefined}
+      data-payment-offer={paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}
       data-theme="inverse"
     >
       <div className={sceneStyles.heroInner}>
@@ -30,48 +31,51 @@ export default function DetectionScene({ previewHref, paymentConfigured }: { pre
           </p>
         </div>
 
-        <div
-          className={sceneStyles.resolutionChain}
-          data-hero-visual
-          data-mobile-hero-signal
-          data-hero-company-brief="true"
-          aria-label={`Пример рекомендации: ${DEMO_COMPANY.name}`}
-        >
-          <article className={`${sceneStyles.chainNode} ${sceneStyles.companyNode}`}>
-            <span className={sceneStyles.nodeLabel}>Изменение в компании</span>
-            <h2>{DEMO_COMPANY.name}</h2>
-            <strong>{DEMO_COMPANY.signal}.</strong>
-            <small>{DEMO_COMPANY.location} · {DEMO_COMPANY.industry}</small>
-          </article>
+        <div className={sceneStyles.companyBrief}>
+          <div
+            className={sceneStyles.resolutionChain}
+            data-hero-visual
+            data-mobile-hero-signal
+            data-hero-company-brief="true"
+            aria-label={`Пример рекомендации: ${DEMO_COMPANY.name}`}
+          >
+            <article className={`${sceneStyles.chainNode} ${sceneStyles.companyNode}`}>
+              <span className={sceneStyles.nodeLabel}>Рекомендация / сегодня · изменение в компании</span>
+              <h2>{DEMO_COMPANY.name}</h2>
+              <span className={sceneStyles.whyLabel}>Почему сейчас</span>
+              <strong>{DEMO_COMPANY.signal}.</strong>
+              <small>{DEMO_COMPANY.location} · {DEMO_COMPANY.industry}</small>
+            </article>
 
-          <span className={sceneStyles.chainArrow} aria-hidden="true">→</span>
+            <span className={sceneStyles.chainArrow} aria-hidden="true">→</span>
 
-          <article className={`${sceneStyles.chainNode} ${sceneStyles.evidenceNode}`}>
-            <span className={sceneStyles.nodeLabel}>Подтверждения</span>
-            <ul>
-              {DEMO_EVIDENCE_SOURCES.map((item) => (
-                <li key={item.source}>
-                  <span>{item.eventDate} · {item.source}</span>
-                  <strong>{item.fact}</strong>
-                </li>
-              ))}
-            </ul>
-          </article>
+            <article className={`${sceneStyles.chainNode} ${sceneStyles.evidenceNode}`}>
+              <span className={sceneStyles.nodeLabel}>Подтверждения</span>
+              <ul>
+                {DEMO_EVIDENCE_SOURCES.map((item) => (
+                  <li key={item.source}>
+                    <span>{item.eventDate} · {item.source}</span>
+                    <strong>{item.fact}</strong>
+                  </li>
+                ))}
+              </ul>
+            </article>
 
-          <span className={sceneStyles.chainArrow} aria-hidden="true">→</span>
+            <span className={sceneStyles.chainArrow} aria-hidden="true">→</span>
 
-          <article className={`${sceneStyles.chainNode} ${sceneStyles.confidenceNode}`}>
-            <span className={sceneStyles.nodeLabel}>Уровень подтверждения</span>
-            <strong className={sceneStyles.confidenceValue}>HIGH</strong>
-            <small>{DEMO_COMPANY.confidence} · {DEMO_COMPANY.score} / 100</small>
-          </article>
+            <article className={`${sceneStyles.chainNode} ${sceneStyles.confidenceNode}`}>
+              <span className={sceneStyles.nodeLabel}>Уровень подтверждения</span>
+              <strong className={sceneStyles.confidenceValue}>HIGH</strong>
+              <small>{DEMO_COMPANY.confidence} · {DEMO_COMPANY.score} / 100</small>
+            </article>
 
-          <span className={sceneStyles.chainArrow} aria-hidden="true">→</span>
+            <span className={sceneStyles.chainArrow} aria-hidden="true">→</span>
 
-          <article className={`${sceneStyles.chainNode} ${sceneStyles.moveNode}`}>
-            <span className={sceneStyles.nodeLabel}>Следующий ход</span>
-            <strong>{DEMO_COMPANY.opener}</strong>
-          </article>
+            <article className={`${sceneStyles.chainNode} ${sceneStyles.moveNode}`}>
+              <span className={sceneStyles.nodeLabel}>Следующий ход</span>
+              <strong>{DEMO_COMPANY.opener}</strong>
+            </article>
+          </div>
         </div>
 
         <div className={sceneStyles.heroFooter}>
