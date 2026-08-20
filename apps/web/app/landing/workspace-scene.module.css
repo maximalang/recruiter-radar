@@ -238,6 +238,9 @@
   font-weight: 700;
   text-decoration: none;
 }
+.checkout {
+  min-height: 52px;
+}
 .productFooter span { color: color-mix(in srgb, var(--color-text-inverse) 45%, transparent); font-size: .68rem; }
 
 @media (hover: hover) and (pointer: fine) {
