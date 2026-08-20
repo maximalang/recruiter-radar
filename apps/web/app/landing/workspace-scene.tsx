@@ -39,6 +39,7 @@ export default function WorkspaceScene(props: WorkspaceProps) {
       aria-labelledby="workspace-title"
       data-header-tone="light"
       data-motion-reveal="section"
+      data-preview-layout="marketing-demo"
     >
       <div className={styles.workspaceLayout} data-preview-section-content>
         <LandingPreviewInteractions />
@@ -49,9 +50,9 @@ export default function WorkspaceScene(props: WorkspaceProps) {
           data-preview-editorial="true"
         >
           <div className={sceneStyles.previewHeader} aria-label="Состояние интерактивного примера">
-            <span>Живой пример выдачи</span>
-            <strong>Настройте профиль — рекомендации обновятся</strong>
-            <small>готов к настройке</small>
+            <span>Живой пример</span>
+            <strong>Приоритет компаний на сегодня</strong>
+            <small>профиль можно менять</small>
           </div>
           <PreviewConfigurator previewInput={props.previewInput} hasPreview={props.hasPreview} />
           <div
@@ -77,12 +78,10 @@ export default function WorkspaceScene(props: WorkspaceProps) {
 function WorkspaceIntro() {
   return (
     <div className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
-      <p className={styles.sceneLabel}>Интерактивный пример</p>
-      <h2 id="workspace-title" className={styles.sceneHeading}>
-        Посмотрите результат на своей нише — <em>и разберите первую рекомендацию.</em>
-      </h2>
+      <p className={styles.sceneLabel}>Проверьте на своей нише</p>
+      <h2 id="workspace-title" className={styles.sceneHeading}>Настройте профиль — выдача обновится.</h2>
       <p className={styles.sceneLead}>
-        Выберите специализацию и географию. Радар покажет приоритетные компании, факты и объяснение, почему стоит действовать сейчас.
+        Выберите специализацию и географию. Сначала покажем несколько компаний, которым есть смысл уделить внимание.
       </p>
     </div>
   );
@@ -90,10 +89,7 @@ function WorkspaceIntro() {
 
 function PreviewConfigurator(props: Pick<WorkspaceProps, "previewInput" | "hasPreview">) {
   return (
-    <div id="preview-configurator" className={`${styles.workspaceControls} ${sceneStyles.anchor} ${sceneStyles.controls}`}>
-      <p className={sceneStyles.controlHint}>
-        Выберите готовый пример или задайте свою специализацию и город.
-      </p>
+    <div id="preview-configurator" className={`${styles.workspaceControls} ${sceneStyles.anchor} ${sceneStyles.controls}`} data-preview-configurator>
       <div className={`${styles.presetStrip} ${sceneStyles.presets}`} aria-label="Готовые профили радара">
         <span>Готовые профили</span>
         {PREVIEW_PRESETS.map((preset) => {
@@ -151,7 +147,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
   try {
     const previewState = await getPublicSampleDigestState(props.previewInput);
     const appliedProfile = [props.previewInput.specialization, props.previewInput.targetCity].filter(Boolean);
-    const visibleItems = previewState.items.slice(0, 5);
+    const visibleItems = previewState.items.slice(0, 4);
 
     return (
       <div
@@ -176,16 +172,13 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
 
         {!previewState.isLive ? (
           <p className={styles.workspaceDataNote}>
-            <strong>Обезличенный пример.</strong>{" "}
-            Названия и часть фактов изменены. Пример использует те же продуктовые признаки:
-            соответствие профилю, выраженность найма, свежесть сигнала и доступность
-            корпоративного контакта. Это демонстрационная выдача, а не расчёт вашего рабочего радара.
+            <strong>Обезличенный пример.</strong> Названия и часть фактов изменены; логика приоритета и типы источников сохранены.
           </p>
         ) : null}
 
         {appliedProfile.length > 0 ? (
           <div className={styles.appliedProfile} aria-label="Применённый профиль">
-            <span>Профиль:</span><strong>{appliedProfile.join(" · ")}</strong>
+            <span>Профиль</span><strong>{appliedProfile.join(" · ")}</strong>
           </div>
         ) : null}
 
@@ -197,7 +190,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
         ) : (
           <div>
             {previewState.isPersonalized && !previewState.hasExactMatches ? (
-              <p className={styles.workspaceMatchNote}>Пока нет точных совпадений. Показаны ближайшие по релевантности компании.</p>
+              <p className={styles.workspaceMatchNote}>Точных совпадений пока нет — показаны ближайшие по релевантности компании.</p>
             ) : null}
             <WorkspaceLeadList>
               {visibleItems.map((item, index) => (
