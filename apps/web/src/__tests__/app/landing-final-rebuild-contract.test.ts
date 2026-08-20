@@ -23,22 +23,28 @@ describe("landing final rebuild narrative", () => {
     expect(page).not.toContain("<RadarScene");
   });
 
-  it("uses an evidence-first decision object instead of the old table grammar", () => {
+  it("uses a three-stage evidence-first decision object with actions before evidence", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const heroCss = source("app/landing/detection-scene.module.css");
 
     expect(hero).toContain('data-hero-layout="company-brief"');
     expect(hero).toContain('data-art-direction="evidence-first"');
     expect(hero).toContain('data-hero-company-brief="true"');
+    expect(hero).toContain('data-hero-stage="signal"');
+    expect(hero).toContain('data-hero-stage="evidence"');
+    expect(hero).toContain('data-hero-stage="decision"');
     expect(hero).toContain("Почему сейчас");
-    expect(hero).toContain("Подтверждения");
-    expect(hero).toContain("Уровень подтверждения");
+    expect(hero).toContain("Подтверждение");
+    expect(hero).toContain("Уверенность");
     expect(hero).toContain("Следующий ход");
+    expect(hero).toContain("DEMO_EVIDENCE_SOURCES[0]");
+    expect(hero).toContain("+2 подтверждения");
+    expect(hero.indexOf("data-hero-actions")).toBeLessThan(hero.indexOf('data-hero-company-brief="true"'));
     expect(hero).toContain("Проверяемые факты · официальный контакт · без авторассылки");
+    expect(hero).not.toContain("HIGH");
     expect(hero).not.toContain('data-hero-layout="signal-spine"');
     expect(heroCss).toContain(".resolutionChain");
     expect(heroCss).not.toContain(".briefHeader");
-    expect(heroCss).not.toContain(".evidenceBlock li + li");
   });
 
   it("uses one canonical default company story across hero, preview, and proof", () => {
@@ -48,20 +54,24 @@ describe("landing final rebuild narrative", () => {
     expect(copy).toContain('from "../../lib/landing-demo"');
     expect(preview).toContain('from "./landing-demo"');
     expect(copy).toContain("DEFAULT_LANDING_DEMO_STORY.company");
+    expect(copy).toContain("opener: DEFAULT_LANDING_DEMO_STORY.company.opener");
     expect(preview).toContain("DEFAULT_LANDING_DEMO_STORY.company");
     expect(copy).not.toContain('name: "Промышленная группа"');
   });
 
-  it("consolidates time, evidence, confidence, and next move into one proof chain", () => {
+  it("lets proof own the complete evidence chain and a stronger conclusion", () => {
     const proof = source("app/landing/evidence-scene.tsx");
     const proofCss = source("app/landing/evidence-scene.module.css");
 
     expect(proof).toContain('data-proof-story="why-now"');
     expect(proof).toContain("data-proof-event");
     expect(proof).toContain("data-proof-brief");
-    expect(proof).toContain("Уровень подтверждения");
+    expect(proof).toContain("DEMO_EVIDENCE_SOURCES.map");
+    expect(proof).toContain("Уверенность");
     expect(proof).toContain("Следующий ход");
+    expect(proof).not.toContain("HIGH CONFIDENCE");
     expect(proofCss).toContain(".evidenceChain");
+    expect(proofCss).toContain(".resolution");
     expect(proofCss).not.toContain(".proofObject");
   });
 
@@ -75,8 +85,14 @@ describe("landing final rebuild narrative", () => {
     expect(workspace).toContain('data-preview-layout="marketing-demo"');
     expect(workspace).toContain("Проверьте на своей нише");
     expect(workspace).toContain("Настройте профиль — выдача обновится.");
-    expect(workspace).toContain("<WorkspaceLeadList>");
+    expect(workspace).toContain("Интерактивный пример");
+    expect(workspace).toContain("Обезличенный пример.");
+    expect(workspace).toContain("props.previewState.isPersonalized && appliedProfile.length > 0");
+    expect(workspace).toContain("<WorkspaceLeadList");
     expect(lead).toContain("limit: 2");
+    expect(lead).toContain("Уверенность");
+    expect(lead).toContain("Следующий ход");
+    expect(lead).not.toContain("Confidence</span>");
     expect(leadList).toContain("const defaultVisible = mobileEnhanced ? 3 : 4");
     expect(leadList).toContain("Показать ещё");
     expect(workspaceCss).not.toContain("-webkit-line-clamp");
@@ -88,6 +104,7 @@ describe("landing final rebuild narrative", () => {
     const deliveryCss = source("app/landing/delivery-scene.module.css");
 
     expect(delivery).toContain('data-delivery-summary="compact"');
+    expect(delivery).toContain("Работайте там, где удобно.");
     expect(delivery).toContain("Веб-кабинет");
     expect(delivery).toContain("Telegram");
     expect(delivery).toContain("Email");
@@ -100,7 +117,7 @@ describe("landing final rebuild narrative", () => {
     expect(delivery).not.toContain("ПРИМЕР СООБЩЕНИЯ");
   });
 
-  it("makes the pilot the only dominant offer and centers FAQ", () => {
+  it("makes the pilot the only dominant offer and keeps the final CTA compact", () => {
     const conversion = source("app/landing/conversion-panel.tsx");
     const conversionCss = source("app/landing/conversion-panel.module.css");
 
@@ -109,7 +126,8 @@ describe("landing final rebuild narrative", () => {
     expect(conversion).toContain('data-faq-layout="centered"');
     expect(conversion).not.toContain("data-recommended={plan.isPrimary");
     expect(conversion).not.toContain("TargetIcon");
-    expect(conversionCss).toContain("min-height: 26rem");
+    expect(conversionCss).toContain("min-height: 21rem");
+    expect(conversionCss).not.toContain("min-height: 26rem");
   });
 
   it("removes the shared giant-section composition layer", () => {

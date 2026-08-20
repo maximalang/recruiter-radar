@@ -1,102 +1,106 @@
 import Link from "next/link";
 
-import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
+import {
+  LANDING_ANALYTICS_CONTEXT,
+  LANDING_ANALYTICS_EVENT,
+} from "../../lib/landing-analytics-contract";
 import { ArrowGlyph } from "./brand-glyphs";
 import { DEMO_COMPANY, DEMO_EVIDENCE_SOURCES } from "./landing-copy";
-import sceneStyles from "./detection-scene.module.css";
+import styles from "./detection-scene.module.css";
 
-export default function DetectionScene({ previewHref, paymentConfigured }: { previewHref: string; paymentConfigured: boolean }) {
+function capitalize(value: string): string {
+  return value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`;
+}
+
+export default function DetectionScene(props: { paymentConfigured: boolean }) {
+  const strongestEvidence = DEMO_EVIDENCE_SOURCES[0];
+  const [confidenceGrade = "A", confidenceText = "высокая"] = DEMO_COMPANY.confidence
+    .split("/")
+    .map((part) => part.trim());
+
   return (
     <section
       id="scene-detection"
-      className={sceneStyles.section}
-      aria-labelledby="detection-title"
+      className={styles.hero}
       data-header-tone="dark"
       data-hero-layout="company-brief"
       data-art-direction="evidence-first"
-      data-payment-ready={paymentConfigured || undefined}
-      data-payment-offer={paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}
-      data-theme="inverse"
+      data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}
     >
-      <div className={sceneStyles.heroInner}>
-        <div className={sceneStyles.heroHeading} data-hero-copy>
+      <div className={styles.heroInner}>
+        <div className={styles.heroHeading}>
           <div>
-            <p className={sceneStyles.serviceLabel}>Клиентский радар для рекрутинговых агентств</p>
-            <h1 id="detection-title" className={sceneStyles.title} data-hero-title>
-              Находите компании, которым стоит написать сейчас.
-            </h1>
+            <p className={styles.serviceLabel}>Клиентский радар для рекрутинговых агентств</p>
+            <h1 className={styles.title}>Находите компании, которым стоит написать сейчас.</h1>
           </div>
-          <p className={sceneStyles.description} data-hero-description>
-            Recruiter Radar замечает свежие изменения в найме, проверяет их по источникам и показывает конкретный повод для первого контакта.
-          </p>
+          <div className={styles.promiseColumn}>
+            <p className={styles.promise}>
+              Recruiter Radar замечает свежие изменения в найме, проверяет их по источникам
+              и показывает конкретный повод для первого контакта.
+            </p>
+            <div className={styles.heroFooter} data-hero-actions>
+              <div className={styles.actions}>
+                <a
+                  className={styles.primaryCta}
+                  href="#preview-configurator"
+                  data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
+                  data-analytics-context={LANDING_ANALYTICS_CONTEXT.hero}
+                >
+                  Посмотреть пример <ArrowGlyph />
+                </a>
+                <Link className={styles.loginLink} href="/login">Войти</Link>
+              </div>
+              <p className={styles.trustLine} data-hero-trust-line>
+                Проверяемые факты · официальный контакт · без авторассылки
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className={sceneStyles.companyBrief}>
-          <div
-            className={sceneStyles.resolutionChain}
-            data-hero-visual
-            data-mobile-hero-signal
-            data-hero-company-brief="true"
-            aria-label={`Пример рекомендации: ${DEMO_COMPANY.name}`}
-          >
-            <article className={`${sceneStyles.chainNode} ${sceneStyles.companyNode}`}>
-              <span className={sceneStyles.nodeLabel}>Рекомендация / сегодня · изменение в компании</span>
+        <div className={styles.companyBrief} data-hero-company-brief="true">
+          <div className={styles.resolutionChain} aria-label="От сигнала к решению">
+            <article className={`${styles.node} ${styles.signalNode}`} data-hero-stage="signal">
+              <span className={styles.stageLabel}>Сигнал</span>
+              <small>Сегодня · изменение в компании</small>
               <h2>{DEMO_COMPANY.name}</h2>
-              <span className={sceneStyles.whyLabel}>Почему сейчас</span>
-              <strong>{DEMO_COMPANY.signal}.</strong>
-              <small>{DEMO_COMPANY.location} · {DEMO_COMPANY.industry}</small>
+              <div className={styles.whyNow}>
+                <span>Почему сейчас</span>
+                <strong>{DEMO_COMPANY.signal}</strong>
+              </div>
+              <p>{DEMO_COMPANY.location} · {DEMO_COMPANY.industry}</p>
             </article>
 
-            <span className={sceneStyles.chainArrow} aria-hidden="true">→</span>
+            <span className={styles.chainArrow} aria-hidden="true"><ArrowGlyph size={18} /></span>
 
-            <article className={`${sceneStyles.chainNode} ${sceneStyles.evidenceNode}`}>
-              <span className={sceneStyles.nodeLabel}>Подтверждения</span>
+            <article className={`${styles.node} ${styles.evidenceNode}`} data-hero-stage="evidence">
+              <span className={styles.stageLabel}>Подтверждение</span>
               <ul>
-                {DEMO_EVIDENCE_SOURCES.map((item) => (
-                  <li key={item.source}>
-                    <span>{item.eventDate} · {item.source}</span>
-                    <strong>{item.fact}</strong>
-                  </li>
-                ))}
+                <li>
+                  <small>{strongestEvidence.eventDate} · {strongestEvidence.source}</small>
+                  <strong>{strongestEvidence.fact}</strong>
+                </li>
               </ul>
+              <div className={styles.evidenceSummary}>
+                <strong>+2 подтверждения</strong>
+                <span>Даты и источники — ниже</span>
+              </div>
             </article>
 
-            <span className={sceneStyles.chainArrow} aria-hidden="true">→</span>
+            <span className={styles.chainArrow} aria-hidden="true"><ArrowGlyph size={18} /></span>
 
-            <article className={`${sceneStyles.chainNode} ${sceneStyles.confidenceNode}`}>
-              <span className={sceneStyles.nodeLabel}>Уровень подтверждения</span>
-              <strong className={sceneStyles.confidenceValue}>HIGH</strong>
-              <small>{DEMO_COMPANY.confidence} · {DEMO_COMPANY.score} / 100</small>
-            </article>
-
-            <span className={sceneStyles.chainArrow} aria-hidden="true">→</span>
-
-            <article className={`${sceneStyles.chainNode} ${sceneStyles.moveNode}`}>
-              <span className={sceneStyles.nodeLabel}>Следующий ход</span>
-              <strong>{DEMO_COMPANY.opener}</strong>
+            <article className={`${styles.node} ${styles.decisionNode}`} data-hero-stage="decision">
+              <span className={styles.stageLabel}>Решение</span>
+              <div className={styles.confidenceBlock}>
+                <span>Уверенность</span>
+                <strong>{capitalize(confidenceText)}</strong>
+                <small>Класс {confidenceGrade} · {DEMO_COMPANY.score} / 100</small>
+              </div>
+              <div className={styles.nextMove}>
+                <span>Следующий ход</span>
+                <strong>{DEMO_COMPANY.opener}</strong>
+              </div>
             </article>
           </div>
-        </div>
-
-        <div className={sceneStyles.heroFooter}>
-          <div className={sceneStyles.actions} data-hero-actions>
-            <a
-              href={previewHref}
-              className={sceneStyles.primaryButton}
-              data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
-              data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
-            >
-              Посмотреть пример <ArrowGlyph />
-            </a>
-            <Link href="/login?returnTo=%2Fdashboard" className={sceneStyles.loginLink}>Войти</Link>
-          </div>
-          <p
-            className={sceneStyles.microcopy}
-            data-hero-trust-line
-            data-manual-outreach-label="Сообщения отправляете вы"
-          >
-            Проверяемые факты · официальный контакт · без авторассылки
-          </p>
         </div>
       </div>
     </section>

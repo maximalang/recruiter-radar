@@ -6,7 +6,7 @@ type DeliveryChannel = { key: DeliveryChannelKey; title: string; status: string;
 const CORE_CHANNEL = {
   title: "Веб-кабинет",
   status: "Всегда доступен",
-  text: "Полная карточка остаётся в кабинете: компания, почему сейчас, факты, confidence и официальный путь контакта.",
+  text: "Полная карточка остаётся в кабинете: компания, почему сейчас, факты, уверенность и официальный путь контакта.",
 } as const;
 
 const PRIMARY_ROUTES: ReadonlyArray<DeliveryChannel> = [
@@ -44,7 +44,7 @@ export default function DeliveryScene() {
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.intro}>
           <p>Как приходят результаты</p>
-          <h2 id="delivery-title">Результаты — в веб-кабинете. Уведомления — Telegram / Email. Компании пишете вы.</h2>
+          <h2 id="delivery-title">Работайте там, где удобно.</h2>
         </div>
 
         <div className={sceneStyles.capabilityBand} aria-label="Поддерживаемые способы доставки">

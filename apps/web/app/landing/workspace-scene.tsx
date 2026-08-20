@@ -1,268 +1,178 @@
-import Link from "next/link";
-import { Suspense } from "react";
+import { Input } from "@recruiter-radar/ui";
 
-import {
-  PUBLIC_PREVIEW_FIELD_LIMITS,
-  buildPublicPreviewHref,
-  getPublicSampleDigestState,
-  type PublicPreviewInput,
-} from "../../lib/publicProduct";
-import {
-  LANDING_ANALYTICS_CONTEXT,
-  LANDING_ANALYTICS_EVENT,
-} from "../../lib/landing-analytics-contract";
-import LandingPreviewInteractions from "../landing-preview-interactions";
-import PreviewGeneratedEvent from "../preview-generated-event";
-import { ArrowGlyph } from "./brand-glyphs";
-import styles from "./landing.module.css";
+import { DEFAULT_LANDING_DEMO_STORY } from "../../lib/landing-demo";
+import type { PublicPreviewInput, PublicPreviewItem } from "../../lib/publicProduct";
+import { LandingTrackedSubmit } from "./landing-analytics";
+import { WorkspaceLeadList } from "./workspace-lead-list";
+import landingStyles from "./landing.module.css";
 import sceneStyles from "./workspace-scene.module.css";
-import WorkspaceLead from "./workspace-lead";
-import WorkspaceLeadList from "./workspace-lead-list";
 
-const PREVIEW_PRESETS = [
-  { label: "Инженерный подбор · Москва", specialization: "инженерный подбор", targetCity: "Москва" },
-  { label: "IT-подбор · удалённо", specialization: "IT-подбор", targetCity: "удалённо" },
-  { label: "Коммерческие роли · Петербург", specialization: "коммерческие роли", targetCity: "Санкт-Петербург" },
-] as const;
-
-type WorkspaceProps = {
-  previewInput: PublicPreviewInput;
-  hasPreview: boolean;
-  checkoutHref: string;
+export type PreviewPreset = {
+  id: string;
+  label: string;
+  specialization: string;
+  targetCity: string;
+  includeKeywords: string;
+  excludeKeywords: string;
+  dailyDigestLimit: number;
 };
 
-export default function WorkspaceScene(props: WorkspaceProps) {
-  return (
-    <section
-      id="scene-workspace"
-      className={`${styles.scene} ${styles.lightScene} ${styles.workspaceScene} ${sceneStyles.section}`}
-      aria-labelledby="workspace-title"
-      aria-label="Интерактивный пример"
-      data-header-tone="light"
-      data-motion-reveal="section"
-      data-preview-layout="marketing-demo"
-    >
-      <div className={styles.workspaceLayout} data-preview-section-content>
-        <LandingPreviewInteractions />
-        <WorkspaceIntro />
-        <div
-          className={sceneStyles.productFrame}
-          data-product-preview="live-radar"
-          data-preview-editorial="true"
-        >
-          <div className={sceneStyles.previewHeader} aria-label="Состояние интерактивного примера">
-            <span>Живой пример</span>
-            <strong>Приоритет компаний на сегодня</strong>
-            <small>профиль можно менять</small>
-          </div>
-          <PreviewConfigurator previewInput={props.previewInput} hasPreview={props.hasPreview} />
-          <div
-            id="preview-results"
-            className={`${styles.workspaceResults} ${sceneStyles.anchor} ${sceneStyles.results}`}
-            data-preview-results
-            data-preview-results-skeleton
-          >
-            <Suspense fallback={<WorkspaceResultsSkeleton />}>
-              <WorkspaceResults
-                previewInput={props.previewInput}
-                checkoutHref={props.checkoutHref}
-                embedded
-              />
-            </Suspense>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+type WorkspaceSceneProps = {
+  previewInput: PublicPreviewInput;
+  previewState: {
+    isLive: boolean;
+    isPersonalized: boolean;
+    hasExactMatches: boolean;
+    items: PublicPreviewItem[];
+  };
+  previewPresets: PreviewPreset[];
+  previewHref: string;
+  checkoutHref: string;
+  canCheckout: boolean;
+  paymentConfigured: boolean;
+};
 
 function WorkspaceIntro() {
   return (
-    <div className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
-      <p className={styles.sceneLabel}>Проверьте на своей нише</p>
-      <h2 id="workspace-title" className={styles.sceneHeading}>Настройте профиль — выдача обновится.</h2>
-      <p className={styles.sceneLead}>
-        Выберите специализацию и географию. Сначала покажем несколько компаний, которым есть смысл уделить внимание.
+    <header className={`${landingStyles.workspaceIntro} ${sceneStyles.intro}`}>
+      <div>
+        <p className={landingStyles.sceneLabel}>Проверьте на своей нише</p>
+        <h2 className={landingStyles.sceneHeading}>Настройте профиль — выдача обновится.</h2>
+      </div>
+      <p className={landingStyles.sceneLead}>
+        Профиль влияет на порядок и приоритет. Сначала покажем несколько компаний,
+        которые есть смысл изучить сегодня.
       </p>
-    </div>
+    </header>
   );
 }
 
-function PreviewConfigurator(props: Pick<WorkspaceProps, "previewInput" | "hasPreview">) {
+function PreviewForm({ input, presets }: { input: PublicPreviewInput; presets: PreviewPreset[] }) {
   return (
-    <div id="preview-configurator" className={`${styles.workspaceControls} ${sceneStyles.anchor} ${sceneStyles.controls}`} data-preview-configurator>
-      <div className={`${styles.presetStrip} ${sceneStyles.presets}`} aria-label="Готовые профили радара">
+    <div className={`${landingStyles.workspaceControls} ${sceneStyles.controls}`}>
+      <div className={`${landingStyles.presetStrip} ${sceneStyles.presetStrip}`} aria-label="Готовые профили">
         <span>Готовые профили</span>
-        {PREVIEW_PRESETS.map((preset) => {
-          const selected = props.previewInput.specialization === preset.specialization
-            && props.previewInput.targetCity === preset.targetCity;
+        {presets.map((preset) => {
+          const params = new URLSearchParams({
+            specialization: preset.specialization,
+            targetCity: preset.targetCity,
+            includeKeywords: preset.includeKeywords,
+            excludeKeywords: preset.excludeKeywords,
+            dailyDigestLimit: String(preset.dailyDigestLimit),
+          });
           return (
-            <Link
-              key={preset.label}
-              href={buildPublicPreviewHref({ ...preset, dailyDigestLimit: props.previewInput.dailyDigestLimit })}
-              data-preview-preset
-              data-selected={selected || undefined}
-              aria-current={selected ? "true" : undefined}
-            >
+            <a key={preset.id} href={`/?${params.toString()}#preview`}>
               {preset.label}
-            </Link>
+            </a>
           );
         })}
       </div>
 
-      <form method="GET" action="/#preview-results" className={`${styles.workspaceForm} ${sceneStyles.commandForm}`} data-preview-form aria-busy="false">
-        <label htmlFor="specialization">
-          <span>Специализация</span>
-          <input
-            id="specialization"
-            name="specialization"
-            defaultValue={props.previewInput.specialization}
-            maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.specialization}
-            placeholder="Например, инженерный подбор"
-          />
-        </label>
-        <label htmlFor="targetCity">
-          <span>География</span>
-          <input
-            id="targetCity"
-            name="targetCity"
-            defaultValue={props.previewInput.targetCity}
-            maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.targetCity}
-            placeholder="Москва / удалённо"
-          />
-        </label>
-        {props.previewInput.includeKeywords ? <input type="hidden" name="includeKeywords" value={props.previewInput.includeKeywords} /> : null}
-        {props.previewInput.excludeKeywords ? <input type="hidden" name="excludeKeywords" value={props.previewInput.excludeKeywords} /> : null}
-        <input type="hidden" name="dailyDigestLimit" value={props.previewInput.dailyDigestLimit} />
-        <button type="submit" data-preview-submit>
-          <span data-preview-submit-label>Показать компании →</span>
-          <span data-preview-submit-status hidden>Ищем свежие сигналы…</span>
-        </button>
-        {props.hasPreview ? <Link href="/#scene-workspace">Сбросить</Link> : null}
-      </form>
-    </div>
-  );
-}
-
-export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput" | "checkoutHref"> & { embedded?: boolean }) {
-  try {
-    const previewState = await getPublicSampleDigestState(props.previewInput);
-    const appliedProfile = [props.previewInput.specialization, props.previewInput.targetCity].filter(Boolean);
-    const visibleItems = previewState.items.slice(0, 5);
-
-    return (
-      <div
-        id={props.embedded ? undefined : "preview-results"}
-        className={props.embedded ? undefined : `${styles.workspaceResults} ${sceneStyles.anchor} ${sceneStyles.results}`}
-        data-preview-results={props.embedded ? undefined : true}
-        data-preview-results-ready
+      <LandingTrackedSubmit
+        as="form"
+        id="preview-configurator"
+        className={`${landingStyles.workspaceForm} ${sceneStyles.workspaceForm}`}
+        action="/"
+        method="get"
+        context="preview_configurator"
+        eventName="preview_submitted"
       >
-        <PreviewGeneratedEvent
-          generated={previewState.isLive && previewState.isPersonalized}
-          context={LANDING_ANALYTICS_CONTEXT.preview}
-        />
-        <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
-          <div>
-            <span>КОМПАНИИ НА СЕГОДНЯ / {String(previewState.items.length).padStart(2, "0")}</span>
-            <strong>{previewState.isPersonalized ? "Приоритет по вашему профилю" : "Пример сегодняшней выдачи"}</strong>
-          </div>
-          <span data-live={previewState.isLive || undefined}>
-            {previewState.isLive ? "свежие данные" : "демо"}
-          </span>
-        </div>
-
-        {!previewState.isLive ? (
-          <p className={styles.workspaceDataNote}>
-            <strong>Обезличенный пример.</strong> Названия и часть фактов изменены; логика приоритета и типы источников сохранены.
-          </p>
-        ) : null}
-
-        {appliedProfile.length > 0 ? (
-          <div className={styles.appliedProfile} aria-label="Применённый профиль">
-            <span>Профиль</span><strong>{appliedProfile.join(" · ")}</strong>
-          </div>
-        ) : null}
-
-        {previewState.items.length === 0 ? (
-          <div className={styles.workspaceEmpty} role="status">
-            <span>Пока нет точных совпадений.</span>
-            <strong>Попробуйте расширить географию или уточнить специализацию.</strong>
-          </div>
-        ) : (
-          <div>
-            {previewState.isPersonalized && !previewState.hasExactMatches ? (
-              <p className={styles.workspaceMatchNote}>Точных совпадений пока нет — показаны ближайшие по релевантности компании.</p>
-            ) : null}
-            <WorkspaceLeadList>
-              {visibleItems.map((item, index) => (
-                <WorkspaceLead
-                  key={`${item.org_id}-${item.rank}`}
-                  item={item}
-                  defaultOpen={index === 0}
-                />
-              ))}
-            </WorkspaceLeadList>
-          </div>
-        )}
-
-        <div className={sceneStyles.footerRail}>
-          <Link
-            prefetch={false}
-            href={props.checkoutHref}
-            className={sceneStyles.checkout}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
-            data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
-          >
-            {previewState.items.length > 0 ? "Запустить радар на 7 дней" : "Попробовать неделю"} <ArrowGlyph />
-          </Link>
-          <small>7 дней · без автопродления</small>
-        </div>
-      </div>
-    );
-  } catch {
-    return <WorkspaceResultsFailure checkoutHref={props.checkoutHref} embedded={props.embedded} />;
-  }
-}
-
-function WorkspaceResultsFailure({ checkoutHref, embedded }: { checkoutHref: string; embedded?: boolean }) {
-  return (
-    <div
-      id={embedded ? undefined : "preview-results"}
-      className={embedded ? undefined : `${styles.workspaceResults} ${sceneStyles.anchor} ${sceneStyles.results}`}
-      data-preview-results={embedded ? undefined : true}
-      data-preview-results-ready
-      role="status"
-    >
-      <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
-        <div><span>ПРИМЕР НЕДОСТУПЕН</span><strong>Не удалось обновить пример.</strong></div>
-        <span>можно повторить</span>
-      </div>
-      <div className={styles.workspaceEmpty}>
-        <span>Попробуйте ещё раз.</span>
-        <strong>Тарифы и ответы на вопросы доступны ниже.</strong>
-      </div>
-      <div className={sceneStyles.footerRail}>
-        <Link
-          prefetch={false}
-          href={checkoutHref}
-          className={sceneStyles.checkout}
-          data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
-          data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
-        >
-          Попробовать 7 дней <ArrowGlyph />
-        </Link>
-        <small>7 дней · без автопродления</small>
-      </div>
+        <label>
+          <span>Специализация</span>
+          <Input name="specialization" maxLength={160} defaultValue={input.specialization} placeholder="Например, инженерный подбор" />
+        </label>
+        <label>
+          <span>География</span>
+          <Input name="targetCity" maxLength={120} defaultValue={input.targetCity} placeholder="Москва / удалённо" />
+        </label>
+        <label>
+          <span>Кого ищете / сигналы</span>
+          <Input name="includeKeywords" maxLength={300} defaultValue={input.includeKeywords} placeholder="конструктор, производство, разработка" />
+        </label>
+        <input type="hidden" name="excludeKeywords" value={input.excludeKeywords} />
+        <input type="hidden" name="dailyDigestLimit" value={input.dailyDigestLimit} />
+        <button type="submit">Показать компании →</button>
+      </LandingTrackedSubmit>
     </div>
   );
 }
 
-export function WorkspaceResultsSkeleton() {
+export function WorkspaceScene(props: WorkspaceSceneProps) {
+  const appliedProfile = [
+    props.previewInput.specialization,
+    props.previewInput.targetCity,
+    props.previewInput.includeKeywords,
+  ].filter(Boolean);
+
   return (
-    <div data-preview-results-skeleton aria-busy="true" aria-label="Результаты примера загружаются">
-      <div className={styles.workspaceSkeleton}>
-        <span /><span /><span />
+    <section
+      id="scene-workspace"
+      className={`${landingStyles.scene} ${landingStyles.lightScene} ${landingStyles.workspaceScene} ${sceneStyles.section}`}
+      data-header-tone="light"
+      data-preview-editorial="true"
+      data-preview-layout="marketing-demo"
+    >
+      <div className={landingStyles.workspaceLayout}>
+        <WorkspaceIntro />
+
+        <div className={sceneStyles.productFrame} data-product-preview="live-radar">
+          <div className={sceneStyles.previewHeader}>
+            <span>Интерактивный пример</span>
+            <small>Профиль можно менять</small>
+          </div>
+
+          <PreviewForm input={props.previewInput} presets={props.previewPresets} />
+
+          <div id="preview-results" className={`${landingStyles.workspaceResults} ${sceneStyles.results}`}>
+            <div className={`${landingStyles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
+              <div>
+                <span>КОМПАНИИ НА СЕГОДНЯ / {String(props.previewState.items.length).padStart(2, "0")}</span>
+                <strong>{props.previewState.isPersonalized ? "Выдача по вашему профилю" : "Пример сегодняшней выдачи"}</strong>
+                {!props.previewState.isLive ? (
+                  <small className={sceneStyles.demoDisclosure}>
+                    <strong>Обезличенный пример.</strong> Названия и часть фактов изменены.
+                  </small>
+                ) : null}
+              </div>
+              <span data-live={props.previewState.isLive ? "true" : undefined}>
+                {props.previewState.isLive ? "live" : "демо"}
+              </span>
+            </div>
+
+            {props.previewState.isPersonalized && appliedProfile.length > 0 ? (
+              <div className={`${landingStyles.appliedProfile} ${sceneStyles.appliedProfile}`} data-applied-profile>
+                <span>Применено</span>
+                {appliedProfile.map((item) => <strong key={item}>{item}</strong>)}
+              </div>
+            ) : null}
+
+            {!props.previewState.hasExactMatches && props.previewState.items.length > 0 ? (
+              <p className={landingStyles.workspaceMatchNote}>
+                Точного совпадения не нашлось — показываем ближайшие компании по вашему профилю.
+              </p>
+            ) : null}
+
+            {props.previewState.items.length === 0 ? (
+              <div className={landingStyles.workspaceEmpty}>
+                <span>Сегодня по этому профилю ничего не найдено.</span>
+                <strong>Измените специализацию или географию.</strong>
+              </div>
+            ) : (
+              <WorkspaceLeadList
+                items={props.previewState.items}
+                checkoutHref={props.checkoutHref}
+                canCheckout={props.canCheckout}
+                paymentConfigured={props.paymentConfigured}
+              />
+            )}
+          </div>
+
+          <div className={sceneStyles.productFooter}>
+            <a href={props.previewHref}>Запустить радар на 7 дней →</a>
+            <span>{DEFAULT_LANDING_DEMO_STORY.company.location} · пример выдачи</span>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

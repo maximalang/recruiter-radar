@@ -18,16 +18,24 @@ describe("landing final production contract", () => {
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
     expect(hero).toContain("Находите компании, которым стоит написать сейчас.");
     expect(hero).toContain('data-art-direction="evidence-first"');
-    expect(hero).toContain('data-payment-offer={paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
+    expect(hero).toContain('data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
     expect(hero).toContain("Посмотреть пример");
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain("Почему сейчас");
-    expect(hero).toContain("Подтверждения");
+    expect(hero).toContain("Подтверждение");
+    expect(hero).toContain("Уверенность");
     expect(hero).toContain("Следующий ход");
+    expect(hero).toContain('data-hero-stage="signal"');
+    expect(hero).toContain('data-hero-stage="evidence"');
+    expect(hero).toContain('data-hero-stage="decision"');
+    expect(hero).toContain("DEMO_EVIDENCE_SOURCES[0]");
+    expect(hero).toContain("+2 подтверждения");
+    expect(hero.indexOf("data-hero-actions")).toBeLessThan(hero.indexOf('data-hero-company-brief="true"'));
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("Проверяемые факты · официальный контакт · без авторассылки");
     expect(hero).toContain("LANDING_ANALYTICS_EVENT.previewStarted");
     expect(hero).not.toContain("HeroRadar");
+    expect(hero).not.toContain("HIGH");
     expect(heroCss).toMatch(/\.title\s*\{[\s\S]*?font-size:\s*clamp\(3\.5rem,\s*4\.6vw,\s*4\.25rem\)/);
   });
 
@@ -52,7 +60,8 @@ describe("landing final production contract", () => {
     expect(conversionCss).toContain(".pricingDecision");
     expect(conversionCss).toContain(".faqHeading");
     expect(conversionCss).toContain("width: min(58rem, 100%)");
-    expect(conversionCss).toContain("min-height: 26rem");
+    expect(conversionCss).toContain("min-height: 21rem");
+    expect(conversionCss).not.toContain("min-height: 26rem");
     expect(landing).not.toContain("--title:");
     expect(landing).not.toMatch(/\.sceneHeading\s*\{[^}]*font-size/);
     expect(visual).toContain("--page-gutter:");
@@ -80,6 +89,7 @@ describe("landing final production contract", () => {
     expect(page).not.toContain("<SignalTimelineScene");
     expect(page).not.toContain("<RadarScene");
     expect(page.indexOf("<EvidenceScene")).toBeLessThan(page.indexOf("<DeliveryScene"));
+    expect(delivery).toContain("Работайте там, где удобно.");
     expect(delivery).toContain("Сообщения компаниям не отправляются автоматически.");
     expect(delivery).toContain('data-delivery-routes="connected"');
     expect(delivery).toContain("PRIMARY_ROUTES.map");
@@ -88,9 +98,10 @@ describe("landing final production contract", () => {
     expect(evidence).toContain('data-proof-story="why-now"');
     expect(evidence).toContain("data-proof-event");
     expect(evidence).toContain("data-proof-brief");
-    expect(evidence).toContain("Уровень подтверждения");
-    expect(evidence).toContain("Свежесть");
+    expect(evidence).toContain("DEMO_EVIDENCE_SOURCES.map");
+    expect(evidence).toContain("Уверенность");
     expect(evidence).toContain("Следующий ход");
+    expect(evidence).not.toContain("HIGH CONFIDENCE");
   });
 
   test("keeps FAQ copy professional and free of internal delivery terminology", () => {

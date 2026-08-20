@@ -14,6 +14,15 @@ import sceneStyles from "./workspace-scene.module.css";
 
 export type PreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
+function formatPublicConfidence(value: string): string {
+  switch (value.trim().toLowerCase()) {
+    case "high": return "Высокая";
+    case "medium": return "Средняя";
+    case "low": return "Низкая";
+    default: return value.replace(" / ", " · ");
+  }
+}
+
 export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem; defaultOpen: boolean }) {
   const whyNow = deriveWhyNow(item.reasons) || "Активность найма подтверждена источниками";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath) || "Корпоративный путь нужно уточнить";
@@ -21,6 +30,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
   const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
   const employerName = cleanEmployerName(item.employer_name);
   const freshness = formatVacancyFreshness(item.latest_published_at);
+  const confidence = formatPublicConfidence(item.confidenceLabel);
   const evidence = buildPreviewEvidenceItems({
     whyNow,
     vacanciesCaption,
@@ -31,7 +41,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
 
   return (
     <article
-      className={`${styles.workspaceLead} ${sceneStyles.lead} ${defaultOpen ? sceneStyles.leadPrimary : ""}`}
+      className={`${styles.workspaceLead} ${defaultOpen ? sceneStyles.leadPrimary : sceneStyles.leadSecondary}`}
       data-lead-row="true"
       data-primary-lead={defaultOpen || undefined}
       data-outreach-mode={defaultOpen ? "Сообщения не отправляются автоматически" : undefined}
@@ -44,7 +54,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
         </span>
         <span className={`${styles.workspaceSignal} ${sceneStyles.leadSignal}`} data-lead-why-now>{whyNow}</span>
         <span className={styles.workspaceScore} data-lead-confidence>
-          <b className={sceneStyles.confidence}>{item.confidenceLabel}</b>
+          <b className={sceneStyles.confidence}>{confidence}</b>
         </span>
       </div>
 
@@ -61,17 +71,17 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
           </div>
 
           <div className={sceneStyles.outcomeGrid}>
-            <div>
+            <div className={sceneStyles.outcomeMeta}>
               <span>Официальный контакт</span>
               <p>{contactPath}</p>
             </div>
-            <div>
+            <div className={sceneStyles.outcomeMeta}>
+              <span>Уверенность</span>
+              <p><strong>{confidence}</strong></p>
+            </div>
+            <div className={sceneStyles.nextMove}>
               <span>Следующий ход</span>
               <p>{item.opener?.trim() || "Проверить факты и выбрать безопасный путь обращения"}</p>
-            </div>
-            <div>
-              <span>Confidence</span>
-              <p><strong>{item.confidenceLabel}</strong></p>
             </div>
           </div>
         </div>

@@ -11,8 +11,12 @@ const reviewDirectory = process.env.LANDING_REVIEW_SCREENSHOT_DIR
   ?? path.join(path.dirname(auditScreenshotDirectory), "review");
 
 const viewports = [
-  { width: 1440, height: 900, name: "1440x900" },
-  { width: 390, height: 844, name: "390x844" },
+  { width: 1440, height: 900, name: "1440x900", focused: true },
+  { width: 390, height: 844, name: "390x844", focused: true },
+  { width: 320, height: 568, name: "320x568", focused: false },
+  { width: 768, height: 1024, name: "768x1024", focused: false },
+  { width: 1024, height: 768, name: "1024x768", focused: false },
+  { width: 1920, height: 1080, name: "1920x1080", focused: false },
 ];
 
 const focusedSurfaces = [
@@ -80,13 +84,15 @@ try {
       animations: "disabled",
     });
 
-    for (const surface of focusedSurfaces) {
-      const locator = page.locator(surface.selector).first();
-      await locator.waitFor({ state: "visible" });
-      await locator.screenshot({
-        path: path.join(reviewDirectory, `${viewport.name}-${surface.name}.png`),
-        animations: "disabled",
-      });
+    if (viewport.focused) {
+      for (const surface of focusedSurfaces) {
+        const locator = page.locator(surface.selector).first();
+        await locator.waitFor({ state: "visible" });
+        await locator.screenshot({
+          path: path.join(reviewDirectory, `${viewport.name}-${surface.name}.png`),
+          animations: "disabled",
+        });
+      }
     }
 
     await context.close();
