@@ -39,9 +39,7 @@ export default function ConversionPanel(props: {
         <div className={panelStyles.pricingIntro} data-pricing-intro>
           <span>Попробуйте на своей нише</span>
           <h2>Попробовать 7 дней — {pilotPlan.price}</h2>
-          <p>
-            За неделю проверьте, находит ли Recruiter Radar релевантные компании и даёт ли достаточно фактов для первого контакта.
-          </p>
+          <p>Проверьте радар на своей нише за 7 дней: находит ли он релевантные компании и даёт ли достаточно фактов для первого контакта.</p>
         </div>
 
         <div className={panelStyles.pricingDecision}>
@@ -67,7 +65,7 @@ export default function ConversionPanel(props: {
             </Link>
             <small data-consent-safe-copy>{props.paymentConfigured
               ? "Разовая оплата · без автопродления"
-              : "Заявка без списания · профиль сохранится"}</small>
+              : "Оставьте заявку на 7-дневный пилот без списания · профиль сохранится"}</small>
           </div>
 
           <div className={panelStyles.secondaryOffers} aria-label="Продолжение после пилота" data-pricing-secondary="true">
@@ -105,7 +103,7 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <div className={panelStyles.faqHeading} data-faq-heading>
-          <span>FAQ</span>
+          <span>FAQ · Коротко о главном</span>
           <h2>Что важно знать перед запуском.</h2>
           <p>Как появляются компании, откуда берутся данные и что происходит после оплаты.</p>
           <small data-faq-trust>Пример можно настроить без регистрации.</small>
@@ -135,6 +133,7 @@ export default function ConversionPanel(props: {
           <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
             <li>{pilotPlan.price} / 7 дней</li>
             <li>Без автопродления</li>
+            <li>Проверяемые факты</li>
             <li>Сообщения отправляете вы</li>
           </ul>
           <Link
