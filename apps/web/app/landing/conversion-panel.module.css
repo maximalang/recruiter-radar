@@ -53,10 +53,10 @@
   display: grid;
   gap: 1.1rem;
   padding: clamp(1.4rem, 2.5vw, 2rem);
-  border-radius: 1.35rem;
+  border-radius: var(--radius-overlay);
   background: var(--color-text-primary);
   color: var(--color-text-inverse);
-  box-shadow: 0 20px 52px color-mix(in srgb, var(--color-information) 12%, transparent);
+  box-shadow: var(--shadow-overlay);
 }
 
 .pilotTopline {
