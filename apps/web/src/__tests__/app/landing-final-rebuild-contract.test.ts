@@ -58,9 +58,16 @@ describe("landing final rebuild narrative", () => {
 
   it("presents the live preview as an editorial product outcome", () => {
     const workspace = source("app/landing/workspace-scene.tsx");
+    const leadList = source("app/landing/workspace-lead-list.tsx");
+    const workspaceCss = source("app/landing/workspace-scene.module.css");
 
     expect(workspace).toContain('data-preview-editorial="true"');
     expect(workspace).toContain("Посмотрите результат на своей нише");
+    expect(workspace).toContain("<WorkspaceLeadList>");
+    expect(leadList).toContain('data-mobile-lead-disclosure="true"');
+    expect(leadList).toContain('aria-expanded={showAll}');
+    expect(leadList).toContain("Показать ещё");
+    expect(workspaceCss).not.toContain("-webkit-line-clamp");
     expect(workspace).not.toContain("RECRUITER RADAR</strong>");
     expect(workspace).not.toContain("/ ПРИМЕР");
   });

@@ -48,7 +48,9 @@ export default function LandingPage(props: {
           faqItems={props.faqItems}
         />
       </main>
-      <SiteFooter tone="dark" showCookieSettings={isYandexMetrikaConfigured()} />
+      <div className={styles.landingFooter} data-landing-footer="compact">
+        <SiteFooter tone="light" showCookieSettings={isYandexMetrikaConfigured()} />
+      </div>
     </div>
   );
 }

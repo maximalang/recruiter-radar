@@ -20,7 +20,7 @@ export default function DetectionScene({ previewHref, paymentConfigured }: { pre
           <Link href="/login?returnTo=%2Fdashboard" className={sceneStyles.loginLink}>Войти</Link>
         </div>
         <p className={sceneStyles.microcopy} data-hero-trust-line>
-          Подтверждённые факты · Корпоративные пути контакта · Сообщения отправляете вы
+          Факты можно проверить · Радар показывает официальный контакт · Сообщения отправляете вы
         </p>
         <p className={sceneStyles.pilotLine}>{paymentConfigured ? "7 дней · 990 ₽ · без автопродления" : "7 дней · заявка без списания"}</p>
       </div>

@@ -257,7 +257,7 @@
 
 /* Workspace */
 .workspaceScene { min-height: auto; background: var(--color-surface-secondary); }
-.workspaceLayout { display: grid; gap: 2.4rem; width: min(var(--content), 100%); margin: auto; }
+.workspaceLayout { display: grid; gap: 1.25rem; width: min(var(--content), 100%); margin: auto; }
 .workspaceIntro { display: grid; grid-template-columns: minmax(19rem, .82fr) minmax(28rem, 1.18fr); grid-template-areas: "label label" "title lead"; align-items: end; gap: 1rem clamp(3rem, 7vw, 7rem); padding-bottom: 2.2rem; border-bottom: 1px solid var(--color-separator); }
 .workspaceIntro .sceneLabel { grid-area: label; }
 .workspaceIntro .sceneHeading { grid-area: title; }
@@ -335,7 +335,7 @@
 .workspaceSkeleton span { display: block; height: 4.8rem; background: linear-gradient(90deg, color-mix(in srgb, var(--color-information) 4%, transparent), color-mix(in srgb, var(--color-information) 10%, transparent), color-mix(in srgb, var(--color-information) 4%, transparent)); background-size: 200% 100%; animation: none; }
 
 /* Evidence */
-.evidenceScene { background: linear-gradient(135deg, color-mix(in srgb, var(--color-copper) 4.5%, transparent), transparent 34%), var(--color-text-primary); }
+.evidenceScene { background: var(--color-text-primary); }
 .evidenceLayout { display: grid; grid-template-columns: minmax(19rem, .72fr) minmax(32rem, 1.28fr); grid-template-areas: "intro score" "ledger ledger" "roles roles"; gap: clamp(3rem, 7vw, 6rem); width: min(var(--content), 100%); margin: auto; }
 .evidenceIntro { grid-area: intro; }
 .evidenceIntro .sceneHeading { margin-top: 1.1rem; }
@@ -386,20 +386,12 @@
 
 /* Delivery */
 .deliveryScene { background: var(--color-canvas); }
-.deliveryLayout { display: grid; gap: 3rem; width: min(var(--content), 100%); margin: auto; }
+.deliveryLayout { display: grid; gap: 1.6rem; width: min(var(--content), 100%); margin: auto; }
 .deliveryIntro { display: grid; grid-template-columns: minmax(18rem, .76fr) minmax(28rem, 1.24fr); grid-template-areas: "label label" "title lead"; align-items: end; gap: 1rem clamp(3rem, 7vw, 7rem); padding-bottom: 2.2rem; border-bottom: 1px solid var(--color-separator); }
 .deliveryIntro .sceneLabel { grid-area: label; }
 .deliveryIntro .sceneHeading { grid-area: title; }
 .deliveryIntro .sceneHeading em { color: var(--color-signal); }
 .deliveryIntro .sceneLead { grid-area: lead; align-self: end; margin: 0; }
-.deliveryFlow { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(1.4rem,3vw,3rem); margin: 0; padding: 1.35rem 0 0; border-top: 1px solid var(--color-separator); list-style: none; }
-.deliveryFlow::before { position: absolute; top: 2.05rem; right: 3rem; left: .3rem; height: 1px; background: linear-gradient(90deg,color-mix(in srgb, var(--color-signal) 64%, transparent),color-mix(in srgb, var(--color-signal) 8%, transparent)); content: ""; }
-.deliveryFlow li { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: .8rem; min-height: 7.4rem; padding: 0 0 1rem; }
-.deliveryFlow li > span { color: var(--color-copper); font-family: var(--font-mono); font-size: .56rem; }
-.deliveryFlow li div { display: grid; gap: .5rem; }
-.deliveryFlow li strong { font-size: .96rem; font-weight: 620; }
-.deliveryFlow li p { margin: 0; color: var(--color-text-secondary); font-size: .75rem; line-height: 1.5; }
-.deliveryFlow li > :global(svg) { color: var(--color-signal); }
 .deliveryDemo { display: grid; grid-template-columns: minmax(28rem, 1.3fr) minmax(18rem, .7fr); gap: 1.2rem; }
 .deliveryChannel { padding: clamp(1.3rem, 3vw, 2.4rem); background: var(--color-text-primary); color: var(--color-canvas); }
 .deliveryChannel > div:first-child { display: flex; align-items: center; gap: .8rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-separator); color: var(--color-signal); }
@@ -416,16 +408,16 @@
 .deliveryBoundary p { margin: 0; color: var(--color-text-secondary); font-size: .82rem; line-height: 1.55; }
 
 /* Pricing / FAQ */
-.conversionPanel { display: grid; gap: clamp(4rem, 8vw, 7rem); padding: clamp(5rem, 8vw, 8rem) var(--scene-pad); background: var(--color-text-primary); color: var(--color-canvas); }
+.conversionPanel { display: grid; gap: clamp(3.25rem, 6vw, 5.5rem); padding: clamp(4.5rem, 7vw, 6.5rem) var(--scene-pad) 0; background: var(--color-text-primary); color: var(--color-canvas); }
 .pricingStage,
 .faqStage,
 .finalCall { width: min(var(--content), 100%); margin: auto; }
-.pricingStage { display: grid; grid-template-columns: minmax(18rem, .72fr) minmax(24rem, 1fr) minmax(15rem, .68fr); gap: clamp(1.5rem, 4vw, 4rem); }
+.pricingStage { display: grid; grid-template-columns: minmax(17rem, .62fr) minmax(25rem, 1.08fr) minmax(15rem, .62fr); gap: clamp(1.35rem, 3vw, 3rem); }
 .pricingIntro > span,
 .faqHeading > span,
 .finalCall > span { color: var(--color-copper); font-family: var(--font-mono); font-size: .58rem; letter-spacing: .05em; text-transform: uppercase; }
 .pricingIntro h2,
-.faqHeading h2 { margin: 1rem 0 0; font-size: clamp(2rem, 3.7vw, 3.5rem); font-weight: 500; letter-spacing: -.05em; line-height: 1; }
+.faqHeading h2 { margin: .85rem 0 0; font-size: clamp(2rem, 3.25vw, 3.15rem); font-weight: 500; letter-spacing: -.05em; line-height: 1; }
 .pricingIntro p,
 .faqHeading p { margin: 1.2rem 0 0; color: var(--color-text-secondary); font-size: .86rem; line-height: 1.58; }
 .pilotOffer { display: grid; gap: 1rem; padding: 1.4rem; border: 1px solid color-mix(in srgb, var(--color-signal) 38%, transparent); background: var(--color-text-primary); }
@@ -442,14 +434,14 @@
 .pilotOffer > a { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .7rem; padding: .8rem .9rem; background: var(--color-signal); color: var(--color-text-primary); font-family: var(--font-mono); font-size: .6rem; font-weight: 700; text-decoration: none; text-transform: uppercase; }
 .pilotOffer > small { color: var(--color-text-secondary); font-family: var(--font-mono); font-size: .52rem; }
 .secondaryOffers { display: grid; align-content: start; }
-.secondaryOfferLabel { padding-bottom: .7rem; color: color-mix(in srgb, var(--color-copper) 70%, transparent); font-size: .72rem; font-weight: 600; }
-.secondaryOffers article { display: grid; gap: .6rem; padding: 1.1rem 0; border-top: 1px solid var(--color-separator); }
+.secondaryOfferLabel { padding-bottom: .7rem; color: var(--color-signal); font-family: var(--font-mono); font-size: .58rem; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+.secondaryOffers article { display: grid; gap: .5rem; padding: .9rem 0; border-top: 1px solid var(--color-separator); }
 .secondaryOffers article:last-child { border-bottom: 1px solid var(--color-separator); }
 .secondaryOffers article > span { color: var(--color-copper); font-family: var(--font-mono); font-size: .55rem; text-transform: uppercase; }
 .secondaryOffers article > strong { font-size: 1.5rem; font-weight: 500; }
 .secondaryOffers p { margin: 0; color: var(--color-text-secondary); font-size: .72rem; line-height: 1.45; }
 .secondaryOffers a { display: inline-flex; width: fit-content; min-height: 44px; align-items: center; gap: .5rem; color: var(--color-signal); font-family: var(--font-mono); font-size: .56rem; text-decoration: none; text-transform: uppercase; }
-.faqStage { display: grid; grid-template-columns: minmax(17rem, .62fr) minmax(31rem, 1.38fr); gap: clamp(3rem, 8vw, 8rem); padding-top: 3rem; border-top: 1px solid var(--color-separator); }
+.faqStage { display: grid; grid-template-columns: minmax(18rem, .72fr) minmax(31rem, 1.28fr); gap: clamp(2.5rem, 6vw, 6rem); padding-top: 2.5rem; border-top: 1px solid var(--color-separator); }
 .faqList { border-top: 1px solid var(--color-separator); }
 .faqList details { border-bottom: 1px solid var(--color-separator); }
 .faqList summary { display: grid; grid-template-columns: 2rem 1fr auto; align-items: center; gap: 1rem; min-height: 4.5rem; cursor: pointer; list-style: none; color: color-mix(in srgb, var(--color-copper) 80%, transparent); font-size: .86rem; }
@@ -458,10 +450,13 @@
 .faqList summary i { display: grid; width: 1.5rem; height: 1.5rem; place-items: center; color: var(--color-signal); font-style: normal; transition: transform var(--motion-duration-disclosure) var(--motion-ease-standard); }
 .faqList details[open] summary i { transform: rotate(45deg); }
 .faqList details p { margin: 0; padding: 0 2.5rem 1.2rem 3rem; color: var(--color-text-secondary); font-size: .78rem; line-height: 1.58; }
-.finalCall { position: relative; overflow: hidden; padding: clamp(2rem, 6vw, 5rem); border: 1px solid var(--color-separator); background: var(--color-text-primary); }
-.finalCall::after { position: absolute; top: -12rem; right: -8rem; width: 28rem; height: 28rem; border: 1px solid color-mix(in srgb, var(--color-signal) 16%, transparent); border-radius: 50%; box-shadow: none; content: ""; pointer-events: none; }
-.finalCall h2 { position: relative; z-index: 1; max-width: 12ch; margin: 1rem 0 0; font-size: clamp(3rem, 7vw, 6.6rem); font-weight: 470; letter-spacing: -.07em; line-height: .92; }
-.finalCall p { position: relative; z-index: 1; max-width: 36rem; margin: 1.4rem 0 0; color: var(--color-text-secondary); font-size: .95rem; line-height: 1.55; }
+.finalCall { position: relative; padding: clamp(2.5rem, 5vw, 4.5rem) clamp(1.5rem, 5vw, 4.5rem); border-block-start: 1px solid var(--color-separator); background: var(--color-text-primary); }
+.finalCall::after { content: none; }
+.finalCall h2 { position: relative; z-index: 1; max-width: 15ch; margin: .85rem 0 0; font-size: clamp(2.65rem, 5.25vw, 5.25rem); font-weight: 480; letter-spacing: -.065em; line-height: .96; }
+.finalCall p { position: relative; z-index: 1; max-width: 42rem; margin: 1.15rem 0 0; color: var(--color-text-secondary); font-size: .92rem; line-height: 1.55; }
+.landingFooter { width: 100%; background: var(--color-canvas); }
+.landingFooter :global(footer > div) { padding-top: clamp(2rem, 3vw, 3rem); }
+.landingFooter :global(footer > div > div:first-child) { gap: clamp(2rem, 5vw, 5rem); padding-bottom: 2rem; }
 .finalActions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 1.1rem; margin-top: 1.8rem; }
 .finalActions a:first-child { display: inline-flex; min-height: 48px; align-items: center; gap: .75rem; padding: .82rem 1rem; background: var(--color-signal); color: var(--color-text-primary); font-family: var(--font-mono); font-size: .61rem; font-weight: 700; text-decoration: none; text-transform: uppercase; }
 .finalActions a:last-child { display: inline-flex; min-height: 44px; align-items: center; gap: .5rem; color: var(--color-text-secondary); font-size: .76rem; text-decoration: none; }
@@ -506,7 +501,6 @@
   .workspaceForm { grid-template-columns: 1fr 1fr; }
   .workspaceForm button,
   .workspaceForm > a { width: 100%; }
-  .deliveryFlow { grid-template-columns: repeat(2, 1fr); }
   .deliveryDemo { grid-template-columns: 1fr; }
 
   .pricingStage { grid-template-columns: 1fr 1fr; grid-template-areas: "intro intro" "pilot secondary"; }
@@ -578,12 +572,9 @@
   .workspaceFiur { grid-template-columns: 1fr 1fr; }
   .workspaceLeadFooter { align-items: flex-start; flex-direction: column; }
 
-  .deliveryFlow { grid-template-columns: 1fr; }
-  .deliveryFlow::before { top: 1.35rem; right: auto; bottom: 1rem; left: .22rem; width: 1px; height: auto; background: linear-gradient(180deg,color-mix(in srgb, var(--color-signal) 64%, transparent),color-mix(in srgb, var(--color-signal) 8%, transparent)); }
-  .deliveryFlow li { grid-template-columns: 1.2rem 1fr auto; min-height: auto; padding-bottom: 1.4rem; }
   .deliveryChannel dl div { grid-template-columns: 1fr; gap: .35rem; }
 
-  .conversionPanel { gap: 4.2rem; padding: 5rem 1rem; }
+  .conversionPanel { gap: 3.5rem; padding: 4.5rem 1rem 0; }
   .pricingStage { grid-template-columns: 1fr; grid-template-areas: "intro" "pilot" "secondary"; }
   .faqStage { gap: 1.8rem; }
   .faqList details p { padding-right: 0; padding-left: 2rem; }

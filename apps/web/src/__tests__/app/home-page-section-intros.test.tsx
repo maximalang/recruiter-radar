@@ -296,7 +296,8 @@ describe("final unified evidence-first landing contract", () => {
     expect(evidence).toContain("Последовательность подтверждающих фактов");
     expect(evidence).toContain("Почему эта компания сейчас");
     expect(evidence).not.toContain("открыть факт");
-    expect(delivery).toContain("Радар следит за рынком");
+    expect(delivery).not.toContain("DELIVERY_STEPS");
+    expect(delivery).toContain("Полная карточка остаётся в кабинете");
     expect(delivery).toContain("Сообщения компаниям не отправляются автоматически.");
   });
 

@@ -1,9 +1,9 @@
 .section {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 0.88fr) minmax(34rem, 0.82fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(34rem, 0.9fr);
   align-items: center;
-  gap: clamp(3rem, 6vw, 6.5rem);
+  gap: clamp(2.5rem, 5vw, 5rem);
   min-height: min(51rem, 100svh);
   padding: clamp(7rem, 10vw, 9rem) var(--scene-pad) clamp(4.5rem, 7vw, 6rem);
   overflow: hidden;
@@ -11,33 +11,11 @@
   color: var(--color-text-primary);
 }
 
-.section::before,
-.section::after {
-  position: absolute;
-  border: 1px solid var(--color-separator);
-  border-radius: 50%;
-  content: "";
-  pointer-events: none;
-}
-
-.section::before {
-  inset-block-start: 8%;
-  inset-inline-end: -15rem;
-  inline-size: 42rem;
-  block-size: 42rem;
-}
-
-.section::after {
-  inset-block-start: 21%;
-  inset-inline-end: -6rem;
-  inline-size: 24rem;
-  block-size: 24rem;
-}
-
 .copy,
 .companyBrief {
   position: relative;
   z-index: 1;
+  min-width: 0;
 }
 
 .copy {
@@ -56,7 +34,7 @@
   max-width: 14ch;
   margin: 0;
   color: var(--color-text-primary);
-  font-size: clamp(3.1rem, 5vw, 4.7rem);
+  font-size: clamp(2.9rem, 4.35vw, 4.15rem);
   font-weight: 520;
   letter-spacing: -0.055em;
   line-height: 0.98;
@@ -115,7 +93,7 @@
 .pilotLine {
   max-width: 37rem;
   color: var(--color-text-tertiary);
-  font-size: var(--type-metadata-size);
+  font-size: clamp(.76rem, .9vw, .86rem);
   line-height: 1.45;
 }
 
@@ -125,7 +103,8 @@
 .companyBrief {
   max-width: 38rem;
   border-block: 1px solid var(--color-separator-strong);
-  background: color-mix(in srgb, var(--color-surface-primary) 92%, transparent);
+  border-inline-start: 2px solid var(--color-signal);
+  background: color-mix(in srgb, var(--color-surface-primary) 97%, var(--color-signal) 3%);
 }
 
 .briefHeader,
@@ -134,9 +113,13 @@
 .evidenceBlock,
 .nextMove,
 .briefFooter {
-  border-block-end: 1px solid var(--color-separator);
-  padding: 1rem 1.1rem;
+  padding: 1rem 1.25rem;
 }
+
+.briefHeader,
+.companyIdentity,
+.whyNow,
+.evidenceBlock { border-block-end: 1px solid var(--color-separator); }
 
 .briefHeader,
 .companyIdentity,
@@ -165,7 +148,7 @@
 .companyIdentity { justify-content: flex-start; }
 .companyIdentity > span { color: var(--color-copper); }
 .companyIdentity div { display: grid; gap: 0.25rem; }
-.companyIdentity div strong { font-size: clamp(1.45rem, 2.2vw, 2rem); font-weight: 620; }
+.companyIdentity div strong { font-size: clamp(1.55rem, 2.25vw, 2.15rem); font-weight: 620; }
 .companyIdentity small,
 .evidenceBlock li small { color: var(--color-text-tertiary); font-size: var(--type-metadata-size); }
 .whyNow,
@@ -174,9 +157,10 @@
 .nextMove strong { max-width: 35rem; font-size: var(--type-body-size); font-weight: 560; line-height: 1.5; }
 .evidenceBlock > span { display: block; margin-block-end: 0.55rem; }
 .evidenceBlock ul { margin: 0; padding: 0; list-style: none; }
-.evidenceBlock li { min-block-size: 2.65rem; border-block-start: 1px solid var(--color-separator); }
-.evidenceBlock li span { min-width: 8.5rem; color: var(--color-text-tertiary); font-size: var(--type-metadata-size); }
-.evidenceBlock li strong { flex: 1; font-size: var(--type-metadata-size); font-weight: 560; }
+.evidenceBlock li { min-block-size: 3rem; }
+.evidenceBlock li + li { border-block-start: 1px solid var(--color-separator); }
+.evidenceBlock li span { min-width: 8.5rem; color: var(--color-text-tertiary); font-size: .74rem; }
+.evidenceBlock li strong { flex: 1; font-size: .82rem; font-weight: 580; }
 .nextMove { border-inline-start: 2px solid var(--color-signal); }
 .briefFooter { border-block-end: 0; color: var(--color-signal-hover); }
 
@@ -195,10 +179,10 @@
 }
 
 @media (max-width: 600px) {
-  .section { padding: 5.75rem 1rem 3.5rem; gap: 1.75rem; }
-  .title { max-width: 15ch; font-size: clamp(2.35rem, 10vw, 3.15rem); line-height: 1; }
+  .section { padding: 5.4rem 1rem 3rem; gap: 1.5rem; }
+  .title { max-width: 15ch; font-size: clamp(2.25rem, 9.4vw, 2.9rem); line-height: 1; }
   .description { margin-block-start: 1.1rem; }
-  .actions { align-items: center; flex-direction: row; margin-block-start: 1.25rem; }
+  .actions { width: 100%; align-items: center; flex-direction: row; flex-wrap: wrap; margin-block-start: 1.25rem; }
   .evidenceBlock li { display: grid; grid-template-columns: 1fr auto; gap: 0.2rem 0.75rem; padding-block: 0.6rem; }
   .evidenceBlock li span,
   .evidenceBlock li strong { grid-column: 1; }

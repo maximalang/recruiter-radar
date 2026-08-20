@@ -13,7 +13,7 @@ import { RouteGlyph } from "./brand-glyphs";
 import styles from "./landing.module.css";
 import sceneStyles from "./workspace-scene.module.css";
 
-type PreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
+export type PreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
 export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem; defaultOpen: boolean }) {
   const whyNow = deriveWhyNow(item.reasons) || "Активность найма подтверждена источниками";
@@ -43,7 +43,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
           <strong>{employerName}</strong>
           <small>{[location, vacanciesCaption].filter(Boolean).join(" · ")}</small>
         </span>
-        <span className={`${styles.workspaceSignal} ${sceneStyles.leadSignal}`}>{whyNow}</span>
+        <span className={`${styles.workspaceSignal} ${sceneStyles.leadSignal}`} data-lead-why-now>{whyNow}</span>
         <span className={styles.workspaceScore} data-lead-confidence>
           <b className={sceneStyles.confidence}>{item.confidenceLabel}</b>
         </span>

@@ -12,7 +12,8 @@ export default function EvidenceScene() {
           <p className={sceneStyles.lead}>Радар связывает изменения во времени, показывает источники и отделяет подтверждённый повод от обычного шума вакансий.</p>
         </div>
 
-        <ol className={sceneStyles.timeline} aria-label="Последовательность подтверждающих фактов">
+        <div className={sceneStyles.proofObject} data-proof-object="evidence-resolution">
+          <ol className={sceneStyles.timeline} aria-label="Последовательность подтверждающих фактов">
             {DEMO_EVIDENCE_SOURCES.map((row, index) => (
               <li key={row.source} data-proof-event>
                 <span>{String(index + 1).padStart(2, "0")}</span>
@@ -21,22 +22,23 @@ export default function EvidenceScene() {
                 <em>{row.confidence}</em>
               </li>
             ))}
-        </ol>
+          </ol>
 
-        <aside className={sceneStyles.brief} data-proof-brief>
-          <div className={sceneStyles.briefTopline}><span>Компания</span><strong>Приоритет 01</strong></div>
-          <h3>{DEMO_COMPANY.name}</h3>
-          <p>{DEMO_COMPANY.whyNow}</p>
-          <dl>
-            <div><dt>Уровень подтверждения</dt><dd>Высокий</dd></div>
-            <div><dt>Свежесть</dt><dd>{DEMO_COMPANY.freshness}</dd></div>
-            <div><dt>Корпоративный контакт</dt><dd>Карьерная страница</dd></div>
-          </dl>
-          <div className={sceneStyles.action}>
-            <span>Следующий ход</span>
-            <strong>Проверить факты и предложить точечный инженерный подбор.</strong>
-          </div>
-        </aside>
+          <aside className={sceneStyles.brief} data-proof-brief>
+            <div className={sceneStyles.briefTopline}><span>Компания</span><strong>Приоритет 01</strong></div>
+            <h3>{DEMO_COMPANY.name}</h3>
+            <p>{DEMO_COMPANY.whyNow}</p>
+            <dl>
+              <div><dt>Уровень подтверждения</dt><dd>Высокий</dd></div>
+              <div><dt>Свежесть</dt><dd>{DEMO_COMPANY.freshness}</dd></div>
+              <div><dt>Официальный контакт</dt><dd>Карьерная страница</dd></div>
+            </dl>
+            <div className={sceneStyles.action}>
+              <span>Следующий ход</span>
+              <strong>Проверить факты и предложить точечный инженерный подбор.</strong>
+            </div>
+          </aside>
+        </div>
       </div>
     </section>
   );

@@ -1,12 +1,5 @@
-import { ArrowGlyph, RouteGlyph } from "./brand-glyphs";
 import sceneStyles from "./delivery-scene.module.css";
 import styles from "./landing.module.css";
-
-const DELIVERY_STEPS = [
-  { title: "Задайте нишу", text: "Укажите специализацию и географию агентства." },
-  { title: "Радар следит за рынком", text: "Свежие изменения в найме связываются с компаниями и проверяются по источникам." },
-  { title: "Получайте компании с поводом", text: "В выдаче видно, кому написать, почему сейчас и на каких фактах это основано." },
-] as const;
 
 type DeliveryChannelKey = "cabinet" | "telegram" | "email" | "vk" | "push" | "webhook";
 
@@ -120,19 +113,9 @@ export default function DeliveryScene() {
             Радар находит повод. <em>Пишете вы.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Задайте нишу, получите подтверждённый повод и выберите корпоративный путь контакта. Финальное решение всегда остаётся за вами.
+            Полная карточка остаётся в кабинете. Короткие уведомления можно получать в удобном канале; решение о контакте всегда за вами.
           </p>
         </div>
-
-        <ol className={styles.deliveryFlow}>
-          {DELIVERY_STEPS.map((step, index) => (
-            <li key={step.title}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <div><strong>{step.title}</strong><p>{step.text}</p></div>
-              {index < DELIVERY_STEPS.length - 1 ? <ArrowGlyph size={16} /> : <RouteGlyph size={18} />}
-            </li>
-          ))}
-        </ol>
 
         <div className={sceneStyles.capabilityPanel} aria-label="Поддерживаемые способы доставки">
           <div className={sceneStyles.capabilityHeader}>

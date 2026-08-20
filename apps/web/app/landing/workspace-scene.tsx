@@ -17,6 +17,7 @@ import { ArrowGlyph } from "./brand-glyphs";
 import styles from "./landing.module.css";
 import sceneStyles from "./workspace-scene.module.css";
 import WorkspaceLead from "./workspace-lead";
+import WorkspaceLeadList from "./workspace-lead-list";
 
 const PREVIEW_PRESETS = [
   { label: "Инженерный подбор · Москва", specialization: "инженерный подбор", targetCity: "Москва" },
@@ -194,17 +195,19 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
             <strong>Попробуйте расширить географию или уточнить специализацию.</strong>
           </div>
         ) : (
-          <div className={styles.workspaceLeadList}>
+          <div>
             {previewState.isPersonalized && !previewState.hasExactMatches ? (
               <p className={styles.workspaceMatchNote}>Пока нет точных совпадений. Показаны ближайшие по релевантности компании.</p>
             ) : null}
-            {visibleItems.map((item, index) => (
-              <WorkspaceLead
-                key={`${item.org_id}-${item.rank}`}
-                item={item}
-                defaultOpen={index === 0}
-              />
-            ))}
+            <WorkspaceLeadList>
+              {visibleItems.map((item, index) => (
+                <WorkspaceLead
+                  key={`${item.org_id}-${item.rank}`}
+                  item={item}
+                  defaultOpen={index === 0}
+                />
+              ))}
+            </WorkspaceLeadList>
           </div>
         )}
 

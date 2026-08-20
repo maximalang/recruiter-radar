@@ -84,7 +84,7 @@ export default function ConversionPanel(props: {
         </div>
 
         <div className={`${styles.secondaryOffers} ${panelStyles.secondaryOffers}`} aria-label="Продолжение после пилота" data-pricing-secondary="true">
-          <span className={styles.secondaryOfferLabel}>Продолжите, если радар подходит вашей нише</span>
+          <span className={styles.secondaryOfferLabel}>После пилота</span>
           {secondaryPlans.map((plan) => {
             const quarterly = plan.code === "quarterly";
             return (

@@ -311,8 +311,10 @@ async function assertHeroGeometry(page, label) {
   }
 }
 
-async function assertLeadRows(page, label) {
+async function assertLeadRows(page, label, viewport) {
   const leads = page.locator("article[data-lead-row]");
+  const disclosure = page.locator('[data-mobile-lead-disclosure="true"]');
+  if (viewport.width <= 480) await disclosure.waitFor({ state: "visible" });
   const count = await leads.count();
   assert.ok(count >= 2, `${label}: expected at least two recommendations, received ${count}`);
   const primary = leads.nth(0);
@@ -321,6 +323,32 @@ async function assertLeadRows(page, label) {
   await primary.locator("[data-selected-lead-detail]").waitFor({ state: "visible" });
   await primary.getByText("Подтверждения и источники", { exact: true }).waitFor({ state: "visible" });
   assert.equal(await secondary.locator("[data-selected-lead-detail]").count(), 0, `${label}: secondary recommendation must remain a scan row`);
+
+  if (viewport.width <= 480) {
+    assert.equal(count, 3, `${label}: mobile should initially show one full and two compact recommendations`);
+    assert.equal(await disclosure.getAttribute("aria-expanded"), "false");
+    const visibleCompactSignals = await leads.locator(':scope:not([data-primary-lead]) [data-lead-why-now]').evaluateAll((elements) => (
+      elements.filter((element) => getComputedStyle(element).display !== "none").length
+    ));
+    assert.equal(visibleCompactSignals, 0, `${label}: compact mobile rows must not contain clipped why-now prose`);
+    await disclosure.click();
+    assert.equal(await page.locator("article[data-lead-row]").count(), 5, `${label}: disclosure must reveal all five recommendations`);
+    assert.equal(await disclosure.getAttribute("aria-expanded"), "true");
+  }
+}
+
+async function assertMobilePresetComposition(page, viewport) {
+  if (viewport.width > 480) return;
+  const strip = page.locator('[aria-label="Готовые профили радара"]');
+  const stripBox = await strip.boundingBox();
+  assert.ok(stripBox, `${viewport.name}: missing preset group`);
+  const clipped = await strip.locator("[data-preview-preset]").evaluateAll((elements, bounds) => elements.flatMap((element) => {
+    const rect = element.getBoundingClientRect();
+    return rect.left < bounds.left - 1 || rect.right > bounds.right + 1
+      ? [{ text: element.textContent?.trim(), left: rect.left, right: rect.right }]
+      : [];
+  }), stripBox);
+  assert.deepEqual(clipped, [], `${viewport.name}: preset controls must wrap without half-clipped options`);
 }
 
 async function measurePageHeight(page, viewport) {
@@ -383,7 +411,8 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertRequiredSurface(page, viewport.name);
   await assertHeaderLayout(page, viewport);
   await assertHeroGeometry(page, viewport.name);
-  await assertLeadRows(page, viewport.name);
+  await assertLeadRows(page, viewport.name, viewport);
+  await assertMobilePresetComposition(page, viewport);
   await revealAllMotionSections(page, viewport.name);
 
   await assertNoHorizontalOverflow(page, viewport.name);
