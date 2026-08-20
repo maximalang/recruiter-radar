@@ -4,6 +4,7 @@ import { isYandexMetrikaConfigured } from "../../lib/analytics-config";
 import ConversionPanel from "./conversion-panel";
 import DeliveryScene from "./delivery-scene";
 import DetectionScene from "./detection-scene";
+import EvidenceScene from "./evidence-scene";
 import frameStyles from "./landing-frame.module.css";
 import polishStyles from "./landing-final-polish.module.css";
 import LandingHashNavigation from "./landing-hash-navigation";
