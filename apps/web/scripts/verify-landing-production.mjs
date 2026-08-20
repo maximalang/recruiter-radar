@@ -503,13 +503,44 @@ async function assertActiveNavigationAndTone(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const { page, assertCleanConsole } = await preparePage(context, "active-navigation-tone");
   const brandHeader = page.locator('header[data-brand-header="recruiter-radar"]');
+  const activeLink = brandHeader.locator("a[aria-current='location']");
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(160);
+  assert.equal(await activeLink.count(), 0, "header: hero must not inherit a stale active section");
+
+  await page.locator("#faq").scrollIntoViewIfNeeded();
+  await page.evaluate(() => {
+    const faq = document.querySelector("#faq");
+    if (faq) window.scrollTo(0, window.scrollY + faq.getBoundingClientRect().top - 48);
+  });
+  await page.waitForFunction(() => /FAQ/.test(
+    document.querySelector('header[data-brand-header="recruiter-radar"] a[aria-current="location"]')?.textContent ?? "",
+  ));
+  assert.match(await activeLink.first().innerText(), /FAQ/);
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForFunction(() => !document.querySelector(
+    'header[data-brand-header="recruiter-radar"] a[aria-current="location"]',
+  ));
+  assert.equal(await activeLink.count(), 0, "header: active section must clear after returning to hero");
+
+  await page.evaluate(() => {
+    window.location.hash = "preview-configurator";
+  });
+  await page.waitForURL(/#preview-configurator$/);
+  await page.waitForFunction(() => /Пример/.test(
+    document.querySelector('header[data-brand-header="recruiter-radar"] a[aria-current="location"]')?.textContent ?? "",
+  ));
+  assert.match(await activeLink.first().innerText(), /Пример/, "header: hash navigation must not retain stale FAQ state");
+
   await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
   await page.evaluate(() => {
     const evidence = document.querySelector("#scene-evidence");
     if (evidence) window.scrollTo(0, window.scrollY + evidence.getBoundingClientRect().top - 48);
   });
   await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark");
-  assert.match(await brandHeader.locator("a[aria-current='location']").first().innerText(), /Как работает/);
+  assert.match(await activeLink.first().innerText(), /Как работает/);
   assert.equal(await brandHeader.getAttribute("data-tone"), "dark");
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
   await page.locator("#scene-delivery").scrollIntoViewIfNeeded();

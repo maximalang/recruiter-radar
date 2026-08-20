@@ -35,6 +35,17 @@ describe("landing final rebuild narrative", () => {
     expect(hero).not.toContain('data-hero-layout="signal-spine"');
   });
 
+  it("uses one canonical default company story across hero, preview, and proof", () => {
+    const copy = source("app/landing/landing-copy.ts");
+    const preview = source("lib/publicProduct.ts");
+
+    expect(copy).toContain('from "../../lib/landing-demo"');
+    expect(preview).toContain('from "./landing-demo"');
+    expect(copy).toContain("DEFAULT_LANDING_DEMO_STORY.company");
+    expect(preview).toContain("DEFAULT_LANDING_DEMO_STORY.company");
+    expect(copy).not.toContain('name: "Промышленная группа"');
+  });
+
   it("consolidates time, evidence, confidence, and next move into one proof scene", () => {
     const proof = source("app/landing/evidence-scene.tsx");
 

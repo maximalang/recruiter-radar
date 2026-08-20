@@ -54,6 +54,7 @@ describe("landing runtime truth contract", () => {
   test("compact source copy stays truthful while the FAQ explains runtime roles", () => {
     const evidence = webSource("app/landing/evidence-scene.tsx");
     const landingCopy = webSource("app/landing/landing-copy.ts");
+    const landingDemo = webSource("lib/landing-demo.ts");
     const faq = webSource("app/landing/landing-faq.ts");
     const policy = JSON.parse(repoSource("packages/db/source-policy.json"));
     const readiness = JSON.parse(repoSource("packages/db/source-readiness.json"));
@@ -77,9 +78,10 @@ describe("landing runtime truth contract", () => {
     expect(evidence).toContain("Почему эта компания сейчас");
     expect(evidence).toContain("DEMO_EVIDENCE_SOURCES.map");
     expect(evidence).toContain('from "./landing-copy"');
-    expect(landingCopy).toContain("Карьерная страница");
-    expect(landingCopy).toContain("Публичные вакансии");
-    expect(landingCopy).toContain("Прямой источник");
+    expect(landingCopy).toContain("DEFAULT_LANDING_DEMO_STORY.evidence");
+    expect(landingDemo).toContain("Карьерная страница");
+    expect(landingDemo).toContain("Публичные вакансии");
+    expect(landingDemo).toContain("Прямой источник");
     expect(evidence).not.toContain("SOURCE_ROLES");
 
     expect(faq).toContain("включая hh.ru, «Работу России» и карьерные страницы");

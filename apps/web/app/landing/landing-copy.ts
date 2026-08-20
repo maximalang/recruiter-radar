@@ -1,3 +1,5 @@
+import { DEFAULT_LANDING_DEMO_STORY } from "../../lib/landing-demo";
+
 export const LANDING_NAV_ITEMS = [
   { id: "scene-workspace", label: "Пример" },
   { id: "scene-evidence", label: "Как работает" },
@@ -5,22 +7,18 @@ export const LANDING_NAV_ITEMS = [
   { id: "faq", label: "FAQ" },
 ] as const;
 export const DEMO_COMPANY = {
-  name: "Промышленная группа",
-  location: "Москва и область",
-  industry: "Промышленность",
-  signal: "Инженерный найм заметно ускорился",
-  change: "8 инженерных вакансий, новая руководящая роль и расширение географии",
-  freshness: "2 часа назад",
-  confidence: "A / высокая",
-  whyNow: "Компания заметно усилила инженерный найм: за неделю появилось несколько новых позиций и повторных публикаций.",
-  score: 87,
+  name: DEFAULT_LANDING_DEMO_STORY.company.name,
+  location: DEFAULT_LANDING_DEMO_STORY.company.location,
+  industry: DEFAULT_LANDING_DEMO_STORY.company.industry,
+  signal: DEFAULT_LANDING_DEMO_STORY.company.signal,
+  change: DEFAULT_LANDING_DEMO_STORY.company.change,
+  freshness: DEFAULT_LANDING_DEMO_STORY.company.freshness,
+  confidence: DEFAULT_LANDING_DEMO_STORY.company.confidence,
+  whyNow: DEFAULT_LANDING_DEMO_STORY.company.whyNow,
+  score: DEFAULT_LANDING_DEMO_STORY.company.score,
 } as const;
 
-export const DEMO_EVIDENCE_SOURCES = [
-  { source: "Карьерная страница", fact: "8 инженерных позиций", eventDate: "4 августа", confidence: "Прямой источник" },
-  { source: "Публичные вакансии", fact: "Новая руководящая роль", eventDate: "1 августа", confidence: "Подтверждено" },
-  { source: "Повторная публикация", fact: "3 роли появились снова", eventDate: "сегодня", confidence: "Свежий сигнал" },
-] as const;
+export const DEMO_EVIDENCE_SOURCES = DEFAULT_LANDING_DEMO_STORY.evidence;
 
 export const DEMO_EVIDENCE = [
   {
