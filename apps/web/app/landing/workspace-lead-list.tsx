@@ -15,7 +15,7 @@ export default function WorkspaceLeadList({ children }: { children: ReactNode })
     const media = window.matchMedia(MOBILE_QUERY);
     const sync = () => {
       setMobileEnhanced(media.matches);
-      if (!media.matches) setShowAll(false);
+      setShowAll(false);
     };
     sync();
     media.addEventListener("change", sync);
@@ -23,25 +23,26 @@ export default function WorkspaceLeadList({ children }: { children: ReactNode })
   }, []);
 
   const rows = Children.toArray(children);
-  const collapsed = mobileEnhanced && !showAll;
-  const visibleRows = collapsed ? rows.slice(0, 3) : rows;
-  const remaining = Math.max(0, rows.length - 3);
+  const defaultVisible = mobileEnhanced ? 3 : 4;
+  const visibleRows = showAll ? rows : rows.slice(0, defaultVisible);
+  const remaining = Math.max(0, rows.length - defaultVisible);
 
   return (
     <div className={styles.workspaceLeadList} data-mobile-lead-list data-expanded={showAll || undefined}>
       <div id="landing-preview-lead-rows">
         {visibleRows}
       </div>
-      {mobileEnhanced && remaining > 0 ? (
+      {remaining > 0 ? (
         <button
           type="button"
           className={sceneStyles.leadDisclosure}
-          data-mobile-lead-disclosure="true"
+          data-mobile-lead-disclosure={mobileEnhanced || undefined}
+          data-lead-disclosure="true"
           aria-expanded={showAll}
           aria-controls="landing-preview-lead-rows"
           onClick={() => setShowAll((current) => !current)}
         >
-          {showAll ? "Скрыть дополнительные компании" : `Показать ещё ${remaining} компании`}
+          {showAll ? "Скрыть дополнительные компании" : `Показать ещё ${remaining} ${remaining === 1 ? "компанию" : "компании"}`}
         </button>
       ) : null}
     </div>
