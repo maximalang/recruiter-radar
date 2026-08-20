@@ -12,7 +12,7 @@ function capitalize(value: string): string {
   return value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`;
 }
 
-export default function DetectionScene(props: { paymentConfigured: boolean }) {
+export default function DetectionScene(props: { previewHref: string; paymentConfigured: boolean }) {
   const strongestEvidence = DEMO_EVIDENCE_SOURCES[0];
   const [confidenceGrade = "A", confidenceText = "высокая"] = DEMO_COMPANY.confidence
     .split("/")
@@ -42,13 +42,13 @@ export default function DetectionScene(props: { paymentConfigured: boolean }) {
               <div className={styles.actions}>
                 <a
                   className={styles.primaryCta}
-                  href="#preview-configurator"
+                  href={props.previewHref}
                   data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
-                  data-analytics-context={LANDING_ANALYTICS_CONTEXT.hero}
+                  data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
                 >
                   Посмотреть пример <ArrowGlyph />
                 </a>
-                <Link className={styles.loginLink} href="/login">Войти</Link>
+                <Link className={styles.loginLink} href="/login?returnTo=%2Fdashboard">Войти</Link>
               </div>
               <p className={styles.trustLine} data-hero-trust-line>
                 Проверяемые факты · официальный контакт · без авторассылки
