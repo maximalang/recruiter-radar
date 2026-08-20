@@ -1,4 +1,4 @@
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -11,12 +11,12 @@ const reviewDirectory = process.env.LANDING_REVIEW_SCREENSHOT_DIR
   ?? path.join(path.dirname(auditScreenshotDirectory), "review");
 
 const viewports = [
-  { width: 1440, height: 900, name: "1440x900", focused: true },
-  { width: 390, height: 844, name: "390x844", focused: true },
-  { width: 320, height: 568, name: "320x568", focused: false },
-  { width: 768, height: 1024, name: "768x1024", focused: false },
-  { width: 1024, height: 768, name: "1024x768", focused: false },
-  { width: 1920, height: 1080, name: "1920x1080", focused: false },
+  { width: 1440, height: 900, name: "1440x900", focused: true, deliveryOpen: true },
+  { width: 390, height: 844, name: "390x844", focused: true, deliveryOpen: false },
+  { width: 320, height: 568, name: "320x568", focused: false, deliveryOpen: false },
+  { width: 768, height: 1024, name: "768x1024", focused: false, deliveryOpen: false },
+  { width: 1024, height: 768, name: "1024x768", focused: false, deliveryOpen: true },
+  { width: 1920, height: 1080, name: "1920x1080", focused: false, deliveryOpen: false },
 ];
 
 const focusedSurfaces = [
@@ -62,6 +62,47 @@ async function preparePage(context) {
   return page;
 }
 
+async function documentHeight(page) {
+  return page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight));
+}
+
+async function captureContrastCrops(page, viewportName) {
+  if (viewportName !== "1440x900") return [];
+
+  const artifacts = [];
+  const decision = page.locator('[data-hero-stage="decision"]').first();
+  await decision.screenshot({
+    path: path.join(reviewDirectory, `${viewportName}-hero-decision.png`),
+    animations: "disabled",
+  });
+  artifacts.push(`${viewportName}-hero-decision.png`);
+
+  const states = [
+    { name: "pilot-cta", locator: page.locator("#pricing [data-pricing-primary] > a").first() },
+    { name: "final-cta-primary", locator: page.locator('#conversion-final [data-analytics-context="closing"]').first() },
+  ];
+
+  for (const state of states) {
+    await page.mouse.move(0, 0);
+    await state.locator.screenshot({
+      path: path.join(reviewDirectory, `${viewportName}-${state.name}-normal.png`),
+      animations: "disabled",
+    });
+    artifacts.push(`${viewportName}-${state.name}-normal.png`);
+
+    await state.locator.hover();
+    await page.waitForTimeout(40);
+    await state.locator.screenshot({
+      path: path.join(reviewDirectory, `${viewportName}-${state.name}-hover.png`),
+      animations: "disabled",
+    });
+    artifacts.push(`${viewportName}-${state.name}-hover.png`);
+  }
+
+  await page.mouse.move(0, 0);
+  return artifacts;
+}
+
 await rm(reviewDirectory, { recursive: true, force: true });
 await mkdir(reviewDirectory, { recursive: true });
 
@@ -70,6 +111,12 @@ const browser = await chromium.launch({
   executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
 });
 
+const manifest = {
+  fullPage: {},
+  deliveryOpen: {},
+  contrastCrops: [],
+};
+
 try {
   for (const viewport of viewports) {
     const context = await browser.newContext({
@@ -77,6 +124,8 @@ try {
       reducedMotion: "reduce",
     });
     const page = await preparePage(context);
+    const closedHeight = await documentHeight(page);
+    manifest.fullPage[viewport.name] = { width: viewport.width, height: closedHeight };
 
     await page.screenshot({
       path: path.join(reviewDirectory, `${viewport.name}-full.png`),
@@ -95,15 +144,39 @@ try {
       }
     }
 
+    manifest.contrastCrops.push(...await captureContrastCrops(page, viewport.name));
+
+    if (viewport.deliveryOpen) {
+      const details = page.locator("#scene-delivery details").first();
+      const summary = details.locator("summary");
+      await summary.scrollIntoViewIfNeeded();
+      await summary.click();
+      await details.locator(":scope > div").waitFor({ state: "visible" });
+      const openHeight = await documentHeight(page);
+      manifest.deliveryOpen[viewport.name] = { width: viewport.width, height: openHeight };
+      await page.screenshot({
+        path: path.join(reviewDirectory, `${viewport.name}-delivery-open-full.png`),
+        fullPage: true,
+        animations: "disabled",
+      });
+      await page.locator("#scene-delivery").screenshot({
+        path: path.join(reviewDirectory, `${viewport.name}-delivery-open.png`),
+        animations: "disabled",
+      });
+    }
+
     await context.close();
   }
 } finally {
   await browser.close();
 }
 
+await writeFile(path.join(reviewDirectory, "manifest.json"), JSON.stringify(manifest, null, 2));
+
 process.stdout.write(JSON.stringify({
   ok: true,
   reviewDirectory,
   viewports: viewports.map(({ width, height }) => `${width}x${height}`),
   focusedSurfaces: focusedSurfaces.map(({ name }) => name),
+  manifest,
 }) + "\n");

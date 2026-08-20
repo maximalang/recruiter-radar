@@ -1,0 +1,77 @@
+.polish :global(#scene-detection [data-hero-copy] > div:first-child > p) {
+  color: var(--color-text-inverse);
+}
+
+.polish :global(#scene-detection [data-hero-trust-line]) {
+  color: color-mix(in srgb, var(--color-text-inverse) 68%, transparent);
+}
+
+.polish :global(#scene-detection [data-analytics-context="hero_primary"]) {
+  color: var(--color-text-inverse);
+}
+
+.polish :global(#scene-detection [data-analytics-context="hero_primary"]:focus-visible),
+.polish :global(#scene-detection a[href^="/login"]:focus-visible) {
+  outline-color: var(--color-text-inverse);
+}
+
+.polish :global(#scene-detection [data-hero-stage="signal"] > span:first-child),
+.polish :global(#scene-detection [data-hero-stage="signal"] > div > span:first-child) {
+  color: var(--color-text-inverse);
+}
+
+.polish :global(#scene-detection [data-hero-stage="signal"] > small),
+.polish :global(#scene-detection [data-hero-stage="signal"] > p) {
+  color: color-mix(in srgb, var(--color-text-inverse) 68%, transparent);
+}
+
+.polish :global(#scene-detection [data-hero-stage="decision"]) {
+  color: var(--color-text-inverse);
+}
+
+.polish :global(#scene-detection [data-hero-stage="decision"] > span:first-child),
+.polish :global(#scene-detection [data-hero-stage="decision"] span),
+.polish :global(#scene-detection [data-hero-stage="decision"] small) {
+  color: color-mix(in srgb, var(--color-text-inverse) 75%, transparent);
+}
+
+.polish :global(#scene-detection [data-hero-stage="decision"] > div:last-child) {
+  border-color: color-mix(in srgb, var(--color-text-inverse) 24%, transparent);
+}
+
+.polish :global(#pricing [data-pricing-primary] > div:first-child > div:first-child > span),
+.polish :global(#conversion-final > div:first-child > span) {
+  color: var(--color-signal-on-dark);
+}
+
+.polish :global(#pricing [data-pricing-primary] > a),
+.polish :global(#conversion-final [data-analytics-context="closing"]) {
+  color: var(--color-text-inverse);
+}
+
+.polish :global(#pricing [data-pricing-primary] > a:focus-visible),
+.polish :global(#conversion-final [data-analytics-context="closing"]:focus-visible) {
+  outline-color: var(--color-text-inverse);
+}
+
+.polish :global(#scene-delivery details) {
+  position: static;
+  width: 100%;
+  min-width: 0;
+}
+
+.polish :global(#scene-delivery details > div) {
+  position: static;
+  right: auto;
+  z-index: auto;
+  width: 100%;
+  margin-top: .4rem;
+}
+
+@media (min-width: 821px) {
+  .polish :global(#scene-delivery > div > div:last-child) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 32rem);
+    align-items: start;
+  }
+}

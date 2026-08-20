@@ -5,6 +5,7 @@ import { resolveAuditScriptPath } from "./landing-audit-path.mjs";
 
 const auditScript = resolveAuditScriptPath(import.meta.url);
 const reviewCaptureScript = new URL("./capture-landing-review.mjs", import.meta.url).pathname;
+const accessibilityAuditScript = new URL("./verify-landing-accessibility.mjs", import.meta.url).pathname;
 const maxAttempts = 2;
 
 function wait(milliseconds) {
@@ -52,9 +53,13 @@ if (reviewCapture.code !== 0) {
   process.exit(reviewCapture.code);
 }
 
+let productionAuditPassed = false;
 for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   const result = await runScript(auditScript);
-  if (result.code === 0) process.exit(0);
+  if (result.code === 0) {
+    productionAuditPassed = true;
+    break;
+  }
 
   const abortedNavigation = result.output.includes("net::ERR_ABORTED");
   const canRetry = abortedNavigation && attempt < maxAttempts;
@@ -71,4 +76,14 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   await wait(500);
 }
 
-process.exit(1);
+if (!productionAuditPassed) process.exit(1);
+
+const accessibilityAudit = await runScript(accessibilityAuditScript);
+if (accessibilityAudit.code !== 0) {
+  if (accessibilityAudit.signal) {
+    process.stderr.write(`Landing accessibility audit stopped by ${accessibilityAudit.signal}.\n`);
+  }
+  process.exit(accessibilityAudit.code);
+}
+
+process.exit(0);
