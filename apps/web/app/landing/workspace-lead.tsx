@@ -34,6 +34,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
       className={`${styles.workspaceLead} ${sceneStyles.lead} ${defaultOpen ? sceneStyles.leadPrimary : ""}`}
       data-lead-row="true"
       data-primary-lead={defaultOpen || undefined}
+      data-outreach-mode={defaultOpen ? "Сообщения не отправляются автоматически" : undefined}
     >
       <div className={`${styles.workspaceLeadRow} ${sceneStyles.leadRow}`}>
         <span className={styles.workspaceRank}>{String(item.rank).padStart(2, "0")}</span>
@@ -55,7 +56,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
           </div>
 
           <div className={`${styles.workspaceEvidence} ${sceneStyles.evidenceBlock}`}>
-            <span>Два сильных факта</span>
+            <span>Подтверждения и источники</span>
             <ul>{evidence.map((fact) => <li key={fact}><RouteGlyph size={14} />{fact}</li>)}</ul>
           </div>
 
