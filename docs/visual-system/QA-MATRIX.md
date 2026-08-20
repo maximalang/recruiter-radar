@@ -29,6 +29,8 @@ Authenticated E2E/accessibility evidence covers the decision flow and operationa
 ## Required states and interaction invariants
 
 - Mobile More open state is captured at 320×568 and 390×844; the authenticated browser gate verifies that the menu remains inside the viewport, exposes every secondary destination, activates an internal route and does not resize or overlap the main scroll area.
+- Company Brief action hierarchy is captured at 640, 768, 900, 1000 and 1024 pixels; exactly one primary CTA remains visible and it derives from the same presentation decision as `Следующий ход`.
+- Mobile Companies active-filter and pending states keep the status message in normal layout flow and preserve 44px controls without permanent reserved space.
 - loading and pending states do not use decorative ambient animation;
 - reduced-motion mode suppresses non-essential transitions and animation;
 - hover-only behavior is capability-gated;

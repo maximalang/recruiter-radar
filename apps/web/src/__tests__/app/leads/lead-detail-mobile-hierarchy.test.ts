@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 
 const pagePath = resolve(process.cwd(), 'app', 'leads', '[id]', 'page.tsx')
 const stylesPath = resolve(process.cwd(), 'app', 'leads', '[id]', 'lead-brief.module.css')
+const decisionPath = resolve(process.cwd(), 'app', 'leads', '[id]', 'company-brief-decision.ts')
 
 describe('company brief mobile hierarchy', () => {
   it('keeps Why now -> Evidence -> Confidence -> Next move -> Provenance before contextual actions and secondary context', async () => {
@@ -52,13 +53,14 @@ describe('company brief mobile hierarchy', () => {
 
   it('uses shared Russian count grammar and final user-facing terminology', async () => {
     const page = await readFile(pagePath, 'utf8')
+    const decision = await readFile(decisionPath, 'utf8')
 
     expect(page).toContain("formatVacanciesCount(lead.vacanciesCount)")
     expect(page).toContain("pluralForm(count, ['роль', 'роли', 'ролей'])")
     expect(page).toContain("pluralForm(count, ['источник', 'источника', 'источников'])")
     expect(page).toContain('<span className={styles.railTitle}>Статус</span>')
-    expect(page).toContain('текущий сигнал найма')
-    expect(page).not.toContain('текущий hiring signal')
+    expect(decision).toContain('текущий сигнал найма')
+    expect(decision).not.toContain('текущий hiring signal')
     expect(page).not.toContain('<span className={styles.railTitle}>Workflow</span>')
     expect(page).not.toContain('{lead.vacanciesCount} вакансий')
     expect(page).not.toContain('{lead.sourceFamilies.length} источников')

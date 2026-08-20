@@ -121,6 +121,10 @@ describe("cross-route visual layer contract", () => {
     expect(workspaceStyles).toMatch(/\.mobileMoreMenu \{[\s\S]*?position: absolute/);
     expect(workspaceStyles).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
     expect(workspaceStyles).toContain("padding: 24px 16px calc(32px + env(safe-area-inset-bottom))");
+    const briefStyles = readAppFile("leads/[id]/lead-brief.module.css");
+    expect(briefStyles).toContain("@media (max-width: 1000px)");
+    expect(briefStyles).toMatch(/@media \(max-width: 1000px\)[\s\S]*?\.mobilePrimaryAction \{[\s\S]*?display: inline-flex/);
+    expect(briefStyles).toMatch(/@media \(min-width: 1001px\)[\s\S]*?\.railPrimaryAction \{[\s\S]*?display: inline-flex/);
   });
 
   it("uses continuous decision rails instead of nested card stacks on core product surfaces", () => {

@@ -101,6 +101,16 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("Mobile More menu is outside the ${suffix}px viewport");
     expect(runner).toContain("Opening Mobile More resized the main scroll area");
     expect(runner).toContain("Mobile More internal route did not activate");
+    expect(runner).toContain("const companyBriefActionViewports = [");
+    for (const width of [640, 768, 900, 1000, 1024]) {
+      expect(runner).toContain(`width: ${width}`);
+    }
+    expect(runner).toContain("Company Brief must expose exactly one dominant primary action");
+    expect(runner).toContain("Company Brief inline primary action is not next to Next move");
+    expect(runner).toContain("const companyFilterViewports = [");
+    expect(runner).toContain("Search-only Companies state must keep filters closed");
+    expect(runner).toContain("Companies pending status reserves or escapes layout flow");
+    expect(runner).toContain("Companies filters expose a sub-44px target");
     expect(runner).toContain("const authenticatedProductViewports = [");
     expect(runner).toMatch(/suffix:\s*'1440'[\s\S]{0,120}width:\s*1440[\s\S]{0,120}height:\s*1000/);
     expect(runner).toMatch(/suffix:\s*'390'[\s\S]{0,120}width:\s*390[\s\S]{0,120}height:\s*844/);

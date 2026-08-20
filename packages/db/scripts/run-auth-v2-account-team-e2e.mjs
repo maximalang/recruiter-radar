@@ -1295,6 +1295,19 @@ const mobileMoreViewports = [
   },
 ]
 
+const companyBriefActionViewports = [
+  { suffix: '640', width: 640, height: 900 },
+  { suffix: '768', width: 768, height: 1024 },
+  { suffix: '900', width: 900, height: 1000 },
+  { suffix: '1000', width: 1000, height: 900 },
+  { suffix: '1024', width: 1024, height: 768 },
+]
+
+const companyFilterViewports = [
+  { suffix: '320', width: 320, height: 568 },
+  { suffix: '390', width: 390, height: 844 },
+]
+
 async function verifyMobileMoreNavigation(
   page,
   { suffix, width, height, screenshot },
@@ -1418,6 +1431,143 @@ async function verifyMobileMoreNavigation(
     new URL(page.url()).pathname === '/settings',
     `Mobile More internal route did not activate at ${suffix}px.`,
   )
+}
+
+async function verifyCompanyBriefActionHierarchy(page, owner, viewport) {
+  const { suffix, width, height } = viewport
+  await page.setViewportSize({ width, height })
+  const pathname = `/leads/${owner.productSurfaces.candidateId}`
+  await page.goto(`${baseUrl}${pathname}`, { waitUntil: 'domcontentloaded' })
+  await page.locator('[data-company-brief-next-move]').waitFor({
+    state: 'visible',
+  })
+
+  const recommendationMatches = await page.evaluate(() => {
+    const nextMove = document.querySelector(
+      '[data-company-brief-next-move] p',
+    )?.textContent?.trim()
+    const railMove = document.querySelector(
+      '[data-company-brief-action] [data-company-brief-primary-action]',
+    )?.previousElementSibling?.textContent?.trim()
+    return Boolean(nextMove && railMove && nextMove === railMove)
+  })
+  assert(
+    recommendationMatches,
+    `Company Brief recommendation diverged from its action model at ${suffix}px.`,
+  )
+
+  const visibleActions = page.locator(
+    '[data-company-brief-primary-action]:visible',
+  )
+  assert(
+    await visibleActions.count() === 1,
+    `Company Brief must expose exactly one dominant primary action at ${suffix}px.`,
+  )
+  const visibleAction = visibleActions.first()
+  const placement = await visibleAction.evaluate((element) => ({
+    inline: Boolean(element.closest('[data-company-brief-next-move]')),
+    rail: Boolean(element.closest('[data-company-brief-action]')),
+  }))
+  if (width <= 1000) {
+    assert(
+      placement.inline && !placement.rail,
+      `Company Brief inline primary action is not next to Next move at ${suffix}px.`,
+    )
+  } else {
+    assert(
+      placement.rail && !placement.inline,
+      `Company Brief desktop primary action is not in the Decision Rail at ${suffix}px.`,
+    )
+  }
+
+  await visibleAction.scrollIntoViewIfNeeded()
+  const screenshotPath = resolve(
+    artifactsDirectory,
+    `auth-v2-account-team-e2e-shot-company-brief-action-${suffix}.png`,
+  )
+  await page.screenshot({
+    path: screenshotPath,
+    fullPage: false,
+    caret: 'initial',
+  })
+  report.screenshots[`company-brief-action-${suffix}`] = screenshotPath
+}
+
+async function verifyCompanyFilters(page, viewport) {
+  const { suffix, width, height } = viewport
+  await page.setViewportSize({ width, height })
+  await page.goto(
+    `${baseUrl}/leads?q=${encodeURIComponent('Очень длинный поисковый запрос по компании')}`,
+    { waitUntil: 'domcontentloaded' },
+  )
+
+  let toggle = page.getByRole('button', { name: /^Фильтры/ })
+  assert(
+    await toggle.getAttribute('aria-expanded') === 'false',
+    `Search-only Companies state must keep filters closed at ${suffix}px.`,
+  )
+  const statusLayout = await page.locator(
+    '[aria-label="Фильтры компаний"] [role="status"][data-motion-status]',
+  ).evaluate(
+    (element) => ({
+      display: getComputedStyle(element).display,
+      position: getComputedStyle(element).position,
+    }),
+  )
+  assert(
+    statusLayout.display === 'none' && statusLayout.position === 'static',
+    `Companies pending status reserves or escapes layout flow at ${suffix}px.`,
+  )
+
+  await toggle.click()
+  await page.getByRole('combobox', { name: 'Уровень подтверждения' }).selectOption('C')
+  await page.waitForURL((url) => url.searchParams.get('gate') === 'C')
+  await page.getByRole('combobox', { name: 'Статус работы' }).selectOption('none')
+  await page.waitForURL((url) => url.searchParams.get('feedback') === 'none')
+  toggle = page.getByRole('button', { name: /^Фильтры/ })
+  assert(
+    await toggle.getAttribute('aria-expanded') === 'true',
+    `Companies active filters collapsed unexpectedly at ${suffix}px.`,
+  )
+
+  const filterLayout = await page.evaluate(() => {
+    const controls = [...document.querySelectorAll(
+      '[aria-label="Фильтры компаний"] input, [aria-label="Фильтры компаний"] select, [aria-label="Фильтры компаний"] button',
+    )].filter((element) => {
+      const rect = element.getBoundingClientRect()
+      return getComputedStyle(element).display !== 'none'
+        && rect.width > 0
+        && rect.height > 0
+    })
+    return {
+      minTargetHeight: Math.min(
+        ...controls.map((element) => element.getBoundingClientRect().height),
+      ),
+      overflow: document.documentElement.scrollWidth - window.innerWidth,
+    }
+  })
+  assert(
+    filterLayout.minTargetHeight >= 44,
+    `Companies filters expose a sub-44px target at ${suffix}px.`,
+  )
+  assert(
+    filterLayout.overflow <= 0,
+    `Companies active filters overflow by ${filterLayout.overflow}px at ${suffix}px.`,
+  )
+
+  const screenshotPath = resolve(
+    artifactsDirectory,
+    `auth-v2-account-team-e2e-shot-leads-active-filters-${suffix}.png`,
+  )
+  await page.screenshot({ path: screenshotPath, fullPage: false, caret: 'initial' })
+  report.screenshots[`leads-active-filters-${suffix}`] = screenshotPath
+
+  await page.getByRole('button', { name: 'Сбросить' }).click()
+  await page.waitForURL((url) => (
+    !url.searchParams.has('q')
+      && !url.searchParams.has('gate')
+      && !url.searchParams.has('feedback')
+  ))
 }
 
 async function verifyAuthenticatedProductSurfacesAtViewport(
@@ -1546,6 +1696,13 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
   for (const viewport of mobileMoreViewports) {
     await verifyMobileMoreNavigation(page, viewport)
   }
+  for (const viewport of companyBriefActionViewports) {
+    await verifyCompanyBriefActionHierarchy(page, owner, viewport)
+  }
+  for (const viewport of companyFilterViewports) {
+    await verifyCompanyFilters(page, viewport)
+  }
+  await page.setViewportSize({ width: 390, height: 844 })
   report.flows.authenticatedProductSurfaces = {
     desktop1440: true,
     mobile390: true,
@@ -1558,6 +1715,8 @@ async function verifyAuthenticatedProductSurfaces(page, owner) {
     commercialSignalCard: true,
     evidenceRadarMarkerSelection: true,
     mobileMoreNavigation320And390: true,
+    companyBriefActionHierarchy640Through1024: true,
+    companyFilters320And390: true,
   }
 }
 

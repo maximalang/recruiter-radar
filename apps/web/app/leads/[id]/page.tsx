@@ -14,6 +14,7 @@ import { formatScorePoints } from '@/lib/scoring/score-display';
 import FeedbackButtons from './feedback-buttons';
 import AiEnrichmentBlock from './ai-enrichment-block';
 import NextStepsBlock from './next-steps-block';
+import { deriveCompanyBriefDecision, type CompanyBriefPrimaryAction } from './company-brief-decision';
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -55,6 +56,20 @@ function formatSourceCount(count: number): string {
 
 function StateLink({ href, label }: { href: string; label: string }) {
   return <Link href={href}>{label}</Link>;
+}
+
+function PrimaryDecisionAction({ action, className }: { action: CompanyBriefPrimaryAction; className: string }) {
+  return (
+    <a
+      className={className}
+      href={action.href}
+      target={action.external ? '_blank' : undefined}
+      rel={action.external ? 'noopener noreferrer' : undefined}
+      data-company-brief-primary-action
+    >
+      {action.label}{action.external ? ' ↗' : ''}
+    </a>
+  );
 }
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -171,19 +186,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const contactPolicy = profile?.contactPolicy ?? 'corporate_only';
   const contactViews = toContactPathViews(filterContactPathsByPolicy(lead.contactPaths, contactPolicy));
   const lawfulPath = formatLawfulContactPath(lead.lawfulContactPath);
-
-  const nextMove = contactViews.length > 0
-    ? `Начать с найденного корпоративного контакта и сослаться на текущий сигнал найма.`
-    : lawfulPath
-      ? `Использовать безопасный путь контакта: ${lawfulPath}.`
-      : lead.careerPageUrl
-        ? 'Открыть карьерную страницу и найти корпоративный путь контакта вручную.'
-        : 'Сначала подтвердить корпоративный путь контакта, затем выходить с предложением.';
-
-  const nextStepLinks: { href: string; label: string }[] = [];
-  if (lead.careerPageUrl) nextStepLinks.push({ href: lead.careerPageUrl, label: 'Карьерная страница' });
-  if (lead.orgWebsite) nextStepLinks.push({ href: lead.orgWebsite, label: 'Сайт компании' });
-  const primaryNextStep = nextStepLinks[0] ?? null;
   const crmBlock = leadToCrmBlock({
     orgName: lead.orgName,
     score: lead.score,
@@ -212,6 +214,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     ? new Date(lead.latestPublishedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
     : null;
   const confidence = confidenceView(lead.confidenceGate);
+  const decision = deriveCompanyBriefDecision({
+    hasLawfulCorporateContact: contactViews.length > 0,
+    lawfulContactPath: lawfulPath,
+    careerPageUrl: lead.careerPageUrl,
+    confidenceContext: confidence.label,
+  });
 
   return (
     <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
@@ -275,11 +283,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
           <section className={`${styles.section} ${styles.nextMoveSection}`} data-company-brief-next-move>
             <h2>Следующий ход</h2>
-            <p className={styles.nextMove}>{nextMove}</p>
-            {primaryNextStep ? (
-              <a className={styles.mobilePrimaryAction} href={primaryNextStep.href} target="_blank" rel="noopener noreferrer">
-                Открыть: {primaryNextStep.label.toLocaleLowerCase('ru-RU')} ↗
-              </a>
+            <p className={styles.nextMove}>{decision.recommendation}</p>
+            {decision.primaryAction ? (
+              <PrimaryDecisionAction action={decision.primaryAction} className={styles.mobilePrimaryAction} />
             ) : null}
           </section>
 
@@ -295,8 +301,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <div className={styles.rail}>
               <section className={styles.railSection}>
                 <span className={styles.railTitle}>Рекомендуемый ход</span>
-                <div className={styles.railDecision}>{nextMove}</div>
-                <NextStepsBlock crmBlock={crmBlock} links={nextStepLinks} singleExportHref={`/api/leads/${lead.id}/export`} />
+                <div className={styles.railDecision}>{decision.recommendation}</div>
+                {decision.primaryAction ? (
+                  <PrimaryDecisionAction action={decision.primaryAction} className={styles.railPrimaryAction} />
+                ) : null}
+                <NextStepsBlock crmBlock={crmBlock} links={[]} singleExportHref={`/api/leads/${lead.id}/export`} />
               </section>
 
               <section className={styles.railSection}>
@@ -305,7 +314,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <div className={styles.railMetric} data-numeric="true">Сила сигнала · {score}</div>
               </section>
 
-              <section className={styles.railSection}>
+              <section className={styles.railSection} id="company-brief-contact">
                 <span className={styles.railTitle}>Контакт</span>
                 {lawfulPath ? <div className={styles.railValue}>{lawfulPath}</div> : null}
                 {contactViews.length > 0 ? (
