@@ -20,7 +20,7 @@ export default function EvidenceScene() {
           <p className={sceneStyles.lead}>Мы показываем последовательность подтверждений, а не прячем рекомендацию за непрозрачным score.</p>
         </div>
 
-        <div className={sceneStyles.evidenceChain} data-proof-object="evidence-resolution">
+        <div className={sceneStyles.evidenceChain} data-proof-object="evidence-resolution" aria-label="Почему эта компания сейчас">
           <ol className={sceneStyles.timeline} aria-label="Последовательность подтверждающих фактов">
             {DEMO_EVIDENCE_SOURCES.map((row) => (
               <li key={row.source} data-proof-event>
