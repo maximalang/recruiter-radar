@@ -10,22 +10,24 @@ function source(path: string): string {
 }
 
 describe("landing visual and login reliability polish", () => {
-  test("keeps light pricing and FAQ surfaces readable inside the dark conversion wrapper", () => {
+  test("keeps light pricing and FAQ readable without a global composition override", () => {
     const conversion = source("app/landing/conversion-panel.tsx");
+    const conversionCss = source("app/landing/conversion-panel.module.css");
     const visual = source("app/landing/landing-visual-system.module.css");
 
     expect(conversion).toContain('data-pricing-primary="true"');
     expect(conversion).toContain('data-pricing-secondary="true"');
     expect(conversion).toContain('data-faq-surface="true"');
-    expect(visual).toContain(':global(#pricing),');
-    expect(visual).toContain(':global(#faq)');
-    expect(visual).toMatch(/color\s*:\s*var\(--color-text-primary\)\s*;/);
-    expect(visual).toContain(':global(#pricing [data-pricing-primary])');
-    expect(visual).toContain(':global(#pricing [data-pricing-secondary] p)');
-    expect(visual).toContain(':global(#faq summary)');
+    expect(conversion).toContain('data-pricing-layout="pilot-decision"');
+    expect(conversion).toContain('data-faq-layout="centered"');
+    expect(conversionCss).toContain(".pricing");
+    expect(conversionCss).toContain(".faq");
+    expect(conversionCss).toContain("color: var(--color-text-primary)");
+    expect(visual).not.toContain(":global(#pricing [data-pricing-primary])");
+    expect(visual).not.toContain(":global(#faq summary)");
   });
 
-  test("uses a static company brief hero without an ambient radar runtime", () => {
+  test("uses a static evidence-first hero without an ambient radar runtime", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const heroScene = source("app/landing/detection-scene.module.css");
     const visual = source("app/landing/landing-visual-system.module.css");
@@ -33,6 +35,7 @@ describe("landing visual and login reliability polish", () => {
     const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
     expect(hero).toContain('data-hero-layout="company-brief"');
+    expect(hero).toContain('data-art-direction="evidence-first"');
     expect(hero).toContain('data-hero-company-brief="true"');
     expect(hero).toContain("Почему сейчас");
     expect(hero).toContain("Подтверждения");
