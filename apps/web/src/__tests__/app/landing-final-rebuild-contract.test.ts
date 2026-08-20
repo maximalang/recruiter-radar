@@ -118,7 +118,7 @@ describe("landing final rebuild narrative", () => {
 
     expect(landing).not.toContain("--display:");
     expect(landing).not.toContain("--title:");
-    expect(landing).not.toMatch(/\.sceneHeading\s*\{[^}]*font-size/s);
+    expect(landing).not.toMatch(/\.sceneHeading\s*\{[^}]*font-size/);
     expect(visual).not.toContain(":global(#pricing [data-pricing-intro] h2)");
     expect(visual).not.toContain(":global(#faq [data-faq-heading] h2)");
   });

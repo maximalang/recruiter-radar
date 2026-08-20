@@ -54,7 +54,7 @@ describe("landing final production contract", () => {
     expect(conversionCss).toContain("width: min(58rem, 100%)");
     expect(conversionCss).toContain("min-height: 26rem");
     expect(landing).not.toContain("--title:");
-    expect(landing).not.toMatch(/\.sceneHeading\s*\{[^}]*font-size/s);
+    expect(landing).not.toMatch(/\.sceneHeading\s*\{[^}]*font-size/);
     expect(visual).toContain("--page-gutter:");
     expect(visual).toContain("--content-max:");
     expect(visual).not.toContain(":global(#pricing [data-pricing-intro] h2)");

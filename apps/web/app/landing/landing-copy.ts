@@ -15,6 +15,7 @@ export const DEMO_COMPANY = {
   freshness: DEFAULT_LANDING_DEMO_STORY.company.freshness,
   confidence: DEFAULT_LANDING_DEMO_STORY.company.confidence,
   whyNow: DEFAULT_LANDING_DEMO_STORY.company.whyNow,
+  opener: DEFAULT_LANDING_DEMO_STORY.company.opener,
   score: DEFAULT_LANDING_DEMO_STORY.company.score,
 } as const;
 
