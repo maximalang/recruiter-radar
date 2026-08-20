@@ -17,7 +17,7 @@ describe('team member count copy', () => {
     const styles = readFileSync(
       resolve(process.cwd(), 'app/settings/team/team-settings.module.css'),
       'utf8',
-    )
+    ).replace(/\r\n/g, '\n')
 
     expect(styles).toContain('.inviteList > li > div {\n  min-width: 0;\n}')
     expect(styles).toContain('.inviteList strong,\n.inviteList p {\n  overflow-wrap: anywhere;\n}')

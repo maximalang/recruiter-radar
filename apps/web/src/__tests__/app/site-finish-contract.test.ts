@@ -88,7 +88,9 @@ describe("cross-route visual layer contract", () => {
     expect(nextSteps).toContain("var(--motion-duration-control)");
     expect(nextSteps).toContain("var(--motion-ease-standard)");
     expect(nextSteps).toContain("outline: 2px solid var(--color-focus)");
-    expect(nextSteps).toContain("background-color: var(--color-signal-soft)");
+    expect(nextSteps).toContain('.nextStepsLink[data-variant="primary"]');
+    expect(nextSteps).toContain("background-color: var(--color-signal)");
+    expect(nextSteps).toContain("color: var(--color-text-inverse)");
     expect(nextSteps).toContain("color: var(--color-destructive)");
     expect(nextSteps).toContain("min-height: 44px");
     expect(nextSteps).not.toContain("min-height: 40px");
@@ -112,9 +114,17 @@ describe("cross-route visual layer contract", () => {
     const workspaceStyles = readAppFile("ui/product-workspace.module.css");
 
     expect(workspaceStyles).toContain("@media (max-width: 767px)");
-    expect(workspaceStyles).toMatch(/\.mobileNav \{[\s\S]*?position: fixed/);
+    expect(workspaceStyles).toMatch(/\.workspaceBody \{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden/);
+    expect(workspaceStyles).toMatch(/\.content \{[\s\S]*?overflow-y: auto/);
+    expect(workspaceStyles).toMatch(/\.mobileNav \{[\s\S]*?position: static/);
+    expect(workspaceStyles).toMatch(/\.mobileMore \{[\s\S]*?position: relative/);
+    expect(workspaceStyles).toMatch(/\.mobileMoreMenu \{[\s\S]*?position: absolute/);
     expect(workspaceStyles).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
-    expect(workspaceStyles).toContain("padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom))");
+    expect(workspaceStyles).toContain("padding: 24px 16px calc(32px + env(safe-area-inset-bottom))");
+    const briefStyles = readAppFile("leads/[id]/lead-brief.module.css");
+    expect(briefStyles).toContain("@media (max-width: 1000px)");
+    expect(briefStyles).toMatch(/@media \(max-width: 1000px\)[\s\S]*?\.mobilePrimaryAction \{[\s\S]*?display: inline-flex/);
+    expect(briefStyles).toMatch(/@media \(min-width: 1001px\)[\s\S]*?\.railPrimaryAction \{[\s\S]*?display: inline-flex/);
   });
 
   it("uses continuous decision rails instead of nested card stacks on core product surfaces", () => {

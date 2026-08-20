@@ -72,10 +72,10 @@
   height: 0.95em;
 }
 
-.nextStepsBtn[data-variant="primary"] {
+.nextStepsLink[data-variant="primary"] {
   border-color: var(--color-signal);
-  background-color: var(--color-signal-soft);
-  color: var(--color-signal);
+  background-color: var(--color-signal);
+  color: var(--color-text-inverse);
 }
 
 .nextStepsBtn:disabled {

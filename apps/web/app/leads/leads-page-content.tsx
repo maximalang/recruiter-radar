@@ -417,7 +417,6 @@ export default async function LeadsPage({
           : selectedProfile
             ? `Практика: ${selectedProfile.agencyName}`
             : 'Кому написать сейчас — и на каких подтверждениях держится приоритет'}
-        nav={allLeads.length > 0 ? <a href={exportHref} download>Экспорт CSV</a> : null}
       />
 
       <div className={styles.summaryStrip} aria-label="Сводка рабочего набора">
@@ -428,6 +427,7 @@ export default async function LeadsPage({
           <span><strong>{readyCount}</strong> готовы к контакту</span>
           <Link href="/review"><strong>{pendingReview}</strong> на проверке</Link>
           {totalLeads !== visibleLeads.length ? <span>{totalLeads} всего</span> : null}
+          {allLeads.length > 0 ? <a className={styles.export} href={exportHref} download>Экспорт CSV</a> : null}
         </div>
       </div>
 

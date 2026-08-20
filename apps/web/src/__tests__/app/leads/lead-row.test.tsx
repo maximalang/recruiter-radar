@@ -1,5 +1,7 @@
 /** @jest-environment jsdom */
 import { fireEvent, render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { LeadRow } from '@/app/leads/leads-page-content';
 import type { LeadItem } from '@/lib/leads-data';
 
@@ -159,10 +161,14 @@ describe('LeadRow V1-V6 decision-row contract', () => {
     expect(container.querySelectorAll('[data-ui="confidence-indicator"]')).toHaveLength(8);
     expect(container.querySelectorAll('[aria-label^="Сила сигнала "]')).toHaveLength(8);
     expect(container.textContent).toContain(longWhyNow);
+    const styles = readFileSync(
+      resolve(process.cwd(), 'app/leads/leads-workspace.module.css'),
+      'utf8',
+    );
+    expect(styles).toContain('content:"Сила · "');
     for (const [index, orgName] of organizationNames.entries()) {
       expect(container.textContent).toContain(orgName);
       expect(rows[index]?.textContent).toContain(String(index + 1).padStart(2, '0'));
-      expect(rows[index]?.textContent).toContain('Сила ·');
     }
   });
 });

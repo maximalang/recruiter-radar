@@ -23,7 +23,13 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
     expect(map).toContain('latestEvidenceTimestamp')
     expect(map).toContain('confidenceScore')
     expect(map).toContain('RADAR_WINDOW_DAYS')
-    expect(map).toContain('Свежесть × уровень подтверждения')
+    expect(map).toContain("props.leads.length <= 2 ? 'sparse'")
+    expect(map).toContain("props.leads.length <= 5 ? 'compact' : 'full'")
+    expect(mapCss).not.toContain('.canvas[data-density="sparse"]')
+    expect(mapCss).toContain('.sparseStrip')
+    expect(map).toContain('data-sparse-evidence-strip')
+    expect(map).toContain("density === 'sparse'")
+    expect(map).toContain('Свежесть, подтверждение и релевантность')
     expect(map).toContain('Подтверждённых сигналов пока нет')
   })
 
@@ -68,7 +74,7 @@ describe('Evidence Radar V1-V6 production surface contract', () => {
   it('keeps verified geography as metadata rather than primary Radar geometry', () => {
     expect(radarPage).not.toContain('listEvidenceRadarRegionBoundaries')
     expect(radarPage).not.toContain('boundaries={boundaries}')
-    expect(radarPage).toContain('География остаётся контекстом')
+    expect(radarPage).toContain('География — только контекст')
     expect(map).toContain('lead.location.city')
     expect(map).not.toContain('data-region-code')
   })

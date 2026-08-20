@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 
 import { AuthShell } from "@/app/login/auth-shell";
 import { InternalPageFrame } from "@/app/ui/internal-page";
@@ -64,10 +64,16 @@ describe("Recruiter Radar unified UI system", () => {
       "href",
       "#main-content",
     );
-    expect(screen.getByRole("navigation", { name: "Мобильная навигация" })).toBeInTheDocument();
+    const mobileNavigation = screen.getByRole("navigation", { name: "Мобильная навигация" });
+    expect(mobileNavigation).toBeInTheDocument();
     expect(screen.getByText("Ещё")).toBeInTheDocument();
-    expect(screen.getByRole("contentinfo", { name: "Служебные ссылки" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Поддержка" })).toHaveAttribute(
+    expect(within(mobileNavigation).getByRole("link", { name: "Поддержка" })).toHaveAttribute(
+      "href",
+      "mailto:support@recruiter-radar.ru",
+    );
+    const productFooter = screen.getByRole("contentinfo", { name: "Служебные ссылки" });
+    expect(productFooter).toBeInTheDocument();
+    expect(within(productFooter).getByRole("link", { name: "Поддержка" })).toHaveAttribute(
       "href",
       "mailto:support@recruiter-radar.ru",
     );

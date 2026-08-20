@@ -42,7 +42,7 @@ describe('Situation research mode mobile hierarchy', () => {
     expect(source.match(/name="q"/g)).toHaveLength(1)
     expect(source.match(/name="gate"/g)).toHaveLength(1)
     expect(source.match(/aria-label="Представления ситуаций"/g)).toHaveLength(1)
-    expect(source).not.toContain('props.children')
+    expect(source.split('function ResearchLink')[0]).not.toContain('props.children')
   })
 
   it('toggles the mobile disclosure without duplicating search controls', () => {

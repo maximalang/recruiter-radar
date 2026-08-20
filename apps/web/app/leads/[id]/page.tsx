@@ -14,6 +14,7 @@ import { formatScorePoints } from '@/lib/scoring/score-display';
 import FeedbackButtons from './feedback-buttons';
 import AiEnrichmentBlock from './ai-enrichment-block';
 import NextStepsBlock from './next-steps-block';
+import { deriveCompanyBriefDecision, type CompanyBriefPrimaryAction } from './company-brief-decision';
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -55,6 +56,20 @@ function formatSourceCount(count: number): string {
 
 function StateLink({ href, label }: { href: string; label: string }) {
   return <Link href={href}>{label}</Link>;
+}
+
+function PrimaryDecisionAction({ action, className }: { action: CompanyBriefPrimaryAction; className: string }) {
+  return (
+    <a
+      className={className}
+      href={action.href}
+      target={action.external ? '_blank' : undefined}
+      rel={action.external ? 'noopener noreferrer' : undefined}
+      data-company-brief-primary-action
+    >
+      {action.label}{action.external ? ' ↗' : ''}
+    </a>
+  );
 }
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -171,18 +186,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const contactPolicy = profile?.contactPolicy ?? 'corporate_only';
   const contactViews = toContactPathViews(filterContactPathsByPolicy(lead.contactPaths, contactPolicy));
   const lawfulPath = formatLawfulContactPath(lead.lawfulContactPath);
-
-  const nextMove = contactViews.length > 0
-    ? `Начать с найденного корпоративного контакта и сослаться на текущий сигнал найма.`
-    : lawfulPath
-      ? `Использовать безопасный путь контакта: ${lawfulPath}.`
-      : lead.careerPageUrl
-        ? 'Открыть карьерную страницу и найти корпоративный путь контакта вручную.'
-        : 'Сначала подтвердить корпоративный путь контакта, затем выходить с предложением.';
-
-  const nextStepLinks: { href: string; label: string }[] = [];
-  if (lead.orgWebsite) nextStepLinks.push({ href: lead.orgWebsite, label: 'Сайт компании' });
-  if (lead.careerPageUrl) nextStepLinks.push({ href: lead.careerPageUrl, label: 'Карьерная страница' });
   const crmBlock = leadToCrmBlock({
     orgName: lead.orgName,
     score: lead.score,
@@ -211,6 +214,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     ? new Date(lead.latestPublishedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
     : null;
   const confidence = confidenceView(lead.confidenceGate);
+  const decision = deriveCompanyBriefDecision({
+    hasLawfulCorporateContact: contactViews.length > 0,
+    lawfulContactPathKind: lead.lawfulContactPath,
+    lawfulContactPathLabel: lawfulPath,
+    careerPageUrl: lead.careerPageUrl,
+    confidenceContext: confidence.label,
+  });
 
   return (
     <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
@@ -274,7 +284,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
           <section className={`${styles.section} ${styles.nextMoveSection}`} data-company-brief-next-move>
             <h2>Следующий ход</h2>
-            <p className={styles.nextMove}>{nextMove}</p>
+            <p className={styles.nextMove}>{decision.recommendation}</p>
+            {decision.primaryAction ? (
+              <PrimaryDecisionAction action={decision.primaryAction} className={styles.mobilePrimaryAction} />
+            ) : null}
           </section>
 
           <div className={styles.provenanceSection} data-company-brief-provenance>
@@ -288,6 +301,21 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <aside className={styles.aside} aria-label="Действия и контекст" data-company-brief-action>
             <div className={styles.rail}>
               <section className={styles.railSection}>
+                <span className={styles.railTitle}>Рекомендуемый ход</span>
+                <div className={styles.railDecision}>{decision.recommendation}</div>
+                {decision.primaryAction ? (
+                  <PrimaryDecisionAction action={decision.primaryAction} className={styles.railPrimaryAction} />
+                ) : null}
+                <NextStepsBlock crmBlock={crmBlock} links={[]} singleExportHref={`/api/leads/${lead.id}/export`} />
+              </section>
+
+              <section className={styles.railSection}>
+                <span className={styles.railTitle}>Уверенность Радара</span>
+                <ConfidenceIndicator level={confidence.level}>{confidence.label}</ConfidenceIndicator>
+                <div className={styles.railMetric} data-numeric="true">Сила сигнала · {score}</div>
+              </section>
+
+              <section className={styles.railSection} id="company-brief-contact">
                 <span className={styles.railTitle}>Контакт</span>
                 {lawfulPath ? <div className={styles.railValue}>{lawfulPath}</div> : null}
                 {contactViews.length > 0 ? (
@@ -308,19 +336,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </section>
 
               <section className={styles.railSection}>
-                <span className={styles.railTitle}>Действие</span>
-                <NextStepsBlock crmBlock={crmBlock} links={nextStepLinks} singleExportHref={`/api/leads/${lead.id}/export`} />
-              </section>
-
-              <section className={styles.railSection}>
                 <span className={styles.railTitle}>Статус</span>
                 <div className={styles.railValue}>{feedback ? feedback.label : 'Обратной связи ещё нет'}</div>
                 {lead.feedbackNote ? <p className={styles.body}>{lead.feedbackNote}</p> : null}
                 <FeedbackButtons orgId={lead.orgId} clientProfileId={lead.clientProfileId} currentStatus={lead.feedbackStatus ?? 'none'} />
               </section>
 
-              <section className={styles.railSection}>
-                <span className={styles.railTitle}>Компания</span>
+              <details className={styles.railDetails} data-motion-disclosure>
+                <summary>Реквизиты и служебные данные</summary>
                 <div className={styles.metaList}>
                   {lead.orgDomain ? <span>{lead.orgDomain}</span> : null}
                   {lead.orgWebsite ? <a href={lead.orgWebsite} target="_blank" rel="noopener noreferrer">Сайт компании</a> : null}
@@ -330,7 +353,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   {lead.sourceExternalId ? <span className={styles.identifier}>ID {lead.sourceExternalId}</span> : null}
                   <span>Добавлено {new Date(lead.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                 </div>
-              </section>
+              </details>
             </div>
           </aside>
 

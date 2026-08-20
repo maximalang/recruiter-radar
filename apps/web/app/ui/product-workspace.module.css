@@ -287,8 +287,9 @@
   }
 
   .workspaceBody {
-    min-height: 100vh;
-    padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .mobileTopbar {
@@ -313,26 +314,21 @@
 
   .content {
     flex: 1 1 auto;
-    padding: 24px 16px 32px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    padding: 24px 16px calc(32px + env(safe-area-inset-bottom));
+    scroll-padding-bottom: 24px;
   }
 
   .productFooter {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0;
-    padding: 12px 16px;
-  }
-
-  .productFooter nav {
-    gap: 4px 14px;
+    display: none;
   }
 
   .mobileNav {
-    position: fixed;
+    position: static;
+    flex: 0 0 auto;
     z-index: 30;
-    right: 0;
-    bottom: 0;
-    left: 0;
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     padding: 5px max(4px, env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
@@ -361,6 +357,11 @@
     line-height: 1.1;
     list-style: none;
     text-decoration: none;
+  }
+
+  .mobileMore {
+    position: relative;
+    min-width: 0;
   }
 
   .mobileNavItem[data-active="true"],
@@ -397,8 +398,8 @@
 
   .mobileMoreMenu {
     position: absolute;
-    right: 8px;
-    bottom: calc(100% + 8px);
+    inset-inline-end: 8px;
+    inset-block-end: calc(100% + 8px);
     width: min(250px, calc(100vw - 16px));
     display: grid;
     padding: 8px;

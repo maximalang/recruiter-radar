@@ -28,6 +28,12 @@ Authenticated E2E/accessibility evidence covers the decision flow and operationa
 
 ## Required states and interaction invariants
 
+- Mobile More open state is captured at 320×568 and 390×844; the authenticated browser gate verifies that the menu remains inside the viewport, exposes every secondary destination, activates an internal route and does not resize or overlap the main scroll area.
+- Company Brief action hierarchy is captured at 640, 768, 900, 1000 and 1024 pixels; exactly one primary CTA remains visible and it derives from the same presentation decision as `Следующий ход`.
+- Mobile Companies active-filter and pending states keep the status message in normal layout flow and preserve 44px controls without permanent reserved space.
+- Review at 1440×1000 and 390×844 renders eight deterministic pending rows spanning long names, multiple locations, Gate C, foreign, single-source and stale/fresh evidence cases without horizontal overflow.
+- Review rows expose the strongest evidence title with source count and freshness; approve/reject settles the acted-on row, while destructive emphasis appears only on interaction or a committed verdict.
+- Evidence Radar with one or two companies renders a compact evidence strip plus the canonical detail, with no comparison axes or duplicated priority list; three to five uses the compact field and six or more the full field.
 - loading and pending states do not use decorative ambient animation;
 - reduced-motion mode suppresses non-essential transitions and animation;
 - hover-only behavior is capability-gated;

@@ -33,6 +33,9 @@ const ACCOUNT_SECONDARY_LINKS = [
   { href: "/settings/team", label: "Команда" },
   { href: "/settings/security", label: "Безопасность" },
   { href: "/settings/access", label: "Доступ и оплата" },
+  { href: "mailto:support@recruiter-radar.ru", label: "Поддержка" },
+  { href: "/legal", label: "Документы" },
+  { href: "/privacy", label: "Конфиденциальность" },
 ] as const;
 
 const CORE_HREFS = new Set(CORE_DESTINATIONS.map((item) => item.href));

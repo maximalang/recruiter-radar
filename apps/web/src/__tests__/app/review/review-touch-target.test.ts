@@ -11,4 +11,23 @@ describe('review workspace interaction contract', () => {
     expect(styles).toContain('.actions>a{min-height:44px;')
     expect(styles).not.toContain('.actions>a{min-height:40px;')
   })
+
+  it('surfaces the strongest evidence and keeps destructive styling interaction-bound', () => {
+    const page = readFileSync(
+      resolve(process.cwd(), 'app/review/page.tsx'),
+      'utf8',
+    )
+    const actions = readFileSync(
+      resolve(process.cwd(), 'app/review/review-actions.module.css'),
+      'utf8',
+    )
+
+    expect(page).toContain('data-review-evidence-title')
+    expect(page).toContain('candidate.evidenceTitles[0]')
+    expect(page).toContain('listPendingReviewCandidates')
+    expect(page).not.toContain('fetch(url.toString()')
+    expect(actions).not.toContain('.btn[data-tone="danger"] {')
+    expect(actions).toContain('.btn[data-tone="danger"]:hover')
+    expect(actions).toContain('.verdict[data-tone="danger"]')
+  })
 })
