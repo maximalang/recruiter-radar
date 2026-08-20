@@ -216,7 +216,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const confidence = confidenceView(lead.confidenceGate);
   const decision = deriveCompanyBriefDecision({
     hasLawfulCorporateContact: contactViews.length > 0,
-    lawfulContactPath: lawfulPath,
+    lawfulContactPathKind: lead.lawfulContactPath,
+    lawfulContactPathLabel: lawfulPath,
     careerPageUrl: lead.careerPageUrl,
     confidenceContext: confidence.label,
   });

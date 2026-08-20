@@ -13,7 +13,8 @@ export type CompanyBriefDecision = {
 
 export function deriveCompanyBriefDecision(input: {
   hasLawfulCorporateContact: boolean;
-  lawfulContactPath: string | null;
+  lawfulContactPathKind: string | null;
+  lawfulContactPathLabel: string | null;
   careerPageUrl: string | null;
   confidenceContext: string;
 }): CompanyBriefDecision {
@@ -30,7 +31,7 @@ export function deriveCompanyBriefDecision(input: {
     };
   }
 
-  if (input.careerPageUrl) {
+  if (input.lawfulContactPathKind === 'career-page' && input.careerPageUrl) {
     return {
       kind: 'career',
       recommendation: 'Открыть карьерную страницу и найти корпоративный путь контакта вручную.',
@@ -43,11 +44,24 @@ export function deriveCompanyBriefDecision(input: {
     };
   }
 
-  if (input.lawfulContactPath) {
+  if (input.lawfulContactPathLabel) {
     return {
       kind: 'lawful-path',
-      recommendation: `Использовать безопасный путь контакта: ${input.lawfulContactPath}.`,
+      recommendation: `Использовать безопасный путь контакта: ${input.lawfulContactPathLabel}.`,
       primaryAction: null,
+      confidenceContext: input.confidenceContext,
+    };
+  }
+
+  if (input.careerPageUrl) {
+    return {
+      kind: 'career',
+      recommendation: 'Открыть карьерную страницу и найти корпоративный путь контакта вручную.',
+      primaryAction: {
+        href: input.careerPageUrl,
+        label: 'Открыть карьерную страницу',
+        external: true,
+      },
       confidenceContext: input.confidenceContext,
     };
   }
