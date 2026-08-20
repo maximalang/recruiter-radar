@@ -166,7 +166,7 @@
 .finalTrust li { display: flex; align-items: center; gap: .55rem; color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent); font-size: .8rem; }
 .finalTrust li::before { width: .35rem; height: .35rem; border-radius: 50%; background: var(--color-signal); content: ""; }
 .finalDecision > a:first-of-type { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-primary); font-size: .88rem; font-weight: 700; text-decoration: none; }
-.finalDecision > a:last-of-type { display: inline-flex; min-height: 40px; align-items: center; color: color-mix(in srgb, var(--color-text-inverse) 58%, transparent); font-size: .8rem; text-decoration: none; }
+.finalDecision > a:last-of-type { display: inline-flex; min-height: 44px; align-items: center; color: color-mix(in srgb, var(--color-text-inverse) 58%, transparent); font-size: .8rem; text-decoration: none; }
 
 @keyframes faqReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .faqList details[open] p { animation: faqReveal var(--motion-duration-navigation) var(--motion-ease-enter) both; }
