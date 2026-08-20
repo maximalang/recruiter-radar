@@ -168,6 +168,9 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
       props.previewInput.includeKeywords,
     ].filter(Boolean);
     const visibleItems = previewState.items.slice(0, 5);
+    const statusLabel = previewState.isPersonalized
+      ? `Выдача по вашему профилю · ${previewState.isLive ? "свежие данные" : "демо"}`
+      : "Пример сегодняшней выдачи · демо";
 
     return (
       <div
@@ -182,17 +185,14 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
         />
         <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
           <div>
-            <span>КОМПАНИИ НА СЕГОДНЯ / {String(previewState.items.length).padStart(2, "0")}</span>
-            <strong>{previewState.isPersonalized ? "Выдача по вашему профилю" : "Пример сегодняшней выдачи"}</strong>
+            <strong>{statusLabel}</strong>
             {!previewState.isLive ? (
               <small className={sceneStyles.demoDisclosure}>
-                <strong>Обезличенный пример.</strong> Названия и часть фактов изменены.
+                <strong>Обезличенный пример:</strong> названия и часть фактов изменены.
               </small>
             ) : null}
           </div>
-          <span data-live={previewState.isLive || undefined}>
-            {previewState.isLive ? "свежие данные" : "демо"}
-          </span>
+          <span data-live={previewState.isLive || undefined}>{previewState.items.length} компаний</span>
         </div>
 
         {previewState.isPersonalized && appliedProfile.length > 0 ? (
