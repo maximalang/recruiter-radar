@@ -37,6 +37,7 @@ export default function WorkspaceScene(props: WorkspaceProps) {
       id="scene-workspace"
       className={`${styles.scene} ${styles.lightScene} ${styles.workspaceScene} ${sceneStyles.section}`}
       aria-labelledby="workspace-title"
+      aria-label="Интерактивный пример"
       data-header-tone="light"
       data-motion-reveal="section"
       data-preview-layout="marketing-demo"
@@ -147,7 +148,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
   try {
     const previewState = await getPublicSampleDigestState(props.previewInput);
     const appliedProfile = [props.previewInput.specialization, props.previewInput.targetCity].filter(Boolean);
-    const visibleItems = previewState.items.slice(0, 4);
+    const visibleItems = previewState.items.slice(0, 5);
 
     return (
       <div
