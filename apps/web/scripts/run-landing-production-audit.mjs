@@ -4,15 +4,16 @@ import process from "node:process";
 import { resolveAuditScriptPath } from "./landing-audit-path.mjs";
 
 const auditScript = resolveAuditScriptPath(import.meta.url);
+const reviewCaptureScript = new URL("./capture-landing-review.mjs", import.meta.url).pathname;
 const maxAttempts = 2;
 
 function wait(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-function runAudit() {
+function runScript(scriptPath) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [auditScript], {
+    const child = spawn(process.execPath, [scriptPath], {
       cwd: process.cwd(),
       env: process.env,
       stdio: ["inherit", "pipe", "pipe"],
@@ -43,8 +44,16 @@ function runAudit() {
   });
 }
 
+const reviewCapture = await runScript(reviewCaptureScript);
+if (reviewCapture.code !== 0) {
+  if (reviewCapture.signal) {
+    process.stderr.write(`Landing review capture stopped by ${reviewCapture.signal}.\n`);
+  }
+  process.exit(reviewCapture.code);
+}
+
 for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-  const result = await runAudit();
+  const result = await runScript(auditScript);
   if (result.code === 0) process.exit(0);
 
   const abortedNavigation = result.output.includes("net::ERR_ABORTED");
