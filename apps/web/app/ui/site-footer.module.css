@@ -107,6 +107,7 @@
   background: transparent;
   font: inherit;
   cursor: pointer;
+  scroll-margin-block: 1rem calc(5.5rem + env(safe-area-inset-bottom));
 }
 
 .footerBrand:focus-visible,
@@ -276,6 +277,10 @@
   }
 
   .footerNav nav:last-child strong {
+    grid-column: 1 / -1;
+  }
+
+  .footerButton {
     grid-column: 1 / -1;
   }
 }
