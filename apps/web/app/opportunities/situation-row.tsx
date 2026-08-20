@@ -88,6 +88,11 @@ export function SituationRow(props: {
               {opportunity.validUntil ? ` · актуально до ${formatDate(opportunity.validUntil)}` : ''}
             </div>
 
+            <p className={rowStyles.nextAction}>
+              <span>Следующий ход</span>
+              {opportunity.recommendedAction}
+            </p>
+
             <div className={rowStyles.temporal} aria-label={`Ситуация с ${formatDate(opportunity.episodeStartedAt)} по ${formatDate(opportunity.episodeLastSeenAt)}`}>
               <time dateTime={opportunity.episodeStartedAt}>{formatShortDate(opportunity.episodeStartedAt)}</time>
               <span className={rowStyles.temporalLine} aria-hidden="true" />

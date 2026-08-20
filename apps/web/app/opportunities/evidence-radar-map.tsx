@@ -24,6 +24,7 @@ export function EvidenceRadarMap(props: {
     () => new Set(rankedLeads.slice(0, MAX_PERSISTENT_LABELS).map((lead) => lead.cardId)),
     [rankedLeads],
   )
+  const density = props.leads.length <= 2 ? 'sparse' : props.leads.length <= 5 ? 'compact' : 'full'
 
   if (props.leads.length === 0) {
     return (
@@ -38,17 +39,17 @@ export function EvidenceRadarMap(props: {
   }
 
   return (
-    <div className={styles.layout}>
+    <div className={styles.layout} data-density={density}>
       <section className={styles.radarPanel} aria-labelledby="evidence-radar-title">
         <header className={styles.radarHeader}>
           <div>
-            <span className={styles.radarEyebrow}>Свежесть × уровень подтверждения</span>
-            <h2 id="evidence-radar-title">Сильные сигналы ближе к верхнему правому углу</h2>
+            <span className={styles.radarEyebrow}>Поле доказательств</span>
+            <h2 id="evidence-radar-title">Свежесть, подтверждение и релевантность</h2>
           </div>
           <div className={styles.radarLegend} aria-label="Как читать Радар">
-            <span>по горизонтали — свежесть</span>
-            <span>по вертикали — подтверждение</span>
-            <span>размер — коммерческая релевантность</span>
+            <span>X — свежесть</span>
+            <span>Y — подтверждение</span>
+            <span>Размер — релевантность</span>
           </div>
         </header>
 
@@ -56,7 +57,7 @@ export function EvidenceRadarMap(props: {
           {selected ? `Выбрано: ${selected.organizationName}, ${selected.location.city}` : ''}
         </p>
 
-        <div className={styles.canvas} data-evidence-radar-map>
+        <div className={styles.canvas} data-evidence-radar-map data-density={density}>
           <div className={styles.axisY} aria-hidden="true">
             <span>сильнее подтверждено</span>
             <span>слабее подтверждено</span>
@@ -98,7 +99,8 @@ export function EvidenceRadarMap(props: {
                     </span>
                     <span className={styles.semanticWhy}>{lead.whyNow}</span>
                     <span className={styles.semanticConfidence} data-level={confidence.level}>
-                      {confidence.label}
+                      <span>{confidence.label}</span>
+                      <small>релевантность {Math.round(lead.score.opportunityScore)}</small>
                     </span>
                   </button>
                 </li>

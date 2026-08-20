@@ -1,6 +1,17 @@
 .row {
+  position: relative;
   border-bottom: 1px solid var(--color-separator);
   background: transparent;
+}
+
+.row::before {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  width: 2px;
+  height: 22px;
+  background: var(--color-signal);
+  content: "";
 }
 
 .row[data-freshness="stale"] .summary {
@@ -13,10 +24,11 @@
   grid-template-columns: minmax(190px, .85fr) minmax(220px, 1.15fr) minmax(190px, .9fr) auto;
   grid-template-areas:
     "identity change timeline cue"
-    "identity proof timeline cue";
+    "identity proof timeline cue"
+    "identity next timeline cue";
   align-items: center;
   gap: 8px 24px;
-  padding: 18px 4px;
+  padding: 16px 4px 16px 14px;
   color: var(--color-text-primary);
 }
 
@@ -66,6 +78,24 @@
   color: var(--color-text-tertiary);
   font-size: var(--type-metadata-size);
   line-height: 1.4;
+}
+
+.nextAction {
+  grid-area: next;
+  margin: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--type-metadata-size);
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.nextAction span {
+  margin-right: 7px;
+  color: var(--color-signal-hover);
+  font-weight: 650;
 }
 
 .temporal {
@@ -155,6 +185,7 @@
     grid-template-areas:
       "identity change cue"
       "identity proof cue"
+      "identity next cue"
       "timeline timeline timeline";
     gap: 8px 18px;
   }
@@ -172,10 +203,11 @@
       "identity cue"
       "change change"
       "proof proof"
+      "next next"
       "timeline timeline";
     min-height: 0;
     gap: 9px 12px;
-    padding: 16px 0;
+    padding: 16px 0 16px 12px;
   }
 
   .change {

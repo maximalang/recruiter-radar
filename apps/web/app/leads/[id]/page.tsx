@@ -181,8 +181,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         : 'Сначала подтвердить корпоративный путь контакта, затем выходить с предложением.';
 
   const nextStepLinks: { href: string; label: string }[] = [];
-  if (lead.orgWebsite) nextStepLinks.push({ href: lead.orgWebsite, label: 'Сайт компании' });
   if (lead.careerPageUrl) nextStepLinks.push({ href: lead.careerPageUrl, label: 'Карьерная страница' });
+  if (lead.orgWebsite) nextStepLinks.push({ href: lead.orgWebsite, label: 'Сайт компании' });
+  const primaryNextStep = nextStepLinks[0] ?? null;
   const crmBlock = leadToCrmBlock({
     orgName: lead.orgName,
     score: lead.score,
@@ -275,6 +276,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <section className={`${styles.section} ${styles.nextMoveSection}`} data-company-brief-next-move>
             <h2>Следующий ход</h2>
             <p className={styles.nextMove}>{nextMove}</p>
+            {primaryNextStep ? (
+              <a className={styles.mobilePrimaryAction} href={primaryNextStep.href} target="_blank" rel="noopener noreferrer">
+                Открыть: {primaryNextStep.label.toLocaleLowerCase('ru-RU')} ↗
+              </a>
+            ) : null}
           </section>
 
           <div className={styles.provenanceSection} data-company-brief-provenance>
@@ -287,6 +293,18 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
           <aside className={styles.aside} aria-label="Действия и контекст" data-company-brief-action>
             <div className={styles.rail}>
+              <section className={styles.railSection}>
+                <span className={styles.railTitle}>Рекомендуемый ход</span>
+                <div className={styles.railDecision}>{nextMove}</div>
+                <NextStepsBlock crmBlock={crmBlock} links={nextStepLinks} singleExportHref={`/api/leads/${lead.id}/export`} />
+              </section>
+
+              <section className={styles.railSection}>
+                <span className={styles.railTitle}>Уверенность Радара</span>
+                <ConfidenceIndicator level={confidence.level}>{confidence.label}</ConfidenceIndicator>
+                <div className={styles.railMetric} data-numeric="true">Сила сигнала · {score}</div>
+              </section>
+
               <section className={styles.railSection}>
                 <span className={styles.railTitle}>Контакт</span>
                 {lawfulPath ? <div className={styles.railValue}>{lawfulPath}</div> : null}
@@ -308,19 +326,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </section>
 
               <section className={styles.railSection}>
-                <span className={styles.railTitle}>Действие</span>
-                <NextStepsBlock crmBlock={crmBlock} links={nextStepLinks} singleExportHref={`/api/leads/${lead.id}/export`} />
-              </section>
-
-              <section className={styles.railSection}>
                 <span className={styles.railTitle}>Статус</span>
                 <div className={styles.railValue}>{feedback ? feedback.label : 'Обратной связи ещё нет'}</div>
                 {lead.feedbackNote ? <p className={styles.body}>{lead.feedbackNote}</p> : null}
                 <FeedbackButtons orgId={lead.orgId} clientProfileId={lead.clientProfileId} currentStatus={lead.feedbackStatus ?? 'none'} />
               </section>
 
-              <section className={styles.railSection}>
-                <span className={styles.railTitle}>Компания</span>
+              <details className={styles.railDetails} data-motion-disclosure>
+                <summary>Реквизиты и служебные данные</summary>
                 <div className={styles.metaList}>
                   {lead.orgDomain ? <span>{lead.orgDomain}</span> : null}
                   {lead.orgWebsite ? <a href={lead.orgWebsite} target="_blank" rel="noopener noreferrer">Сайт компании</a> : null}
@@ -330,7 +343,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   {lead.sourceExternalId ? <span className={styles.identifier}>ID {lead.sourceExternalId}</span> : null}
                   <span>Добавлено {new Date(lead.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                 </div>
-              </section>
+              </details>
             </div>
           </aside>
 

@@ -931,6 +931,20 @@ async function inspectCurrentSurface(
     () => document.documentElement.scrollWidth - window.innerWidth,
   )
   assert(overflow <= 0, `${pathname} overflows horizontally by ${overflow}px.`)
+  const mobileNavOverlap = await page.evaluate(() => {
+    if (window.innerWidth > 767) return 0
+    const main = document.querySelector('main')
+    const nav = document.querySelector('nav[aria-label="Мобильная навигация"]')
+    if (!(main instanceof HTMLElement) || !(nav instanceof HTMLElement)) return 0
+    return Math.max(
+      0,
+      Math.ceil(main.getBoundingClientRect().bottom - nav.getBoundingClientRect().top),
+    )
+  })
+  assert(
+    mobileNavOverlap === 0,
+    `${pathname} mobile navigation overlaps content by ${mobileNavOverlap}px.`,
+  )
   const unlabeledControls = await page.evaluate(() => {
     const visible = (element) => {
       const style = window.getComputedStyle(element)
@@ -1007,6 +1021,7 @@ async function inspectCurrentSurface(
   report.responsive[key] = {
     viewport: page.viewportSize(),
     overflowPixels: overflow,
+    mobileNavigationOverlapPixels: mobileNavOverlap,
   }
   report.screenshots[key] = screenshotPath
 }
@@ -1294,6 +1309,16 @@ async function verifyAuthenticatedProductSurfacesAtViewport(
   const todayFilter = page.locator('button[data-motion-interactive]').filter({
     hasText: 'Сегодня в работе',
   })
+  if (suffix === '390') {
+    const mobileFilterToggle = page.getByRole('button', {
+      name: /^Фильтры/,
+    })
+    await mobileFilterToggle.click()
+    assert(
+      await mobileFilterToggle.getAttribute('aria-expanded') === 'true',
+      'Mobile company filters did not expand.',
+    )
+  }
   await todayFilter.click()
   await page.waitForURL((url) => url.pathname === '/leads' && url.searchParams.get('today') === '1')
   assert(

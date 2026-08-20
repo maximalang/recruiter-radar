@@ -65,7 +65,7 @@ export default async function EvidenceRadarPage() {
     <InternalPageFrame navItems={NAVIGATION}>
       <InternalPageHeader
         title="Радар"
-        subtitle="По горизонтали — свежесть подтверждения, по вертикали — его сила. География остаётся контекстом и не определяет положение компании."
+        subtitle="Подтверждённые сигналы по свежести, силе и релевантности. География — только контекст."
       />
       {leads ? (
         <EvidenceRadarMap leads={leads} referenceTimestamp={Date.now()} />

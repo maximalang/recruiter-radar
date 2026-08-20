@@ -112,10 +112,11 @@ describe('EvidenceRadarMap V1-V6 contract', () => {
 
     const { container } = render(<EvidenceRadarMap leads={[alphaLead, betaLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
 
-    expect(screen.getByText('Свежесть × уровень подтверждения')).toBeInTheDocument()
-    expect(screen.getByText('по горизонтали — свежесть')).toBeInTheDocument()
-    expect(screen.getByText('по вертикали — подтверждение')).toBeInTheDocument()
-    expect(container.querySelector('[data-evidence-radar-map]')).not.toBeNull()
+    expect(screen.getByText('Свежесть, подтверждение и релевантность')).toBeInTheDocument()
+    expect(screen.getByText('X — свежесть')).toBeInTheDocument()
+    expect(screen.getByText('Y — подтверждение')).toBeInTheDocument()
+    expect(container.querySelector('[data-evidence-radar-map]')).toHaveAttribute('data-density', 'sparse')
+    expect(screen.getAllByText(/релевантность 80/)).toHaveLength(2)
     expect(container.querySelector('[data-recency]')).not.toBeNull()
     expect(container.querySelector('[data-confidence]')).not.toBeNull()
     expect(container.querySelector('[data-region-code]')).toBeNull()

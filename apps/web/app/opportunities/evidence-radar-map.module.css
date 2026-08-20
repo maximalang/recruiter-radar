@@ -72,6 +72,14 @@
   color: var(--radar-ink);
 }
 
+.canvas[data-density="sparse"] {
+  min-height: 300px;
+}
+
+.canvas[data-density="compact"] {
+  min-height: clamp(380px, 42vw, 480px);
+}
+
 .axisX,
 .axisY {
   position: absolute;
@@ -333,7 +341,17 @@
 
 .semanticConfidence {
   justify-self: end;
+  display: grid;
+  gap: 3px;
   font-weight: 600;
+  text-align: right;
+}
+
+.semanticConfidence small {
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--type-label-size);
+  font-weight: 500;
 }
 
 .semanticConfidence[data-level="high"] {
@@ -678,6 +696,14 @@
 
   .canvas {
     min-height: 220px;
+  }
+
+  .canvas[data-density="sparse"] {
+    min-height: 210px;
+  }
+
+  .canvas[data-density="compact"] {
+    min-height: 260px;
   }
 
   .axisY {

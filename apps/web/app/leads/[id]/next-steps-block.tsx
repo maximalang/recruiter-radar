@@ -77,13 +77,14 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
 
       {safeLinks.length > 0 && (
         <div className={s.nextStepsLinks}>
-          {safeLinks.map((l) => (
+          {safeLinks.map((l, index) => (
             <a
               key={l.href}
               href={l.href}
               target="_blank"
               rel="noopener noreferrer"
               className={s.nextStepsLink}
+              data-variant={index === 0 ? 'primary' : undefined}
             >
               {l.label} ↗
             </a>
@@ -96,7 +97,6 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
           type="button"
           onClick={handleCopy}
           className={s.nextStepsBtn}
-          data-variant="primary"
           disabled={isPending}
         >
           {copied ? <><CheckIcon className={s.copiedIcon} aria-hidden="true" /> Скопировано</> : 'Скопировать для CRM'}

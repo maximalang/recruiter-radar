@@ -7,6 +7,14 @@
   gap: 16px;
 }
 
+@media (min-width: 1041px) {
+  .researchControls {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 12px;
+  }
+}
+
 @media (max-width: 680px) {
   .mobileToggle {
     width: 100%;
