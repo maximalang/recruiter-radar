@@ -29,12 +29,20 @@
 
 .pricingIntro > span,
 .faqHeading > span,
-.finalCopy > span {
-  color: var(--color-signal-hover);
+.finalEyebrow {
   font-size: .72rem;
   font-weight: 650;
   letter-spacing: .08em;
   text-transform: uppercase;
+}
+
+.pricingIntro > span,
+.faqHeading > span {
+  color: var(--color-signal-hover);
+}
+
+.finalEyebrow {
+  color: var(--color-signal-on-dark);
 }
 
 .pricingIntro > span { grid-area: label; padding-top: .45rem; }
@@ -66,8 +74,8 @@
   gap: 1.5rem;
 }
 
-.pilotTopline > div:first-child { display: grid; gap: .3rem; }
-.pilotTopline span { color: var(--color-signal); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+.pilotMeta { display: grid; gap: .3rem; }
+.pilotEyebrow { color: var(--color-signal-on-dark); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
 .pilotTopline strong { font-size: 1rem; font-weight: 600; }
 .pilotPrice { font-size: clamp(3rem, 5vw, 4.7rem); font-weight: 520; letter-spacing: -.07em; line-height: .9; }
 
@@ -75,7 +83,7 @@
 .pilotOffer li { display: flex; align-items: flex-start; gap: .55rem; color: color-mix(in srgb, var(--color-text-inverse) 78%, transparent); font-size: .9rem; line-height: 1.45; }
 .pilotOffer li :global(svg) { flex: 0 0 auto; margin-top: .16rem; color: var(--color-signal); }
 
-.pilotOffer > a {
+.pilotCta {
   display: inline-flex;
   min-height: 48px;
   align-items: center;
@@ -84,10 +92,15 @@
   padding: .8rem 1rem;
   border-radius: var(--radius-control);
   background: var(--color-signal);
-  color: var(--color-text-primary);
+  color: var(--color-text-inverse);
   font-size: .88rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.pilotCta:focus-visible,
+.finalCta:focus-visible {
+  outline-color: var(--color-text-inverse);
 }
 
 .pilotOffer > small { color: color-mix(in srgb, var(--color-text-inverse) 52%, transparent); font-size: .74rem; }
@@ -165,15 +178,15 @@
 .finalTrust { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none; }
 .finalTrust li { display: flex; align-items: center; gap: .55rem; color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent); font-size: .8rem; }
 .finalTrust li::before { width: .35rem; height: .35rem; border-radius: 50%; background: var(--color-signal); content: ""; }
-.finalDecision > a:first-of-type { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-primary); font-size: .88rem; font-weight: 700; text-decoration: none; }
-.finalDecision > a:last-of-type { display: inline-flex; min-height: 44px; align-items: center; color: color-mix(in srgb, var(--color-text-inverse) 58%, transparent); font-size: .8rem; text-decoration: none; }
+.finalCta { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .88rem; font-weight: 700; text-decoration: none; }
+.finalSecondaryLink { display: inline-flex; min-height: 44px; align-items: center; color: color-mix(in srgb, var(--color-text-inverse) 58%, transparent); font-size: .8rem; text-decoration: none; }
 
 @keyframes faqReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .faqList details[open] p { animation: faqReveal var(--motion-duration-navigation) var(--motion-ease-enter) both; }
 
 @media (hover: hover) and (pointer: fine) {
-  .pilotOffer > a:hover,
-  .finalDecision > a:first-of-type:hover { background: var(--color-signal-hover); }
+  .pilotCta:hover,
+  .finalCta:hover { background: var(--color-signal-hover); }
   .secondaryOffers article > a:hover { color: var(--color-text-primary); }
 }
 
