@@ -14,8 +14,12 @@ describe('V1–V6 visual closure cleanliness', () => {
       repoPath('apps/web/app/ui/product-workspace-polish.module.css'),
       repoPath('apps/web/app/opportunities/opportunity-card.tsx'),
       repoPath('apps/web/app/dashboard/dashboard.module.css'),
+      // Legacy raw-hex implementations stay retired; the restored signal field
+      // lives under canonical token-based module names instead.
       repoPath('apps/web/app/landing/hero-radar.module.css'),
       repoPath('apps/web/app/landing/hero-radar.tsx'),
+      repoPath('apps/web/app/landing/signal-timeline-scene.tsx'),
+      repoPath('apps/web/app/landing/signal-timeline-scene.module.css'),
     ]
 
     for (const file of retired) {

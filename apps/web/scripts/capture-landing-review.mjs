@@ -83,7 +83,7 @@ async function resetInteractionState(page) {
   });
   await page.waitForFunction(() => (
     window.scrollY === 0
-    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light"
+    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark"
   ));
   await movePointerToNeutral(page);
   await page.evaluate(() => {
@@ -236,12 +236,12 @@ async function captureContrastCrops(page, viewportName) {
 
   const artifacts = [];
   await resetInteractionState(page);
-  const decision = page.locator('[data-hero-stage="decision"]').first();
+  const decision = page.locator("#scene-detection [data-hero-copy]").first();
   await decision.screenshot({
-    path: path.join(reviewDirectory, `${viewportName}-hero-decision.png`),
+    path: path.join(reviewDirectory, `${viewportName}-hero-copy.png`),
     animations: "disabled",
   });
-  artifacts.push(`${viewportName}-hero-decision.png`);
+  artifacts.push(`${viewportName}-hero-copy.png`);
 
   const states = [
     { name: "pilot-cta", locator: page.locator("#pricing [data-pricing-primary] > a").first() },
