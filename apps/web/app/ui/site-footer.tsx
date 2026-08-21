@@ -55,10 +55,11 @@ export async function SiteFooter(props: { tone?: "light" | "dark"; showCookieSet
             <nav aria-label="Документы">
               <strong>Документы</strong>
               <Link href="/legal" aria-label="Правовая информация — Реквизиты" className={s.footerLink}>Правовая информация</Link>
-              <Link href="/privacy" aria-label="Конфиденциальность — Политика конфиденциальности" className={s.footerLink}>Политика конфиденциальности</Link>
               <Link href="/terms" aria-label="Условия использования — Оферта" className={s.footerLink}>Условия использования</Link>
-              <Link href="/personal-data-consent" aria-label="Согласие на обработку персональных данных" className={s.footerLink}>Обработка данных</Link>
               <Link href="/payment-and-refund" aria-label="Информация об оплате и возврате" className={s.footerLink}>Оплата и возврат</Link>
+              <Link href="/privacy" aria-label="Конфиденциальность — Политика обработки персональных данных" className={s.footerLink}>Персональные данные</Link>
+              <Link href="/personal-data-consent" aria-label="Согласие на обработку персональных данных" className={s.footerLink}>Согласие</Link>
+              <Link href="/cookies" aria-label="Cookies и аналитика" className={s.footerLink}>Cookies</Link>
               {props.showCookieSettings ? <CookieSettingsButton /> : null}
             </nav>
           </div>
