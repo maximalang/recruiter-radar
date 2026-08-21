@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getAccountById } from "@/lib/account-auth";
 import { getSession } from "@/lib/auth-v2/authorization";
+import { validateCheckoutOrderForm } from "@/lib/checkout-legal";
 import { buildLegalAcceptanceAudit } from "@/lib/legalDocuments";
 import { OPERATOR_REQUISITES } from "@/lib/operatorRequisites";
 import { buildPaymentReadinessReport } from "@/lib/payment-readiness";
@@ -63,19 +64,12 @@ export default async function CheckoutPage(props: {
     const providerCheckoutAllowed = buildPaymentReadinessReport().selfServeCheckoutReady;
 
     const separator = checkoutHref.includes("?") ? "&" : "?";
-    const agencyName = readFormText(formData, "agencyName");
-    const payerType = readFormText(formData, "payerType") === "individual" ? "individual" : "business";
-    const buyerInn = readFormText(formData, "buyerInn").replace(/\D/g, "");
-
-    if (!agencyName || agencyName.length > 160) {
-      redirect(`${checkoutHref}${separator}error=agency`);
+    const decision = validateCheckoutOrderForm(formData);
+    if (!decision.ok) {
+      redirect(`${checkoutHref}${separator}error=${decision.errorCode}`);
     }
-    if (payerType === "business" && !/^(?:\d{10}|\d{12})$/.test(buyerInn)) {
-      redirect(`${checkoutHref}${separator}error=inn`);
-    }
-    if (formData.get("acceptTerms") !== "on" || formData.get("acceptPersonalData") !== "on") {
-      redirect(`${checkoutHref}${separator}error=legal`);
-    }
+    const { payerType, buyerInn } = decision;
+    const agencyName = String(formData.get("agencyName") ?? "").trim();
 
     const legalAcceptance = buildLegalAcceptanceAudit();
     const result = await startCheckoutOrder({
@@ -259,9 +253,4 @@ function TrustItem({ title, text }: { title: string; text: string }) {
       <span>{text}</span>
     </div>
   );
-}
-
-function readFormText(formData: FormData, key: string): string {
-  const value = formData.get(key);
-  return typeof value === "string" ? value.trim() : "";
 }
