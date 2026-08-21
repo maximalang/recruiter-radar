@@ -23,7 +23,7 @@ async function preparePage(context) {
   await page.locator('[data-landing-experience="signal-lock"]').waitFor({ state: "attached" });
   await page.locator("#scene-detection").waitFor({ state: "visible" });
 
-  const consent = page.getByRole("button", { name: "Разрешить", exact: true });
+  const consent = page.getByRole("button", { name: "Принять аналитику", exact: true });
   if (await consent.isVisible()) {
     await consent.click();
     await consent.waitFor({ state: "hidden" });
