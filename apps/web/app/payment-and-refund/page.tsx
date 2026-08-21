@@ -106,7 +106,7 @@ export default function PaymentAndRefundPage() {
           </PolicySection>
 
           <PolicySection n="10" title="Связанные документы">
-            <p>Полные договорные условия содержатся в <Link href="/terms" className={s.docLink}>публичной оферте</Link>, порядок обработки данных — в <Link href="/privacy" className={s.docLink}>политике обработки персональных данных</Link>, реквизиты продавца — на странице <Link href="/legal" className={s.docLink}>«Реквизиты»</Link>.</p>
+            <p>Полные договорные условия содержатся в <Link href="/terms" className={s.docLink}>публичной оферте</Link>, порядок обработки данных — в <Link href="/privacy" className={s.docLink}>политике обработки персональных данных</Link>, реквизиты продавца — на странице <Link href="/legal" className={s.docLink}>«Реквизиты»</Link>, правила работы с результатами сервиса — на странице <Link href="/acceptable-use" className={s.docLink}>«Правила использования»</Link>.</p>
           </PolicySection>
         </div>
       </section>
