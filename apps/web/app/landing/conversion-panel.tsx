@@ -49,13 +49,17 @@ export default function ConversionPanel(props: {
             data-pilot-entry="primary"
           >
             <div className={panelStyles.pilotTopline}>
-              <div><span>Пилот</span><strong>{pilotPlan.cadence}</strong></div>
+              <div className={panelStyles.pilotMeta}>
+                <span className={panelStyles.pilotEyebrow}>Пилот</span>
+                <strong>{pilotPlan.cadence}</strong>
+              </div>
               <div className={panelStyles.pilotPrice}>{pilotPlan.price}</div>
             </div>
             <ul>
               {PILOT_BULLETS.map((bullet) => <li key={bullet}><ArrowGlyph size={14} />{bullet}</li>)}
             </ul>
             <Link
+              className={panelStyles.pilotCta}
               prefetch={false}
               href={buildCheckoutHref({ ...props.previewInput, planCode: pilotPlan.code })}
               data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
@@ -125,7 +129,7 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <div className={panelStyles.finalCopy}>
-          <span>7 дней / своя ниша</span>
+          <span className={panelStyles.finalEyebrow}>7 дней / своя ниша</span>
           <h2>Посмотрите, кому стоит написать сейчас.</h2>
           <p>Радар покажет приоритет компаний, проверяемые факты и конкретный повод для первого контакта.</p>
         </div>
@@ -137,6 +141,7 @@ export default function ConversionPanel(props: {
             <li>Сообщения отправляете вы</li>
           </ul>
           <Link
+            className={panelStyles.finalCta}
             prefetch={false}
             href={buildCheckoutHref({ ...props.previewInput, planCode: pilotPlan.code })}
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
@@ -144,7 +149,7 @@ export default function ConversionPanel(props: {
           >
             {props.paymentConfigured ? `Запустить на 7 дней — ${pilotPlan.price}` : "Оставить заявку на пилот"} <ArrowGlyph />
           </Link>
-          <a href="#preview-configurator">Сначала посмотреть пример</a>
+          <a className={panelStyles.finalSecondaryLink} href="#preview-configurator">Сначала посмотреть пример</a>
         </div>
       </div>
     </section>
