@@ -29,6 +29,68 @@ const focusedSurfaces = [
   { name: "final-cta", selector: "#conversion-final" },
 ];
 
+async function movePointerToNeutral(page) {
+  const viewport = page.viewportSize();
+  if (!viewport) return;
+
+  const point = await page.evaluate(({ width, height }) => {
+    const interactiveSelector = "a,button,summary,input,select,textarea,[role='button'],[role='link']";
+    for (let y = Math.max(1, height - 2); y >= 1; y -= 24) {
+      for (let x = Math.max(1, width - 2); x >= 1; x -= 24) {
+        const target = document.elementFromPoint(x, y);
+        if (!target?.closest(interactiveSelector)) return { x, y };
+      }
+    }
+    return { x: 0, y: 0 };
+  }, viewport);
+
+  await page.mouse.move(point.x, point.y);
+  const hoveredInteractive = page.locator(
+    "a:hover,button:hover,summary:hover,input:hover,select:hover,textarea:hover,[role='button']:hover,[role='link']:hover",
+  );
+  if (await hoveredInteractive.count() !== 0) {
+    throw new Error(`Unable to place pointer at a neutral coordinate: ${JSON.stringify(point)}`);
+  }
+}
+
+async function resetInteractionState(page) {
+  const menuDialog = page.getByRole("dialog", { name: "Навигация по продукту" });
+  if (await menuDialog.isVisible()) {
+    await page.keyboard.press("Escape");
+    await menuDialog.waitFor({ state: "hidden" });
+  }
+
+  await page.locator("#scene-delivery details").evaluateAll((details) => {
+    for (const detail of details) detail.open = false;
+  });
+  await page.locator("#faq details").evaluateAll((details) => {
+    details.forEach((detail, index) => {
+      detail.open = index === 0;
+    });
+  });
+
+  const mobileDisclosure = page.locator('[data-mobile-lead-disclosure="true"]');
+  if (await mobileDisclosure.count() === 1 && await mobileDisclosure.getAttribute("aria-expanded") === "true") {
+    await mobileDisclosure.click();
+    await page.waitForFunction(() => (
+      document.querySelector('[data-mobile-lead-disclosure="true"]')?.getAttribute("aria-expanded") === "false"
+    ));
+  }
+
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    window.scrollTo(0, 0);
+  });
+  await page.waitForFunction(() => (
+    window.scrollY === 0
+    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light"
+  ));
+  await movePointerToNeutral(page);
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+}
+
 async function preparePage(context) {
   const page = await context.newPage();
   await page.route("**/api/landing-events", (route) => route.fulfill({ status: 204 }));
@@ -58,16 +120,54 @@ async function preparePage(context) {
     await page.evaluate((nextY) => window.scrollTo(0, nextY), y);
     await page.waitForTimeout(35);
   }
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForFunction(() => (
-    document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light"
-  ));
-  await page.waitForTimeout(80);
+  await resetInteractionState(page);
   return page;
 }
 
 async function documentHeight(page) {
   return page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight));
+}
+
+async function readInteractionStyle(locator) {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      borderColor: style.borderColor,
+      borderStyle: style.borderStyle,
+      borderWidth: style.borderWidth,
+      outlineColor: style.outlineColor,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
+      backgroundColor: style.backgroundColor,
+      hovered: element.matches(":hover"),
+      focused: element === document.activeElement,
+    };
+  });
+}
+
+async function captureHeroLoginInteraction(page, viewportName) {
+  if (viewportName !== "320x568") return null;
+
+  const login = page.locator("#scene-detection").getByRole("link", { name: "Войти", exact: true });
+  await resetInteractionState(page);
+  const neutralFile = `${viewportName}-hero-login-neutral.png`;
+  const neutral = await readInteractionStyle(login);
+  await page.screenshot({ path: path.join(reviewDirectory, neutralFile), animations: "disabled" });
+
+  await login.hover();
+  await page.waitForFunction(() => (
+    document.querySelector('#scene-detection a[href^="/login?"]')?.matches(":hover") === true
+  ));
+  const hoverFile = `${viewportName}-hero-login-hover.png`;
+  const hover = await readInteractionStyle(login);
+  await page.screenshot({ path: path.join(reviewDirectory, hoverFile), animations: "disabled" });
+
+  await resetInteractionState(page);
+  return {
+    neutral: { screenshot: neutralFile, ...neutral },
+    hover: { screenshot: hoverFile, ...hover },
+    hoverOnlyBorder: neutral.borderColor !== hover.borderColor && !neutral.hovered && hover.hovered,
+  };
 }
 
 async function scrollSectionUnderHeader(page, selector) {
@@ -82,6 +182,7 @@ async function scrollSectionUnderHeader(page, selector) {
 async function captureHeaderEvidence(page, viewportName) {
   const artifacts = [];
   const topViewports = new Set(["1440x900", "1024x768", "390x844", "320x568"]);
+  await resetInteractionState(page);
   if (topViewports.has(viewportName)) {
     const fileName = `${viewportName}-hero-header-top.png`;
     await page.screenshot({
@@ -93,12 +194,14 @@ async function captureHeaderEvidence(page, viewportName) {
 
   if (viewportName === "1440x900") {
     await scrollSectionUnderHeader(page, "#scene-workspace");
+    await movePointerToNeutral(page);
     await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
     let fileName = `${viewportName}-header-preview.png`;
     await page.screenshot({ path: path.join(reviewDirectory, fileName), animations: "disabled" });
     artifacts.push(fileName);
 
     await scrollSectionUnderHeader(page, "#scene-evidence");
+    await movePointerToNeutral(page);
     await page.waitForFunction(() => (
       document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark"
     ));
@@ -106,13 +209,11 @@ async function captureHeaderEvidence(page, viewportName) {
     await page.screenshot({ path: path.join(reviewDirectory, fileName), animations: "disabled" });
     artifacts.push(fileName);
 
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.waitForFunction(() => (
-      document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light"
-    ));
+    await resetInteractionState(page);
   }
 
   if (viewportName === "390x844") {
+    await resetInteractionState(page);
     let fileName = `${viewportName}-menu-trigger.png`;
     await page.screenshot({ path: path.join(reviewDirectory, fileName), animations: "disabled" });
     artifacts.push(fileName);
@@ -124,8 +225,7 @@ async function captureHeaderEvidence(page, viewportName) {
     fileName = `${viewportName}-menu-open.png`;
     await page.screenshot({ path: path.join(reviewDirectory, fileName), animations: "disabled" });
     artifacts.push(fileName);
-    await page.keyboard.press("Escape");
-    await dialog.waitFor({ state: "hidden" });
+    await resetInteractionState(page);
   }
 
   return artifacts;
@@ -135,6 +235,7 @@ async function captureContrastCrops(page, viewportName) {
   if (viewportName !== "1440x900") return [];
 
   const artifacts = [];
+  await resetInteractionState(page);
   const decision = page.locator('[data-hero-stage="decision"]').first();
   await decision.screenshot({
     path: path.join(reviewDirectory, `${viewportName}-hero-decision.png`),
@@ -148,7 +249,9 @@ async function captureContrastCrops(page, viewportName) {
   ];
 
   for (const state of states) {
-    await page.mouse.move(0, 0);
+    await resetInteractionState(page);
+    await state.locator.scrollIntoViewIfNeeded();
+    await movePointerToNeutral(page);
     await state.locator.screenshot({
       path: path.join(reviewDirectory, `${viewportName}-${state.name}-normal.png`),
       animations: "disabled",
@@ -156,7 +259,11 @@ async function captureContrastCrops(page, viewportName) {
     artifacts.push(`${viewportName}-${state.name}-normal.png`);
 
     await state.locator.hover();
-    await page.waitForTimeout(40);
+    await page.waitForFunction((selector) => document.querySelector(selector)?.matches(":hover") === true, (
+      state.name === "pilot-cta"
+        ? "#pricing [data-pricing-primary] > a"
+        : '#conversion-final [data-analytics-context="closing"]'
+    ));
     await state.locator.screenshot({
       path: path.join(reviewDirectory, `${viewportName}-${state.name}-hover.png`),
       animations: "disabled",
@@ -164,7 +271,7 @@ async function captureContrastCrops(page, viewportName) {
     artifacts.push(`${viewportName}-${state.name}-hover.png`);
   }
 
-  await page.mouse.move(0, 0);
+  await resetInteractionState(page);
   return artifacts;
 }
 
@@ -181,6 +288,7 @@ const manifest = {
   deliveryOpen: {},
   contrastCrops: [],
   headerEvidence: [],
+  heroLogin320: null,
 };
 
 try {
@@ -190,16 +298,16 @@ try {
       reducedMotion: "reduce",
     });
     const page = await preparePage(context);
+
+    manifest.heroLogin320 = await captureHeroLoginInteraction(page, viewport.name) ?? manifest.heroLogin320;
+
+    await resetInteractionState(page);
     const closedHeight = await documentHeight(page);
-    manifest.fullPage[viewport.name] = { width: viewport.width, height: closedHeight };
+    manifest.fullPage[viewport.name] = { width: viewport.width, height: closedHeight, state: "default" };
 
     manifest.headerEvidence.push(...await captureHeaderEvidence(page, viewport.name));
 
-    await page.evaluate(() => {
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-      window.scrollTo(0, 0);
-    });
-    await page.waitForTimeout(80);
+    await resetInteractionState(page);
     await page.screenshot({
       path: path.join(reviewDirectory, `${viewport.name}-full.png`),
       fullPage: true,
@@ -208,8 +316,11 @@ try {
 
     if (viewport.focused) {
       for (const surface of focusedSurfaces) {
+        await resetInteractionState(page);
         const locator = page.locator(surface.selector).first();
         await locator.waitFor({ state: "visible" });
+        await locator.scrollIntoViewIfNeeded();
+        await movePointerToNeutral(page);
         await locator.screenshot({
           path: path.join(reviewDirectory, `${viewport.name}-${surface.name}.png`),
           animations: "disabled",
@@ -220,13 +331,14 @@ try {
     manifest.contrastCrops.push(...await captureContrastCrops(page, viewport.name));
 
     if (viewport.deliveryOpen) {
+      await resetInteractionState(page);
       const details = page.locator("#scene-delivery details").first();
       const summary = details.locator("summary");
       await summary.scrollIntoViewIfNeeded();
       await summary.click();
       await details.locator(":scope > div").waitFor({ state: "visible" });
       const openHeight = await documentHeight(page);
-      manifest.deliveryOpen[viewport.name] = { width: viewport.width, height: openHeight };
+      manifest.deliveryOpen[viewport.name] = { width: viewport.width, height: openHeight, state: "delivery-open" };
       await page.screenshot({
         path: path.join(reviewDirectory, `${viewport.name}-delivery-open-full.png`),
         fullPage: true,
