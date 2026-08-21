@@ -141,15 +141,13 @@
   border: 1px solid color-mix(in srgb, var(--color-text-inverse) 15%, transparent);
 }
 
-.signalNode .stageLabel,
-.signalNode .whyNow span {
+.signalNode .stageLabel {
   color: var(--color-text-inverse);
 }
 
 .signalNode > small,
 .evidenceNode small,
 .decisionNode small {
-  color: color-mix(in srgb, var(--color-text-inverse) 43%, transparent);
   font-size: .69rem;
   line-height: 1.4;
 }
@@ -170,7 +168,6 @@
 .whyNow span,
 .confidenceBlock > span,
 .nextMove > span {
-  color: var(--color-signal);
   font-size: .7rem;
   font-weight: 700;
 }
