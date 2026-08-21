@@ -236,7 +236,7 @@ async function auditHeader(browser, viewport) {
   if (viewport.width >= 960) {
     const nav = header.getByRole("navigation", { name: "Разделы лендинга" }).getByRole("link", { name: "Пример", exact: true });
     const login = header.getByRole("link", { name: "Войти", exact: true });
-    const cta = header.locator('[data-analytics-context="header"]');
+    const cta = header.locator('[data-analytics-context="header"]:visible');
     await assertContrast(nav, `${viewport.name} Header nav`, 4.5, heroBackground);
     await assertContrast(login, `${viewport.name} Header login`, 4.5, heroBackground);
     await assertContrast(cta, `${viewport.name} Header preview CTA`, 4.5, heroBackground);
@@ -253,7 +253,7 @@ async function auditHeader(browser, viewport) {
   await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
   await assertContrast(brand, `${viewport.name} Scrolled header BrandLogo`);
   if (viewport.width >= 960) {
-    await assertContrast(header.locator('[data-analytics-context="header"]'), `${viewport.name} Scrolled header preview CTA`);
+    await assertContrast(header.locator('[data-analytics-context="header"]:visible'), `${viewport.name} Scrolled header preview CTA`);
   } else {
     await assertContrast(header.getByRole("button", { name: "Открыть меню" }), `${viewport.name} Scrolled header menu glyph`, 3);
   }
