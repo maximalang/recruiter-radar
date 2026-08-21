@@ -33,7 +33,7 @@
 
 .serviceLabel {
   margin: 0 0 .8rem;
-  color: var(--color-signal);
+  color: var(--color-text-inverse);
   font-size: .72rem;
   font-weight: 650;
   letter-spacing: .08em;
@@ -89,7 +89,7 @@
   gap: .65rem;
   padding: .72rem 1rem;
   background: var(--color-signal);
-  color: var(--color-text-primary);
+  color: var(--color-text-inverse);
 }
 
 .loginLink {
@@ -98,9 +98,14 @@
   color: var(--color-text-inverse);
 }
 
+.primaryCta:focus-visible,
+.loginLink:focus-visible {
+  outline-color: var(--color-text-inverse);
+}
+
 .trustLine {
   margin: 0;
-  color: color-mix(in srgb, var(--color-text-inverse) 46%, transparent);
+  color: color-mix(in srgb, var(--color-text-inverse) 68%, transparent);
   font-size: .72rem;
   line-height: 1.45;
 }
@@ -136,12 +141,21 @@
   border: 1px solid color-mix(in srgb, var(--color-text-inverse) 15%, transparent);
 }
 
+.signalNode .stageLabel,
+.signalNode .whyNow span {
+  color: var(--color-text-inverse);
+}
+
 .signalNode > small,
 .evidenceNode small,
 .decisionNode small {
   color: color-mix(in srgb, var(--color-text-inverse) 43%, transparent);
   font-size: .69rem;
   line-height: 1.4;
+}
+
+.signalNode > small {
+  color: color-mix(in srgb, var(--color-text-inverse) 68%, transparent);
 }
 
 .signalNode h2 {
@@ -160,8 +174,9 @@
   font-size: .7rem;
   font-weight: 700;
 }
+.signalNode .whyNow span { color: var(--color-text-inverse); }
 .whyNow strong { font-size: .9rem; line-height: 1.35; }
-.signalNode > p { margin: auto 0 0; color: color-mix(in srgb, var(--color-text-inverse) 48%, transparent); font-size: .72rem; }
+.signalNode > p { margin: auto 0 0; color: color-mix(in srgb, var(--color-text-inverse) 68%, transparent); font-size: .72rem; }
 
 .chainArrow {
   display: grid;
@@ -194,22 +209,22 @@
   grid-template-areas: "label label" "confidence move";
   align-items: end;
   background: var(--color-signal);
-  color: var(--color-text-primary);
+  color: var(--color-text-inverse);
 }
-.decisionNode .stageLabel { grid-area: label; color: color-mix(in srgb, var(--color-text-primary) 55%, transparent); }
+.decisionNode .stageLabel { grid-area: label; color: color-mix(in srgb, var(--color-text-inverse) 75%, transparent); }
 .confidenceBlock { grid-area: confidence; display: grid; gap: .18rem; align-content: end; }
-.confidenceBlock > span { color: color-mix(in srgb, var(--color-text-primary) 62%, transparent); }
+.confidenceBlock > span { color: color-mix(in srgb, var(--color-text-inverse) 75%, transparent); }
 .confidenceBlock > strong { font-size: clamp(1.5rem, 2.4vw, 2.35rem); font-weight: 590; letter-spacing: -.055em; line-height: .96; }
-.decisionNode small { color: color-mix(in srgb, var(--color-text-primary) 55%, transparent); }
+.decisionNode small { color: color-mix(in srgb, var(--color-text-inverse) 75%, transparent); }
 .nextMove {
   grid-area: move;
   display: grid;
   gap: .28rem;
   min-width: 0;
   padding-left: 1rem;
-  border-left: 1px solid color-mix(in srgb, var(--color-text-primary) 20%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--color-text-inverse) 24%, transparent);
 }
-.nextMove > span { color: color-mix(in srgb, var(--color-text-primary) 62%, transparent); }
+.nextMove > span { color: color-mix(in srgb, var(--color-text-inverse) 75%, transparent); }
 .nextMove > strong { font-size: .94rem; line-height: 1.35; }
 
 @media (hover: hover) and (pointer: fine) {
@@ -222,7 +237,7 @@
   .title { font-size: clamp(3rem, 6vw, 3.7rem); }
   .resolutionChain { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.1fr); }
   .decisionNode { grid-template-columns: 1fr; grid-template-areas: "label" "confidence" "move"; }
-  .nextMove { padding: .65rem 0 0; border-top: 1px solid color-mix(in srgb, var(--color-text-primary) 20%, transparent); border-left: 0; }
+  .nextMove { padding: .65rem 0 0; border-top: 1px solid color-mix(in srgb, var(--color-text-inverse) 24%, transparent); border-left: 0; }
 }
 
 @media (max-width: 760px) {
@@ -240,7 +255,7 @@
   .chainArrow svg { display: none; }
   .node { min-height: 0; padding: 1rem; }
   .decisionNode { grid-template-columns: .72fr 1.28fr; grid-template-areas: "label label" "confidence move"; }
-  .nextMove { padding: 0 0 0 .9rem; border-top: 0; border-left: 1px solid color-mix(in srgb, var(--color-text-primary) 20%, transparent); }
+  .nextMove { padding: 0 0 0 .9rem; border-top: 0; border-left: 1px solid color-mix(in srgb, var(--color-text-inverse) 24%, transparent); }
 }
 
 @media (max-width: 600px) {
@@ -275,7 +290,7 @@
     align-items: start;
   }
   .confidenceBlock > strong { font-size: 1.08rem; letter-spacing: -.03em; }
-  .nextMove { padding: 0 0 0 .75rem; border-top: 0; border-left: 1px solid color-mix(in srgb, var(--color-text-primary) 20%, transparent); }
+  .nextMove { padding: 0 0 0 .75rem; border-top: 0; border-left: 1px solid color-mix(in srgb, var(--color-text-inverse) 24%, transparent); }
   .nextMove > strong { font-size: .9rem; line-height: 1.3; }
 }
 
