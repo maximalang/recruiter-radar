@@ -10,12 +10,13 @@ function source(path: string) {
 }
 
 describe("landing visual regression contract", () => {
-  it("keeps the dark hero and header on the same tone contract", () => {
+  it("keeps the inverse hero and transparent header on readable tone contracts", () => {
     const hero = source("app/landing/detection-scene.tsx");
 
     expect(hero).toContain('data-theme="inverse"');
-    expect(hero).toContain('data-header-tone="dark"');
-    expect(hero).not.toContain('data-header-tone="light" data-hero-layout="signal-spine"');
+    expect(hero).toContain('data-header-tone="light"');
+    expect(hero).toContain('data-hero-layout="company-brief"');
+    expect(hero).not.toContain('data-header-tone="dark"');
   });
 
   it("keeps the live product preview on the canonical scene stylesheet", () => {
