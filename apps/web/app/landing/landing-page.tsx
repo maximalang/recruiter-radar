@@ -6,7 +6,6 @@ import DeliveryScene from "./delivery-scene";
 import DetectionScene from "./detection-scene";
 import EvidenceScene from "./evidence-scene";
 import frameStyles from "./landing-frame.module.css";
-import polishStyles from "./landing-final-polish.module.css";
 import LandingHashNavigation from "./landing-hash-navigation";
 import LandingHeader from "./landing-header";
 import LandingMotion from "./landing-motion";
@@ -28,7 +27,7 @@ export default function LandingPage(props: {
 }) {
   return (
     <div
-      className={`${styles.landingPage} ${frameStyles.frame} ${visualStyles.visualSystem} ${motionStyles.motionRoot} ${polishStyles.polish}`}
+      className={`${styles.landingPage} ${frameStyles.frame} ${visualStyles.visualSystem} ${motionStyles.motionRoot}`}
       data-landing-experience="signal-lock"
     >
       <LandingMotion />
