@@ -16,27 +16,18 @@ describe("landing final production contract", () => {
     const heroCss = source("app/landing/detection-scene.module.css");
 
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
-    expect(hero).toContain("Находите компании, которым стоит написать сейчас.");
-    expect(hero).toContain('data-art-direction="evidence-first"');
+    expect(hero).toContain("Компании, которым стоит написать сегодня.");
+    expect(hero).toContain('data-hero-layout="ambient-radar"');
     expect(hero).toContain('data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
     expect(hero).toContain("Посмотреть пример");
     expect(hero).toContain(">Войти</Link>");
-    expect(hero).toContain("Почему сейчас");
-    expect(hero).toContain("Подтверждение");
-    expect(hero).toContain("Уверенность");
-    expect(hero).toContain("Следующий ход");
-    expect(hero).toContain('data-hero-stage="signal"');
-    expect(hero).toContain('data-hero-stage="evidence"');
-    expect(hero).toContain('data-hero-stage="decision"');
-    expect(hero).toContain("DEMO_EVIDENCE_SOURCES[0]");
-    expect(hero).toContain("+2 подтверждения");
-    expect(hero.indexOf("data-hero-actions")).toBeLessThan(hero.indexOf('data-hero-company-brief="true"'));
+    expect(hero).toContain('data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}');
+    expect(hero).toContain('data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}');
+    expect(hero).toContain("Настройте нишу и географию · без регистрации");
     expect(hero).toContain("data-hero-trust-line");
-    expect(hero).toContain("Проверяемые факты · официальный контакт · без авторассылки");
-    expect(hero).toContain("LANDING_ANALYTICS_EVENT.previewStarted");
     expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");
-    expect(heroCss).toMatch(/\.title\s*\{[\s\S]*?font-size:\s*clamp\(3\.5rem,\s*4\.6vw,\s*4\.25rem\)/);
+    expect(heroCss).toMatch(/\.title\s*\{[\s\S]*?font-size:\s*clamp\(3\.55rem,\s*5\.4vw,\s*5\.45rem\)/);
   });
 
   test("uses one Pilot decision, centered FAQ, and compact closing CTA", () => {
@@ -86,7 +77,7 @@ describe("landing final production contract", () => {
     const evidence = source("app/landing/evidence-scene.tsx");
 
     expect(page).not.toContain("<OutreachScene");
-    expect(page).not.toContain("<SignalTimelineScene");
+    expect(page).not.toContain("SignalTimelineScene");
     expect(page).not.toContain("<RadarScene");
     expect(page.indexOf("<EvidenceScene")).toBeLessThan(page.indexOf("<DeliveryScene"));
     expect(delivery).toContain("Работайте там, где удобно.");

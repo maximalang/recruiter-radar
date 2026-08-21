@@ -25,7 +25,7 @@ const FOCUSABLE_SELECTOR = [
 export default function LandingHeader({ previewHref }: { previewHref: string }) {
   const [activeId, setActiveId] = useState("");
   const [scrolled, setScrolled] = useState(false);
-  const [tone, setTone] = useState<HeaderTone>("light");
+  const [tone, setTone] = useState<HeaderTone>("dark");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);

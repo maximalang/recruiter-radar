@@ -10,7 +10,7 @@ function source(path: string): string {
 }
 
 describe("landing final rebuild narrative", () => {
-  it("moves the real product example directly after the promise", () => {
+  it("restores the timeline scene between the promise and the product example", () => {
     const page = source("app/landing/landing-page.tsx");
     const heroIndex = page.indexOf("<DetectionScene");
     const workspaceIndex = page.indexOf("<WorkspaceScene");
@@ -19,32 +19,24 @@ describe("landing final rebuild narrative", () => {
     expect(heroIndex).toBeGreaterThan(-1);
     expect(workspaceIndex).toBeGreaterThan(heroIndex);
     expect(proofIndex).toBeGreaterThan(workspaceIndex);
-    expect(page.slice(heroIndex, workspaceIndex)).not.toContain("<SignalTimelineScene");
+    const timelineIndex = page.indexOf("<SignalTimeline />");
+    expect(timelineIndex).toBeGreaterThan(heroIndex);
+    expect(timelineIndex).toBeLessThan(workspaceIndex);
     expect(page).not.toContain("<RadarScene");
   });
 
-  it("uses a three-stage evidence-first decision object with actions before evidence", () => {
+  it("keeps the restored ambient hero payment-aware and connected to the preview", () => {
     const hero = source("app/landing/detection-scene.tsx");
-    const heroCss = source("app/landing/detection-scene.module.css");
 
-    expect(hero).toContain('data-hero-layout="company-brief"');
-    expect(hero).toContain('data-art-direction="evidence-first"');
-    expect(hero).toContain('data-hero-company-brief="true"');
-    expect(hero).toContain('data-hero-stage="signal"');
-    expect(hero).toContain('data-hero-stage="evidence"');
-    expect(hero).toContain('data-hero-stage="decision"');
-    expect(hero).toContain("Почему сейчас");
-    expect(hero).toContain("Подтверждение");
-    expect(hero).toContain("Уверенность");
-    expect(hero).toContain("Следующий ход");
-    expect(hero).toContain("DEMO_EVIDENCE_SOURCES[0]");
-    expect(hero).toContain("+2 подтверждения");
-    expect(hero.indexOf("data-hero-actions")).toBeLessThan(hero.indexOf('data-hero-company-brief="true"'));
-    expect(hero).toContain("Проверяемые факты · официальный контакт · без авторассылки");
+    expect(hero).toContain('data-hero-layout="ambient-radar"');
+    expect(hero).toContain('data-theme="inverse"');
+    expect(hero).toContain("data-payment-offer=");
+    expect(hero).toContain("Посмотреть пример");
+    expect(hero).toContain("data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}");
+    expect(hero).toContain("data-hero-trust-line");
+    expect(hero).toContain("без автопродления · сообщения отправляете вы");
+    expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");
-    expect(hero).not.toContain('data-hero-layout="signal-spine"');
-    expect(heroCss).toContain(".resolutionChain");
-    expect(heroCss).not.toContain(".briefHeader");
   });
 
   it("uses one canonical default company story across hero, preview, and proof", () => {

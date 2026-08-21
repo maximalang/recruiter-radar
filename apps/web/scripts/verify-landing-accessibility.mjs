@@ -215,7 +215,7 @@ async function auditHeader(browser, viewport) {
   const heroBackground = "#scene-detection";
 
   await page.evaluate(() => window.scrollTo(0, 0));
-  await assertHeaderTone(page, `${viewport.name} Hero top`, "light");
+  await assertHeaderTone(page, `${viewport.name} Hero top`, "dark");
   await page.waitForFunction(() => !document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
   assert.equal(await header.getAttribute("data-scrolled"), null, `${viewport.name}: header must stay transparent at page top`);
 
@@ -254,7 +254,7 @@ async function auditHeader(browser, viewport) {
   await scrollSectionUnderHeader(page, "#pricing");
   await assertHeaderTone(page, `${viewport.name} light Pricing`, "light");
   await page.evaluate(() => window.scrollTo(0, 0));
-  await assertHeaderTone(page, `${viewport.name} Hero restored`, "light");
+  await assertHeaderTone(page, `${viewport.name} Hero restored`, "dark");
 
   assertCleanConsole();
   await context.close();
@@ -279,11 +279,11 @@ async function auditContrast(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const { page, assertCleanConsole } = await preparePage(context, "contrast-1440x900");
 
-  await assertContrast(page.locator("#scene-detection [data-hero-copy] > div:first-child > p"), "Hero service label");
+  await assertContrast(page.locator("#scene-detection [data-hero-copy] > p:first-child"), "Hero service label");
   await assertContrast(page.locator("#scene-detection [data-hero-trust-line]"), "Hero trust line");
-  await assertContrast(page.locator('#scene-detection [data-hero-stage="signal"] > span:first-child'), "Hero Signal stage label");
-  await assertContrast(page.locator('#scene-detection [data-hero-stage="signal"] > small'), "Hero signal metadata");
-  await assertContrast(page.locator('#scene-detection [data-hero-stage="signal"] > div > span:first-child'), "Hero Why now label");
+  await assertContrast(page.locator("#scene-detection [data-hero-copy] .\\/title, #scene-detection [data-hero-title]").first(), "Hero title");
+  await assertContrast(page.locator("#scene-detection [data-hero-description]"), "Hero description");
+  await assertContrast(page.locator("#scene-detection .\\/actionHint, #scene-detection [class*='actionHint']").first(), "Hero action hint");
 
   const heroCta = page.locator('#scene-detection [data-analytics-context="hero_primary"]');
   await assertContrast(heroCta, "Hero primary CTA");
@@ -291,14 +291,6 @@ async function auditContrast(browser) {
   await assertContrast(heroCta, "Hero primary CTA hover");
   await page.mouse.move(0, 0);
   await assertFocus(page, heroCta, "Hero primary CTA focus");
-
-  const decision = page.locator('#scene-detection [data-hero-stage="decision"]');
-  await assertContrast(decision.locator(":scope > span:first-child"), "Hero decision label");
-  await assertContrast(decision.getByText("Уверенность", { exact: true }), "Hero decision confidence label");
-  await assertContrast(decision.locator("strong").first(), "Hero decision confidence value");
-  await assertContrast(decision.locator("small"), "Hero decision score metadata");
-  await assertContrast(decision.getByText("Следующий ход", { exact: true }), "Hero decision next-move label");
-  await assertContrast(decision.locator(":scope > div:last-child > strong"), "Hero decision next move");
 
   const pricing = page.locator("#pricing [data-pricing-primary]");
   await assertContrast(pricing.locator(":scope > div:first-child > div:first-child > span"), "Pilot eyebrow");
