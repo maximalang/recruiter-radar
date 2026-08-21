@@ -92,8 +92,8 @@
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control, 12px);
-  background: var(--card, #fff);
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  background: var(--color-surface-elevated, var(--card, inherit));
+  box-shadow: none;
 }
 
 .docNavMoreLinks .docNavLink {
