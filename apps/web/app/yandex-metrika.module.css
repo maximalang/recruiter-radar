@@ -116,6 +116,12 @@
     justify-content: stretch;
   }
 
+  .actions .link {
+    flex: 1 1 100%;
+    justify-content: center;
+    order: 3;
+  }
+
   .primaryButton,
   .secondaryButton {
     flex: 1 1 12rem;

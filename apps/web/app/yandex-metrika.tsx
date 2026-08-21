@@ -84,12 +84,13 @@ export default function YandexMetrika() {
           <div className={styles.copy}>
             <strong id="analytics-consent-title" className={styles.title}>Необязательная аналитика</strong>
             <span className={styles.text}>
-              Мы используем Яндекс Метрику только для обезличенной оценки публичного сайта. Она не загружается без вашего согласия и не работает на checkout или в личном кабинете. Подробнее — в <Link href="/privacy" className={styles.link}>политике обработки данных</Link>.
+              Мы используем Яндекс Метрику только для обезличенной оценки публичного сайта. Она не загружается без вашего согласия и не работает на checkout или в личном кабинете. Подробнее — в <Link href="/cookies" className={styles.link}>политике cookies</Link>.
             </span>
           </div>
           <div className={styles.actions}>
-            <button type="button" className={styles.secondaryButton} onClick={() => saveChoice("denied")}>Отклонить</button>
-            <button type="button" className={styles.primaryButton} onClick={() => saveChoice("granted")}>Разрешить</button>
+            <button type="button" className={styles.secondaryButton} onClick={() => saveChoice("denied")}>Отклонить необязательные</button>
+            <Link href="/cookies" className={styles.link} onClick={() => setSettingsOpen(false)}>Настроить</Link>
+            <button type="button" className={styles.primaryButton} onClick={() => saveChoice("granted")}>Принять аналитику</button>
           </div>
         </div>
       ) : null}
