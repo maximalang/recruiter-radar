@@ -1,0 +1,13 @@
+{
+  "comment": "SHA-256 of apps/web/lib/legal/archive/documents/*.md. Regenerate with: node apps/web/scripts/hash-legal-archive.mjs",
+  "algorithm": "sha256",
+  "entries": {
+    "paymentAndRefund-2026-08-05.md": "b166f5f6bb9c0d8387fb699053261c99b61402250683eb5b7e722e20082f1d7c",
+    "paymentAndRefund-2026-08-21.md": "292fcc2f18750dca55f09cb8033d4505b9d77f6c08e94d03b344a03e31cc957a",
+    "personalDataConsent-2026-08-05.md": "78b99014ce5a251a2711433ac0c23fdd544fce8e903cf3c256ab408fcc00c061",
+    "privacy-2026-08-05.md": "4aee042267fb1990b224f839ce87b7c5929e0b432d47fd8615f8e65b284fa2c7",
+    "privacy-2026-08-21.md": "40d72c394ac858690dc14ec1cc2c90d29683e141ef2b51eb72f88c9546842924",
+    "terms-2026-08-05.md": "0fd7264a3613143eb6dc951eb0557591407545f61c7e0905e468f3e03dfc8d30",
+    "terms-2026-08-21.md": "1b4ca6f70e4f547c0e996bb6e20b4172a940fa2fdbb5c6acb8c04b53958e422a"
+  }
+}
