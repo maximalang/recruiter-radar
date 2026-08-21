@@ -1,0 +1,5 @@
+# Legal archive snapshots must stay byte-for-byte immutable across
+# platforms: their SHA-256 hashes are recorded in manifest.json and used
+# as historical acceptance evidence.
+lib/legal/archive/documents/*.md -text
+lib/legal/archive/manifest.json -text
