@@ -64,6 +64,45 @@ assert.deepEqual(SOURCE_ESCALATION_STAGES, [
   const called = [];
   const result = await runSourceEscalation({
     validateRecord: validateVacancy,
+    stageOrder: ['rendered-dom', 'static-http', 'structured-data'],
+    stages: {
+      'static-http': async () => {
+        called.push('static-http');
+        return { artifact: '<html><script type="application/ld+json">{}</script></html>' };
+      },
+      'structured-data': async ({ artifact }) => {
+        called.push('structured-data');
+        assert.match(artifact, /ld\+json/);
+        return { records: [validVacancy] };
+      },
+      'rendered-dom': async () => {
+        called.push('rendered-dom');
+        return { records: [validVacancy] };
+      },
+    },
+  });
+  assert.equal(result.selectedStage, 'rendered-dom');
+  assert.deepEqual(called, ['rendered-dom']);
+}
+
+{
+  await assert.rejects(
+    runSourceEscalation({
+      validateRecord: validateVacancy,
+      stageOrder: ['rendered-dom'],
+      stages: {
+        'static-http': async () => ({}),
+        'rendered-dom': async () => ({}),
+      },
+    }),
+    /must include every active stage: missing static-http/,
+  );
+}
+
+{
+  const called = [];
+  const result = await runSourceEscalation({
+    validateRecord: validateVacancy,
     stages: {
       'static-http': async () => {
         called.push('static-http');

@@ -103,6 +103,7 @@ async function runLiveModeSmoke() {
       regionCode: '7700000000000',
       offset: 0,
       limit: 1,
+      pages: 1,
     });
     assert.equal(liveInput.inputMode, 'live-public');
     assert.equal(liveInput.liveProvider, 'trudvsem-opendata');
@@ -112,9 +113,10 @@ async function runLiveModeSmoke() {
     assert.equal(requestedUrls.length, 1);
     const requestedUrl = new URL(requestedUrls[0]);
     assert.equal(requestedUrl.hostname, 'opendata.trudvsem.ru');
-    assert.equal(requestedUrl.pathname, '/api/v1/vacancies');
+    assert.equal(requestedUrl.pathname, '/api/v1/vacancies/region/7700000000000');
     assert.equal(requestedUrl.searchParams.get('text'), 'data engineer');
-    assert.equal(requestedUrl.searchParams.get('region_code'), '7700000000000');
+    assert.equal(requestedUrl.searchParams.has('region_code'), false);
+    assert.equal(requestedUrl.searchParams.get('offset'), '0');
 
     return {
       inputMode: liveInput.inputMode,
@@ -137,14 +139,15 @@ async function runEmptyLiveModeSmoke() {
 
   try {
     const input = await resolveRabotaRossiiLiveInput({
-      searchText: 'no matching vacancies',
+      modifiedFrom: '2026-08-19T00:00:00Z',
       regionCode: '7700000000000',
       offset: 0,
       limit: 1,
+      pages: 1,
     });
     const emptySummary = buildFetchSummary(input);
     assert.equal(emptySummary.recordsReceived, 0);
-    assert.equal(emptySummary.zeroReason, 'no-vacancies-for-query');
+    assert.equal(emptySummary.zeroReason, 'no-vacancies-in-incremental-window');
     return { zeroReason: emptySummary.zeroReason };
   } finally {
     globalThis.fetch = originalFetch;

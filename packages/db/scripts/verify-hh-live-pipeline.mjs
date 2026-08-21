@@ -110,8 +110,12 @@ try {
     ok: true,
     source: 'hh',
     mode: 'live-fetch-normalize-ingest-evidence-lineage',
+    verifiedAt: new Date().toISOString(),
     recordsReceived: metrics.recordsReceived,
     normalizedRecords: metrics.normalizedRecords,
+    signalUpsertsCompleted: metrics.signalUpsertsCompleted,
+    evidenceUpsertsCompleted: metrics.evidenceUpsertsCompleted,
+    lineageCreated: metrics.lineageCreated,
     ...proof,
   }, null, 2));
 } finally {

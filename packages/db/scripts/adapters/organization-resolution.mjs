@@ -11,8 +11,11 @@ const PLATFORM_DOMAINS = new Set([
   'superjob.com',
   'trudvsem.ru',
   'linkedin.com',
+  'avito.ru',
   'rabota.ru',
   'zarplata.ru',
+  'getmatch.ru',
+  'geekjob.ru',
   'greenhouse.io',
   'lever.co',
   'workday.com',
@@ -28,6 +31,20 @@ const PLATFORM_DOMAINS = new Set([
   'personio.com',
   'jazz.co',
   'jobs.eu',
+  // Public profile/content platforms are useful contact/context surfaces, but
+  // they are not employer-owned domains and must never become global identity
+  // keys. Keeping this in the shared classifier protects every source adapter.
+  'vk.com',
+  'vk.ru',
+  't.me',
+  'telegram.me',
+  'youtube.com',
+  'youtu.be',
+  'rutube.ru',
+  'dzen.ru',
+  'ok.ru',
+  'instagram.com',
+  'facebook.com',
 ]);
 
 const PUBLIC_SUFFIX_DOMAINS = new Set([
