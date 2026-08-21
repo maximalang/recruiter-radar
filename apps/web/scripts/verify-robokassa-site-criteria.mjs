@@ -150,8 +150,10 @@ for (const token of [
 }
 
 for (const token of [
-  "Отклонить",
-  "Разрешить",
+  "Отклонить необязательные",
+  "Принять аналитику",
+  "Настроить",
+  "/cookies",
   "CONSENT_TTL_MS = 426",
 ]) requireText("metrika", token, `analytics consent requirement ${token}`);
 
