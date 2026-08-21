@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { readdir, rename } from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
 
 import { resolveAuditScriptPath } from "./landing-audit-path.mjs";
@@ -46,6 +48,35 @@ function runScript(scriptPath) {
   });
 }
 
+function readScreenshotDirectory(output) {
+  const match = output.match(/"screenshotDirectory":\s*("(?:\\.|[^"\\])*")/);
+  if (match) return JSON.parse(match[1]);
+  return process.env.LANDING_SCREENSHOT_DIR ?? null;
+}
+
+async function labelProductionScreenshotStates(output) {
+  const screenshotDirectory = readScreenshotDirectory(output);
+  if (!screenshotDirectory) {
+    throw new Error("Landing production audit did not report its screenshot directory");
+  }
+
+  const files = await readdir(screenshotDirectory);
+  const desktopDefault = files.find((fileName) => /^desktop-1440x900-full-\d+px\.png$/.test(fileName));
+  const mobileExpanded = files.find((fileName) => /^mobile-390x844-full-\d+px\.png$/.test(fileName));
+  if (!desktopDefault || !mobileExpanded) {
+    throw new Error(`Landing production screenshot state labeling failed: ${JSON.stringify(files)}`);
+  }
+
+  await rename(
+    path.join(screenshotDirectory, desktopDefault),
+    path.join(screenshotDirectory, desktopDefault.replace("-full-", "-full-default-")),
+  );
+  await rename(
+    path.join(screenshotDirectory, mobileExpanded),
+    path.join(screenshotDirectory, mobileExpanded.replace("-full-", "-full-expanded-")),
+  );
+}
+
 const reviewCapture = await runScript(reviewCaptureScript);
 if (reviewCapture.code !== 0) {
   if (reviewCapture.signal) {
@@ -55,8 +86,10 @@ if (reviewCapture.code !== 0) {
 }
 
 let productionAuditPassed = false;
+let productionAuditOutput = "";
 for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   const result = await runScript(auditScript);
+  productionAuditOutput = result.output;
   if (result.code === 0) {
     productionAuditPassed = true;
     break;
@@ -78,6 +111,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
 }
 
 if (!productionAuditPassed) process.exit(1);
+await labelProductionScreenshotStates(productionAuditOutput);
 
 const accessibilityAudit = await runScript(accessibilityAuditScript);
 if (accessibilityAudit.code !== 0) {
