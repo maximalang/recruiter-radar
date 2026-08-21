@@ -25,7 +25,7 @@ const FOCUSABLE_SELECTOR = [
 export default function LandingHeader({ previewHref }: { previewHref: string }) {
   const [activeId, setActiveId] = useState("");
   const [scrolled, setScrolled] = useState(false);
-  const [tone, setTone] = useState<HeaderTone>("dark");
+  const [tone, setTone] = useState<HeaderTone>("light");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
@@ -155,7 +155,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     </a>
   );
 
-  const logoTone = tone === "light" && !scrolled && !menuOpen ? "light" : "dark";
+  const logoTone = scrolled || menuOpen ? "light" : tone;
 
   return (
     <header

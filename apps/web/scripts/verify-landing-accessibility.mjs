@@ -23,11 +23,7 @@ const deliveryMatrix = [
   { width: 1920, height: 1080, name: "1920x1080" },
 ];
 
-const results = {
-  contrast: [],
-  focus: [],
-  delivery: [],
-};
+const results = { contrast: [], focus: [], headerTone: [], delivery: [] };
 
 function attachConsoleGate(page, label) {
   const messages = [];
@@ -40,7 +36,7 @@ function attachConsoleGate(page, label) {
   return () => assert.deepEqual(messages, [], `${label}: console warnings/errors: ${JSON.stringify(messages)}`);
 }
 
-async function preparePage(context, label) {
+async function preparePage(context, label, url = baseUrl) {
   const page = await context.newPage();
   const assertCleanConsole = attachConsoleGate(page, label);
   await page.route("**/api/landing-events", (route) => route.fulfill({ status: 204 }));
@@ -49,7 +45,7 @@ async function preparePage(context, label) {
     contentType: "application/javascript",
     body: "/* deterministic analytics loader stub for focused accessibility audit */",
   }));
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.goto(url, { waitUntil: "networkidle" });
   await page.locator('[data-landing-experience="signal-lock"]').waitFor({ state: "attached" });
   await page.locator("#scene-detection").waitFor({ state: "visible" });
 
@@ -58,57 +54,38 @@ async function preparePage(context, label) {
     await consent.click();
     await consent.waitFor({ state: "hidden" });
   }
-
   return { page, assertCleanConsole };
 }
 
-async function readContrast(locator) {
-  return locator.evaluate((element) => {
-    function parseChannel(value) {
-      const token = value.trim();
-      if (token.endsWith("%")) return Number.parseFloat(token) / 100;
-      return Number.parseFloat(token) / 255;
-    }
-
-    function parseAlpha(value) {
-      const token = value.trim();
-      if (token.endsWith("%")) return Number.parseFloat(token) / 100;
-      return Number.parseFloat(token);
-    }
-
-    function parseColor(value) {
+async function readContrast(locator, backgroundSelector = null) {
+  return locator.evaluate((element, explicitBackgroundSelector) => {
+    const parseChannel = (value) => value.trim().endsWith("%")
+      ? Number.parseFloat(value) / 100
+      : Number.parseFloat(value) / 255;
+    const parseAlpha = (value) => value.trim().endsWith("%")
+      ? Number.parseFloat(value) / 100
+      : Number.parseFloat(value);
+    const parseColor = (value) => {
       const color = value.trim().toLowerCase();
       if (color === "transparent") return [0, 0, 0, 0];
-
       if (color.startsWith("color(srgb")) {
-        const body = color.slice("color(srgb".length, -1).trim();
-        const [channelsPart, alphaPart] = body.split("/").map((part) => part.trim());
+        const [channelsPart, alphaPart] = color.slice("color(srgb".length, -1).trim().split("/").map((part) => part.trim());
         const channels = channelsPart.split(/\s+/).map(Number);
-        assertChannels(channels, value);
-        return [channels[0], channels[1], channels[2], alphaPart ? parseAlpha(alphaPart) : 1];
+        if (channels.length !== 3 || channels.some((channel) => !Number.isFinite(channel))) throw new Error(`Invalid computed color: ${value}`);
+        return [...channels, alphaPart ? parseAlpha(alphaPart) : 1];
       }
-
-      if (color.startsWith("rgb(" ) || color.startsWith("rgba(")) {
-        const body = color.slice(color.indexOf("(") + 1, -1).replaceAll(",", " ").trim();
-        const [channelsPart, alphaPart] = body.split("/").map((part) => part.trim());
+      if (color.startsWith("rgb(") || color.startsWith("rgba(")) {
+        const [channelsPart, alphaPart] = color.slice(color.indexOf("(") + 1, -1).replaceAll(",", " ").trim().split("/").map((part) => part.trim());
         const tokens = channelsPart.split(/\s+/).filter(Boolean);
         let alpha = alphaPart ? parseAlpha(alphaPart) : 1;
         if (tokens.length === 4) alpha = parseAlpha(tokens.pop());
         const channels = tokens.map(parseChannel);
-        assertChannels(channels, value);
-        return [channels[0], channels[1], channels[2], alpha];
+        if (channels.length !== 3 || channels.some((channel) => !Number.isFinite(channel))) throw new Error(`Invalid computed color: ${value}`);
+        return [...channels, alpha];
       }
-
       throw new Error(`Unsupported computed color: ${value}`);
-    }
-
-    function assertChannels(channels, source) {
-      if (channels.length !== 3 || channels.some((channel) => !Number.isFinite(channel))) {
-        throw new Error(`Invalid computed color: ${source}`);
-      }
-    }
-
-    function composite(top, bottom) {
+    };
+    const composite = (top, bottom) => {
       const alpha = top[3] + bottom[3] * (1 - top[3]);
       if (alpha === 0) return [0, 0, 0, 0];
       return [
@@ -117,42 +94,30 @@ async function readContrast(locator) {
         (top[2] * top[3] + bottom[2] * bottom[3] * (1 - top[3])) / alpha,
         alpha,
       ];
-    }
-
-    function effectiveBackground(target) {
+    };
+    const effectiveBackground = (target) => {
       const layers = [];
       for (let node = target; node instanceof Element; node = node.parentElement) {
         layers.push(parseColor(getComputedStyle(node).backgroundColor));
       }
       let rendered = [0, 0, 0, 0];
       for (const layer of layers.reverse()) rendered = composite(layer, rendered);
-      if (rendered[3] < 1) rendered = composite(rendered, [1, 1, 1, 1]);
-      return rendered;
-    }
-
-    function linear(channel) {
-      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-    }
-
-    function luminance(color) {
-      return 0.2126 * linear(color[0]) + 0.7152 * linear(color[1]) + 0.0722 * linear(color[2]);
-    }
-
-    function ratio(foreground, background) {
-      const high = Math.max(luminance(foreground), luminance(background));
-      const low = Math.min(luminance(foreground), luminance(background));
+      return rendered[3] < 1 ? composite(rendered, [1, 1, 1, 1]) : rendered;
+    };
+    const linear = (channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    const luminance = (color) => 0.2126 * linear(color[0]) + 0.7152 * linear(color[1]) + 0.0722 * linear(color[2]);
+    const ratio = (first, second) => {
+      const high = Math.max(luminance(first), luminance(second));
+      const low = Math.min(luminance(first), luminance(second));
       return (high + 0.05) / (low + 0.05);
-    }
-
-    function printable(color) {
-      return `rgba(${Math.round(color[0] * 255)}, ${Math.round(color[1] * 255)}, ${Math.round(color[2] * 255)}, ${color[3].toFixed(3)})`;
-    }
+    };
+    const printable = (color) => `rgba(${Math.round(color[0] * 255)}, ${Math.round(color[1] * 255)}, ${Math.round(color[2] * 255)}, ${color[3].toFixed(3)})`;
 
     const style = getComputedStyle(element);
-    const background = effectiveBackground(element);
+    const explicitBackground = explicitBackgroundSelector ? document.querySelector(explicitBackgroundSelector) : null;
+    const background = effectiveBackground(explicitBackground ?? element);
     const computedForeground = parseColor(style.color);
     const foreground = computedForeground[3] < 1 ? composite(computedForeground, background) : computedForeground;
-
     return {
       ratio: ratio(foreground, background),
       foreground: printable(foreground),
@@ -163,12 +128,12 @@ async function readContrast(locator) {
       fontWeight: style.fontWeight,
       text: element.textContent?.trim().replace(/\s+/g, " ").slice(0, 160) ?? "",
     };
-  });
+  }, backgroundSelector);
 }
 
-async function assertContrast(locator, label, minimum = 4.5) {
+async function assertContrast(locator, label, minimum = 4.5, backgroundSelector = null) {
   await locator.waitFor({ state: "visible" });
-  const measurement = await readContrast(locator);
+  const measurement = await readContrast(locator, backgroundSelector);
   results.contrast.push({ label, minimum, ...measurement });
   assert.ok(
     measurement.ratio >= minimum,
@@ -177,45 +142,23 @@ async function assertContrast(locator, label, minimum = 4.5) {
   return measurement;
 }
 
-async function assertFocus(page, locator, label) {
+async function assertFocus(page, locator, label, backgroundSelector = null) {
   await locator.focus();
   await page.keyboard.press("Tab");
   await page.keyboard.press("Shift+Tab");
-  const focus = await locator.evaluate((element) => {
-    function parseChannel(value) {
-      const token = value.trim();
-      if (token.endsWith("%")) return Number.parseFloat(token) / 100;
-      return Number.parseFloat(token) / 255;
-    }
-
-    function parseAlpha(value) {
-      const token = value.trim();
-      if (token.endsWith("%")) return Number.parseFloat(token) / 100;
-      return Number.parseFloat(token);
-    }
-
-    function parseColor(value) {
-      const color = value.trim().toLowerCase();
-      if (color === "transparent") return [0, 0, 0, 0];
-      if (color.startsWith("color(srgb")) {
-        const body = color.slice("color(srgb".length, -1).trim();
-        const [channelsPart, alphaPart] = body.split("/").map((part) => part.trim());
-        const channels = channelsPart.split(/\s+/).map(Number);
-        return [channels[0], channels[1], channels[2], alphaPart ? parseAlpha(alphaPart) : 1];
-      }
-      if (color.startsWith("rgb(") || color.startsWith("rgba(")) {
-        const body = color.slice(color.indexOf("(") + 1, -1).replaceAll(",", " ").trim();
-        const [channelsPart, alphaPart] = body.split("/").map((part) => part.trim());
-        const tokens = channelsPart.split(/\s+/).filter(Boolean);
-        let alpha = alphaPart ? parseAlpha(alphaPart) : 1;
-        if (tokens.length === 4) alpha = parseAlpha(tokens.pop());
-        const channels = tokens.map(parseChannel);
-        return [channels[0], channels[1], channels[2], alpha];
-      }
-      throw new Error(`Unsupported computed color: ${value}`);
-    }
-
-    function composite(top, bottom) {
+  const focus = await locator.evaluate((element, explicitBackgroundSelector) => {
+    const toRgba = (value) => {
+      const probe = document.createElement("span");
+      probe.style.color = value;
+      probe.style.position = "fixed";
+      probe.style.visibility = "hidden";
+      document.body.append(probe);
+      const resolved = getComputedStyle(probe).color;
+      probe.remove();
+      const numbers = resolved.match(/[\d.]+/g)?.map(Number) ?? [];
+      return [numbers[0] / 255, numbers[1] / 255, numbers[2] / 255, numbers[3] ?? 1];
+    };
+    const composite = (top, bottom) => {
       const alpha = top[3] + bottom[3] * (1 - top[3]);
       if (alpha === 0) return [0, 0, 0, 0];
       return [
@@ -224,55 +167,123 @@ async function assertFocus(page, locator, label) {
         (top[2] * top[3] + bottom[2] * bottom[3] * (1 - top[3])) / alpha,
         alpha,
       ];
-    }
-
-    function effectiveBackground(target) {
+    };
+    const effectiveBackground = (target) => {
       const layers = [];
-      for (let node = target; node instanceof Element; node = node.parentElement) {
-        layers.push(parseColor(getComputedStyle(node).backgroundColor));
-      }
+      for (let node = target; node instanceof Element; node = node.parentElement) layers.push(toRgba(getComputedStyle(node).backgroundColor));
       let rendered = [0, 0, 0, 0];
       for (const layer of layers.reverse()) rendered = composite(layer, rendered);
-      if (rendered[3] < 1) rendered = composite(rendered, [1, 1, 1, 1]);
-      return rendered;
-    }
-
-    function linear(channel) {
-      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-    }
-
-    function luminance(color) {
-      return 0.2126 * linear(color[0]) + 0.7152 * linear(color[1]) + 0.0722 * linear(color[2]);
-    }
-
-    function ratio(first, second) {
-      const high = Math.max(luminance(first), luminance(second));
-      const low = Math.min(luminance(first), luminance(second));
-      return (high + 0.05) / (low + 0.05);
-    }
+      return rendered[3] < 1 ? composite(rendered, [1, 1, 1, 1]) : rendered;
+    };
+    const linear = (channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    const luminance = (color) => 0.2126 * linear(color[0]) + 0.7152 * linear(color[1]) + 0.0722 * linear(color[2]);
+    const ratio = (first, second) => (Math.max(luminance(first), luminance(second)) + 0.05) / (Math.min(luminance(first), luminance(second)) + 0.05);
 
     const style = getComputedStyle(element);
-    const adjacent = effectiveBackground(element.parentElement ?? element);
-    const computedOutline = parseColor(style.outlineColor);
-    const renderedOutline = computedOutline[3] < 1 ? composite(computedOutline, adjacent) : computedOutline;
-
+    const explicitBackground = explicitBackgroundSelector ? document.querySelector(explicitBackgroundSelector) : null;
+    const adjacent = effectiveBackground(explicitBackground ?? element.parentElement ?? element);
+    const outline = toRgba(style.outlineColor);
     return {
       active: document.activeElement === element,
       outlineStyle: style.outlineStyle,
       outlineWidth: Number.parseFloat(style.outlineWidth),
       outlineOffset: Number.parseFloat(style.outlineOffset),
       outlineColor: style.outlineColor,
-      adjacentBackground: getComputedStyle(element.parentElement ?? element).backgroundColor,
-      outlineContrast: ratio(renderedOutline, adjacent),
+      outlineContrast: ratio(outline[3] < 1 ? composite(outline, adjacent) : outline, adjacent),
     };
-  });
+  }, backgroundSelector);
+
   assert.equal(focus.active, true, `${label}: element did not receive focus`);
   assert.notEqual(focus.outlineStyle, "none", `${label}: focus outline is missing`);
   assert.ok(focus.outlineWidth >= 2, `${label}: focus outline is thinner than 2px`);
   assert.ok(focus.outlineOffset >= 2, `${label}: focus outline needs separation from the control`);
   assert.ok(focus.outlineContrast >= 3, `${label}: focus indicator contrast ${focus.outlineContrast.toFixed(2)}:1 is below 3:1`);
   results.focus.push({ label, ...focus });
-  await assertContrast(locator, `${label} text while focused`, 4.5);
+  await assertContrast(locator, `${label} text while focused`, 4.5, backgroundSelector);
+}
+
+async function assertHeaderTone(page, label, expected) {
+  const selector = 'header[data-brand-header="recruiter-radar"]';
+  await page.waitForFunction(([headerSelector, tone]) => document.querySelector(headerSelector)?.getAttribute("data-tone") === tone, [selector, expected]);
+  const actual = await page.locator(selector).getAttribute("data-tone");
+  results.headerTone.push({ label, expected, actual, scrollY: await page.evaluate(() => window.scrollY) });
+  assert.equal(actual, expected, `${label}: expected ${expected}, received ${actual}`);
+}
+
+async function scrollSectionUnderHeader(page, selector) {
+  await page.locator(selector).scrollIntoViewIfNeeded();
+  await page.evaluate((targetSelector) => {
+    const target = document.querySelector(targetSelector);
+    if (target) window.scrollTo(0, window.scrollY + target.getBoundingClientRect().top - 48);
+  }, selector);
+  await page.waitForTimeout(120);
+}
+
+async function auditHeader(browser, viewport) {
+  const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+  const { page, assertCleanConsole } = await preparePage(context, `header-${viewport.name}`);
+  const header = page.locator('header[data-brand-header="recruiter-radar"]');
+  const heroBackground = "#scene-detection";
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await assertHeaderTone(page, `${viewport.name} Hero top`, "light");
+  await page.waitForFunction(() => !document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
+  assert.equal(await header.getAttribute("data-scrolled"), null, `${viewport.name}: header must stay transparent at page top`);
+
+  const brand = header.locator('[role="img"][aria-label="Recruiter Radar"]');
+  await assertContrast(brand, `${viewport.name} Header BrandLogo`, 4.5, heroBackground);
+
+  if (viewport.width >= 960) {
+    const nav = header.getByRole("navigation", { name: "Разделы лендинга" }).getByRole("link", { name: "Пример", exact: true });
+    const login = header.getByRole("link", { name: "Войти", exact: true });
+    const cta = header.locator('[data-analytics-context="header"]');
+    await assertContrast(nav, `${viewport.name} Header nav`, 4.5, heroBackground);
+    await assertContrast(login, `${viewport.name} Header login`, 4.5, heroBackground);
+    await assertContrast(cta, `${viewport.name} Header preview CTA`, 4.5, heroBackground);
+    await assertFocus(page, cta, `${viewport.name} Header preview CTA focus`, heroBackground);
+  } else {
+    const menu = header.getByRole("button", { name: "Открыть меню" });
+    const target = await menu.boundingBox();
+    assert.ok(target && target.width >= 44 && target.height >= 44, `${viewport.name}: menu target is below 44x44`);
+    await assertContrast(menu, `${viewport.name} Header menu glyph`, 3, heroBackground);
+    await assertFocus(page, menu, `${viewport.name} Header menu focus`, heroBackground);
+  }
+
+  await scrollSectionUnderHeader(page, "#scene-workspace");
+  await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
+  await assertContrast(brand, `${viewport.name} Scrolled header BrandLogo`);
+  if (viewport.width >= 960) {
+    await assertContrast(header.locator('[data-analytics-context="header"]'), `${viewport.name} Scrolled header preview CTA`);
+  } else {
+    await assertContrast(header.getByRole("button", { name: "Открыть меню" }), `${viewport.name} Scrolled header menu glyph`, 3);
+  }
+
+  await scrollSectionUnderHeader(page, "#scene-evidence");
+  await assertHeaderTone(page, `${viewport.name} dark Proof`, "dark");
+  await scrollSectionUnderHeader(page, "#scene-delivery");
+  await assertHeaderTone(page, `${viewport.name} light Delivery`, "light");
+  await scrollSectionUnderHeader(page, "#pricing");
+  await assertHeaderTone(page, `${viewport.name} light Pricing`, "light");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await assertHeaderTone(page, `${viewport.name} Hero restored`, "light");
+
+  assertCleanConsole();
+  await context.close();
+}
+
+async function auditHeaderHashes(browser) {
+  const specs = [
+    { hash: "scene-evidence", tone: "dark" },
+    { hash: "pricing", tone: "light" },
+    { hash: "faq", tone: "light" },
+  ];
+  for (const spec of specs) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const { page, assertCleanConsole } = await preparePage(context, `header-hash-${spec.hash}`, `${baseUrl}/#${spec.hash}`);
+    await assertHeaderTone(page, `hash #${spec.hash}`, spec.tone);
+    assertCleanConsole();
+    await context.close();
+  }
 }
 
 async function auditContrast(browser) {
@@ -335,7 +346,6 @@ async function auditDelivery(browser, viewport) {
 
   const closedHeight = await page.evaluate(() => document.documentElement.scrollHeight);
   assert.equal(await details.getAttribute("open"), null, `${viewport.name}: disclosure should start closed`);
-
   const target = await summary.boundingBox();
   assert.ok(target && target.width >= 44 && target.height >= 44, `${viewport.name}: disclosure target is below 44x44`);
 
@@ -352,24 +362,21 @@ async function auditDelivery(browser, viewport) {
     const pricing = document.querySelector("#pricing");
     const header = document.querySelector('header[data-brand-header="recruiter-radar"]');
     if (!(detailsElement && summaryElement && extra && pricing)) return null;
-
     const extraRect = extra.getBoundingClientRect();
     const pricingRect = pricing.getBoundingClientRect();
     const summaryRect = summaryElement.getBoundingClientRect();
     const headerRect = header?.getBoundingClientRect() ?? null;
-    const intersectsPricing = !(
-      extraRect.right <= pricingRect.left + 1
-      || extraRect.left >= pricingRect.right - 1
-      || extraRect.bottom <= pricingRect.top + 1
-      || extraRect.top >= pricingRect.bottom - 1
-    );
-
     return {
       extra: extraRect.toJSON(),
       pricing: pricingRect.toJSON(),
       summary: summaryRect.toJSON(),
       header: headerRect?.toJSON() ?? null,
-      intersectsPricing,
+      intersectsPricing: !(
+        extraRect.right <= pricingRect.left + 1
+        || extraRect.left >= pricingRect.right - 1
+        || extraRect.bottom <= pricingRect.top + 1
+        || extraRect.top >= pricingRect.bottom - 1
+      ),
       viewportWidth: document.documentElement.clientWidth,
       activeIsSummary: document.activeElement === summaryElement,
       open: detailsElement.hasAttribute("open"),
@@ -391,27 +398,18 @@ async function auditDelivery(browser, viewport) {
 
   const openHeight = await page.evaluate(() => document.documentElement.scrollHeight);
   assert.ok(openHeight > closedHeight, `${viewport.name}: open disclosure must add document height`);
-
   await page.keyboard.press("Enter");
   await extraRoutes.waitFor({ state: "hidden" });
   assert.equal(await details.getAttribute("open"), null, `${viewport.name}: disclosure did not close from keyboard`);
   const restoredHeight = await page.evaluate(() => document.documentElement.scrollHeight);
   assert.ok(Math.abs(restoredHeight - closedHeight) <= 2, `${viewport.name}: closed document height did not restore`);
 
-  results.delivery.push({
-    viewport: viewport.name,
-    closedHeight,
-    openHeight,
-    addedHeight: openHeight - closedHeight,
-    geometry,
-  });
-
+  results.delivery.push({ viewport: viewport.name, closedHeight, openHeight, addedHeight: openHeight - closedHeight, geometry });
   assertCleanConsole();
   await context.close();
 }
 
 await mkdir(reportDirectory, { recursive: true });
-
 const browser = await chromium.launch({
   headless: true,
   executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
@@ -419,6 +417,9 @@ const browser = await chromium.launch({
 
 try {
   await auditContrast(browser);
+  await auditHeader(browser, { width: 1440, height: 900, name: "1440x900" });
+  await auditHeader(browser, { width: 390, height: 844, name: "390x844" });
+  await auditHeaderHashes(browser);
   for (const viewport of deliveryMatrix) await auditDelivery(browser, viewport);
 } finally {
   await browser.close();

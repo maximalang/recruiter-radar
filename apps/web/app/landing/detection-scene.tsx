@@ -24,7 +24,7 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
       className={sceneStyles.hero}
       aria-labelledby="detection-title"
       data-theme="inverse"
-      data-header-tone="dark"
+      data-header-tone="light"
       data-hero-layout="company-brief"
       data-art-direction="evidence-first"
       data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}

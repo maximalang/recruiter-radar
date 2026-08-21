@@ -14,6 +14,7 @@ const viewports = [
   { width: 1440, height: 900, name: "1440x900", focused: true, deliveryOpen: true },
   { width: 390, height: 844, name: "390x844", focused: true, deliveryOpen: false },
   { width: 320, height: 568, name: "320x568", focused: false, deliveryOpen: false },
+  { width: 430, height: 932, name: "430x932", focused: false, deliveryOpen: false },
   { width: 768, height: 1024, name: "768x1024", focused: false, deliveryOpen: false },
   { width: 1024, height: 768, name: "1024x768", focused: false, deliveryOpen: true },
   { width: 1920, height: 1080, name: "1920x1080", focused: false, deliveryOpen: false },
@@ -58,12 +59,76 @@ async function preparePage(context) {
     await page.waitForTimeout(35);
   }
   await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForFunction(() => (
+    document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light"
+  ));
   await page.waitForTimeout(80);
   return page;
 }
 
 async function documentHeight(page) {
   return page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight));
+}
+
+async function scrollSectionUnderHeader(page, selector) {
+  await page.locator(selector).scrollIntoViewIfNeeded();
+  await page.evaluate((targetSelector) => {
+    const target = document.querySelector(targetSelector);
+    if (target) window.scrollTo(0, window.scrollY + target.getBoundingClientRect().top - 48);
+  }, selector);
+  await page.waitForTimeout(120);
+}
+
+async function captureHeaderEvidence(page, viewportName) {
+  const artifacts = [];
+  const topViewports = new Set(["1440x900", "1024x768", "390x844", "320x568"]);
+  if (topViewports.has(viewportName)) {
+    const fileName = `${viewportName}-hero-header-top.png`;
+    await page.screenshot({
+      path: path.join(reviewDirectory, fileName),
+      animations: "disabled",
+    });
+    artifacts.push(fileName);
+  }
+
+  if (viewportName === "1440x900") {
+    await scrollSectionUnderHeader(page, "#scene-workspace");
+    await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
+    let fileName = `${viewportName}-header-preview.png`;
+    await page.screenshot({ path: path.join(reviewDirectory, fileName), animations: "disabled" });
+    artifacts.push(fileName);
+
+    await scrollSectionUnderHeader(page, "#scene-evidence");
+    await page.waitForFunction(() => (
+      document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark"
+    ));
+    fileName = `${viewportName}-header-proof-dark.png`;
+    await page.screenshot({ path: path.join(reviewDirectory, fileName), animations: "disabled" });
+    artifacts.push(fileName);
+
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForFunction(() => (
+      document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light"
+    ));
+  }
+
+  if (viewportName === "390x844") {
+    let fileName = `${viewportName}-menu-trigger.png`;
+    await page.screenshot({ path: path.join(reviewDirectory, fileName), animations: "disabled" });
+    artifacts.push(fileName);
+
+    const trigger = page.getByRole("button", { name: "Открыть меню" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "Навигация по продукту" });
+    await dialog.waitFor({ state: "visible" });
+    fileName = `${viewportName}-menu-open.png`;
+    await page.screenshot({ path: path.join(reviewDirectory, fileName), animations: "disabled" });
+    artifacts.push(fileName);
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "hidden" });
+  }
+
+  return artifacts;
 }
 
 async function captureContrastCrops(page, viewportName) {
@@ -115,6 +180,7 @@ const manifest = {
   fullPage: {},
   deliveryOpen: {},
   contrastCrops: [],
+  headerEvidence: [],
 };
 
 try {
@@ -127,6 +193,13 @@ try {
     const closedHeight = await documentHeight(page);
     manifest.fullPage[viewport.name] = { width: viewport.width, height: closedHeight };
 
+    manifest.headerEvidence.push(...await captureHeaderEvidence(page, viewport.name));
+
+    await page.evaluate(() => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      window.scrollTo(0, 0);
+    });
+    await page.waitForTimeout(80);
     await page.screenshot({
       path: path.join(reviewDirectory, `${viewport.name}-full.png`),
       fullPage: true,
