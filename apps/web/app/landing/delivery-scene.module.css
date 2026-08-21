@@ -173,8 +173,7 @@
   .capabilityBand { grid-template-columns: 1fr; margin-top: 1.5rem; }
   .boundaryRow { align-items: flex-start; flex-direction: column; }
   .manualBoundary { align-items: flex-start; flex-direction: column; gap: .25rem; }
-  .moreRoutes { width: 100%; }
-  .extraRoutes { position: static; width: 100%; margin-top: .4rem; box-shadow: none; }
+  .extraRoutes { box-shadow: none; }
 }
 
 @media (max-width: 520px) {
