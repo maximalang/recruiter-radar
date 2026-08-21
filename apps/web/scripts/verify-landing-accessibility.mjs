@@ -59,31 +59,18 @@ async function preparePage(context, label, url = baseUrl) {
 
 async function readContrast(locator, backgroundSelector = null) {
   return locator.evaluate((element, explicitBackgroundSelector) => {
-    const parseChannel = (value) => value.trim().endsWith("%")
-      ? Number.parseFloat(value) / 100
-      : Number.parseFloat(value) / 255;
-    const parseAlpha = (value) => value.trim().endsWith("%")
-      ? Number.parseFloat(value) / 100
-      : Number.parseFloat(value);
+    const colorCanvas = document.createElement("canvas");
+    colorCanvas.width = 1;
+    colorCanvas.height = 1;
+    const colorContext = colorCanvas.getContext("2d", { willReadFrequently: true });
+    if (!colorContext) throw new Error("2D canvas context unavailable for color conversion");
     const parseColor = (value) => {
-      const color = value.trim().toLowerCase();
-      if (color === "transparent") return [0, 0, 0, 0];
-      if (color.startsWith("color(srgb")) {
-        const [channelsPart, alphaPart] = color.slice("color(srgb".length, -1).trim().split("/").map((part) => part.trim());
-        const channels = channelsPart.split(/\s+/).map(Number);
-        if (channels.length !== 3 || channels.some((channel) => !Number.isFinite(channel))) throw new Error(`Invalid computed color: ${value}`);
-        return [...channels, alphaPart ? parseAlpha(alphaPart) : 1];
-      }
-      if (color.startsWith("rgb(") || color.startsWith("rgba(")) {
-        const [channelsPart, alphaPart] = color.slice(color.indexOf("(") + 1, -1).replaceAll(",", " ").trim().split("/").map((part) => part.trim());
-        const tokens = channelsPart.split(/\s+/).filter(Boolean);
-        let alpha = alphaPart ? parseAlpha(alphaPart) : 1;
-        if (tokens.length === 4) alpha = parseAlpha(tokens.pop());
-        const channels = tokens.map(parseChannel);
-        if (channels.length !== 3 || channels.some((channel) => !Number.isFinite(channel))) throw new Error(`Invalid computed color: ${value}`);
-        return [...channels, alpha];
-      }
-      throw new Error(`Unsupported computed color: ${value}`);
+      colorContext.clearRect(0, 0, 1, 1);
+      colorContext.fillStyle = "rgba(0, 0, 0, 0)";
+      colorContext.fillStyle = value;
+      colorContext.fillRect(0, 0, 1, 1);
+      const [red, green, blue, alpha] = colorContext.getImageData(0, 0, 1, 1).data;
+      return [red / 255, green / 255, blue / 255, alpha / 255];
     };
     const composite = (top, bottom) => {
       const alpha = top[3] + bottom[3] * (1 - top[3]);
@@ -147,16 +134,18 @@ async function assertFocus(page, locator, label, backgroundSelector = null) {
   await page.keyboard.press("Tab");
   await page.keyboard.press("Shift+Tab");
   const focus = await locator.evaluate((element, explicitBackgroundSelector) => {
+    const colorCanvas = document.createElement("canvas");
+    colorCanvas.width = 1;
+    colorCanvas.height = 1;
+    const colorContext = colorCanvas.getContext("2d", { willReadFrequently: true });
+    if (!colorContext) throw new Error("2D canvas context unavailable for focus color conversion");
     const toRgba = (value) => {
-      const probe = document.createElement("span");
-      probe.style.color = value;
-      probe.style.position = "fixed";
-      probe.style.visibility = "hidden";
-      document.body.append(probe);
-      const resolved = getComputedStyle(probe).color;
-      probe.remove();
-      const numbers = resolved.match(/[\d.]+/g)?.map(Number) ?? [];
-      return [numbers[0] / 255, numbers[1] / 255, numbers[2] / 255, numbers[3] ?? 1];
+      colorContext.clearRect(0, 0, 1, 1);
+      colorContext.fillStyle = "rgba(0, 0, 0, 0)";
+      colorContext.fillStyle = value;
+      colorContext.fillRect(0, 0, 1, 1);
+      const [red, green, blue, alpha] = colorContext.getImageData(0, 0, 1, 1).data;
+      return [red / 255, green / 255, blue / 255, alpha / 255];
     };
     const composite = (top, bottom) => {
       const alpha = top[3] + bottom[3] * (1 - top[3]);
