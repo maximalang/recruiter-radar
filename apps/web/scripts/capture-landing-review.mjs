@@ -104,10 +104,18 @@ async function preparePage(context) {
   await page.locator("#scene-detection").waitFor({ state: "visible" });
   await page.locator("#preview-results").waitFor({ state: "attached" });
 
-  const consent = page.getByRole("button", { name: "Разрешить", exact: true });
+  const consent = page.getByRole("button", { name: "Принять аналитику", exact: true });
   if (await consent.isVisible()) {
     await consent.click();
     await consent.waitFor({ state: "hidden" });
+  } else {
+    // Symmetric dismissal so the fixed banner cannot intercept hover/click
+    // targets below when analytics is configured but acceptance is declined.
+    const reject = page.getByRole("button", { name: "Отклонить необязательные", exact: true });
+    if (await reject.isVisible()) {
+      await reject.click();
+      await reject.waitFor({ state: "hidden" });
+    }
   }
 
   const pageHeight = await page.evaluate(() => Math.max(
