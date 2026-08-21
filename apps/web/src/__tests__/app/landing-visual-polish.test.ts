@@ -194,6 +194,7 @@ describe("polished unified landing visual contract", () => {
     expect(footer).toContain('href="/payment-and-refund"');
     expect(footer).toContain('href="/privacy"');
     expect(footer).toContain('href="/personal-data-consent"');
+    expect(footer).toContain('href="/cookies"');
     expect(offerAlias.trim()).toBe('export { default, metadata } from "../terms/page";');
     expect(footer).toContain("OPERATOR_REQUISITES.inn");
     expect(footer).toContain("OPERATOR_REQUISITES.email");
