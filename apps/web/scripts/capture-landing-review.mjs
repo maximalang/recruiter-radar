@@ -309,7 +309,7 @@ try {
 
     await resetInteractionState(page);
     await page.screenshot({
-      path: path.join(reviewDirectory, `${viewport.name}-full.png`),
+      path: path.join(reviewDirectory, `${viewport.name}-full-default.png`),
       fullPage: true,
       animations: "disabled",
     });
