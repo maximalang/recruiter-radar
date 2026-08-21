@@ -98,8 +98,8 @@
   text-decoration: none;
 }
 
-.pilotCta:focus-visible,
-.finalCta:focus-visible {
+.pilotOffer .pilotCta:focus-visible,
+.final .finalCta:focus-visible {
   outline-color: var(--color-text-inverse);
 }
 
