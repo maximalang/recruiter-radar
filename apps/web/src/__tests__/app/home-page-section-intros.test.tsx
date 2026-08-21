@@ -247,7 +247,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).not.toContain('id="scene-timeline"');
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
-    expect(html).toContain("Настройте нишу");
+    expect(html).toContain("Настройте профиль");
     expect(footerSource).toContain('href="/legal"');
     expect(footerSource).toContain('href="/terms"');
     expect(footerSource).toContain('href="/payment-and-refund"');
@@ -286,17 +286,18 @@ describe("final unified evidence-first landing contract", () => {
     const evidence = renderToStaticMarkup(<EvidenceScene />);
     const delivery = renderToStaticMarkup(<DeliveryScene />);
 
-    expect(hero).toContain("Компании, которым стоит написать сегодня");
+    expect(hero).toContain("Находите компании, которым стоит написать сейчас");
     expect(hero).toContain("Посмотреть пример");
     expect(hero).toContain(">Войти</a>");
     expect(hero).toContain("заявка без списания");
     expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
     expect(hero).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
     expect(evidence).toContain("Уровень подтверждения");
-    expect(evidence).toContain("Источник · факт · дата · статус");
-    expect(evidence).toContain("почему сейчас");
+    expect(evidence).toContain("Последовательность подтверждающих фактов");
+    expect(evidence).toContain("Почему эта компания сейчас");
     expect(evidence).not.toContain("открыть факт");
-    expect(delivery).toContain("Радар следит за рынком");
+    expect(delivery).not.toContain("DELIVERY_STEPS");
+    expect(delivery).toContain("Полная карточка остаётся в кабинете");
     expect(delivery).toContain("Сообщения компаниям не отправляются автоматически.");
   });
 

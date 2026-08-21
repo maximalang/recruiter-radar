@@ -1,42 +1,58 @@
 import { DEMO_COMPANY, DEMO_EVIDENCE_SOURCES } from "./landing-copy";
-import sceneStyles from "./evidence-scene.module.css";
-import styles from "./landing.module.css";
+import styles from "./evidence-scene.module.css";
+
+function capitalize(value: string): string {
+  return value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`;
+}
 
 export default function EvidenceScene() {
+  const [confidenceGrade = "A", confidenceText = "высокая"] = DEMO_COMPANY.confidence
+    .split("/")
+    .map((part) => part.trim());
+
   return (
-    <section id="scene-evidence" className={`${styles.scene} ${styles.lightScene} ${styles.evidenceScene} ${sceneStyles.section}`} style={{ scrollMarginTop: "calc(72px + 32px)" }} aria-labelledby="evidence-title" data-header-tone="light" data-motion-reveal="section">
-      <div className={sceneStyles.layout}>
-        <div className={sceneStyles.intro}>
-          <p className={styles.sceneLabel}>Подтверждения</p>
-          <h2 id="evidence-title" className={styles.sceneHeading}>По каждой компании видно, <em>на чём основана рекомендация.</em></h2>
-          <p className={styles.sceneLead}>Радар показывает, что изменилось в найме, когда это произошло и где найдено. Факты можно проверить до первого сообщения.</p>
-        </div>
+    <section
+      id="scene-evidence"
+      className={styles.section}
+      aria-label="Почему эта компания сейчас"
+      data-header-tone="dark"
+      data-proof-story="why-now"
+    >
+      <div className={styles.layout}>
+        <header className={styles.intro}>
+          <div>
+            <p>Почему рекомендацию можно проверить</p>
+            <h2>Факт усиливает факт — пока сигнал не становится решением.</h2>
+          </div>
+          <p>
+            Мы показываем подтверждения к рекомендации, а не прячем решение за непрозрачным score.
+          </p>
+        </header>
 
-        <div className={sceneStyles.proofSummary} aria-label="Уровень подтверждения компании">
-          <span>Уровень подтверждения</span>
-          <strong>Высокий</strong>
-          <p>Несколько независимых фактов подтверждают активное расширение команды.</p>
-        </div>
-
-        <div className={sceneStyles.ledger}>
-          <header className={sceneStyles.ledgerHeading}>
-            <div><span>Компания</span><strong>{DEMO_COMPANY.name}</strong></div>
-            <p>Источник · факт · дата · статус</p>
-          </header>
-          <ul className={sceneStyles.records}>
-            {DEMO_EVIDENCE_SOURCES.map((row, index) => (
-              <li key={row.source} className={sceneStyles.record} tabIndex={0} data-evidence-row aria-label={`${row.source}: ${row.fact}. ${row.confidence}`}>
-                <span className={sceneStyles.recordIndex}>{String(index + 1).padStart(2, "0")}</span>
-                <div className={sceneStyles.recordFact}><span>{row.source}</span><strong>{row.fact}</strong></div>
-                <span className={sceneStyles.recordDate}>{row.eventDate}</span>
-                <span className={sceneStyles.recordStatus}>{row.confidence}</span>
+        <div className={styles.evidenceChain}>
+          <ol className={styles.timeline} aria-label="Последовательность подтверждающих фактов">
+            {DEMO_EVIDENCE_SOURCES.map((event, index) => (
+              <li key={event.source} data-proof-event>
+                <span className={styles.index}>{String(index + 1).padStart(2, "0")}</span>
+                <small>{event.eventDate}</small>
+                <strong>{event.fact}</strong>
+                <span>{event.source}</span>
               </li>
             ))}
-          </ul>
-          <div className={sceneStyles.conclusion} data-evidence-conclusion="source-fact-conclusion">
-            <div><span>Источник</span><i aria-hidden="true">→</i><span>Факт</span><i aria-hidden="true">→</i><strong>Вывод</strong></div>
-            <p>Подтверждения объясняют «почему сейчас»; сила сигнала помогает сортировать, но не заменяет факты.</p>
-          </div>
+          </ol>
+
+          <aside className={styles.resolution} data-proof-brief>
+            <span className={styles.resolutionLabel}>Вывод</span>
+            <div className={styles.confidenceBlock} aria-label="Уровень подтверждения">
+              <span>Уверенность</span>
+              <strong>{capitalize(confidenceText)}</strong>
+              <small>Класс {confidenceGrade} · {DEMO_COMPANY.freshness} · {DEMO_COMPANY.score} / 100</small>
+            </div>
+            <div className={styles.action}>
+              <span>Следующий ход</span>
+              <strong>{DEMO_COMPANY.opener}</strong>
+            </div>
+          </aside>
         </div>
       </div>
     </section>

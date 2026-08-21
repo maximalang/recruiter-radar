@@ -1,4 +1,5 @@
 import { getHhDigestItems, type HhDigestItem } from "./hhDigest"
+import { DEFAULT_LANDING_DEMO_STORY } from "./landing-demo"
 import { deriveLawfulContactPath, deriveNegativeSignals } from "./leads-data"
 import { rankPreviewItems, type PreviewRelevanceSignals } from "./preview-relevance"
 import {
@@ -61,16 +62,13 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
       rank: 1,
       org_id: "demo-industrial",
       hh_employer_id: "demo-industrial",
-      employer_name: "Производственная компания",
-      vacancies_count: 14,
-      distinct_vacancy_names_count: 6,
+      employer_name: DEFAULT_LANDING_DEMO_STORY.company.name,
+      vacancies_count: DEFAULT_LANDING_DEMO_STORY.company.vacanciesCount,
+      distinct_vacancy_names_count: DEFAULT_LANDING_DEMO_STORY.company.distinctVacancyNamesCount,
       latest_published_at: referenceDate.toISOString(),
       total_score: 348,
-      reasons: [
-        "Инженерный подбор: 14 новых вакансий за 6 дней",
-        "Появилась редкая инженерная роль",
-      ],
-      opener: "Предложить точечный подбор по инженерным ролям",
+      reasons: [...DEFAULT_LANDING_DEMO_STORY.company.reasons],
+      opener: DEFAULT_LANDING_DEMO_STORY.company.opener,
       source_families: ["hh", "career-pages", "egrul-fns"],
       evidence_titles: ["Инженер-конструктор", "Руководитель производства"],
       candidate_source_keys: ["demo:hh:industrial", "demo:career:industrial", "demo:egrul:industrial"],

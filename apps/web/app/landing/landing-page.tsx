@@ -12,8 +12,6 @@ import LandingMotion from "./landing-motion";
 import motionStyles from "./landing-motion.module.css";
 import styles from "./landing.module.css";
 import visualStyles from "./landing-visual-system.module.css";
-import RadarScene from "./radar-scene";
-import SignalTimelineScene from "./signal-timeline-scene";
 import WorkspaceScene from "./workspace-scene";
 
 export function LandingSkipLink() {
@@ -35,16 +33,19 @@ export default function LandingPage(props: {
       <LandingMotion />
       <LandingHashNavigation />
       <LandingHeader previewHref="#preview-configurator" />
+      <noscript>
+        <div className={styles.noScriptNotice} data-noscript-disclosure role="note">
+          Интерактивная настройка примера требует JavaScript. Основная информация о продукте, тарифах и условиях остаётся доступна без него.
+        </div>
+      </noscript>
       <main id="main-content">
         <DetectionScene previewHref="#preview-configurator" paymentConfigured={props.paymentConfigured} />
-        <SignalTimelineScene />
         <WorkspaceScene
           previewInput={props.previewInput}
           hasPreview={props.hasPreview}
           checkoutHref={props.checkoutHref}
         />
         <EvidenceScene />
-        <RadarScene />
         <DeliveryScene />
         <ConversionPanel
           previewInput={props.previewInput}
@@ -52,7 +53,9 @@ export default function LandingPage(props: {
           faqItems={props.faqItems}
         />
       </main>
-      <SiteFooter tone="dark" showCookieSettings={isYandexMetrikaConfigured()} />
+      <div className={styles.landingFooter} data-landing-footer="compact">
+        <SiteFooter tone="light" showCookieSettings={isYandexMetrikaConfigured()} />
+      </div>
     </div>
   );
 }

@@ -54,6 +54,7 @@ describe("landing runtime truth contract", () => {
   test("compact source copy stays truthful while the FAQ explains runtime roles", () => {
     const evidence = webSource("app/landing/evidence-scene.tsx");
     const landingCopy = webSource("app/landing/landing-copy.ts");
+    const landingDemo = webSource("lib/landing-demo.ts");
     const faq = webSource("app/landing/landing-faq.ts");
     const policy = JSON.parse(repoSource("packages/db/source-policy.json"));
     const readiness = JSON.parse(repoSource("packages/db/source-readiness.json"));
@@ -74,12 +75,13 @@ describe("landing runtime truth contract", () => {
       ]),
     );
 
-    expect(evidence).toContain("почему сейчас");
+    expect(evidence).toContain("Почему эта компания сейчас");
     expect(evidence).toContain("DEMO_EVIDENCE_SOURCES.map");
     expect(evidence).toContain('from "./landing-copy"');
-    expect(landingCopy).toContain("Карьерная страница");
-    expect(landingCopy).toContain("Публичные вакансии");
-    expect(landingCopy).toContain("Прямой источник");
+    expect(landingCopy).toContain("DEFAULT_LANDING_DEMO_STORY.evidence");
+    expect(landingDemo).toContain("Карьерная страница");
+    expect(landingDemo).toContain("Публичные вакансии");
+    expect(landingDemo).toContain("Прямой источник");
     expect(evidence).not.toContain("SOURCE_ROLES");
 
     expect(faq).toContain("включая hh.ru, «Работу России» и карьерные страницы");
@@ -97,14 +99,15 @@ describe("landing runtime truth contract", () => {
     expect(homepage).toContain("buildLandingFaqItems(paymentSetup.configured)");
   });
 
-  test("public preview names shared product signals without claiming production ranking equivalence", () => {
+  test("public preview keeps live/demo distinction without authenticated-workspace density", () => {
     const workspace = webSource("app/landing/workspace-scene.tsx");
     const previewRelevance = webSource("lib/preview-relevance.ts");
 
     expect(previewRelevance).toContain("not an output of the production FIUR engine");
-    expect(workspace).toContain("те же продуктовые признаки");
-    expect(workspace).toContain("Это демонстрационная выдача, а не расчёт вашего рабочего радара");
-    expect(workspace).not.toContain("логика приоритета и структура карточек соответствуют рабочей выдаче");
+    expect(workspace).toContain("Обезличенный пример");
+    expect(workspace).toContain("логика приоритета и типы источников сохранены");
+    expect(workspace).toContain('previewState.isLive ? "свежие данные" : "демо"');
     expect(workspace).not.toContain("тот же алгоритм");
+    expect(workspace).not.toContain("production FIUR");
   });
 });
