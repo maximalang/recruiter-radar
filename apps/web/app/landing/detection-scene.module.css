@@ -98,6 +98,11 @@
   color: var(--color-text-inverse);
 }
 
+.hero .primaryCta:focus-visible,
+.hero .loginLink:focus-visible {
+  outline-color: var(--color-text-inverse);
+}
+
 .trustLine {
   margin: 0;
   color: color-mix(in srgb, var(--color-text-inverse) 68%, transparent);
