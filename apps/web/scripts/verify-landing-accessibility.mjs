@@ -62,7 +62,7 @@ async function preparePage(context, label, url = baseUrl) {
   );
   await page.waitForTimeout(160);
 
-  const consent = page.getByRole("button", { name: "Разрешить", exact: true });
+  const consent = page.getByRole("button", { name: "Принять аналитику", exact: true });
   if (await consent.isVisible()) {
     await consent.click();
     await consent.waitFor({ state: "hidden" });
