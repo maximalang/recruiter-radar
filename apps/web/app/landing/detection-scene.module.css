@@ -98,11 +98,6 @@
   color: var(--color-text-inverse);
 }
 
-.primaryCta:focus-visible,
-.loginLink:focus-visible {
-  outline-color: var(--color-text-inverse);
-}
-
 .trustLine {
   margin: 0;
   color: color-mix(in srgb, var(--color-text-inverse) 68%, transparent);
