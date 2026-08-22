@@ -323,6 +323,11 @@ jobs:
         run: npm run test:landing:e2e
       - name: Responsive surface audit
         run: npm run test:responsive-surfaces
+      - name: Landing review captures (PR evidence artifact)
+        run: npm run test:landing:review-captures --workspace @recruiter-radar/web
+        env:
+          LANDING_REVIEW_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/review
+          LANDING_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/screenshots
       - name: Stop production server
         if: always()
         shell: bash
@@ -354,6 +359,14 @@ jobs:
             /tmp/landing-server.log
           if-no-files-found: warn
           retention-days: 7
+      - name: Upload landing review captures (visual gate evidence)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: landing-review-captures-${{ github.sha }}
+          path: /tmp/recruiter-radar-landing/review
+          if-no-files-found: warn
+          retention-days: 30
 
   auth-v2-verification:
     name: Auth v2 / ${{ matrix.gate }}
