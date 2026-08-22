@@ -193,7 +193,7 @@ for (const entry of manifest.surfaces) {
 // Every captured file must be a real PNG before it can count as evidence.
 for (const entry of manifest.surfaces) {
   const buffer = await readFile(path.join(reviewDirectory, entry.file)).catch(() => null);
-  if (!buffer || buffer.length < 8 || !buffer.subarray(1, 4).toString("latin1").equals("PNG")) {
+  if (!buffer || buffer.length < 8 || buffer.subarray(1, 4).toString("latin1") !== "PNG") {
     fail(`captured file ${entry.file} is not a valid PNG`);
   }
 }
