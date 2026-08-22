@@ -328,6 +328,25 @@ jobs:
         env:
           LANDING_REVIEW_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/review
           LANDING_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/screenshots
+      - name: Pre-218 baseline captures (best effort)
+        if: always()
+        shell: bash
+        run: |
+          git fetch --depth=1 origin 7f8c9a10 || exit 0
+          git worktree add "$RUNNER_TEMP/pre218" 7f8c9a10
+          cd "$RUNNER_TEMP/pre218"
+          npm ci --no-audit --no-fund
+          npm run build --workspace @recruiter-radar/web
+          node apps/web/scripts/prepare-standalone.mjs
+          PORT=3210 HOSTNAME=127.0.0.1 MIGRATE_ON_START=false node apps/web/.next/standalone/apps/web/server.js > /tmp/pre218-server.log 2>&1 &
+          echo $! > /tmp/pre218-server.pid
+          for i in $(seq 1 60); do
+            curl -fsS -o /dev/null http://127.0.0.1:3210/ && break
+            sleep 2
+          done
+          cd "$GITHUB_WORKSPACE"
+          LANDING_BASELINE_URL=http://127.0.0.1:3210 LANDING_REVIEW_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/review-pre218 LANDING_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/screenshots-pre218 npm run test:landing:review-captures --workspace @recruiter-radar/web || echo "::warning::baseline comparison captures incomplete"
+          kill "$(cat /tmp/pre218-server.pid)" 2>/dev/null || true
       - name: Stop production server
         if: always()
         shell: bash
@@ -364,7 +383,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: landing-review-captures-${{ github.sha }}
-          path: /tmp/recruiter-radar-landing/review
+          path: |
+            /tmp/recruiter-radar-landing/review
+            /tmp/recruiter-radar-landing/review-pre218
           if-no-files-found: warn
           retention-days: 30
 
