@@ -121,7 +121,7 @@ describe("landing premium restoration contract", () => {
 
     // Mobile drops the secondary structure instead of scaling everything down.
     expect(fieldCss).toMatch(/@media \(max-width: 760px\)/);
-    expect(fieldCss).toMatch(/@media \(max-width: 480px\)[^@]*opacity:\s*\.68/s);
+    expect(fieldCss).toMatch(/@media \(max-width: 480px\)[^@]*opacity:\s*\.68/);
     // Production audit keeps guarding against horizontal overflow on phones.
     const audit = source("scripts/verify-landing-production.mjs");
     expect(audit).toContain("[data-mobile-hero-signal]");

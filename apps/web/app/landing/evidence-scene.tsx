@@ -51,7 +51,7 @@ export default function EvidenceScene() {
               <span className={styles.blockLabel}>Оценка возможности</span>
               <p className={styles.scoreValue}>
                 {DEMO_COMPANY.score}
-                <small>/{DEMO_COMPANY.score === 87 ? 100 : 100}</small>
+                <small>/100</small>
               </p>
               <div className={styles.scoreScale} aria-hidden="true">
                 <i style={{ "--score": DEMO_COMPANY.score } as CSSProperties} />
