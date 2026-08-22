@@ -1,13 +1,39 @@
 import type { CSSProperties } from "react";
 
+import { DEFAULT_LANDING_DEMO_STORY } from "../../lib/landing-demo";
 import styles from "./signal-timeline.module.css";
 import shared from "./landing.module.css";
 
+/* Canonical demo story is the single source of truth for every dated fact.
+ * The sequence reads as an editorial ledger: what opened, what repeated,
+ * what was confirmed on re-check — ending in one assembled reason. */
+const STORY = DEFAULT_LANDING_DEMO_STORY;
+
 const TIMELINE_EVENTS = [
-  { date: "4 авг", fact: "Открыты 8 инженерных ролей", source: "карьерная страница", state: "новый сигнал" },
-  { date: "6 авг", fact: "Добавлена роль руководителя направления", source: "публичные вакансии", state: "усиление" },
-  { date: "9 авг", fact: "Три позиции опубликованы повторно", source: "повторная публикация", state: "повтор" },
-  { date: "сегодня", fact: "Изменения подтверждены повторной проверкой", source: "3 подтверждающих факта", state: "подтверждено" },
+  {
+    date: "6 дней назад",
+    fact: `Открыты ${STORY.company.vacanciesCount} инженерных ролей`,
+    source: "карьерная страница",
+    state: "новый сигнал",
+  },
+  {
+    date: "2 дня назад",
+    fact: "Появилась новая редкая инженерная роль",
+    source: "публичные вакансии",
+    state: "усиление",
+  },
+  {
+    date: "вчера",
+    fact: "Найм остаётся активным — публикации обновлены",
+    source: "повторная публикация",
+    state: "повтор",
+  },
+  {
+    date: STORY.company.freshness,
+    fact: "Изменения подтверждены повторной проверкой",
+    source: `${STORY.evidence.length} подтверждающих факта`,
+    state: "подтверждено",
+  },
 ] as const;
 
 export default function SignalTimeline() {
@@ -38,7 +64,6 @@ export default function SignalTimeline() {
               <li
                 key={`${event.date}-${event.fact}`}
                 className={styles.event}
-                tabIndex={0}
                 data-timeline-event
                 style={{ "--event-index": index } as CSSProperties}
               >

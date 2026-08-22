@@ -37,6 +37,9 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
         <p className={sceneStyles.description} data-hero-description>
           Recruiter Radar отслеживает свежие изменения в найме и показывает, где появился реальный повод предложить подбор — с фактами и источниками по каждой компании.
         </p>
+        <p className={sceneStyles.visuallyHidden}>
+          Схема показывает несколько подтверждающих сигналов найма, объединённых в одну клиентскую возможность.
+        </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a
             href={props.previewHref}

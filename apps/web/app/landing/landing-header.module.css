@@ -17,12 +17,13 @@
   color: var(--color-text-primary);
 }
 
+/* Scrolled: quiet surface — slightly translucent, no heavy shadow. */
 .header[data-scrolled],
 .header[data-menu-open] {
-  border-bottom-color: var(--color-separator);
-  background: color-mix(in srgb, var(--color-canvas) 95%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--color-separator) 82%, transparent);
+  background: color-mix(in srgb, var(--color-canvas) 88%, transparent);
   color: var(--color-text-primary);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(10px);
 }
 
 .inner {

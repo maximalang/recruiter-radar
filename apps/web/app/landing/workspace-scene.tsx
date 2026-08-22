@@ -51,6 +51,10 @@ export default function WorkspaceScene(props: WorkspaceProps) {
           data-product-preview="live-radar"
           data-preview-editorial="true"
         >
+          <div className={sceneStyles.previewHeader} data-preview-rail aria-hidden="true">
+            <span>Recruiter Radar</span>
+            <small>ПРИМЕР</small>
+          </div>
           <PreviewConfigurator previewInput={props.previewInput} hasPreview={props.hasPreview} />
           <div
             id="preview-results"
