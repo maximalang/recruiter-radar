@@ -80,7 +80,7 @@ describe("landing final production contract", () => {
     expect(page).not.toContain("SignalTimelineScene");
     expect(page).not.toContain("<RadarScene");
     expect(page.indexOf("<EvidenceScene")).toBeLessThan(page.indexOf("<DeliveryScene"));
-    expect(delivery).toContain("Работайте там, где удобно.");
+    expect(delivery).toContain("Радар находит повод. Пишете вы.");
     expect(delivery).toContain("Сообщения компаниям не отправляются автоматически.");
     expect(delivery).toContain('data-delivery-routes="connected"');
     expect(delivery).toContain("PRIMARY_ROUTES.map");

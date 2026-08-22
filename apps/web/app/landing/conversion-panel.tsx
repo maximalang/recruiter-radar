@@ -129,6 +129,19 @@ export default function ConversionPanel(props: {
         data-motion-reveal="section"
       >
         <div className={panelStyles.finalCopy}>
+          <svg className={panelStyles.finalField} viewBox="0 0 520 320" aria-hidden="true" focusable="false" data-final-radar="echo">
+            <defs>
+              <radialGradient id="final-echo-halo" cx="50%" cy="50%" r="50%">
+                <stop className={panelStyles.finalHaloCore} offset="0" />
+                <stop offset="1" stopColor="var(--color-signal)" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <path className={panelStyles.finalArc} d="M 60 318 A 258 258 0 0 1 518 296" />
+            <circle className={panelStyles.finalOrbit} cx="330" cy="196" r="118" pathLength={100} strokeDasharray="14 86" />
+            <circle className={panelStyles.finalSignal} cx="330" cy="196" r="3.4" />
+            <circle cx="352" cy="176" r="1.7" /><circle cx="309" cy="212" r="1.5" />
+            <circle className={panelStyles.finalEchoCopper} cx="368" cy="214" r="2.1" />
+          </svg>
           <span className={panelStyles.finalEyebrow}>7 дней / своя ниша</span>
           <h2>Посмотрите, кому стоит написать сейчас.</h2>
           <p>Радар покажет приоритет компаний, проверяемые факты и конкретный повод для первого контакта.</p>

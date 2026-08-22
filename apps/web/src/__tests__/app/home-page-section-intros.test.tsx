@@ -292,7 +292,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(hero).toContain("заявка без списания");
     expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
     expect(hero).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
-    expect(evidence).toContain("Уровень подтверждения");
+    expect(evidence).toContain("Оценка возможности");
     expect(evidence).toContain("Последовательность подтверждающих фактов");
     expect(evidence).toContain("Почему эта компания сейчас");
     expect(evidence).not.toContain("открыть факт");

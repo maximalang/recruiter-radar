@@ -96,7 +96,7 @@ describe("landing final rebuild narrative", () => {
     const deliveryCss = source("app/landing/delivery-scene.module.css");
 
     expect(delivery).toContain('data-delivery-summary="compact"');
-    expect(delivery).toContain("Работайте там, где удобно.");
+    expect(delivery).toContain("Радар находит повод. Пишете вы.");
     expect(delivery).toContain("Веб-кабинет");
     expect(delivery).toContain("Telegram");
     expect(delivery).toContain("Email");

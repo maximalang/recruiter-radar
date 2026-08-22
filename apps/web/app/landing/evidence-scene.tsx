@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import { DEMO_COMPANY, DEMO_EVIDENCE_SOURCES } from "./landing-copy";
 import styles from "./evidence-scene.module.css";
 
@@ -21,7 +23,7 @@ export default function EvidenceScene() {
       <div className={styles.layout}>
         <header className={styles.intro}>
           <div>
-            <p>Почему рекомендацию можно проверить</p>
+            <p className={styles.introLabel}>Why now · {DEMO_COMPANY.name}</p>
             <h2>Факт усиливает факт — пока сигнал не становится решением.</h2>
           </div>
           <p>
@@ -29,27 +31,39 @@ export default function EvidenceScene() {
           </p>
         </header>
 
-        <div className={styles.evidenceChain}>
+        <div className={styles.evidenceChain} data-proof-chain="source-fact-conclusion">
           <ol className={styles.timeline} aria-label="Последовательность подтверждающих фактов">
             {DEMO_EVIDENCE_SOURCES.map((event, index) => (
               <li key={event.source} data-proof-event>
-                <span className={styles.index}>{String(index + 1).padStart(2, "0")}</span>
-                <small>{event.eventDate}</small>
-                <strong>{event.fact}</strong>
-                <span>{event.source}</span>
+                <span className={styles.sourceCell}>
+                  {String(index + 1).padStart(2, "0")} · {event.source}
+                </span>
+                <strong className={styles.factCell}>{event.fact}</strong>
+                <span className={styles.statusCell}>
+                  {event.eventDate} · {event.confidence}
+                </span>
               </li>
             ))}
           </ol>
 
           <aside className={styles.resolution} data-proof-brief>
-            <span className={styles.resolutionLabel}>Вывод</span>
-            <div className={styles.confidenceBlock} aria-label="Уровень подтверждения">
-              <span>Уверенность</span>
+            <div className={styles.scoreBlock} aria-label={`Оценка возможности: ${DEMO_COMPANY.score} из 100`}>
+              <span className={styles.blockLabel}>Оценка возможности</span>
+              <p className={styles.scoreValue}>
+                {DEMO_COMPANY.score}
+                <small>/{DEMO_COMPANY.score === 87 ? 100 : 100}</small>
+              </p>
+              <div className={styles.scoreScale} aria-hidden="true">
+                <i style={{ "--score": DEMO_COMPANY.score } as CSSProperties} />
+              </div>
+            </div>
+            <div className={styles.confidenceBlock}>
+              <span className={styles.blockLabel}>Уверенность</span>
               <strong>{capitalize(confidenceText)}</strong>
-              <small>Класс {confidenceGrade} · {DEMO_COMPANY.freshness} · {DEMO_COMPANY.score} / 100</small>
+              <small>Класс {confidenceGrade} · подтверждено {DEMO_COMPANY.freshness}</small>
             </div>
             <div className={styles.action}>
-              <span>Следующий ход</span>
+              <span className={styles.blockLabel}>Следующий ход</span>
               <strong>{DEMO_COMPANY.opener}</strong>
             </div>
           </aside>
