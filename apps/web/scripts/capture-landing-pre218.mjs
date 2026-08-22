@@ -37,6 +37,14 @@ function fail(message) {
   process.exit(1);
 }
 
+/* Exit code 2 = invalid comparison evidence (historical == restored bytes).
+ * The CI step treats 2 as a hard failure; other non-zero codes stay
+ * best-effort warnings. */
+function failInvalidEvidence(message) {
+  process.stderr.write(`pre218 capture: ${message}\n`);
+  process.exit(2);
+}
+
 if (!baselineUrl) fail("LANDING_BASELINE_URL is required");
 if (!baselineCommit) fail("LANDING_BASELINE_COMMIT is required");
 
@@ -178,7 +186,15 @@ for (const entry of manifest.surfaces) {
   entry.restoredCounterpartSha256 = restoredHash;
   entry.identicalToRestored = historicalHash === restoredHash;
   if (entry.identicalToRestored) {
-    fail(`INVALID COMPARISON EVIDENCE: ${entry.file} is byte-identical to the restored capture — the historical pipeline captured the wrong server`);
+    failInvalidEvidence(`INVALID COMPARISON EVIDENCE: ${entry.file} is byte-identical to the restored capture — the historical pipeline captured the wrong server`);
+  }
+}
+
+// Every captured file must be a real PNG before it can count as evidence.
+for (const entry of manifest.surfaces) {
+  const buffer = await readFile(path.join(reviewDirectory, entry.file)).catch(() => null);
+  if (!buffer || buffer.length < 8 || !buffer.subarray(1, 4).toString("latin1").equals("PNG")) {
+    fail(`captured file ${entry.file} is not a valid PNG`);
   }
 }
 

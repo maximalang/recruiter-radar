@@ -354,7 +354,17 @@ jobs:
           LANDING_REVIEW_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/review-pre218 \
           LANDING_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/screenshots-pre218 \
           LANDING_REVIEW_DIR=/tmp/recruiter-radar-landing/review \
-          npm run test:landing:pre218-captures --workspace @recruiter-radar/web || echo "::warning::baseline comparison captures incomplete"
+          npm run test:landing:pre218-captures --workspace @recruiter-radar/web
+          status=$?
+          # Exit code 2 = invalid comparison evidence (historical == restored):
+          # a hard failure, not a best-effort warning.
+          if [ "$status" -eq 2 ]; then
+            echo "::error::pre-218 baseline evidence is INVALID (byte-identical to restored captures)"
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::baseline comparison captures incomplete"
+          fi
           kill "$(cat /tmp/pre218-server.pid)" 2>/dev/null || true
       - name: Stop production server
         if: always()
