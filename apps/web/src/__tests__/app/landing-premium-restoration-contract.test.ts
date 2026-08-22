@@ -121,7 +121,12 @@ describe("landing premium restoration contract", () => {
 
     // Mobile drops the secondary structure instead of scaling everything down.
     expect(fieldCss).toMatch(/@media \(max-width: 760px\)/);
-    expect(fieldCss).toMatch(/@media \(max-width: 480px\)[^@]*opacity:\s*\.68/);
+    expect(fieldCss).toMatch(/@media \(max-width: 480px\)[^@]*opacity:\s*\.78/);
+    // Mobile radar identity stays legible: the lone structural arc and focal
+    // rings run modestly stronger than desktop (no glow, no extra geometry).
+    const desktopArcOpacity = Number(fieldCss.match(/\.structArcA\s*\{[^}]*signal-on-dark\)\s*(\d+)%/)?.[1] ?? 0);
+    const mobileArcOpacity = Number(fieldCss.match(/@media \(max-width: 760px\) \{[\s\S]*?\.structArcA\s*\{[^}]*signal-on-dark\)\s*(\d+)%/)?.[1] ?? 0);
+    expect(mobileArcOpacity).toBeGreaterThan(desktopArcOpacity);
     // Production audit keeps guarding against horizontal overflow on phones.
     const audit = source("scripts/verify-landing-production.mjs");
     expect(audit).toContain("[data-mobile-hero-signal]");

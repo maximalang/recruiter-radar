@@ -25,6 +25,15 @@
   text-transform: uppercase;
 }
 
+.intro h2 {
+  margin: 0;
+  max-width: 31ch;
+  font-size: clamp(1.85rem, 2.6vw, 2.55rem);
+  font-weight: 580;
+  letter-spacing: -.04em;
+  line-height: 1.08;
+}
+
 .introSub {
   grid-column: 2;
   max-width: 34rem;
@@ -32,15 +41,6 @@
   color: var(--color-text-secondary);
   font-size: .92rem;
   line-height: 1.55;
-}
-
-.intro h2 {
-  max-width: 31ch;
-  margin: 0;
-  font-size: clamp(1.85rem, 2.6vw, 2.55rem);
-  font-weight: 580;
-  letter-spacing: -.04em;
-  line-height: 1.08;
 }
 
 .capabilityBand {

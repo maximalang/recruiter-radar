@@ -328,6 +328,7 @@ jobs:
         env:
           LANDING_REVIEW_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/review
           LANDING_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/screenshots
+          LANDING_SOURCE_COMMIT: ${{ github.sha }}
       - name: Pre-218 baseline captures (best effort)
         if: always()
         shell: bash
@@ -345,7 +346,15 @@ jobs:
             sleep 2
           done
           cd "$GITHUB_WORKSPACE"
-          LANDING_BASELINE_URL=http://127.0.0.1:3210 LANDING_REVIEW_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/review-pre218 LANDING_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/screenshots-pre218 npm run test:landing:review-captures --workspace @recruiter-radar/web || echo "::warning::baseline comparison captures incomplete"
+          # Historical evidence only: the dedicated script captures the
+          # pre-218 server exclusively, so review-pre218 can never contain
+          # restored-build captures disguised as historical ones.
+          LANDING_BASELINE_URL=http://127.0.0.1:3210 \
+          LANDING_BASELINE_COMMIT=7f8c9a10fb289bb52bd7b39cd3f566661df85ff0 \
+          LANDING_REVIEW_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/review-pre218 \
+          LANDING_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/screenshots-pre218 \
+          LANDING_REVIEW_DIR=/tmp/recruiter-radar-landing/review \
+          npm run test:landing:pre218-captures --workspace @recruiter-radar/web || echo "::warning::baseline comparison captures incomplete"
           kill "$(cat /tmp/pre218-server.pid)" 2>/dev/null || true
       - name: Stop production server
         if: always()

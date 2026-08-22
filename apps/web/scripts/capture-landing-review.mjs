@@ -5,11 +5,13 @@ import path from "node:path";
 import { chromium } from "playwright";
 
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
-const baselineUrl = process.env.LANDING_BASELINE_URL ?? "";
 const auditScreenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), "recruiter-radar-landing", "screenshots");
 const reviewDirectory = process.env.LANDING_REVIEW_SCREENSHOT_DIR
   ?? path.join(path.dirname(auditScreenshotDirectory), "review");
+/* Provenance: which exact tree produced these captures. CI sets this to the
+ * PR head SHA; ad-hoc local runs stay null and are reported as "unknown". */
+const sourceCommit = process.env.LANDING_SOURCE_COMMIT || null;
 
 const viewports = [
   { width: 1440, height: 900, name: "1440x900", focused: true, deliveryOpen: true },
@@ -93,7 +95,7 @@ async function resetInteractionState(page) {
   });
 }
 
-async function preparePage(context) {
+async function preparePage(context, targetUrl = baseUrl) {
   const page = await context.newPage();
   await page.route("**/api/landing-events", (route) => route.fulfill({ status: 204 }));
   await page.route("https://mc.yandex.ru/metrika/tag.js", (route) => route.fulfill({
@@ -101,7 +103,7 @@ async function preparePage(context) {
     contentType: "application/javascript",
     body: "/* deterministic analytics loader stub for review capture */",
   }));
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.goto(targetUrl, { waitUntil: "networkidle" });
   await page.locator('[data-landing-experience="signal-lock"]').waitFor({ state: "attached" });
   await page.locator("#scene-detection").waitFor({ state: "visible" });
   await page.locator("#preview-results").waitFor({ state: "attached" });
@@ -330,31 +332,6 @@ try {
       }
     }
 
-    // Optional pre-218 baseline comparison captures (same surfaces, same
-    // viewport) when LANDING_BASELINE_URL points at the historical landing.
-    if (baselineUrl && viewport.focused) {
-      const baselineContext = await browser.newContext({
-        viewport: { width: viewport.width, height: viewport.height },
-        reducedMotion: "reduce",
-      });
-      const baselinePage = await preparePage(baselineContext, undefined, baselineUrl);
-      for (const surface of focusedSurfaces) {
-        const locator = baselinePage.locator(surface.selector).first();
-        try {
-          await locator.waitFor({ state: "visible", timeout: 8000 });
-          await locator.scrollIntoViewIfNeeded();
-          await movePointerToNeutral(baselinePage);
-          await locator.screenshot({
-            path: path.join(reviewDirectory, `${viewport.name}-pre218-${surface.name}.png`),
-            animations: "disabled",
-          });
-        } catch {
-          // Baseline predates this surface; skip rather than fail evidence.
-        }
-      }
-      await baselineContext.close();
-    }
-
     manifest.contrastCrops.push(...await captureContrastCrops(page, viewport.name));
 
     if (viewport.deliveryOpen) {
@@ -384,10 +361,20 @@ try {
 }
 
 await writeFile(path.join(reviewDirectory, "manifest.json"), JSON.stringify(manifest, null, 2));
+await writeFile(
+  path.join(reviewDirectory, "provenance.json"),
+  JSON.stringify({
+    sourceKind: "restored",
+    sourceCommit: sourceCommit ?? "unknown",
+    baseUrl,
+    capturedAt: new Date().toISOString(),
+  }, null, 2),
+);
 
 process.stdout.write(JSON.stringify({
   ok: true,
   reviewDirectory,
+  provenance: { sourceKind: "restored", sourceCommit: sourceCommit ?? "unknown" },
   viewports: viewports.map(({ width, height }) => `${width}x${height}`),
   focusedSurfaces: focusedSurfaces.map(({ name }) => name),
   manifest,

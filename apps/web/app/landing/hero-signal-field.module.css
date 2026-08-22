@@ -169,11 +169,19 @@
 
 @media (max-width: 760px) {
   /* Intentional mobile composition: one partial arc + focal signal only,
-   * quieter than desktop, sitting behind/right of the copy. */
-  .structArcA { stroke-dasharray: 22 78; }
+   * sitting behind/right of the copy. Strokes run slightly stronger than
+   * desktop so the radar identity survives the smaller, dimmer canvas —
+   * still quiet, no glow, no extra geometry. */
+  .structArcA {
+    stroke: color-mix(in srgb, var(--color-signal-on-dark) 44%, transparent);
+    stroke-width: 1.1;
+  }
   .structArcB, .orbitLine, .whisper { display: none; }
   .pointLayer circle:nth-child(n + 6) { display: none; }
   .linkDashed { display: none; }
+  .focusRing { stroke: color-mix(in srgb, var(--color-signal-on-dark) 32%, transparent); }
+  .focusInnerRing { stroke: color-mix(in srgb, var(--color-signal-on-dark) 24%, transparent); }
+  .focusLinks { stroke: color-mix(in srgb, var(--color-signal-on-dark) 42%, transparent); }
   .annotation {
     top: auto;
     bottom: 24%;
@@ -186,11 +194,11 @@
   .annotationCompany { font-size: .8rem; }
   .annotationLine { display: none; }
   .annotationMeta { font-size: .56rem; }
-  .fieldRoot { opacity: .82; }
+  .fieldRoot { opacity: .86; }
 }
 
 @media (max-width: 480px) {
-  .fieldRoot { opacity: .68; }
+  .fieldRoot { opacity: .78; }
   .annotation { bottom: 30%; max-width: 11rem; }
 }
 
