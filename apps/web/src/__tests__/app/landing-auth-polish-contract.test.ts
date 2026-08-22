@@ -27,39 +27,41 @@ describe("landing visual and login reliability polish", () => {
     expect(visual).not.toContain(":global(#faq summary)");
   });
 
-  test("uses a static evidence-first hero without an ambient radar runtime", () => {
+  test("restores the ambient radar hero on canonical inverse-theme tokens", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const heroScene = source("app/landing/detection-scene.module.css");
+    const signalField = source("app/landing/hero-signal-field.tsx");
+    const signalFieldCss = source("app/landing/hero-signal-field.module.css");
     const visual = source("app/landing/landing-visual-system.module.css");
     const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
     const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(hero).toContain('data-hero-layout="company-brief"');
-    expect(hero).toContain('data-art-direction="evidence-first"');
-    expect(hero).toContain('data-hero-company-brief="true"');
-    expect(hero).toContain("Почему сейчас");
-    expect(hero).toContain("Подтверждения");
-    expect(hero).toContain("Следующий ход");
+    expect(hero).toContain('data-hero-layout="ambient-radar"');
+    expect(hero).toContain("HeroSignalField");
+    expect(hero).toContain("Радар клиентских возможностей");
     expect(hero).not.toContain("HeroRadar");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);
+    expect(signalFieldCss).toContain("var(--color-signal-on-dark)");
+    expect(signalFieldCss).toContain("var(--color-copper)");
+    expect(signalFieldCss).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(signalFieldCss).not.toMatch(/\brgba?\(/);
     expect(heroScene).toContain("var(--color-text-primary)");
     expect(heroScene).toContain("var(--color-signal)");
-    expect(heroScene).not.toMatch(/animation\s*:/);
     expect(heroScene).not.toContain("#c8f36a");
     expect(visual).not.toContain("data-hero-instrument");
   });
 
-  test("binds the transparent fixed header to the light Hero surface from first paint", () => {
+  test("binds the transparent fixed header to the dark Hero surface from first paint", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const header = source("app/landing/landing-header.tsx");
     const accessibilityAudit = source("scripts/verify-landing-accessibility.mjs");
     const reviewCapture = source("scripts/capture-landing-review.mjs");
 
     expect(hero).toContain('data-theme="inverse"');
-    expect(hero).toContain('data-header-tone="light"');
-    expect(hero).not.toContain('data-header-tone="dark"');
-    expect(header).toContain('useState<HeaderTone>("light")');
+    expect(hero).toContain('data-header-tone="dark"');
+    expect(hero).not.toContain('data-header-tone="light"');
+    expect(header).toContain('useState<HeaderTone>("dark")');
     expect(header).toContain('const logoTone = scrolled || menuOpen ? "light" : tone;');
     expect(accessibilityAudit).toContain("Header BrandLogo");
     expect(accessibilityAudit).toContain("Header nav");

@@ -31,7 +31,7 @@
   color: inherit;
 }
 
-.logo[data-tone="dark"] .wordmark {
+.logo[data-tone="dark"] {
   color: var(--color-canvas);
 }
 

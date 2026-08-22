@@ -323,6 +323,30 @@ jobs:
         run: npm run test:landing:e2e
       - name: Responsive surface audit
         run: npm run test:responsive-surfaces
+      - name: Landing review captures (PR evidence artifact)
+        run: npm run test:landing:review-captures --workspace @recruiter-radar/web
+        env:
+          LANDING_REVIEW_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/review
+          LANDING_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/screenshots
+      - name: Pre-218 baseline captures (best effort)
+        if: always()
+        shell: bash
+        run: |
+          git fetch --depth=1 origin 7f8c9a10fb289bb52bd7b39cd3f566661df85ff0 || exit 0
+          git worktree add "$RUNNER_TEMP/pre218" 7f8c9a10fb289bb52bd7b39cd3f566661df85ff0
+          cd "$RUNNER_TEMP/pre218"
+          npm ci --no-audit --no-fund
+          npm run build --workspace @recruiter-radar/web
+          node apps/web/scripts/prepare-standalone.mjs
+          PORT=3210 HOSTNAME=127.0.0.1 MIGRATE_ON_START=false node apps/web/.next/standalone/apps/web/server.js > /tmp/pre218-server.log 2>&1 &
+          echo $! > /tmp/pre218-server.pid
+          for i in $(seq 1 60); do
+            curl -fsS -o /dev/null http://127.0.0.1:3210/ && break
+            sleep 2
+          done
+          cd "$GITHUB_WORKSPACE"
+          LANDING_BASELINE_URL=http://127.0.0.1:3210 LANDING_REVIEW_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/review-pre218 LANDING_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/screenshots-pre218 npm run test:landing:review-captures --workspace @recruiter-radar/web || echo "::warning::baseline comparison captures incomplete"
+          kill "$(cat /tmp/pre218-server.pid)" 2>/dev/null || true
       - name: Stop production server
         if: always()
         shell: bash
@@ -354,6 +378,16 @@ jobs:
             /tmp/landing-server.log
           if-no-files-found: warn
           retention-days: 7
+      - name: Upload landing review captures (visual gate evidence)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: landing-review-captures-${{ github.sha }}
+          path: |
+            /tmp/recruiter-radar-landing/review
+            /tmp/recruiter-radar-landing/review-pre218
+          if-no-files-found: warn
+          retention-days: 30
 
   auth-v2-verification:
     name: Auth v2 / ${{ matrix.gate }}

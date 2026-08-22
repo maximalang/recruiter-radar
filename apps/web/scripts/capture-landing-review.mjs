@@ -5,6 +5,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
+const baselineUrl = process.env.LANDING_BASELINE_URL ?? "";
 const auditScreenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), "recruiter-radar-landing", "screenshots");
 const reviewDirectory = process.env.LANDING_REVIEW_SCREENSHOT_DIR
@@ -22,6 +23,7 @@ const viewports = [
 
 const focusedSurfaces = [
   { name: "hero", selector: "#scene-detection" },
+  { name: "timeline", selector: "#scene-signal-timeline" },
   { name: "preview", selector: '#scene-workspace [data-product-preview="live-radar"]' },
   { name: "proof", selector: "#scene-evidence" },
   { name: "delivery", selector: "#scene-delivery" },
@@ -83,7 +85,7 @@ async function resetInteractionState(page) {
   });
   await page.waitForFunction(() => (
     window.scrollY === 0
-    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light"
+    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark"
   ));
   await movePointerToNeutral(page);
   await page.evaluate(() => {
@@ -236,12 +238,12 @@ async function captureContrastCrops(page, viewportName) {
 
   const artifacts = [];
   await resetInteractionState(page);
-  const decision = page.locator('[data-hero-stage="decision"]').first();
+  const decision = page.locator("#scene-detection [data-hero-copy]").first();
   await decision.screenshot({
-    path: path.join(reviewDirectory, `${viewportName}-hero-decision.png`),
+    path: path.join(reviewDirectory, `${viewportName}-hero-copy.png`),
     animations: "disabled",
   });
-  artifacts.push(`${viewportName}-hero-decision.png`);
+  artifacts.push(`${viewportName}-hero-copy.png`);
 
   const states = [
     { name: "pilot-cta", locator: page.locator("#pricing [data-pricing-primary] > a").first() },
@@ -326,6 +328,31 @@ try {
           animations: "disabled",
         });
       }
+    }
+
+    // Optional pre-218 baseline comparison captures (same surfaces, same
+    // viewport) when LANDING_BASELINE_URL points at the historical landing.
+    if (baselineUrl && viewport.focused) {
+      const baselineContext = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        reducedMotion: "reduce",
+      });
+      const baselinePage = await preparePage(baselineContext, undefined, baselineUrl);
+      for (const surface of focusedSurfaces) {
+        const locator = baselinePage.locator(surface.selector).first();
+        try {
+          await locator.waitFor({ state: "visible", timeout: 8000 });
+          await locator.scrollIntoViewIfNeeded();
+          await movePointerToNeutral(baselinePage);
+          await locator.screenshot({
+            path: path.join(reviewDirectory, `${viewport.name}-pre218-${surface.name}.png`),
+            animations: "disabled",
+          });
+        } catch {
+          // Baseline predates this surface; skip rather than fail evidence.
+        }
+      }
+      await baselineContext.close();
     }
 
     manifest.contrastCrops.push(...await captureContrastCrops(page, viewport.name));

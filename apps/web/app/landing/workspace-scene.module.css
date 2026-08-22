@@ -18,30 +18,37 @@
 
 .productFrame {
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--color-text-primary) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-text-primary) 14%, transparent);
   border-radius: var(--radius-surface);
   background: var(--color-surface-primary);
   box-shadow: var(--shadow-float);
 }
 
+/* Quiet top rail: one product object, not a dashboard window. */
 .previewHeader {
-  min-height: 2.8rem;
+  min-height: 2.6rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: .72rem 1rem;
-  background: var(--color-text-primary);
-  color: var(--color-text-inverse);
+  padding: .66rem 1rem;
+  background: color-mix(in srgb, var(--color-text-primary) 4%, var(--color-surface-primary));
 }
 .previewHeader span {
-  color: var(--color-signal);
-  font-size: .7rem;
-  font-weight: 700;
-  letter-spacing: .06em;
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .18em;
   text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text-primary) 62%, transparent);
 }
-.previewHeader small { color: color-mix(in srgb, var(--color-text-inverse) 48%, transparent); font-size: .69rem; }
+.previewHeader small {
+  color: var(--color-signal-hover);
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 650;
+  letter-spacing: .16em;
+}
 
 .controls {
   gap: .75rem;
@@ -121,8 +128,7 @@
 .appliedProfile { border-top: 1px solid var(--color-separator); }
 
 .leadPrimary {
-  background: var(--color-signal-soft);
-  border-radius: var(--radius-surface);
+  background: transparent;
 }
 .leadSecondary { border-top: 1px solid var(--color-separator); }
 .leadRow {
@@ -157,10 +163,22 @@
 .leadBody {
   display: grid;
   gap: .85rem;
-  margin: 0 .8rem .8rem 2.95rem;
-  padding: .95rem;
+  margin: .2rem 0 1rem;
+  padding: 0 0 0 1.05rem;
   border-left: 2px solid var(--color-signal);
-  background: color-mix(in srgb, var(--color-surface-primary) 88%, transparent);
+}
+
+/* Evidence rows read as aligned facts, not nested chips. */
+.evidenceBlock li {
+  display: flex;
+  align-items: flex-start;
+  gap: .45rem;
+  min-width: 0;
+  padding: .5rem 0;
+  border-bottom: 1px solid var(--color-separator);
+  color: var(--color-text-primary);
+  font-size: .75rem;
+  line-height: 1.38;
 }
 
 .primaryReason,
@@ -190,6 +208,7 @@
   line-height: 1.38;
 }
 .evidenceBlock li :global(svg) { flex: 0 0 auto; margin-top: .12rem; color: var(--color-signal-hover); }
+.evidenceBlock li:last-child { border-bottom: 0; }
 
 .outcomeGrid {
   display: grid;
@@ -226,22 +245,22 @@
   justify-content: space-between;
   gap: 1rem;
   padding: .7rem 1rem;
-  background: var(--color-text-primary);
-  color: var(--color-text-inverse);
+  border-top: 1px solid var(--color-separator);
+  background: color-mix(in srgb, var(--color-text-primary) 4%, var(--color-surface-primary));
 }
 .productFooter a {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
-  color: var(--color-signal);
-  font-size: .72rem;
+  color: var(--color-signal-hover);
+  font-size: .74rem;
   font-weight: 700;
   text-decoration: none;
 }
 .checkout {
   min-height: 52px;
 }
-.productFooter span { color: color-mix(in srgb, var(--color-text-inverse) 45%, transparent); font-size: .68rem; }
+.productFooter span { color: var(--color-text-tertiary); font-size: .68rem; }
 
 @media (hover: hover) and (pointer: fine) {
   .presetStrip a:hover,

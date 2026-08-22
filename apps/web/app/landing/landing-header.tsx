@@ -25,7 +25,7 @@ const FOCUSABLE_SELECTOR = [
 export default function LandingHeader({ previewHref }: { previewHref: string }) {
   const [activeId, setActiveId] = useState("");
   const [scrolled, setScrolled] = useState(false);
-  const [tone, setTone] = useState<HeaderTone>("light");
+  const [tone, setTone] = useState<HeaderTone>("dark");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
@@ -60,11 +60,28 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
       });
     };
 
+    const resolveToneByGeometry = () => {
+      // Short mobile sections can cross the decision band without ever leaving
+      // the previous marker (the hero keeps intersecting the band), so no
+      // entry reports a transition. Resolve the nearest marker above the
+      // decision line directly, mirroring updateActiveSection.
+      const fallbackMarker = Math.max(72, Math.min(window.innerHeight * 0.2, 160));
+      const current = toneElements.reduce<HTMLElement | null>((match, element) => (
+        element.getBoundingClientRect().top <= fallbackMarker ? element : match
+      ), null);
+      const nextTone = current?.dataset.headerTone;
+      if (nextTone === "dark" || nextTone === "light") setTone(nextTone);
+    };
+
     const toneObserver = new IntersectionObserver((entries) => {
       const visible = entries
         .filter((entry) => entry.isIntersecting)
         .sort((left, right) => Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top));
       const nearest = visible[0]?.target as HTMLElement | undefined;
+      if (!nearest) {
+        resolveToneByGeometry();
+        return;
+      }
       const nextTone = nearest?.dataset.headerTone;
       if (nextTone === "dark" || nextTone === "light") setTone(nextTone);
     }, { rootMargin: "-4% 0px -88% 0px", threshold: [0, 0.01] });

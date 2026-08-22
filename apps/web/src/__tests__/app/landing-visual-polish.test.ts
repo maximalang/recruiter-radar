@@ -10,7 +10,7 @@ function source(path: string) {
 }
 
 describe("polished unified landing visual contract", () => {
-  it("uses the final dark hero with a product-specific company brief", () => {
+  it("restores the dark ambient hero with the signal field on canonical tokens", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
     const landingStyles = source("app/landing/landing.module.css");
@@ -19,46 +19,45 @@ describe("polished unified landing visual contract", () => {
     const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
     const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(heroScene).toContain('data-hero-layout="company-brief"');
-    expect(heroScene).toContain('data-hero-company-brief="true"');
+    expect(heroScene).toContain('data-hero-layout="ambient-radar"');
+    expect(heroScene).toContain('data-theme="inverse"');
     expect(heroScene).toContain('data-hero-visual');
-    expect(heroScene).toContain("Рекомендация / сегодня");
-    expect(heroScene).toContain("Почему сейчас");
-    expect(heroScene).toContain("Подтверждения");
-    expect(heroScene).toContain("Следующий ход");
+    expect(heroScene).toContain("HeroSignalField");
+    expect(heroScene).toContain("Радар клиентских возможностей");
     expect(heroScene).not.toContain("HeroRadar");
     expect(heroScene).not.toContain("HeroInstrument");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);
     expect(sceneStyles).toContain("var(--color-text-primary)");
     expect(sceneStyles).toContain("var(--color-signal)");
-    expect(sceneStyles).not.toMatch(/animation\s*:/);
-    expect(sceneStyles).not.toContain("translateY(-1px)");
+    expect(sceneStyles).not.toContain("#c8f36a");
     expect(landingStyles).not.toMatch(/\.(detectionScene|detectionField|detectionCopy|detectionLock|detectionFooter|instrumentCaption)\b/);
     expect(visualStyles).not.toContain('#scene-detection [class*=');
     expect(existsSync(obsoleteResponsiveStyles)).toBe(false);
   });
 
-  it("keeps the same company brief readable on mobile without a separate radar runtime", () => {
+  it("keeps the ambient radar readable on mobile without a separate runtime", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
 
     expect(heroScene).toContain("data-mobile-hero-signal");
-    expect(heroScene).toContain('className={sceneStyles.companyBrief}');
+    expect(heroScene).toContain('className={sceneStyles.fieldFigure}');
     expect(sceneStyles).toContain("@media (max-width: 600px)");
-    expect(sceneStyles).toContain(".companyBrief");
+    expect(sceneStyles).toContain(".fieldFigure");
     expect(sceneStyles).not.toContain("HeroRadar");
   });
 
-  it("moves the live workspace directly after detection", () => {
+  it("restores the signal timeline scene after the hero", () => {
     const page = source("app/landing/landing-page.tsx");
     const detectionIndex = page.indexOf("<DetectionScene");
+    const timelineIndex = page.indexOf("<SignalTimeline />");
     const workspaceIndex = page.indexOf("<WorkspaceScene");
 
     expect(page).not.toContain("SignalTimelineScene");
     expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.tsx"))).toBe(false);
     expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.module.css"))).toBe(false);
-    expect(workspaceIndex).toBeGreaterThan(detectionIndex);
+    expect(timelineIndex).toBeGreaterThan(detectionIndex);
+    expect(workspaceIndex).toBeGreaterThan(timelineIndex);
   });
 
   it("separates the core workspace from connected delivery routes", () => {
