@@ -332,8 +332,8 @@ jobs:
         if: always()
         shell: bash
         run: |
-          git fetch --depth=1 origin 7f8c9a10 || exit 0
-          git worktree add "$RUNNER_TEMP/pre218" 7f8c9a10
+          git fetch --depth=1 origin 7f8c9a10fb289bb52bd7b39cd3f566661df85ff0 || exit 0
+          git worktree add "$RUNNER_TEMP/pre218" 7f8c9a10fb289bb52bd7b39cd3f566661df85ff0
           cd "$RUNNER_TEMP/pre218"
           npm ci --no-audit --no-fund
           npm run build --workspace @recruiter-radar/web
