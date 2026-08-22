@@ -18,12 +18,7 @@ const activeAccess = {
 };
 
 describe("admin user detail", () => {
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
   test("loads the exact user and reuses canonical access and owner-scoped payments", async () => {
-    jest.useFakeTimers().setSystemTime(new Date("2026-08-15T00:00:00.000Z"));
     const query = jest.fn().mockResolvedValue({ rowCount: 1, rows: [{
       id: "42", dataOwnerId: "7", email: "member@example.test", fullName: null, status: "active",
       createdAt: "2026-08-01T00:00:00.000Z", emailVerifiedAt: null,
