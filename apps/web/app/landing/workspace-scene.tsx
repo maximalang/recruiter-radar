@@ -81,10 +81,10 @@ function WorkspaceIntro() {
     <header className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
       <div>
         <p className={styles.sceneLabel}>Интерактивный пример · Проверьте на своей нише</p>
-        <h2 id="workspace-title" className={styles.sceneHeading}>Настройте профиль — выдача обновится.</h2>
+        <h2 id="workspace-title" className={styles.sceneHeading}>Так выглядит ваша рабочая выдача.</h2>
       </div>
       <p className={styles.sceneLead}>
-        Профиль влияет на порядок и приоритет. Сначала покажем несколько компаний, которые есть смысл изучить сегодня.
+        По каждой компании: повод для контакта, подтверждающие факты, оценка уверенности и следующий шаг. Задайте нишу и географию — список перестроится под ваш профиль.
       </p>
     </header>
   );
@@ -193,7 +193,7 @@ function WorkspaceResultsContent(
   const visibleItems = previewState.items.slice(0, 5);
   const statusLabel = previewState.isPersonalized
     ? `Выдача по вашему профилю · ${previewState.isLive ? "свежие данные" : "демо"}`
-    : "Пример сегодняшней выдачи · демо";
+    : "Пример выдачи за сегодня · демо";
 
   return (
     <div

@@ -119,14 +119,14 @@ async function assertRequiredSurface(page, label) {
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
   assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
-  assert.match(await page.locator("#scene-workspace").innerText(), /пример сегодняшней выдачи|приоритет по вашему профилю/i);
+  assert.match(await page.locator("#scene-workspace").innerText(), /пример выдачи за сегодня|приоритет по вашему профилю/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
   assert.ok(await page.locator("#scene-evidence [data-proof-event]").count() >= 3);
   assert.equal(await page.locator("#scene-evidence [data-proof-brief]").count(), 1);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const pricingText = await page.locator("#pricing").innerText();
-  assert.match(pricingText, /Проверьте радар на своей нише за 7 дней/i);
+  assert.match(pricingText, /Полноценная неделя работы/i);
   assert.match(pricingText, /990 ₽/);
   assert.match(pricingText, /2 990 ₽/);
   assert.match(pricingText, /6 990 ₽/);
@@ -724,7 +724,7 @@ async function assertNoJs(browser) {
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const noJsPricingText = await page.locator("#pricing").innerText();
-  assert.match(noJsPricingText, /Проверьте радар на своей нише за 7 дней/i);
+  assert.match(noJsPricingText, /Полноценная неделя работы/i);
   assert.match(noJsPricingText, /990 ₽/);
   assert.ok(await page.locator("#faq summary").count() >= 1, "no-JS FAQ question missing");
   await page.getByRole("heading", { name: /Посмотрите, кому стоит написать сейчас/ }).waitFor({ state: "attached" });

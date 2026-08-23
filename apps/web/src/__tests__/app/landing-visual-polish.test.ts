@@ -23,7 +23,7 @@ describe("polished unified landing visual contract", () => {
     expect(heroScene).toContain('data-theme="inverse"');
     expect(heroScene).toContain('data-hero-visual');
     expect(heroScene).toContain("HeroSignalField");
-    expect(heroScene).toContain("Радар клиентских возможностей");
+    expect(heroScene).toContain("Радар новых клиентов для агентств");
     expect(heroScene).not.toContain("HeroRadar");
     expect(heroScene).not.toContain("HeroInstrument");
     expect(existsSync(retiredRadar)).toBe(false);

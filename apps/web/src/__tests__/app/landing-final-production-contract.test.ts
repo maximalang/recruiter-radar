@@ -41,10 +41,10 @@ describe("landing final production contract", () => {
     expect(conversion).toContain('data-pricing-layout="pilot-decision"');
     expect(conversion).toContain('data-faq-layout="centered"');
     expect(conversion).toContain("Попробовать 7 дней —");
-    expect(conversion).toContain("Проверьте радар на своей нише за 7 дней");
-    expect(browserAudit).toContain("Проверьте радар на своей нише за 7 дней");
+    expect(conversion).toContain("Полноценная неделя работы");
+    expect(browserAudit).toContain("Полноценная неделя работы");
     expect(conversion).toContain("Запустить на 7 дней");
-    expect(conversion).toContain("Разовая оплата · без автопродления");
+    expect(conversion).toContain("Разовая оплата · доступ открывается сразу · без автопродления");
     expect(conversion).toContain("После пилота");
     expect(conversion).toContain("Коротко о главном");
 

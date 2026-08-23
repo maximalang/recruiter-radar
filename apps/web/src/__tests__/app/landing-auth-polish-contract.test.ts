@@ -38,7 +38,7 @@ describe("landing visual and login reliability polish", () => {
 
     expect(hero).toContain('data-hero-layout="ambient-radar"');
     expect(hero).toContain("HeroSignalField");
-    expect(hero).toContain("Радар клиентских возможностей");
+    expect(hero).toContain("Радар новых клиентов для агентств");
     expect(hero).not.toContain("HeroRadar");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);

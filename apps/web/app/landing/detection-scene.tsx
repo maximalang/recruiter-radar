@@ -25,7 +25,7 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
 
       <div className={sceneStyles.kicker}>
         <span className={sceneStyles.kickerRule} aria-hidden="true" />
-        <span>Радар клиентских возможностей</span>
+        <span>Радар новых клиентов для агентств</span>
         <span className={sceneStyles.kickerMeta}>Сигнал → факт → повод</span>
       </div>
 
@@ -35,7 +35,7 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
           Компании, которым стоит написать сегодня.
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Recruiter Radar отслеживает свежие изменения в найме и показывает, где появился реальный повод предложить подбор — с фактами и источниками по каждой компании.
+          Recruiter Radar отслеживает публичный найм и находит компании, где потребность в подборе растёт. Вы получаете приоритетный список: почему компания актуальна сейчас, какие факты это подтверждают и с чего начать контакт.
         </p>
         <p className={sceneStyles.visuallyHidden}>
           Схема показывает несколько подтверждающих сигналов найма, объединённых в одну клиентскую возможность.

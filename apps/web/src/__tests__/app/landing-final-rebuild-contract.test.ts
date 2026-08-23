@@ -92,7 +92,7 @@ describe("landing restoration narrative", () => {
     // Editorial intro stays bound to the live configurator.
     expect(workspace).toContain("Интерактивный пример");
     expect(workspace).toContain("Проверьте на своей нише");
-    expect(workspace).toContain("Настройте профиль — выдача обновится.");
+    expect(workspace).toContain("Так выглядит ваша рабочая выдача.");
     expect(workspace).toContain("Обезличенный пример.");
 
     // Current runtime behavior preserved: personalization, ranked leads,

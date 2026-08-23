@@ -39,7 +39,7 @@ export default function ConversionPanel(props: {
         <div className={panelStyles.pricingIntro} data-pricing-intro>
           <span>Попробуйте на своей нише</span>
           <h2>Попробовать 7 дней — {pilotPlan.price}</h2>
-          <p>Проверьте радар на своей нише за 7 дней: находит ли он релевантные компании и даёт ли достаточно фактов для первого контакта.</p>
+          <p>Полноценная неделя работы: каждый день радар приносит приоритетные компании вашей ниши — с поводом, фактами и источниками. Оплата разовая, без автопродления.</p>
         </div>
 
         <div className={panelStyles.pricingDecision}>
@@ -50,7 +50,7 @@ export default function ConversionPanel(props: {
           >
             <div className={panelStyles.pilotTopline}>
               <div className={panelStyles.pilotMeta}>
-                <span className={panelStyles.pilotEyebrow}>Пилот</span>
+                <span className={panelStyles.pilotEyebrow}>Пилот · 7 дней</span>
                 <strong>{pilotPlan.cadence}</strong>
               </div>
               <div className={panelStyles.pilotPrice}>{pilotPlan.price}</div>
@@ -68,12 +68,12 @@ export default function ConversionPanel(props: {
               {props.paymentConfigured ? "Запустить на 7 дней" : "Оставить заявку на пилот"} <ArrowGlyph />
             </Link>
             <small data-consent-safe-copy>{props.paymentConfigured
-              ? "Разовая оплата · без автопродления"
+              ? "Разовая оплата · доступ открывается сразу · без автопродления"
               : "Оставьте заявку на 7-дневный пилот без списания · профиль сохранится"}</small>
           </div>
 
           <div className={panelStyles.secondaryOffers} aria-label="Продолжение после пилота" data-pricing-secondary="true">
-            <span className={panelStyles.secondaryOfferLabel}>После пилота</span>
+            <span className={panelStyles.secondaryOfferLabel}>После пилота — тот же радар, на более длинный срок</span>
             {secondaryPlans.map((plan) => {
               const quarterly = plan.code === "quarterly";
               return (
@@ -150,7 +150,7 @@ export default function ConversionPanel(props: {
           <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
             <li>{pilotPlan.price} / 7 дней</li>
             <li>Без автопродления</li>
-            <li>Проверяемые факты</li>
+            <li>Факты и источники по каждой компании</li>
             <li>Сообщения отправляете вы</li>
           </ul>
           <Link
