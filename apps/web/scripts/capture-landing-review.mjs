@@ -9,6 +9,9 @@ const auditScreenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), "recruiter-radar-landing", "screenshots");
 const reviewDirectory = process.env.LANDING_REVIEW_SCREENSHOT_DIR
   ?? path.join(path.dirname(auditScreenshotDirectory), "review");
+/* Provenance: which exact tree produced these captures. CI sets this to the
+ * PR head SHA; ad-hoc local runs stay null and are reported as "unknown". */
+const sourceCommit = process.env.LANDING_SOURCE_COMMIT || null;
 
 const viewports = [
   { width: 1440, height: 900, name: "1440x900", focused: true, deliveryOpen: true },
@@ -22,6 +25,7 @@ const viewports = [
 
 const focusedSurfaces = [
   { name: "hero", selector: "#scene-detection" },
+  { name: "timeline", selector: "#scene-signal-timeline" },
   { name: "preview", selector: '#scene-workspace [data-product-preview="live-radar"]' },
   { name: "proof", selector: "#scene-evidence" },
   { name: "delivery", selector: "#scene-delivery" },
@@ -83,7 +87,7 @@ async function resetInteractionState(page) {
   });
   await page.waitForFunction(() => (
     window.scrollY === 0
-    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light"
+    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark"
   ));
   await movePointerToNeutral(page);
   await page.evaluate(() => {
@@ -91,7 +95,7 @@ async function resetInteractionState(page) {
   });
 }
 
-async function preparePage(context) {
+async function preparePage(context, targetUrl = baseUrl) {
   const page = await context.newPage();
   await page.route("**/api/landing-events", (route) => route.fulfill({ status: 204 }));
   await page.route("https://mc.yandex.ru/metrika/tag.js", (route) => route.fulfill({
@@ -99,7 +103,7 @@ async function preparePage(context) {
     contentType: "application/javascript",
     body: "/* deterministic analytics loader stub for review capture */",
   }));
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.goto(targetUrl, { waitUntil: "networkidle" });
   await page.locator('[data-landing-experience="signal-lock"]').waitFor({ state: "attached" });
   await page.locator("#scene-detection").waitFor({ state: "visible" });
   await page.locator("#preview-results").waitFor({ state: "attached" });
@@ -236,12 +240,12 @@ async function captureContrastCrops(page, viewportName) {
 
   const artifacts = [];
   await resetInteractionState(page);
-  const decision = page.locator('[data-hero-stage="decision"]').first();
+  const decision = page.locator("#scene-detection [data-hero-copy]").first();
   await decision.screenshot({
-    path: path.join(reviewDirectory, `${viewportName}-hero-decision.png`),
+    path: path.join(reviewDirectory, `${viewportName}-hero-copy.png`),
     animations: "disabled",
   });
-  artifacts.push(`${viewportName}-hero-decision.png`);
+  artifacts.push(`${viewportName}-hero-copy.png`);
 
   const states = [
     { name: "pilot-cta", locator: page.locator("#pricing [data-pricing-primary] > a").first() },
@@ -289,6 +293,7 @@ const manifest = {
   contrastCrops: [],
   headerEvidence: [],
   heroLogin320: null,
+  hero320: null,
 };
 
 try {
@@ -306,6 +311,21 @@ try {
     manifest.fullPage[viewport.name] = { width: viewport.width, height: closedHeight, state: "default" };
 
     manifest.headerEvidence.push(...await captureHeaderEvidence(page, viewport.name));
+
+    // Dedicated 320px Hero evidence: the full-page 320 capture exists, but
+    // the human visual gate needs a focused Hero crop at 320 as well.
+    if (viewport.name === "320x568") {
+      await resetInteractionState(page);
+      const hero = page.locator("#scene-detection").first();
+      await hero.waitFor({ state: "visible" });
+      await hero.scrollIntoViewIfNeeded();
+      await movePointerToNeutral(page);
+      await hero.screenshot({
+        path: path.join(reviewDirectory, "320x568-hero.png"),
+        animations: "disabled",
+      });
+      manifest.hero320 = "320x568-hero.png";
+    }
 
     await resetInteractionState(page);
     await page.screenshot({
@@ -357,10 +377,20 @@ try {
 }
 
 await writeFile(path.join(reviewDirectory, "manifest.json"), JSON.stringify(manifest, null, 2));
+await writeFile(
+  path.join(reviewDirectory, "provenance.json"),
+  JSON.stringify({
+    sourceKind: "restored",
+    sourceCommit: sourceCommit ?? "unknown",
+    baseUrl,
+    capturedAt: new Date().toISOString(),
+  }, null, 2),
+);
 
 process.stdout.write(JSON.stringify({
   ok: true,
   reviewDirectory,
+  provenance: { sourceKind: "restored", sourceCommit: sourceCommit ?? "unknown" },
   viewports: viewports.map(({ width, height }) => `${width}x${height}`),
   focusedSurfaces: focusedSurfaces.map(({ name }) => name),
   manifest,

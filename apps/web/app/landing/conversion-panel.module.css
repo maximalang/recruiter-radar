@@ -171,7 +171,39 @@
   color: var(--color-text-inverse);
 }
 
-.finalCopy h2 { max-width: 15ch; margin: .65rem 0 0; font-size: clamp(2.35rem, 3.3vw, 3.15rem); font-weight: 560; letter-spacing: -.055em; line-height: 1; }
+.finalCopy { position: relative; }
+
+/* Second radar motif: a quiet echo of the hero field — one arc, one signal.
+ * Purely decorative; closes the visual story the hero opened. */
+.finalField {
+  position: absolute;
+  top: 50%;
+  right: -14%;
+  width: clamp(20rem, 34vw, 30rem);
+  overflow: visible;
+  opacity: .5;
+  pointer-events: none;
+  transform: translateY(-52%);
+}
+
+.finalArc {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-signal) 26%, transparent);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+.finalOrbit {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-text-inverse) 22%, transparent);
+  stroke-width: 1;
+}
+.finalSignal {
+  fill: var(--color-signal);
+}
+.finalEchoCopper { fill: color-mix(in srgb, var(--color-copper) 72%, transparent); }
+.finalHaloCore { stop-color: var(--color-signal); stop-opacity: .1; }
+
+.finalCopy h2 { max-width: 15ch; margin: .65rem 0 0; font-size: clamp(2.35rem, 3.3vw, 3.15rem); font-weight: 560; letter-spacing: -.055em; line-height: 1; position: relative; }
 .finalCopy p { max-width: 36rem; margin: .75rem 0 0; color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent); font-size: .94rem; line-height: 1.5; }
 
 .finalDecision { display: grid; gap: .75rem; align-content: center; }
@@ -195,6 +227,7 @@
   .pricingDecision { grid-template-columns: 1fr; max-width: 44rem; margin-left: 0; }
   .final { grid-template-columns: 1fr; min-height: 0; }
   .finalDecision { max-width: 28rem; }
+  .finalField { right: -30%; width: 18rem; opacity: .32; }
 }
 
 @media (max-width: 620px) {

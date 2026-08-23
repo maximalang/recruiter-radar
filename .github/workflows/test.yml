@@ -279,7 +279,15 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v7
+      # Visual evidence provenance: on pull_request the default checkout is
+      # the synthetic merge commit, but the reviewed capture artifact must be
+      # produced from the exact PR head tree. Checkout the head SHA directly
+      # and build the landing app from it; provenance.json records the same
+      # commit via LANDING_SOURCE_COMMIT below.
+      - name: Checkout exact evidence source commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -288,13 +296,12 @@ jobs:
         run: npm ci
       - name: Apply database migrations
         run: node packages/db/scripts/migrate.mjs
-      - name: Download standalone build
-        uses: actions/download-artifact@v8
-        with:
-          name: web-build-output
-          path: apps/web
-      - name: Prepare standalone static assets
-        run: node apps/web/scripts/prepare-standalone.mjs
+      - name: Build standalone landing app from exact evidence source commit
+        env:
+          NEXT_PUBLIC_YANDEX_METRIKA_ID: '12345678'
+        run: |
+          npm run web:build
+          node apps/web/scripts/prepare-standalone.mjs
       - name: Verify preinstalled system Chrome
         run: |
           test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
@@ -323,6 +330,49 @@ jobs:
         run: npm run test:landing:e2e
       - name: Responsive surface audit
         run: npm run test:responsive-surfaces
+      - name: Landing review captures (PR evidence artifact)
+        run: npm run test:landing:review-captures --workspace @recruiter-radar/web
+        env:
+          LANDING_REVIEW_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/review
+          LANDING_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/screenshots
+          LANDING_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Pre-218 baseline captures (best effort)
+        if: always()
+        shell: bash
+        run: |
+          git fetch --depth=1 origin 7f8c9a10fb289bb52bd7b39cd3f566661df85ff0 || exit 0
+          git worktree add "$RUNNER_TEMP/pre218" 7f8c9a10fb289bb52bd7b39cd3f566661df85ff0
+          cd "$RUNNER_TEMP/pre218"
+          npm ci --no-audit --no-fund
+          npm run build --workspace @recruiter-radar/web
+          node apps/web/scripts/prepare-standalone.mjs
+          PORT=3210 HOSTNAME=127.0.0.1 MIGRATE_ON_START=false node apps/web/.next/standalone/apps/web/server.js > /tmp/pre218-server.log 2>&1 &
+          echo $! > /tmp/pre218-server.pid
+          for i in $(seq 1 60); do
+            curl -fsS -o /dev/null http://127.0.0.1:3210/ && break
+            sleep 2
+          done
+          cd "$GITHUB_WORKSPACE"
+          # Historical evidence only: the dedicated script captures the
+          # pre-218 server exclusively, so review-pre218 can never contain
+          # restored-build captures disguised as historical ones.
+          LANDING_BASELINE_URL=http://127.0.0.1:3210 \
+          LANDING_BASELINE_COMMIT=7f8c9a10fb289bb52bd7b39cd3f566661df85ff0 \
+          LANDING_REVIEW_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/review-pre218 \
+          LANDING_SCREENSHOT_DIR=/tmp/recruiter-radar-landing/screenshots-pre218 \
+          LANDING_REVIEW_DIR=/tmp/recruiter-radar-landing/review \
+          npm run test:landing:pre218-captures --workspace @recruiter-radar/web
+          status=$?
+          # Exit code 2 = invalid comparison evidence (historical == restored):
+          # a hard failure, not a best-effort warning.
+          if [ "$status" -eq 2 ]; then
+            echo "::error::pre-218 baseline evidence is INVALID (byte-identical to restored captures)"
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::baseline comparison captures incomplete"
+          fi
+          kill "$(cat /tmp/pre218-server.pid)" 2>/dev/null || true
       - name: Stop production server
         if: always()
         shell: bash
@@ -354,6 +404,16 @@ jobs:
             /tmp/landing-server.log
           if-no-files-found: warn
           retention-days: 7
+      - name: Upload landing review captures (visual gate evidence)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: landing-review-captures-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/recruiter-radar-landing/review
+            /tmp/recruiter-radar-landing/review-pre218
+          if-no-files-found: warn
+          retention-days: 30
 
   auth-v2-verification:
     name: Auth v2 / ${{ matrix.gate }}

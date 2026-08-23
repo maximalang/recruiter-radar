@@ -44,7 +44,8 @@ export default function DeliveryScene() {
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.intro}>
           <p>Как приходят результаты</p>
-          <h2 id="delivery-title">Работайте там, где удобно.</h2>
+          <h2 id="delivery-title">Радар находит повод. Пишете вы.</h2>
+          <p className={sceneStyles.introSub}>Работайте там, где удобно: карточка возможности всегда в веб-кабинете, сигналы приходят в привычные каналы.</p>
         </div>
 
         <div className={sceneStyles.capabilityBand} aria-label="Поддерживаемые способы доставки">

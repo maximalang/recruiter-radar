@@ -26,12 +26,21 @@
 }
 
 .intro h2 {
-  max-width: 31ch;
   margin: 0;
+  max-width: 31ch;
   font-size: clamp(1.85rem, 2.6vw, 2.55rem);
   font-weight: 580;
   letter-spacing: -.04em;
   line-height: 1.08;
+}
+
+.introSub {
+  grid-column: 2;
+  max-width: 34rem;
+  margin: .55rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: .92rem;
+  line-height: 1.55;
 }
 
 .capabilityBand {
@@ -170,6 +179,7 @@
   .section { padding: 2.75rem 1rem; }
   .intro { grid-template-columns: 1fr; gap: .55rem; }
   .intro h2 { max-width: 24ch; font-size: clamp(1.75rem, 7.8vw, 2.2rem); }
+  .introSub { grid-column: auto; max-width: none; }
   .capabilityBand { grid-template-columns: 1fr; margin-top: 1.5rem; }
   .boundaryRow { align-items: flex-start; flex-direction: column; }
   .manualBoundary { align-items: flex-start; flex-direction: column; gap: .25rem; }
