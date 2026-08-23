@@ -293,6 +293,7 @@ const manifest = {
   contrastCrops: [],
   headerEvidence: [],
   heroLogin320: null,
+  hero320: null,
 };
 
 try {
@@ -310,6 +311,21 @@ try {
     manifest.fullPage[viewport.name] = { width: viewport.width, height: closedHeight, state: "default" };
 
     manifest.headerEvidence.push(...await captureHeaderEvidence(page, viewport.name));
+
+    // Dedicated 320px Hero evidence: the full-page 320 capture exists, but
+    // the human visual gate needs a focused Hero crop at 320 as well.
+    if (viewport.name === "320x568") {
+      await resetInteractionState(page);
+      const hero = page.locator("#scene-detection").first();
+      await hero.waitFor({ state: "visible" });
+      await hero.scrollIntoViewIfNeeded();
+      await movePointerToNeutral(page);
+      await hero.screenshot({
+        path: path.join(reviewDirectory, "320x568-hero.png"),
+        animations: "disabled",
+      });
+      manifest.hero320 = "320x568-hero.png";
+    }
 
     await resetInteractionState(page);
     await page.screenshot({

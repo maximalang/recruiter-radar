@@ -279,7 +279,15 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v7
+      # Visual evidence provenance: on pull_request the default checkout is
+      # the synthetic merge commit, but the reviewed capture artifact must be
+      # produced from the exact PR head tree. Checkout the head SHA directly
+      # and build the landing app from it; provenance.json records the same
+      # commit via LANDING_SOURCE_COMMIT below.
+      - name: Checkout exact evidence source commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -288,13 +296,12 @@ jobs:
         run: npm ci
       - name: Apply database migrations
         run: node packages/db/scripts/migrate.mjs
-      - name: Download standalone build
-        uses: actions/download-artifact@v8
-        with:
-          name: web-build-output
-          path: apps/web
-      - name: Prepare standalone static assets
-        run: node apps/web/scripts/prepare-standalone.mjs
+      - name: Build standalone landing app from exact evidence source commit
+        env:
+          NEXT_PUBLIC_YANDEX_METRIKA_ID: '12345678'
+        run: |
+          npm run web:build
+          node apps/web/scripts/prepare-standalone.mjs
       - name: Verify preinstalled system Chrome
         run: |
           test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
@@ -328,7 +335,7 @@ jobs:
         env:
           LANDING_REVIEW_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/review
           LANDING_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/screenshots
-          LANDING_SOURCE_COMMIT: ${{ github.sha }}
+          LANDING_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Pre-218 baseline captures (best effort)
         if: always()
         shell: bash
@@ -401,7 +408,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: landing-review-captures-${{ github.sha }}
+          name: landing-review-captures-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             /tmp/recruiter-radar-landing/review
             /tmp/recruiter-radar-landing/review-pre218
