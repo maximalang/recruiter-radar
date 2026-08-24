@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
 import { runScheduledSourceRefresh } from '@/lib/lead-discovery/scheduled-source-refresh'
+import { getSourceCriticality, hasDeliveryImpactingFailure } from '@/lib/sources/source-criticality'
 import { logEvent, logWarn } from '@/lib/runtime'
 
 export const runtime = 'nodejs'
@@ -36,6 +37,20 @@ export async function POST(request: NextRequest) {
       )
     }
     const success = results.every((result) => result.success)
+    // Per-source delivery-impact criticality: required/unknown failures change
+    // what digests can deliver (evidence, FIUR inputs), so they must stay
+    // visible as a non-green signal even inside an HTTP 207 partial.
+    const detailsWithCriticality = results.map((result) => ({
+      ...result,
+      criticality: getSourceCriticality(result.source),
+    }))
+    const failedDetails = detailsWithCriticality.filter((result) => !result.success)
+    const failedSources = failedDetails.map(({ source, outcome, criticality }) => ({
+      source,
+      outcome,
+      criticality,
+    }))
+    const deliveryImpactingFailure = hasDeliveryImpactingFailure(failedSources)
     const summary = {
       total: results.length,
       succeeded: results.filter((result) => result.success).length,
@@ -43,12 +58,18 @@ export async function POST(request: NextRequest) {
       deferred: results.filter((result) => result.outcome === 'deferred').length,
       credentialGated: results.filter((result) => result.outcome === 'credential-gated').length,
       rateLimited: results.filter((result) => result.outcome === 'rate-limited').length,
+      failedRequired: failedSources.filter((f) => f.criticality !== 'optional').length,
+      failedOptional: failedSources.filter((f) => f.criticality === 'optional').length,
+      deliveryImpactingFailure,
       durationMs: Date.now() - startedAt.getTime(),
     }
     if (success) logEvent('source_refresh.run', summary)
     else logWarn('source_refresh.partial', summary)
     return NextResponse.json(
-      { success, data: { startedAt: startedAt.toISOString(), ...summary, details: results } },
+      {
+        success,
+        data: { startedAt: startedAt.toISOString(), ...summary, details: detailsWithCriticality },
+      },
       { status: success ? 200 : 207 },
     )
   } catch (error) {

@@ -37,16 +37,16 @@ describe('standalone Source Refresh fail-closed contract', () => {
   test('CASE F: a real failed source remains HTTP 207 and success=false', async () => {
     runScheduledSourceRefresh.mockResolvedValueOnce([
       {
-        source: 'test-source',
+        source: 'hh',
         success: true,
-        outcome: 'success',
+        outcome: 'ingested',
         fetchedCount: 1,
         upsertedCount: 1,
       },
       {
-        source: 'failed-source',
+        source: 'funding-business-signals',
         success: false,
-        outcome: 'failure',
+        outcome: 'failed',
         fetchedCount: 0,
         upsertedCount: 0,
       },
@@ -62,6 +62,54 @@ describe('standalone Source Refresh fail-closed contract', () => {
         total: 2,
         succeeded: 1,
         failed: 1,
+        failedRequired: 0,
+        failedOptional: 1,
+        deliveryImpactingFailure: false,
+      },
+    })
+    // Every detail carries its delivery-impact criticality.
+    expect(body.data.details).toEqual([
+      expect.objectContaining({ source: 'hh', criticality: 'required' }),
+      expect.objectContaining({ source: 'funding-business-signals', criticality: 'optional' }),
+    ])
+  })
+
+  test('CASE G: a required-source failure is flagged as delivery-impacting in the payload', async () => {
+    runScheduledSourceRefresh.mockResolvedValueOnce([
+      {
+        source: 'career-pages',
+        success: false,
+        outcome: 'failed',
+        fetchedCount: 0,
+        upsertedCount: 0,
+      },
+    ])
+
+    const response = await POST(request())
+    const body = await response.json()
+
+    expect(response.status).toBe(207)
+    expect(body).toMatchObject({
+      success: false,
+      data: {
+        total: 1,
+        failed: 1,
+        failedRequired: 1,
+        failedOptional: 0,
+        deliveryImpactingFailure: true,
+      },
+    })
+    // Unknown source ids must map to unknown criticality (fail-closed).
+    runScheduledSourceRefresh.mockResolvedValueOnce([
+      { source: 'mystery-source', success: false, outcome: 'failed' },
+    ])
+    const unknownResponse = await POST(request())
+    const unknownBody = await unknownResponse.json()
+    expect(unknownBody).toMatchObject({
+      data: {
+        failedRequired: 1,
+        deliveryImpactingFailure: true,
+        details: [expect.objectContaining({ source: 'mystery-source', criticality: 'unknown' })],
       },
     })
   })
