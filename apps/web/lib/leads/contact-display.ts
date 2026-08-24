@@ -38,6 +38,27 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const HR_CATEGORIES = new Set(['hr-email', 'careers-email']);
+const SAFE_EMAIL = /^[^\s<>"'`?&#@]+@[^\s<>"'`?&#@]+\.[^\s<>"'`?&#@]+$/;
+
+function safeExternalUrl(value: string): string | null {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeEmailHref(value: string): string | null {
+  const email = value.trim();
+  return SAFE_EMAIL.test(email) ? `mailto:${email}` : null;
+}
+
+function safePhoneHref(value: string): string | null {
+  const phone = value.replace(/[^\d+]/g, '');
+  if (!/^\+?\d{5,20}$/.test(phone)) return null;
+  return `tel:${phone}`;
+}
 
 function hrefFor(category: string, value: string): string | null {
   switch (category) {
@@ -45,13 +66,13 @@ function hrefFor(category: string, value: string): string | null {
     case 'careers-email':
     case 'generic-email':
     case 'personal-email':
-      return `mailto:${value}`;
+      return safeEmailHref(value);
     case 'phone':
-      return `tel:${value.replace(/[^\d+]/g, '')}`;
+      return safePhoneHref(value);
     case 'contact-form':
     case 'telegram':
     case 'whatsapp':
-      return value;
+      return safeExternalUrl(value);
     default:
       return null;
   }

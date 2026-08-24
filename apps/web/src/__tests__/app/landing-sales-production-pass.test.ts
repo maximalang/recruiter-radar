@@ -36,19 +36,22 @@ describe("landing sales production pass", () => {
     expect(runbook).not.toContain("| Месяц | 30 дней | 9 990 ₽ | Нет |");
   });
 
-  it("focuses the preview on the top-ranked visible lead", () => {
+  it("focuses the preview on the top-ranked visible lead and discloses the rest", () => {
     const workspace = source("app/landing/workspace-scene.tsx");
+    const list = source("app/landing/workspace-lead-list.tsx");
     expect(workspace).toContain("const visibleItems = previewState.items.slice(0, 5)");
     expect(workspace).toContain("defaultOpen={index === 0}");
-    expect(workspace).not.toContain("defaultOpen={index === visibleItems.length - 1}");
+    expect(list).toContain("const defaultVisible = mobileEnhanced ? 3 : 4");
+    expect(list).toContain("Показать ещё");
   });
 
   it("keeps the pricing hierarchy and closing trust points concise", () => {
     const panel = source("app/landing/conversion-panel.tsx");
-    expect(panel).toContain("data-recommended={plan.isPrimary || undefined}");
-    expect(panel).toContain("990 ₽ / 7 дней");
+    expect(panel).toContain('data-pilot-entry="primary"');
+    expect(panel).toContain('data-pricing-layout="pilot-decision"');
+    expect(panel).not.toContain("data-recommended={plan.isPrimary");
     expect(panel).toContain("Без автопродления");
-    expect(panel).toContain("Факты по каждой компании");
+    expect(panel).toContain("Проверяемые факты");
     expect(panel).toContain("Сообщения отправляете вы");
   });
 
@@ -57,7 +60,7 @@ describe("landing sales production pass", () => {
     const motionCss = source("app/landing/landing-motion.module.css");
     expect(motion).toContain("IntersectionObserver");
     expect(motion).toContain("prefers-reduced-motion: reduce");
-    expect(motionCss).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(motionCss).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)/);
     expect(motionCss).not.toMatch(/filter:\s*blur/i);
   });
 });

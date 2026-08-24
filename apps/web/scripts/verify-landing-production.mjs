@@ -12,22 +12,21 @@ const requireAnalyticsConsent = process.env.LANDING_REQUIRE_ANALYTICS_CONSENT ==
 
 const viewportMatrix = [
   { width: 1920, height: 1080, name: "desktop-1920x1080" },
+  { width: 1536, height: 960, name: "desktop-1536x960" },
   { width: 1440, height: 900, name: "desktop-1440x900" },
   { width: 1366, height: 768, name: "desktop-1366x768" },
   { width: 1280, height: 800, name: "desktop-1280x800" },
-  { width: 1180, height: 820, name: "tablet-1180x820" },
-  { width: 1152, height: 800, name: "tablet-1152x800" },
   { width: 1024, height: 768, name: "tablet-1024x768" },
-  { width: 900, height: 900, name: "tablet-900x900" },
   { width: 768, height: 1024, name: "tablet-768x1024" },
+  { width: 430, height: 932, name: "mobile-430x932" },
   { width: 390, height: 844, name: "mobile-390x844" },
+  { width: 375, height: 812, name: "mobile-375x812" },
   { width: 360, height: 800, name: "mobile-360x800" },
-  { width: 320, height: 700, name: "mobile-320x700" },
+  { width: 320, height: 568, name: "mobile-320x568" },
 ];
 
 const requiredSelectors = [
   "#scene-detection",
-  "#scene-signal-timeline",
   "#scene-workspace",
   "#preview-configurator",
   "#preview-results",
@@ -121,7 +120,10 @@ async function assertRequiredSurface(page, label) {
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
   assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
   assert.match(await page.locator("#scene-workspace").innerText(), /пример сегодняшней выдачи|приоритет по вашему профилю/i);
-  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
+  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
+  assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
+  assert.ok(await page.locator("#scene-evidence [data-proof-event]").count() >= 3);
+  assert.equal(await page.locator("#scene-evidence [data-proof-brief]").count(), 1);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const pricingText = await page.locator("#pricing").innerText();
   assert.match(pricingText, /Проверьте радар на своей нише за 7 дней/i);
@@ -189,6 +191,7 @@ async function assertNoOverlapOrClipping(page, label) {
       "#preview-configurator",
       "#preview-results",
       "#scene-evidence",
+      "#scene-evidence [data-proof-brief] *",
       "#scene-delivery",
       "#pricing",
       "#faq",
@@ -292,7 +295,7 @@ async function assertHeroGeometry(page, label) {
 
   if (viewport.width >= 1024) {
     const primary = await page.locator('#scene-detection [data-analytics-context="hero_primary"]').boundingBox();
-    const login = await page.getByRole("link", { name: "Уже есть доступ? Войти" }).boundingBox();
+    const login = await page.locator("#scene-detection").getByRole("link", { name: "Войти", exact: true }).boundingBox();
     const trust = await page.locator("#scene-detection [data-hero-trust-line]").boundingBox();
     assert.ok(primary && login && trust, `${label}: missing hero fold surfaces`);
     assert.ok(primary.y + primary.height <= viewport.height, `${label}: primary CTA is below fold`);
@@ -308,22 +311,44 @@ async function assertHeroGeometry(page, label) {
   }
 }
 
-async function assertLeadExpansion(page, label) {
-  const leads = page.locator("details[data-lead-card]");
+async function assertLeadRows(page, label, viewport) {
+  const leads = page.locator("article[data-lead-row]");
+  const disclosure = page.locator('[data-mobile-lead-disclosure="true"]');
+  if (viewport.width <= 480) await disclosure.waitFor({ state: "visible" });
   const count = await leads.count();
   assert.ok(count >= 2, `${label}: expected at least two recommendations, received ${count}`);
-  const active = leads.nth(0);
+  const primary = leads.nth(0);
   const secondary = leads.nth(count - 1);
-  assert.equal(await active.getAttribute("open"), "", `${label}: top-ranked recommendation must be expanded by default`);
-  assert.equal(await active.getAttribute("data-primary-lead"), "true", `${label}: top-ranked recommendation must be the primary lead`);
-  await active.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
-  assert.equal(await secondary.getAttribute("open"), null, `${label}: secondary recommendation must not be expanded by default`);
-  await secondary.locator("summary").click();
-  assert.equal(await secondary.getAttribute("open"), "", `${label}: secondary recommendation did not expand`);
-  await secondary.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
-  assert.equal(await active.getAttribute("open"), null, `${label}: named details did not collapse the previous active recommendation`);
-  await active.locator("summary").click();
-  assert.equal(await active.getAttribute("open"), "", `${label}: top-ranked recommendation did not restore`);
+  assert.equal(await primary.getAttribute("data-primary-lead"), "true", `${label}: top-ranked recommendation must be the primary lead`);
+  await primary.locator("[data-selected-lead-detail]").waitFor({ state: "visible" });
+  await primary.getByText("Подтверждения и источники", { exact: true }).waitFor({ state: "visible" });
+  assert.equal(await secondary.locator("[data-selected-lead-detail]").count(), 0, `${label}: secondary recommendation must remain a scan row`);
+
+  if (viewport.width <= 480) {
+    assert.equal(count, 3, `${label}: mobile should initially show one full and two compact recommendations`);
+    assert.equal(await disclosure.getAttribute("aria-expanded"), "false");
+    const visibleCompactSignals = await leads.locator(':scope:not([data-primary-lead]) [data-lead-why-now]').evaluateAll((elements) => (
+      elements.filter((element) => getComputedStyle(element).display !== "none").length
+    ));
+    assert.equal(visibleCompactSignals, 0, `${label}: compact mobile rows must not contain clipped why-now prose`);
+    await disclosure.click();
+    assert.equal(await page.locator("article[data-lead-row]").count(), 5, `${label}: disclosure must reveal all five recommendations`);
+    assert.equal(await disclosure.getAttribute("aria-expanded"), "true");
+  }
+}
+
+async function assertMobilePresetComposition(page, viewport) {
+  if (viewport.width > 480) return;
+  const strip = page.locator('[aria-label="Готовые профили радара"]');
+  const stripBox = await strip.boundingBox();
+  assert.ok(stripBox, `${viewport.name}: missing preset group`);
+  const clipped = await strip.locator("[data-preview-preset]").evaluateAll((elements, bounds) => elements.flatMap((element) => {
+    const rect = element.getBoundingClientRect();
+    return rect.left < bounds.left - 1 || rect.right > bounds.right + 1
+      ? [{ text: element.textContent?.trim(), left: rect.left, right: rect.right }]
+      : [];
+  }), stripBox);
+  assert.deepEqual(clipped, [], `${viewport.name}: preset controls must wrap without half-clipped options`);
 }
 
 async function measurePageHeight(page, viewport) {
@@ -377,13 +402,6 @@ async function revealAllMotionSections(page, label) {
   }));
   assert.deepEqual(invisible, [], `${label}: hidden motion sections: ${JSON.stringify(invisible)}`);
 
-  const timeline = page.locator("#scene-signal-timeline");
-  await timeline.waitFor({ state: "visible" });
-  const timelineBox = await timeline.boundingBox();
-  assert.ok(
-    timelineBox && timelineBox.width >= 44 && timelineBox.height >= 44,
-    `${label}: signal timeline is missing from the rendered page`,
-  );
 }
 
 async function assertResponsiveSurface(browser, viewport) {
@@ -393,7 +411,8 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertRequiredSurface(page, viewport.name);
   await assertHeaderLayout(page, viewport);
   await assertHeroGeometry(page, viewport.name);
-  await assertLeadExpansion(page, viewport.name);
+  await assertLeadRows(page, viewport.name, viewport);
+  await assertMobilePresetComposition(page, viewport);
   await revealAllMotionSections(page, viewport.name);
 
   await assertNoHorizontalOverflow(page, viewport.name);
@@ -512,13 +531,54 @@ async function assertKeyboardSkipLink(browser) {
 async function assertActiveNavigationAndTone(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const { page, assertCleanConsole } = await preparePage(context, "active-navigation-tone");
+  const brandHeader = page.locator('header[data-brand-header="recruiter-radar"]');
+  const activeLink = brandHeader.locator("a[aria-current='location']");
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(160);
+  assert.equal(await activeLink.count(), 0, "header: hero must not inherit a stale active section");
+
+  await page.locator("#faq").scrollIntoViewIfNeeded();
+  await page.evaluate(() => {
+    const faq = document.querySelector("#faq");
+    if (faq) window.scrollTo(0, window.scrollY + faq.getBoundingClientRect().top - 48);
+  });
+  await page.waitForFunction(() => /FAQ/.test(
+    document.querySelector('header[data-brand-header="recruiter-radar"] a[aria-current="location"]')?.textContent ?? "",
+  ));
+  assert.match(await activeLink.first().innerText(), /FAQ/);
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForFunction(() => !document.querySelector(
+    'header[data-brand-header="recruiter-radar"] a[aria-current="location"]',
+  ));
+  assert.equal(await activeLink.count(), 0, "header: active section must clear after returning to hero");
+
+  await page.evaluate(() => {
+    window.location.hash = "preview-configurator";
+  });
+  await page.waitForURL(/#preview-configurator$/);
+  await page.waitForFunction(() => /Пример/.test(
+    document.querySelector('header[data-brand-header="recruiter-radar"] a[aria-current="location"]')?.textContent ?? "",
+  ));
+  assert.match(await activeLink.first().innerText(), /Пример/, "header: hash navigation must not retain stale FAQ state");
+
   await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
-  await page.waitForTimeout(180);
-  assert.match(await page.locator("header a[aria-current='location']").first().innerText(), /Как работает/);
-  assert.equal(await page.locator("header").getAttribute("data-tone"), "dark");
+  await page.evaluate(() => {
+    const evidence = document.querySelector("#scene-evidence");
+    if (evidence) window.scrollTo(0, window.scrollY + evidence.getBoundingClientRect().top - 48);
+  });
+  await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark");
+  assert.match(await activeLink.first().innerText(), /Как работает/);
+  assert.equal(await brandHeader.getAttribute("data-tone"), "dark");
+  assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
   await page.locator("#scene-delivery").scrollIntoViewIfNeeded();
-  await page.waitForTimeout(180);
-  assert.equal(await page.locator("header").getAttribute("data-tone"), "light");
+  await page.evaluate(() => {
+    const delivery = document.querySelector("#scene-delivery");
+    if (delivery) window.scrollTo(0, window.scrollY + delivery.getBoundingClientRect().top - 48);
+  });
+  await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light");
+  assert.equal(await brandHeader.getAttribute("data-tone"), "light");
   assertCleanConsole();
   await context.close();
 }
@@ -599,16 +659,14 @@ async function assertInteractionContracts(browser) {
   assert.equal(new URL(page.url()).searchParams.get("includeKeywords"), privateInclude);
   assert.equal(new URL(page.url()).searchParams.get("excludeKeywords"), privateExclude);
 
-  const leads = page.locator("details[data-lead-card]");
+  const leads = page.locator("article[data-lead-row]");
   const leadCount = await leads.count();
   assert.ok(leadCount >= 2, "interaction: expected at least two recommendations");
   const activeLead = leads.nth(0);
   const secondaryLead = leads.nth(leadCount - 1);
-  assert.equal(await activeLead.getAttribute("open"), "", "interaction: top-ranked recommendation is not open by default");
   assert.equal(await activeLead.getAttribute("data-primary-lead"), "true", "interaction: top-ranked recommendation is not primary");
-  await secondaryLead.locator("summary").click();
-  assert.equal(await secondaryLead.getAttribute("open"), "", "interaction: secondary recommendation did not open");
-  await secondaryLead.getByText("Факты и источники", { exact: true }).waitFor({ state: "visible" });
+  await activeLead.locator("[data-selected-lead-detail]").waitFor({ state: "visible" });
+  assert.equal(await secondaryLead.locator("[data-selected-lead-detail]").count(), 0, "interaction: secondary recommendation must remain a compact scan row");
 
   const companyNames = (await page.locator("[data-lead-company] strong").allTextContents())
     .map((value) => value.trim())

@@ -89,6 +89,9 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("/settings/team");
     expect(runner).toContain("verifyAuthenticatedProductSurfaces");
     expect(runner).toContain("seedProductSurfaceFixtures");
+    expect(runner).toContain("reviewFixtureCount: 8");
+    expect(runner).toContain("Review fixture did not render 8 evidence-first rows");
+    expect(runner).toContain("Review decision did not settle the acted-on row");
     expect(runner).toContain("'funding-hiring-recruiter'");
     expect(runner).toContain("ARRAY['hh','official-news']");
     expect(runner).toContain("radarCorrelation.rows[0].id");
@@ -96,19 +99,40 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("/opportunities/radar");
     expect(runner).toContain('[data-semantic-mode="v3"]');
     expect(runner).toContain("Evidence Radar marker selection did not become active");
+    expect(runner).toContain("Sparse Evidence Radar did not switch to the evidence strip");
+    expect(runner).toContain("Sparse Evidence Radar still exposes comparison axes");
+    expect(runner).toContain("const mobileMoreViewports = [");
+    expect(runner).toMatch(/suffix:\s*'320'[\s\S]{0,120}width:\s*320[\s\S]{0,120}height:\s*568/);
+    expect(runner).toContain("Mobile More menu is outside the ${suffix}px viewport");
+    expect(runner).toContain("Opening Mobile More resized the main scroll area");
+    expect(runner).toContain("Mobile More internal route did not activate");
+    expect(runner).toContain("const companyBriefActionViewports = [");
+    for (const width of [640, 768, 900, 1000, 1024]) {
+      expect(runner).toContain(`width: ${width}`);
+    }
+    expect(runner).toContain("Company Brief must expose exactly one dominant primary action");
+    expect(runner).toContain("Company Brief inline primary action is not next to Next move");
+    expect(runner).toContain("const companyFilterViewports = [");
+    expect(runner).toContain("Search-only Companies state must keep filters closed");
+    expect(runner).toContain("Companies pending status reserves or escapes layout flow");
+    expect(runner).toContain("Companies filters expose a sub-44px target");
     expect(runner).toContain("const authenticatedProductViewports = [");
     expect(runner).toMatch(/suffix:\s*'1440'[\s\S]{0,120}width:\s*1440[\s\S]{0,120}height:\s*1000/);
     expect(runner).toMatch(/suffix:\s*'390'[\s\S]{0,120}width:\s*390[\s\S]{0,120}height:\s*844/);
     expect(runner).toContain("await page.setViewportSize({ width, height })");
     for (const surface of [
+      "dashboard-data",
       "leads-data",
       "lead-detail-data",
+      "review-data",
       "opportunities-data",
       "evidence-radar-data",
     ]) {
       expect(runner).toContain(`${surface}-1440`);
       expect(runner).toContain(`${surface}-390`);
     }
+    expect(runner).toContain("document.activeElement.blur()");
+    expect(runner).toContain("expectedSemantics,");
     expect(runner).toContain("AUTH_V2_DISPOSABLE_DB_CONFIRMED");
     expect(runner).toContain("/auth/invite#");
     expect(runner).toContain("/auth/change-email#");

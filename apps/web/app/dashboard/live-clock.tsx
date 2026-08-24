@@ -51,7 +51,7 @@ export default function LiveClock() {
 
   return (
     <time
-      style={{ fontSize: '0.875rem', color: 'var(--c-text-muted)' }}
+      style={{ fontSize: '0.875rem', color: 'var(--color-text-tertiary)' }}
       dateTime={currentTime.toISOString()}
       aria-label={`Текущее время: ${currentTime.toLocaleTimeString('ru-RU')}`}
     >

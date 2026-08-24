@@ -433,7 +433,7 @@ function authorizeCron(request: NextRequest): NextResponse | null {
   const expectedKey = process.env.CRON_API_KEY?.trim()
   if (!expectedKey) {
     return NextResponse.json(
-      { success: false, error: 'CRON_API_KEY is not configured.' },
+      { success: false, error: 'Opportunity service is not configured.' },
       { status: 503 },
     )
   }

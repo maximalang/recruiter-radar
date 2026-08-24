@@ -1,83 +1,117 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 import type { OpportunityView } from '@/lib/opportunities/repository'
 import styles from './opportunities.module.css'
+import disclosureStyles from './opportunity-research-mode.module.css'
 
-export function OpportunityResearchMode(props: {
+type ResearchModeProps = {
   view: OpportunityView
   query: string
   confidenceGate: string
   workflowEnabled: boolean
-  children?: React.ReactNode
-}) {
-  const active = Boolean(
-    props.query || props.confidenceGate ||
-    props.view === 'completed' || props.view === 'all' ||
-    (!props.workflowEnabled && props.view !== 'morning'),
-  )
+}
+
+export function OpportunityResearchMode(props: ResearchModeProps) {
+  const hasExplicitCriteria = Boolean(props.query || props.confidenceGate)
+  const [mobileOpen, setMobileOpen] = useState(hasExplicitCriteria)
+
+  useEffect(() => {
+    setMobileOpen(Boolean(props.query || props.confidenceGate))
+  }, [props.view, props.query, props.confidenceGate])
 
   return (
-    <details className={styles.researchMode} open={active || undefined}>
-      <summary>Режим исследования</summary>
+    <section
+      className={styles.researchMode}
+      aria-label="Поиск и фильтры ситуаций"
+    >
       <div className={styles.researchBody}>
-        <form action="/opportunities" method="get" className={styles.researchForm}>
-          <input type="hidden" name="view" value={props.view} />
-          <label className={styles.researchSearch}>
-            <span>Компания или возможность</span>
-            <input
-              type="search"
-              name="q"
-              defaultValue={props.query}
-              maxLength={80}
-              autoComplete="off"
-            />
-          </label>
-          <label>
-            <span>Уровень уверенности</span>
-            <select name="gate" defaultValue={props.confidenceGate}>
-              <option value="">Все уровни</option>
-              <option value="A">A — прямые подтверждения</option>
-              <option value="B">B — сильный источник</option>
-              <option value="C">C — нужна проверка</option>
-              <option value="D">D — только контекст</option>
-            </select>
-          </label>
-          <div className={styles.researchActions}>
-            <button type="submit">Найти</button>
-            {props.query || props.confidenceGate ? (
-              <Link href={`/opportunities?view=${props.view}`}>Сбросить</Link>
-            ) : null}
-          </div>
-        </form>
+        <button
+          type="button"
+          className={disclosureStyles.mobileToggle}
+          aria-expanded={mobileOpen}
+          aria-controls="situation-research-controls"
+          onClick={() => setMobileOpen((open) => !open)}
+        >
+          <span>Поиск и фильтры</span>
+          <small>{viewLabel(props.view)}</small>
+          <span className={disclosureStyles.toggleMark} aria-hidden="true">
+            {mobileOpen ? '−' : '+'}
+          </span>
+        </button>
 
-        <nav className={styles.filters} aria-label="Исследовательские представления">
-          <ResearchLink href="/opportunities?view=today" active={props.view === 'today'}>
-            Сегодня
-          </ResearchLink>
-          {!props.workflowEnabled ? (
-            <>
-              <ResearchLink href="/opportunities?view=morning" active={props.view === 'morning'}>
-                Новые
-              </ResearchLink>
-              <ResearchLink href="/opportunities?view=accepted" active={props.view === 'accepted'}>
-                В работе
-              </ResearchLink>
-              <ResearchLink href="/opportunities?view=snoozed" active={props.view === 'snoozed'}>
-                Отложенные
-              </ResearchLink>
-            </>
-          ) : null}
-          <ResearchLink href="/opportunities?view=completed" active={props.view === 'completed'}>
-            Завершённые
-          </ResearchLink>
-          <ResearchLink href="/opportunities?view=all" active={props.view === 'all'}>
-            Все
-          </ResearchLink>
-        </nav>
-
-        {props.children}
+        <div
+          id="situation-research-controls"
+          className={disclosureStyles.researchControls}
+          data-mobile-open={mobileOpen ? 'true' : 'false'}
+        >
+          <ResearchControls {...props} />
+        </div>
       </div>
-    </details>
+    </section>
+  )
+}
+
+function ResearchControls(props: ResearchModeProps) {
+  return (
+    <>
+      <form action="/opportunities" method="get" className={styles.researchForm}>
+        <input type="hidden" name="view" value={props.view} />
+        <label className={styles.researchSearch}>
+          <span>Компания или ситуация</span>
+          <input
+            type="search"
+            name="q"
+            defaultValue={props.query}
+            maxLength={80}
+            autoComplete="off"
+          />
+        </label>
+        <label>
+          <span>Уровень подтверждения</span>
+          <select name="gate" defaultValue={props.confidenceGate}>
+            <option value="">Все уровни</option>
+            <option value="A">A — прямые подтверждения</option>
+            <option value="B">B — сильный источник</option>
+            <option value="C">C — нужна проверка</option>
+            <option value="D">D — только контекст</option>
+          </select>
+        </label>
+        <div className={styles.researchActions}>
+          <button type="submit">Найти</button>
+          {props.query || props.confidenceGate ? (
+            <Link href={`/opportunities?view=${props.view}`}>Сбросить</Link>
+          ) : null}
+        </div>
+      </form>
+
+      <nav className={styles.filters} aria-label="Представления ситуаций">
+        <ResearchLink href="/opportunities?view=today" active={props.view === 'today'}>
+          Сегодня
+        </ResearchLink>
+        {!props.workflowEnabled ? (
+          <>
+            <ResearchLink href="/opportunities?view=morning" active={props.view === 'morning'}>
+              Новые
+            </ResearchLink>
+            <ResearchLink href="/opportunities?view=accepted" active={props.view === 'accepted'}>
+              В работе
+            </ResearchLink>
+            <ResearchLink href="/opportunities?view=snoozed" active={props.view === 'snoozed'}>
+              Отложенные
+            </ResearchLink>
+          </>
+        ) : null}
+        <ResearchLink href="/opportunities?view=completed" active={props.view === 'completed'}>
+          Завершённые
+        </ResearchLink>
+        <ResearchLink href="/opportunities?view=all" active={props.view === 'all'}>
+          Все
+        </ResearchLink>
+      </nav>
+    </>
   )
 }
 
@@ -96,4 +130,16 @@ function ResearchLink(props: {
       {props.children}
     </Link>
   )
+}
+
+function viewLabel(view: OpportunityView): string {
+  if (view === 'today') return 'Сегодня'
+  if (view === 'morning') return 'Новые'
+  if (view === 'accepted') return 'В работе'
+  if (view === 'follow_up') return 'Следующие касания'
+  if (view === 'overdue') return 'Просроченные'
+  if (view === 'pipeline') return 'Активная работа'
+  if (view === 'snoozed') return 'Отложенные'
+  if (view === 'completed') return 'Завершённые'
+  return 'Все'
 }

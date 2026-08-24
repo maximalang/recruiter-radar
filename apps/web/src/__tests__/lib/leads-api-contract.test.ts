@@ -84,6 +84,18 @@ describe('/api/leads/generate source selection contract', () => {
       sourceCoverage: {},
     })
   })
+
+  it.each([0, -1, 1.5, 501, '100', null])(
+    'rejects invalid maxResults=%p before running generation',
+    async (maxResults) => {
+      const response = await generatePOST(makeRequest('/api/leads/generate', { maxResults }))
+      const payload = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(payload.error).toMatch(/maxResults must be an integer/)
+      expect(mockGenerateLeads).not.toHaveBeenCalled()
+    },
+  )
 })
 
 describe('/api/leads/score source selection contract', () => {
@@ -124,4 +136,16 @@ describe('/api/leads/score source selection contract', () => {
       sourceCoverage: {},
     })
   })
+
+  it.each([0, -1, 1.5, 501, '100', null])(
+    'rejects invalid maxResults=%p before running scoring',
+    async (maxResults) => {
+      const response = await scorePOST(makeRequest('/api/leads/score', { agencyProfile, maxResults }))
+      const payload = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(payload.error).toMatch(/maxResults must be an integer/)
+      expect(mockGenerateAndScoreLeads).not.toHaveBeenCalled()
+    },
+  )
 })

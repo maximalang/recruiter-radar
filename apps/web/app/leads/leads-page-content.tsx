@@ -1,77 +1,97 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getLastRadarRunAt, getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
+import {
+  getLastRadarRunAt,
+  getLeadsForAllProfiles,
+  getPendingReviewCount,
+  type LeadItem,
+  VALID_FEEDBACK_STATUSES,
+} from '@/lib/leads-data';
 import { listClientProfiles, resolveHiringMode, type ClientProfile } from '@/lib/clientProfiles';
 import { getSession } from '@/lib/auth-v2/authorization';
 import { getEffectiveEntitlement } from '@/lib/entitlements';
-import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
+import { buildFitExplanation } from '@/lib/leads/fit-explanation';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
-import { formatVacanciesCount } from '@/lib/format/plural';
-import { formatScorePoints, scorePercent } from '@/lib/scoring/score-display';
+import { formatVacanciesCount, pluralForm } from '@/lib/format/plural';
+import { formatScorePoints } from '@/lib/scoring/score-display';
 import LeadsFilters from './leads-filters';
 import { pluralizeLeads } from './page-helpers';
 import {
   InternalPageFrame,
   InternalPageHeader,
-  MetricGrid,
-  MetricCard,
-  GateBadgeInline,
   FeedbackBadge,
-  formatSignalFreshness,
-  AiHintChip,
-  ForeignEmployerBadge,
   ReviewStatusBadge,
-  getScoreTone,
-  TableCard,
-  EmptyState,
+  formatSignalFreshness,
   LoadingState,
-  ErrorState,
-  FitIcon,
 } from '../ui/internal-page';
-import { buildAccountNavigation } from '../ui/account-navigation';
-import { internalPageClasses as ipStyles } from '../ui/internal-page';
 import {
-  AlertIcon,
-  BriefcaseIcon,
-  CheckIcon,
-  ClockIcon,
-  LayersIcon,
-  LinkIcon,
-  MotionIcon,
-  PinIcon,
-  SearchIcon,
-  ShieldIcon,
-  TargetIcon,
-} from '../ui/icons';
+  ConfidenceIndicator as ConfidenceIndicatorPrimitive,
+  LeadRow as LeadRowPrimitive,
+} from '../ui/intelligence-primitives';
+import { ProductErrorState } from '../ui/product-error-state';
+import { StaticEmptyState } from '../ui/static-empty-state';
+import { buildAccountNavigation } from '../ui/account-navigation';
+import { BriefcaseIcon, ClockIcon, SearchIcon, TargetIcon } from '../ui/icons';
+import styles from './leads-workspace.module.css';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Лиды — Recruiter Radar',
-  description: 'Компании с активным наймом: оценка, доказательства и безопасный путь контакта.',
+  title: 'Компании — Recruiter Radar',
+  description: 'Компании с подтверждёнными hiring signals, приоритетом и безопасным следующим действием.',
 };
 
 const LEADS_NAV = buildAccountNavigation('leads');
 
-export function LeadCard({
+type HiringMode = 'specialist' | 'executive' | 'volume';
+
+type ConfidenceView = {
+  level: 'high' | 'medium' | 'low';
+  label: string;
+};
+
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>;
+}
+
+function confidenceView(gate: LeadItem['confidenceGate']): ConfidenceView {
+  if (gate === 'A') return { level: 'high', label: 'высокая' };
+  if (gate === 'B') return { level: 'medium', label: 'достаточная' };
+  if (gate === 'C') return { level: 'medium', label: 'требует проверки' };
+  return { level: 'low', label: 'недостаточно' };
+}
+
+function ConfidenceIndicator({ gate }: { gate: LeadItem['confidenceGate'] }) {
+  const view = confidenceView(gate);
+  return (
+    <div className={styles.confidence} data-level={view.level} aria-label={`Уверенность: ${view.label}`}>
+      <ConfidenceIndicatorPrimitive level={view.level}>{view.label}</ConfidenceIndicatorPrimitive>
+    </div>
+  );
+}
+
+function WorkflowState({ lead }: { lead: LeadItem }) {
+  if (lead.reviewStatus && lead.reviewStatus !== 'auto_approved') {
+    return <ReviewStatusBadge status={lead.reviewStatus} />;
+  }
+  if (lead.feedbackStatus && lead.feedbackStatus !== 'none') {
+    return <FeedbackBadge status={lead.feedbackStatus} />;
+  }
+  return null;
+}
+
+export function LeadRow({
   lead,
   fitPreview,
   hiringMode,
+  rank,
 }: {
   lead: LeadItem;
   fitPreview: { icon: string; text: string } | null;
-  /**
-   * Resolved hiring mode for the profile that produced this lead (never 'auto'
-   * — resolveHiringMode runs at the profile boundary). Drives mode-aware
-   * urgency framing so an executive agency does not see volume-shaped cues and
-   * a volume agency sees hiring-scale emphasis. Defaults to 'specialist' when
-   * the profile can't be matched (keeps the pre-mode behavior).
-   */
-  hiringMode: 'specialist' | 'executive' | 'volume';
+  hiringMode: HiringMode;
+  rank: number;
 }) {
-  const tone = getScoreTone(lead.score);
-  const risks = lead.negativeSignals.slice(0, 2);
   const roleNames = deriveRoleNames({ evidenceTitles: lead.evidenceTitles });
   const { shown: shownRoles, more: moreRoles } = splitRolesForDisplay(roleNames, 2);
   const urgency = deriveUrgencyCue({
@@ -79,178 +99,62 @@ export function LeadCard({
     latestPublishedAt: lead.latestPublishedAt,
     hiringMode,
   });
-  const showWorkflowStatus =
-    (Boolean(lead.reviewStatus) && lead.reviewStatus !== 'auto_approved') ||
-    (Boolean(lead.feedbackStatus) && lead.feedbackStatus !== 'none');
   const points = formatScorePoints(lead.score);
-  const scoreWidth = scorePercent(lead.score);
-  const freshness = formatSignalFreshness(lead.latestPublishedAt)?.label;
+  const freshness = formatSignalFreshness(lead.latestPublishedAt)?.label ?? 'свежесть проверяется';
   const vacancies = formatVacanciesCount(lead.vacanciesCount);
   const roles = shownRoles.length > 0
     ? `${shownRoles.join(' · ')}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}`
-    : 'Роли уточняются';
-  const vacanciesSummary = [vacancies, freshness].filter(Boolean).join(' · ') || 'Свежесть проверяется';
-  const signalSummary = lead.whyNow || urgency.label;
-  const evidenceTitles = lead.evidenceTitles.slice(0, 4);
-  const sourceFamilies = lead.sourceFamilies.slice(0, 4);
-  const scoreReasons = lead.reasons.slice(0, 3);
-
-  return (
-    <article
-      className={`${ipStyles.leadCard} ${ipStyles.signalLeadCard}`}
-      data-signal-card="true"
-      data-tone={tone}
-      data-motion-item
-    >
-      <div className={ipStyles.signalLeadTopbar}>
-        <div className={ipStyles.leadCardTags}>
-          <GateBadgeInline gate={lead.confidenceGate} />
-          {showWorkflowStatus ? (
-            <span className={ipStyles.leadCardTagGroup} data-chip-group="status">
-              <ReviewStatusBadge status={lead.reviewStatus} />
-              <FeedbackBadge status={lead.feedbackStatus} />
-            </span>
-          ) : null}
-          <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
-          <AiHintChip present={lead.hasAiHint} />
-        </div>
-      </div>
-
-      <div className={ipStyles.signalLeadCompanyRow}>
-        <div>
-          <span className={ipStyles.signalLeadName}>{lead.orgName}</span>
-          {lead.locationNames.length > 0 && (
-            <div className={ipStyles.signalLeadMeta}>
-              <PinIcon className={ipStyles.chipIcon} /> {lead.locationNames.slice(0, 2).join(', ')}
-            </div>
-          )}
-        </div>
-        <div className={ipStyles.signalLeadScore}>
-          <strong>{points}</strong><span>/100</span>
-        </div>
-      </div>
-
-      <div
-        className={ipStyles.signalLeadScoreTrack}
-        role="meter"
-        aria-valuenow={Number(points)}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`Сила сигнала: ${points} из 100`}
-      >
-        <span data-tone={tone} style={{ width: `${scoreWidth}%` }} />
-      </div>
-
-      <div className={ipStyles.signalLeadSections}>
-        <section className={ipStyles.signalLeadSection}>
-          <span>Компания и контакты</span>
-          <strong><ShieldIcon className={ipStyles.chipIcon} /> {lead.lawfulContactPath || 'Корпоративный контакт уточняется'}</strong>
-          {lead.locationNames.length > 0 ? <p>{lead.locationNames.slice(0, 2).join(', ')}</p> : null}
-        </section>
-        <section className={ipStyles.signalLeadSection}>
-          <span>Релевантные вакансии</span>
-          <strong>{roles}</strong>
-          <p>{vacanciesSummary}</p>
-        </section>
-        <section className={`${ipStyles.signalLeadSection} ${ipStyles.signalLeadSectionPrimary}`}>
-          <span>Сигналы</span>
-          <strong>{signalSummary}</strong>
-          {fitPreview ? <p><FitIcon name={fitPreview.icon} className={ipStyles.chipIcon} /> {fitPreview.text}</p> : null}
-        </section>
-      </div>
-
-      {risks.length > 0 && (
-        <div className={ipStyles.leadRiskRow}>
-          {risks.map((risk) => (
-            <span key={risk} className={ipStyles.leadRiskChip}><AlertIcon className={ipStyles.chipIcon} /> {risk}</span>
-          ))}
-        </div>
-      )}
-
-      <details className={ipStyles.signalLeadDisclosure} data-motion-disclosure>
-        <summary data-motion-interactive>
-          <MotionIcon kind="disclosure" className={ipStyles.signalLeadDisclosureIcon}>
-            <LayersIcon />
-          </MotionIcon>
-          <span>Доказательства и расчёт</span>
-          <small>
-            {lead.sourceFamilies.length} семейств источников · {lead.evidenceTitles.length} доказательств
-          </small>
-        </summary>
-        <div className={ipStyles.signalLeadDisclosureBody}>
-          <div className={ipStyles.signalLeadDisclosureInner}>
-            <section>
-              <span>Источники и происхождение</span>
-              {sourceFamilies.length > 0 ? (
-                <ul data-motion-list>
-                  {sourceFamilies.map((source) => (
-                    <li key={source} data-motion-item>{source}</li>
-                  ))}
-                </ul>
-              ) : <p>Семейство источника не указано.</p>}
-              {evidenceTitles.length > 0 ? (
-                <ul data-motion-list>
-                  {evidenceTitles.map((title, index) => (
-                    <li key={`${title}:${index}`} data-motion-item>{title}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </section>
-            <section>
-              <span>Почему этот балл</span>
-              {scoreReasons.length > 0 ? (
-                <ul data-motion-list>
-                  {scoreReasons.map((reason, index) => (
-                    <li key={`${reason}:${index}`} data-motion-item>{reason}</li>
-                  ))}
-                </ul>
-              ) : <p>Подробная декомпозиция доступна в полной карточке.</p>}
-            </section>
-          </div>
-        </div>
-      </details>
-
-      <div className={ipStyles.signalLeadFooter}>
-        <span>Полная информация о компании</span>
-        <Link
-          href={`/leads/${lead.id}`}
-          className={ipStyles.signalLeadCardLink}
-          aria-label={`Открыть полную карточку компании ${lead.orgName}`}
-          data-motion-interactive
-        >
-          Открыть
-          <MotionIcon kind="navigation" className={ipStyles.signalLeadLinkIcon}>
-            <LinkIcon />
-          </MotionIcon>
-        </Link>
-      </div>
-    </article>
+    : null;
+  const whyNow = lead.whyNow || urgency.label;
+  const workflowState = (
+    (lead.reviewStatus && lead.reviewStatus !== 'auto_approved') ||
+    (lead.feedbackStatus && lead.feedbackStatus !== 'none')
   );
-}
+  const secondarySignals = [
+    lead.isForeignEmployer ? 'иностранный работодатель' : null,
+    lead.hasAiHint ? 'ИИ-подсказка доступна' : null,
+    fitPreview?.text ?? null,
+  ].filter(Boolean).join(' · ');
 
-/**
- * Score-tone legend for the leads list. Previously rendered as a blind
- * `aria-hidden` decoration — now it carries a `data-legend` root and visible
- * labels tied to the rail tones, so the colour key is announced to AT and
- * reads as part of the page, not as decoration. The dots stay visual; the
- * labels do the a11y work.
- */
-export function LeadsListLegend() {
   return (
-    <div className={ipStyles.leadsListLegend} data-legend="true" aria-label="Условные обозначения силы сигнала">
-      <span className={ipStyles.leadsListLegendItem}>
-        <span className={ipStyles.leadsListLegendDot} data-tone="success" aria-hidden="true" />
-        высокий
-      </span>
-      <span className={ipStyles.leadsListLegendItem}>
-        <span className={ipStyles.leadsListLegendDot} data-tone="warning" aria-hidden="true" />
-        средний
-      </span>
-      <span className={ipStyles.leadsListLegendItem}>
-        <span className={ipStyles.leadsListLegendDot} data-tone="danger" aria-hidden="true" />
-        низкий
-      </span>
-    </div>
+    <LeadRowPrimitive className={styles.row} data-lead-row="true">
+      <div className={styles.rank}>{String(rank).padStart(2, '0')}</div>
+
+      <div className={styles.identity}>
+        <Link href={`/leads/${lead.id}`} className={styles.company}>{lead.orgName}</Link>
+        {lead.locationNames.length > 0 ? (
+          <div className={styles.meta}>{lead.locationNames.slice(0, 2).join(', ')}</div>
+        ) : null}
+      </div>
+
+      <div className={styles.decision}>
+        <strong>{whyNow}</strong>
+        <div className={styles.decisionMeta}>{[freshness, roles].filter(Boolean).join(' · ')}</div>
+      </div>
+
+      <div className={styles.evidence}>
+        <strong>{vacancies} · {lead.evidenceTitles.length} подтвержд.</strong>
+        <div className={styles.evidenceMeta}>
+          {lead.sourceFamilies.length > 0
+            ? `${lead.sourceFamilies.length} ${pluralForm(lead.sourceFamilies.length, ['источник', 'источника', 'источников'])}`
+            : 'источник не подтверждён'}
+        </div>
+      </div>
+
+      <div className={styles.score} data-numeric="true" aria-label={`Сила сигнала ${points}`}>{points}</div>
+      <ConfidenceIndicator gate={lead.confidenceGate} />
+      <Link href={`/leads/${lead.id}`} className={styles.action} aria-label={`Открыть анализ компании ${lead.orgName}`}>
+        Открыть
+      </Link>
+
+      {(workflowState || lead.negativeSignals[0] || secondarySignals) ? (
+        <div className={styles.workflow}>
+          {workflowState ? <WorkflowState lead={lead} /> : null}
+          {lead.negativeSignals[0] ? <span className={styles.risk}>{lead.negativeSignals[0]}</span> : null}
+          {secondarySignals ? <span className={styles.secondaryMeta}>{secondarySignals}</span> : null}
+        </div>
+      ) : null}
+    </LeadRowPrimitive>
   );
 }
 
@@ -266,149 +170,121 @@ export function LeadsList({
 }: {
   leads: LeadItem[];
   fitPreviewFor: (lead: LeadItem) => { icon: string; text: string } | null;
-  /**
-   * Resolved hiring mode for the profile that produced a given lead. Falls back
-   * to 'specialist' (the pre-mode default) when the profile can't be matched.
-   */
-  hiringModeFor: (lead: LeadItem) => 'specialist' | 'executive' | 'volume';
+  hiringModeFor: (lead: LeadItem) => HiringMode;
   hasActiveProfile: boolean;
   hasAnyProfile: boolean;
   lastRunAt: string | null;
-  /**
-   * True when an active profile has a narrow ICP (specialization or include
-   * keywords set). Used to give an honest, distinct empty state: a specialized
-   * agency with 0 leads is likely facing thin supply for their niche, not a
-   * pipeline failure — the next step is to broaden keywords or wait for the
-   * next run, not to reconfigure the whole profile.
-   */
   narrowProfile: boolean;
-  /**
-   * True when the "Сегодня в работе" working-set filter is active. Changes the
-   * toolbar count noun ("в работе" vs "всего") and the empty-state copy so the
-   * page reads as an open-pipeline view, not the full scored pool.
-   */
   workingSet: boolean;
 }) {
   if (leads.length === 0) {
-    // Distinguish three empty cases so the next step is obvious and the
-    // product never feels broken:
-    //  today view, 0         → honest "ничего в работе" — take a lead from the full pool
-    //  no profile yet        → set one up
-    //  narrow profile, 0     → honest "thin supply for your niche" — broaden or wait
-    //  broad profile, 0      → first batch comes with the next radar run
     if (workingSet) {
       return (
-        <EmptyState
-          icon={ClockIcon}
-          title="Ничего в работе"
-          text="Вы ещё не взяли лиды в работу на этом профиле. Откройте полный радар, оцените компании и отметьте первые — они появятся здесь."
-          action={{ href: '/leads', label: 'Открыть полный радар' }}
-        />
+        <div className={styles.emptyWrap}>
+          <StaticEmptyState
+            icon={ClockIcon}
+            title="Ничего в работе"
+            description="Вы ещё не взяли компании в работу. Откройте полный список и выберите компании для контакта."
+            action={<StateLink href="/leads" label="Открыть компании" />}
+          />
+        </div>
       );
     }
     if (!hasActiveProfile) {
       if (hasAnyProfile) {
         return (
-          <EmptyState
-            icon={TargetIcon}
-            title="Профиль Radar приостановлен"
-            text="Настройки сохранены, но новые возможности не формируются. Включите профиль, чтобы следующий запуск снова учитывал вашу практику."
-            action={{ href: '/settings/radar', label: 'Включить профиль Radar' }}
-          />
+          <div className={styles.emptyWrap}>
+            <StaticEmptyState
+              icon={TargetIcon}
+              title="Профиль радара приостановлен"
+              description="Настройки сохранены, но новые компании не формируются. Включите профиль для следующего сканирования."
+              action={<StateLink href="/settings/radar" label="Включить профиль радара" />}
+            />
+          </div>
         );
       }
       return (
-        <EmptyState
-          icon={TargetIcon}
-          title="Настройте профиль идеального клиента"
-          text="Радар начнёт подбирать компании, как только вы опишете, кого ищете: роли, отрасли, регионы."
-          action={{ href: '/settings/radar', label: 'Настроить профиль' }}
-        />
+        <div className={styles.emptyWrap}>
+          <StaticEmptyState
+            icon={TargetIcon}
+            title="Настройте профиль радара"
+            description="Опишите роли, отрасли и регионы — после этого Радар начнёт ранжировать компании по подтверждённым сигналам."
+            action={<StateLink href="/settings/radar" label="Настроить профиль" />}
+          />
+        </div>
       );
     }
     if (!lastRunAt) {
       return (
-        <EmptyState
-          icon={ClockIcon}
-          title="Первый запуск Radar ещё не завершён"
-          text="Профиль сохранён. После первого сканирования здесь появятся компании с доказательствами и рекомендуемым действием."
-          action={{ href: '/settings/radar', label: 'Проверить настройки Radar' }}
-        />
+        <div className={styles.emptyWrap}>
+          <StaticEmptyState
+            icon={ClockIcon}
+            title="Первое сканирование ещё не завершено"
+            description="Профиль сохранён. После первого прохода здесь появятся компании, причины приоритета и подтверждения."
+            action={<StateLink href="/settings/radar" label="Проверить профиль радара" />}
+          />
+        </div>
       );
     }
     if (narrowProfile) {
       return (
-        <EmptyState
-          icon={SearchIcon}
-          title="По вашей специализации пока мало сигналов"
-          text="С узкой специализацией радар находит реже — это нормально. Расширьте ключевые фразы в профиле (например, смежные роли или отрасли) или дождитесь следующего запуска: новые карьерные страницы и платформенные сигналы появляются ежедневно."
-          action={{ href: '/settings/radar#fine-tuning', label: 'Расширить ключевые фразы' }}
-        />
+        <div className={styles.emptyWrap}>
+          <StaticEmptyState
+            icon={SearchIcon}
+            title="По специализации пока мало сигналов"
+            description="Для узкой практики это нормальный результат. Расширьте ключевые фразы или дождитесь следующего сканирования."
+            action={<StateLink href="/settings/radar#fine-tuning" label="Расширить профиль" />}
+          />
+        </div>
       );
     }
     return (
-      <EmptyState
-        icon={BriefcaseIcon}
-        title="Подходящих компаний пока нет"
-        text="Последний запуск завершён, но компании не прошли текущие фильтры. Можно уточнить профиль или дождаться свежих сигналов."
-        action={{ href: '/settings/radar#fine-tuning', label: 'Уточнить профиль' }}
-      />
+      <div className={styles.emptyWrap}>
+        <StaticEmptyState
+          icon={BriefcaseIcon}
+          title="Подходящих компаний пока нет"
+          description="Последний запуск завершён, но текущие условия не дали достаточно сильных сигналов."
+          action={<StateLink href="/settings/radar#fine-tuning" label="Уточнить профиль" />}
+        />
+      </div>
     );
   }
 
   return (
-    <>
-      <div className={ipStyles.leadsListToolbar}>
-        <div className={ipStyles.leadsListCount}>
-          <strong>{leads.length}</strong> {pluralizeLeads(leads.length)}{workingSet ? ' в работе' : ' всего'}
-        </div>
-        <LeadsListLegend />
-      </div>
-      <div className={`${ipStyles.leadsList} ${ipStyles.signalCardList}`} data-motion-list>
-        {leads.map((lead) => (
-          <LeadCard
-            key={lead.id}
-            lead={lead}
-            fitPreview={fitPreviewFor(lead)}
-            hiringMode={hiringModeFor(lead)}
-          />
-        ))}
-      </div>
-    </>
+    <div className={styles.list} data-motion-list>
+      {leads.map((lead, index) => (
+        <LeadRow key={lead.id} lead={lead} rank={index + 1} fitPreview={fitPreviewFor(lead)} hiringMode={hiringModeFor(lead)} />
+      ))}
+    </div>
   );
 }
 
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ gate?: string; feedback?: string; page?: string; profile?: string; today?: string }>;
+  searchParams: Promise<{ q?: string; gate?: string; feedback?: string; page?: string; profile?: string; today?: string }>;
 }) {
   const filters = await searchParams;
-
-  // Validate and normalize filter params
-  const confidenceGate = filters.gate && ['A', 'B', 'C', 'D'].includes(filters.gate)
-    ? filters.gate
-    : null;
-  const feedbackStatus = filters.feedback && VALID_FEEDBACK_STATUSES.has(filters.feedback as never)
-    ? filters.feedback
-    : null;
-  // "Сегодня в работе" — the agency's open pipeline (contacted/replied).
-  // Supersedes feedbackStatus when both are set (the filter component clears
-  // feedback when today is toggled on, but defend against manual URL edits).
+  const query = filters.q?.trim().toLocaleLowerCase('ru-RU') ?? '';
+  const confidenceGate = filters.gate && ['A', 'B', 'C', 'D'].includes(filters.gate) ? filters.gate : null;
+  const feedbackStatus = filters.feedback && VALID_FEEDBACK_STATUSES.has(filters.feedback as never) ? filters.feedback : null;
   const workingSet = filters.today === '1';
   const effectiveFeedbackStatus = workingSet ? null : feedbackStatus;
 
-  // Owner-scope every read: without a session there are no accessible profiles,
-  // so the page renders empty rather than leaking another tenant's leads.
   const authorization = await getSession({ permission: 'leads:read' });
   if (!authorization) {
     return (
       <InternalPageFrame navItems={LEADS_NAV}>
-        <InternalPageHeader title="Возможности" subtitle="Защищённое рабочее пространство" />
-        <EmptyState title="Нужен вход в аккаунт" text="Войдите, чтобы открыть возможности только вашего workspace." action={{ href: '/login?returnTo=/leads', label: 'Войти' }} />
+        <InternalPageHeader title="Компании" subtitle="Защищённое рабочее пространство" />
+        <StaticEmptyState
+          title="Нужен вход в аккаунт"
+          description="Войдите, чтобы открыть компании только вашего рабочего пространства."
+          action={<StateLink href="/login?returnTo=/leads" label="Войти" />}
+        />
       </InternalPageFrame>
     );
   }
+
   const ownerId = authorization.dataOwnerId;
   const entitlement = authorization.workspaceId
     ? await getEffectiveEntitlement(ownerId, { workspaceId: authorization.workspaceId }).catch(() => null)
@@ -416,16 +292,25 @@ export default async function LeadsPage({
   if (!entitlement) {
     return (
       <InternalPageFrame navItems={LEADS_NAV}>
-        <InternalPageHeader title="Возможности" subtitle="Проверка доступа" />
-        <ErrorState title="Не удалось проверить доступ" description="Обновите страницу немного позже. Мы не показываем данные, пока сервер не подтвердит права аккаунта." action={{ href: '/settings/access', label: 'Доступ и оплата' }} />
+        <InternalPageHeader title="Компании" subtitle="Проверка доступа" />
+        <ProductErrorState
+          title="Не удалось проверить доступ"
+          description="Обновите страницу позже. Данные не показываются, пока сервер не подтвердит права аккаунта."
+        >
+          <StateLink href="/settings/access" label="Доступ и оплата" />
+        </ProductErrorState>
       </InternalPageFrame>
     );
   }
   if (entitlement.status !== 'active' || !entitlement.features.includes('dashboard')) {
     return (
       <InternalPageFrame navItems={LEADS_NAV}>
-        <InternalPageHeader title="Возможности" subtitle="Доступ не активен" />
-        <EmptyState title="Нужен активный доступ" text="Профиль и история сохранены. После активации возможности снова станут доступны." action={{ href: '/settings/access', label: 'Проверить доступ' }} />
+        <InternalPageHeader title="Компании" subtitle="Доступ не активен" />
+        <StaticEmptyState
+          title="Нужен активный доступ"
+          description="Профиль и история сохранены. После активации компании снова станут доступны."
+          action={<StateLink href="/settings/access" label="Проверить доступ" />}
+        />
       </InternalPageFrame>
     );
   }
@@ -436,45 +321,31 @@ export default async function LeadsPage({
   } catch {
     return (
       <InternalPageFrame navItems={LEADS_NAV}>
-        <InternalPageHeader title="Возможности" subtitle="Radar" />
-        <ErrorState title="Не удалось загрузить профиль" description="Это временная ошибка данных, а не пустой результат Radar." action={{ href: '/settings/radar', label: 'Открыть настройки Radar' }} />
+        <InternalPageHeader title="Компании" subtitle="Профиль радара" />
+        <ProductErrorState
+          title="Не удалось загрузить профиль"
+          description="Это временная ошибка данных, а не пустой результат Радара."
+        >
+          <StateLink href="/settings/radar" label="Открыть профиль радара" />
+        </ProductErrorState>
       </InternalPageFrame>
     );
   }
 
-  const activeProfiles = profiles.filter((p) => p.isActive);
+  const activeProfiles = profiles.filter((profile) => profile.isActive);
+  const selectedProfileId = filters.profile && activeProfiles.some((profile) => profile.id === filters.profile) ? filters.profile : null;
+  const selectedProfile = selectedProfileId ? activeProfiles.find((profile) => profile.id === selectedProfileId) ?? null : null;
+  const profileIds = selectedProfileId ? [selectedProfileId] : activeProfiles.map((profile) => profile.id);
 
-  // Optional profile switcher: narrow to a single practice when ?profile= is a valid active id
-  const selectedProfileId =
-    filters.profile && activeProfiles.some((p) => p.id === filters.profile)
-      ? filters.profile
-      : null;
-  const selectedProfile = selectedProfileId
-    ? activeProfiles.find((p) => p.id === selectedProfileId) ?? null
-    : null;
-
-  // Fetch leads for the selected profile, or all active profiles, in a single query (not N+1)
-  const profileIds = selectedProfileId
-    ? [selectedProfileId]
-    : activeProfiles.map((p) => p.id);
   let allLeads: LeadItem[] = [];
   let totalLeads = 0;
   let pendingReview = 0;
   let lastRunAt: string | null = null;
-  // leadsFetchError — surfaced as an ErrorState when the leads/review fetch
-  // genuinely fails. A missing session is NOT an error (it's the legitimate
-  // "no profiles → empty" path), so only a real fetch failure sets the flag.
   let leadsFetchError = false;
 
   try {
     const [result, reviewCount, latestRun] = await Promise.all([
-      getLeadsForAllProfiles({
-        profileIds,
-        ownerId,
-        confidenceGate,
-        feedbackStatus: effectiveFeedbackStatus,
-        workingSet,
-      }),
+      getLeadsForAllProfiles({ profileIds, ownerId, confidenceGate, feedbackStatus: effectiveFeedbackStatus, workingSet }),
       getPendingReviewCount({ profileIds, ownerId }),
       getLastRadarRunAt({ profileIds, ownerId }),
     ]);
@@ -486,82 +357,48 @@ export default async function LeadsPage({
     leadsFetchError = true;
   }
 
-  // Compact per-lead fit preview: the single strongest "почему подходит этому агентству"
-  // line, computed with the same deterministic builder the detail page uses. Keyed by the
-  // profile that produced the lead so multi-profile views stay correct.
-  const fitProfilesById = new Map(
-    activeProfiles.map((p) => [
-      p.id,
-      {
-        industries: p.industries,
-        roles: p.roles,
-        excludedIndustries: p.excludedIndustries,
-        excludedLocations: p.excludedLocations,
-        contactPolicy: p.contactPolicy,
-        remoteFriendly: p.remoteFriendly,
-        targetCity: p.targetCity,
-        // Fold the agency's free-text ICP fields into the profile so the fit
-        // explanation can name the concrete specialization / keyword that
-        // matched, instead of a generic «совпадает с ICP» label. This is the
-        // single most useful line for a narrow/specialized agency.
-        specialization: p.specialization,
-        includeKeywords: p.includeKeywords,
-      },
-    ]),
-  );
-
-  // Resolved hiring mode per profile — drives mode-aware urgency framing on
-  // each lead card. resolveHiringMode turns 'auto' into a concrete mode from
-  // the agency's declared roles, so the card never has to handle 'auto'.
-  const hiringModeByProfileId = new Map(
-    activeProfiles.map((p) => [p.id, resolveHiringMode(p)]),
-  );
+  const fitProfilesById = new Map(activeProfiles.map((profile) => [profile.id, {
+    industries: profile.industries,
+    roles: profile.roles,
+    excludedIndustries: profile.excludedIndustries,
+    excludedLocations: profile.excludedLocations,
+    contactPolicy: profile.contactPolicy,
+    remoteFriendly: profile.remoteFriendly,
+    targetCity: profile.targetCity,
+    specialization: profile.specialization,
+    includeKeywords: profile.includeKeywords,
+  }]));
+  const hiringModeByProfileId = new Map(activeProfiles.map((profile) => [profile.id, resolveHiringMode(profile)]));
 
   const fitPreviewFor = (lead: LeadItem): { icon: string; text: string } | null => {
     const profile = fitProfilesById.get(lead.clientProfileId);
     if (!profile) return null;
-    const fit = buildFitExplanation(
-      {
-        // careerPageUrl / orgDomain live only on LeadDetail, not the list LeadItem.
-        // FitLeadInput marks them optional; the builder degrades gracefully — the
-        // reachability line just isn't surfaced in the compact list preview.
-        structuredReasons: lead.structuredReasons,
-        locationNames: lead.locationNames,
-        lawfulContactPath: lead.lawfulContactPath,
-        sourceFamilies: lead.sourceFamilies,
-        // Pass the visible free-text fields so the ICP re-derivation can name
-        // the matched specialization term from evidence the recruiter can see.
-        orgName: lead.orgName,
-        evidenceTitles: lead.evidenceTitles,
-      },
-      profile,
-    );
+    const fit = buildFitExplanation({
+      structuredReasons: lead.structuredReasons,
+      locationNames: lead.locationNames,
+      lawfulContactPath: lead.lawfulContactPath,
+      sourceFamilies: lead.sourceFamilies,
+      orgName: lead.orgName,
+      evidenceTitles: lead.evidenceTitles,
+    }, profile);
     const first = fit.lines[0];
-    if (!first) return null;
-    return { icon: FIT_DIMENSION_ICON[first.dimension], text: first.text };
+    return first ? { icon: first.dimension, text: first.text } : null;
   };
 
-  const hasFilters =
-    confidenceGate !== null || effectiveFeedbackStatus !== null || selectedProfileId !== null || workingSet;
+  const visibleLeads = query
+    ? allLeads.filter((lead) => [
+        lead.orgName,
+        lead.whyNow,
+        ...lead.evidenceTitles,
+        ...lead.locationNames,
+      ].filter(Boolean).join(' ').toLocaleLowerCase('ru-RU').includes(query))
+    : allLeads;
 
-  // Narrow-ICP detection for the honest empty state: a specialized agency
-  // (specialization text or include keywords set) sees a different message
-  // when there are 0 leads — "thin supply for your niche" rather than the
-  // generic "radar hasn't run yet". When a single practice is selected, judge
-  // by that practice; in the all-practices view, judge by whether ANY active
-  // profile is narrow (a narrow shop with one broad practice still benefits).
+  const hasFilters = Boolean(query || confidenceGate || effectiveFeedbackStatus || selectedProfileId || workingSet);
   const narrowProfile = selectedProfile
-    ? Boolean(
-        (selectedProfile.specialization && selectedProfile.specialization.trim() !== '') ||
-        selectedProfile.includeKeywords.length > 0,
-      )
-    : activeProfiles.some(
-        (p) =>
-          (p.specialization && p.specialization.trim() !== '') ||
-          p.includeKeywords.length > 0,
-      );
+    ? Boolean((selectedProfile.specialization && selectedProfile.specialization.trim() !== '') || selectedProfile.includeKeywords.length > 0)
+    : activeProfiles.some((profile) => (profile.specialization && profile.specialization.trim() !== '') || profile.includeKeywords.length > 0);
 
-  // Carry the active filters into the CSV export link so the export matches the view.
   const exportParams = new URLSearchParams();
   if (confidenceGate) exportParams.set('gate', confidenceGate);
   if (effectiveFeedbackStatus) exportParams.set('feedback', effectiveFeedbackStatus);
@@ -569,76 +406,49 @@ export default async function LeadsPage({
   if (workingSet) exportParams.set('today', '1');
   const exportQuery = exportParams.toString();
   const exportHref = exportQuery ? `/api/leads/export?${exportQuery}` : '/api/leads/export';
+  const readyCount = allLeads.filter((lead) => lead.confidenceGate === 'A' || lead.confidenceGate === 'B').length;
 
   return (
     <InternalPageFrame navItems={LEADS_NAV}>
       <InternalPageHeader
-        title="Лиды"
-        subtitle={
-          <>
-            {workingSet
-              ? 'Сегодня в работе — ваши открытые лиды'
-              : selectedProfile
-                ? `Практика: ${selectedProfile.agencyName}`
-                : 'Компании, которым стоит написать сегодня'}
-            {hasFilters && <span className={ipStyles.filterActive}>(фильтр активен)</span>}
-          </>
-        }
-        nav={
-          allLeads.length > 0 ? (
-            <a
-              href={exportHref}
-              className={ipStyles.leadOpenBtn}
-              download
-              aria-label="Экспортировать лиды в CSV"
-            >
-              Экспорт CSV
-            </a>
-          ) : null
-        }
+        title="Компании"
+        subtitle={workingSet
+          ? 'Компании, по которым уже начата работа сегодня'
+          : selectedProfile
+            ? `Практика: ${selectedProfile.agencyName}`
+            : 'Кому написать сейчас — и на каких подтверждениях держится приоритет'}
       />
 
-      {/* Triage-relevant metrics. In the "Сегодня в работе" view the lead
-          metric is the open-pipeline count (contacted/replied) — the number a
-          recruiter actually acts on — instead of the total scored pool. */}
-      <MetricGrid>
-        {workingSet ? (
-          <MetricCard label="В работе" value={totalLeads} tone="info" />
-        ) : (
-          <MetricCard label="Всего лидов" value={totalLeads} />
-        )}
-        <MetricCard
-          label="Готовы к контакту (A/B)"
-          value={allLeads.filter((l) => l.confidenceGate === 'A' || l.confidenceGate === 'B').length}
-          tone="success"
-        />
-        <MetricCard
-          label="На проверке"
-          value={
-            <Link href="/review" className={ipStyles.leadLink}>
-              {pendingReview}
-            </Link>
-          }
-          tone={pendingReview > 0 ? 'info' : 'neutral'}
-        />
-      </MetricGrid>
+      <div className={styles.summaryStrip} aria-label="Сводка рабочего набора">
+        <div>
+          <strong>{visibleLeads.length}</strong> {pluralizeLeads(visibleLeads.length)}{hasFilters ? ' в текущем срезе' : ''}
+        </div>
+        <div className={styles.summaryLinks}>
+          <span><strong>{readyCount}</strong> готовы к контакту</span>
+          <Link href="/review"><strong>{pendingReview}</strong> на проверке</Link>
+          {totalLeads !== visibleLeads.length ? <span>{totalLeads} всего</span> : null}
+          {allLeads.length > 0 ? <a className={styles.export} href={exportHref} download>Экспорт CSV</a> : null}
+        </div>
+      </div>
 
-      <TableCard>
-        <Suspense fallback={<LoadingState variant="inline" />}>
-          <LeadsFilters
-            profiles={activeProfiles.map((p) => ({ id: p.id, name: p.agencyName }))}
-          />
-        </Suspense>
+      <div className={styles.workspace}>
+        <div className={styles.filters}>
+          <Suspense fallback={<LoadingState variant="inline" />}>
+            <LeadsFilters profiles={activeProfiles.map((profile) => ({ id: profile.id, name: profile.agencyName }))} />
+          </Suspense>
+        </div>
+
         {leadsFetchError ? (
-          <ErrorState
-            title="Не удалось загрузить лиды"
-            description="Радар подбирает компании по вашему профилю. Повторите через минуту — если лиды не появятся, проверьте настройки профиля или напишите поддержку."
-            action={{ href: '/settings/radar', label: 'Проверить профиль' }}
-          />
+          <ProductErrorState
+            title="Не удалось загрузить компании"
+            description="Повторите через минуту. Если ошибка сохранится, проверьте профиль радара или напишите в поддержку."
+          >
+            <StateLink href="/settings/radar" label="Проверить профиль" />
+          </ProductErrorState>
         ) : (
           <Suspense fallback={<LoadingState variant="skeleton" />}>
             <LeadsList
-              leads={allLeads}
+              leads={visibleLeads}
               fitPreviewFor={fitPreviewFor}
               hiringModeFor={(lead) => hiringModeByProfileId.get(lead.clientProfileId) ?? 'specialist'}
               hasActiveProfile={activeProfiles.length > 0}
@@ -649,7 +459,7 @@ export default async function LeadsPage({
             />
           </Suspense>
         )}
-      </TableCard>
+      </div>
     </InternalPageFrame>
   );
 }

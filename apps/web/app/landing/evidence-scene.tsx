@@ -1,105 +1,72 @@
-import { DEMO_COMPANY } from "./landing-copy";
-import sceneStyles from "./evidence-scene.module.css";
-import styles from "./landing.module.css";
+import type { CSSProperties } from "react";
 
-const SOURCE_ROWS = [
-  {
-    source: "Карьерная страница",
-    fact: "8 инженерных позиций",
-    eventDate: "4 августа",
-    confidence: "Прямой источник",
-  },
-  {
-    source: "Публичные вакансии",
-    fact: "Новая руководящая роль",
-    eventDate: "1 августа",
-    confidence: "Подтверждено",
-  },
-  {
-    source: "Повторная публикация",
-    fact: "3 роли появились снова",
-    eventDate: "сегодня",
-    confidence: "Свежий сигнал",
-  },
-] as const;
+import { DEMO_COMPANY, DEMO_EVIDENCE_SOURCES } from "./landing-copy";
+import styles from "./evidence-scene.module.css";
+
+function capitalize(value: string): string {
+  return value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`;
+}
 
 export default function EvidenceScene() {
+  const [confidenceGrade = "A", confidenceText = "высокая"] = DEMO_COMPANY.confidence
+    .split("/")
+    .map((part) => part.trim());
+
   return (
     <section
       id="scene-evidence"
-      className={`${styles.scene} ${styles.darkScene} ${styles.evidenceScene} ${sceneStyles.section}`}
-      style={{ scrollMarginTop: "calc(72px + 32px)" }}
-      aria-labelledby="evidence-title"
+      className={styles.section}
+      aria-label="Почему эта компания сейчас"
       data-header-tone="dark"
-      data-motion-reveal="section"
+      data-proof-story="why-now"
     >
-      <div className={sceneStyles.layout}>
-        <div className={sceneStyles.top}>
-          <div className={sceneStyles.intro}>
-            <p className={styles.sceneLabel}>Почему сейчас</p>
-            <h2 id="evidence-title" className={styles.sceneHeading}>
-              По каждой компании видно, <em>на чём основана рекомендация.</em>
-            </h2>
-            <p className={styles.sceneLead}>
-              Радар показывает, что изменилось в найме, когда это произошло, где найдено и чем подтверждено. Факты можно проверить до первого сообщения.
-            </p>
+      <div className={styles.layout}>
+        <header className={styles.intro}>
+          <div>
+            <p className={styles.introLabel}>Why now · {DEMO_COMPANY.name}</p>
+            <h2>Факт усиливает факт — пока сигнал не становится решением.</h2>
           </div>
+          <p>
+            Мы показываем подтверждения к рекомендации, а не прячем решение за непрозрачной оценкой.
+          </p>
+        </header>
 
-          <div className={sceneStyles.score} aria-label={`Приоритет компании ${DEMO_COMPANY.score} из 100`}>
-            <span>ОЦЕНКА РАДАРА</span>
-            <div className={sceneStyles.scoreValue}>
-              <strong>{DEMO_COMPANY.score}</strong>
-              <small>/100</small>
-            </div>
-            <div className={sceneStyles.scoreMeta}>
-              <strong>Высокая уверенность</strong>
-              <span>4 подтверждающих фактора</span>
-            </div>
-            <div className={sceneStyles.scale} aria-label="Шкала уверенности">
-              <span>низкая</span><span>подтверждённая</span><span>высокая</span>
-              <i className={sceneStyles.scaleTrack} aria-hidden="true" />
-            </div>
-          </div>
-        </div>
-
-        <div className={sceneStyles.ledger}>
-          <div className={sceneStyles.ledgerHeading}>
-            <div>
-              <span>ФАКТЫ ПО КОМПАНИИ</span>
-              <strong>{DEMO_COMPANY.name}</strong>
-            </div>
-            <p>Источник · что найдено · дата · статус</p>
-          </div>
-
-          <ul className={sceneStyles.records}>
-            {SOURCE_ROWS.map((row, index) => (
-              <li
-                key={row.source}
-                className={sceneStyles.record}
-                tabIndex={0}
-                data-evidence-row
-                aria-label={`${row.source}: ${row.fact}. ${row.confidence}`}
-              >
-                <span className={sceneStyles.recordIndex}>{String(index + 1).padStart(2, "0")}</span>
-                <div className={sceneStyles.recordFact}>
-                  <span>{row.source}</span>
-                  <strong>{row.fact}</strong>
-                </div>
-                <dl className={sceneStyles.recordMeta}>
-                  <div><dt>Дата</dt><dd>{row.eventDate}</dd></div>
-                </dl>
-                <span className={sceneStyles.recordStatus}>{row.confidence}</span>
+        <div className={styles.evidenceChain} data-proof-chain="source-fact-conclusion">
+          <ol className={styles.timeline} aria-label="Последовательность подтверждающих фактов">
+            {DEMO_EVIDENCE_SOURCES.map((event, index) => (
+              <li key={event.source} data-proof-event>
+                <span className={styles.sourceCell}>
+                  {String(index + 1).padStart(2, "0")} · {event.source}
+                </span>
+                <strong className={styles.factCell}>{event.fact}</strong>
+                <span className={styles.statusCell}>
+                  {event.eventDate} · {event.confidence}
+                </span>
               </li>
             ))}
-          </ul>
+          </ol>
 
-          <div className={sceneStyles.conclusion} data-evidence-conclusion="source-fact-conclusion">
-            <div>
-              <span>Источник</span><i aria-hidden="true">→</i><span>Факт</span><i aria-hidden="true">→</i><strong>Вывод</strong>
+          <aside className={styles.resolution} data-proof-brief>
+            <div className={styles.scoreBlock} aria-label={`Оценка возможности: ${DEMO_COMPANY.score} из 100`}>
+              <span className={styles.blockLabel}>Оценка возможности</span>
+              <p className={styles.scoreValue}>
+                {DEMO_COMPANY.score}
+                <small>/100</small>
+              </p>
+              <div className={styles.scoreScale} aria-hidden="true">
+                <i style={{ "--score": DEMO_COMPANY.score } as CSSProperties} />
+              </div>
             </div>
-            <p>Несколько независимых фактов подтверждают активное расширение команды и дают конкретный повод для разговора.</p>
-            <span className={sceneStyles.conclusionScore}><small>приоритет</small>{DEMO_COMPANY.score}<small>/100</small></span>
-          </div>
+            <div className={styles.confidenceBlock}>
+              <span className={styles.blockLabel}>Уверенность</span>
+              <strong>{capitalize(confidenceText)}</strong>
+              <small>Класс {confidenceGrade} · подтверждено {DEMO_COMPANY.freshness}</small>
+            </div>
+            <div className={styles.action}>
+              <span className={styles.blockLabel}>Следующий ход</span>
+              <strong>{DEMO_COMPANY.opener}</strong>
+            </div>
+          </aside>
         </div>
       </div>
     </section>

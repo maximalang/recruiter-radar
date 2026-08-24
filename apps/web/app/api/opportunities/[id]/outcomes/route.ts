@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+import { readBoundedRequestText } from '@/lib/http/read-bounded-request-text'
 import {
   isOpportunityEngineV1EnabledForContext,
   isOpportunityOutcomesEnabledForContext,
@@ -52,8 +53,8 @@ export async function POST(
 
   let body: Record<string, unknown>
   try {
-    const raw = await request.text()
-    if (Buffer.byteLength(raw, 'utf8') > MAX_BODY_BYTES) {
+    const raw = await readBoundedRequestText(request, MAX_BODY_BYTES)
+    if (raw === null) {
       return NextResponse.json({ error: 'payload_too_large' }, { status: 400 })
     }
     const parsed = JSON.parse(raw) as unknown

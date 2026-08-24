@@ -18,12 +18,43 @@ export const runtime = 'nodejs'
 
 const VALID_SOURCES: Set<SourceId> = new Set(getAllSourceIds())
 
+type IngestRequestBody = {
+  source?: SourceId
+  sources?: SourceId[]
+  env?: Record<string, string>
+}
+
+function parseIngestRequestBody(value: unknown): IngestRequestBody | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const body = value as Record<string, unknown>
+
+  if (body.source !== undefined && typeof body.source !== 'string') return null
+  if (
+    body.sources !== undefined
+    && (!Array.isArray(body.sources) || body.sources.some(source => typeof source !== 'string'))
+  ) {
+    return null
+  }
+  if (body.env !== undefined) {
+    if (!body.env || typeof body.env !== 'object' || Array.isArray(body.env)) return null
+    if (Object.entries(body.env).some(([key, envValue]) => !key || typeof envValue !== 'string')) {
+      return null
+    }
+  }
+
+  return {
+    ...(body.source === undefined ? {} : { source: body.source as SourceId }),
+    ...(body.sources === undefined ? {} : { sources: body.sources as SourceId[] }),
+    ...(body.env === undefined ? {} : { env: body.env as Record<string, string> }),
+  }
+}
+
 export async function POST(request: NextRequest) {
   // Auth check — INGEST_API_KEY only (no cross-route key fallback)
   const apiKey = process.env.INGEST_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { success: false, error: 'INGEST_API_KEY is not configured.' },
+      { success: false, error: 'Source ingestion service is not configured.' },
       { status: 500 }
     )
   }
@@ -36,12 +67,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json()
-    const { source, sources, env: extraEnv } = body as {
-      source?: SourceId
-      sources?: SourceId[]
-      env?: Record<string, string>
+    const body = parseIngestRequestBody(await request.json())
+    if (!body) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid ingestion request payload.' },
+        { status: 400 }
+      )
     }
+    const { source, sources, env: extraEnv } = body
 
     // Validate source IDs
     if (source && !VALID_SOURCES.has(source)) {
@@ -116,13 +149,13 @@ export async function GET() {
         parameters: {
           source: 'Single source ID to ingest (optional)',
           sources: 'Array of source IDs to ingest in parallel (optional)',
-          env: 'Extra environment variables for the ingestion script (optional)',
+          env: 'Reviewed source-specific environment overrides (optional)',
         },
         availableSources: registry.map(s => ({
           id: s.id,
           name: s.name,
           category: s.category,
-          requires: s.requiredEnvVars.length > 0 ? s.requiredEnvVars.join(', ') : 'None',
+          requiresConfiguration: s.requiredEnvVars.length > 0,
           description: s.description,
         })),
         default: `If no source/sources specified, ingests all primary sources (${primaryIds.join(', ')})`,

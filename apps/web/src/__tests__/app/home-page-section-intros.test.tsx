@@ -247,7 +247,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).not.toContain('id="scene-timeline"');
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
-    expect(html).toContain("Настройте нишу и географию");
+    expect(html).toContain("Настройте профиль");
     expect(footerSource).toContain('href="/legal"');
     expect(footerSource).toContain('href="/terms"');
     expect(footerSource).toContain('href="/payment-and-refund"');
@@ -273,11 +273,11 @@ describe("final unified evidence-first landing contract", () => {
     const results = await WorkspaceResults({ previewInput: input, checkoutHref: buildCheckoutHref(input) });
     const markup = renderToStaticMarkup(results);
 
-    expect(markup.match(/data-lead-card="true"/g)).toHaveLength(2);
+    expect(markup.match(/data-lead-row="true"/g)).toHaveLength(2);
     expect(markup.match(/data-primary-lead="true"/g)).toHaveLength(1);
-    expect(markup.match(/name="preview-leads"/g)).toHaveLength(2);
+    expect(markup.match(/data-selected-lead-detail/g)).toHaveLength(1);
     expect(markup).toContain("Почему сейчас");
-    expect(markup).toContain("Факты и источники");
+    expect(markup).toContain("Подтверждения и источники");
     expect(markup).toContain("Сообщения не отправляются автоматически");
   });
 
@@ -288,15 +288,16 @@ describe("final unified evidence-first landing contract", () => {
 
     expect(hero).toContain("Компании, которым стоит написать сегодня");
     expect(hero).toContain("Посмотреть пример");
-    expect(hero).toContain("Уже есть доступ? Войти");
+    expect(hero).toContain(">Войти</a>");
     expect(hero).toContain("заявка без списания");
     expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
     expect(hero).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
-    expect(evidence).toContain("ОЦЕНКА РАДАРА");
-    expect(evidence).toContain("ФАКТЫ ПО КОМПАНИИ");
-    expect(evidence).toContain("Почему сейчас");
+    expect(evidence).toContain("Оценка возможности");
+    expect(evidence).toContain("Последовательность подтверждающих фактов");
+    expect(evidence).toContain("Почему эта компания сейчас");
     expect(evidence).not.toContain("открыть факт");
-    expect(delivery).toContain("Радар следит за рынком");
+    expect(delivery).not.toContain("DELIVERY_STEPS");
+    expect(delivery).toContain("Полная карточка остаётся в кабинете");
     expect(delivery).toContain("Сообщения компаниям не отправляются автоматически.");
   });
 

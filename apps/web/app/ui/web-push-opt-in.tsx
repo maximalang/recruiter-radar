@@ -148,7 +148,7 @@ export function WebPushOptIn(props: WebPushOptInProps) {
         onSubscribe={subscribe}
         onUnsubscribe={unsubscribe}
       />
-      {error ? <span role="alert" style={{ color: "#b42318" }}>{error}</span> : null}
+      {error ? <span role="alert" style={{ color: "var(--color-destructive)" }}>{error}</span> : null}
     </div>
   );
 }
@@ -179,7 +179,7 @@ function WebPushStatusBody(props: {
       return (
         <div style={{ display: "grid", gap: "6px" }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-            <CheckIcon style={{ width: "1em", height: "1em", color: "#047857" }} aria-hidden="true" />
+            <CheckIcon style={{ width: "1em", height: "1em", color: "var(--color-signal)" }} aria-hidden="true" />
             Уведомления подключены в этом браузере.
           </span>
           <button type="button" onClick={props.onUnsubscribe} disabled={props.busy}>

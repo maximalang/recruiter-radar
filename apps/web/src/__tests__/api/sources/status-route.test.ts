@@ -31,10 +31,13 @@ describe('GET /api/sources/status', () => {
     process.env.INGEST_API_KEY = OLD_ENV;
   });
 
-  it('500s when INGEST_API_KEY is not configured', async () => {
+  it('500s without exposing the credential name when the service is not configured', async () => {
     delete process.env.INGEST_API_KEY;
     const res = await req('anything');
     expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe('Source status service is not configured.');
+    expect(JSON.stringify(body)).not.toContain('INGEST_API_KEY');
   });
 
   it('401s without the api key', async () => {

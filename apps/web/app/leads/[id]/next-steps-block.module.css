@@ -1,5 +1,4 @@
-/* Дальнейшие шаги — handoff area on lead detail. Calm, actionable, secondary
-   to the evidence cards. References :root tokens via internal-page.module.css. */
+/* Дальнейшие шаги — action handoff on Company Brief, subordinate to evidence. */
 
 .nextSteps {
   display: flex;
@@ -8,99 +7,86 @@
 }
 
 .nextStepsLabel {
-  font-size: 0.68rem;
+  color: var(--color-text-tertiary);
+  font-size: var(--type-label-size);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--c-text-muted);
 }
 
-.nextStepsLinks {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.nextStepsLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  border-radius: 8px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-secondary);
-  text-decoration: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.nextStepsLink:hover {
-  border-color: var(--c-brand);
-  color: var(--c-brand);
-}
-
-.nextStepsLink:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
-}
-
+.nextStepsLinks,
 .nextStepsActions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
+.nextStepsLink,
 .nextStepsBtn {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  border-radius: 8px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-secondary);
+  box-sizing: border-box;
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  font-size: var(--type-metadata-size);
+  text-decoration: none;
+  transition:
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard);
+}
+
+.nextStepsLink {
+  padding: 6px 12px;
+  font-weight: 500;
+}
+
+.nextStepsBtn {
+  padding: 8px 14px;
+  font-weight: 600;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nextStepsLink:hover,
+  .nextStepsBtn:hover {
+    border-color: var(--color-signal);
+    color: var(--color-signal);
+  }
+}
+
+.nextStepsLink:focus-visible,
+.nextStepsBtn:focus-visible,
+.nextStepsPreview > summary:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 /* CheckIcon shown next to "Скопировано" after a successful copy — the unified
-   "done" glyph, replacing the literal "✓" character. */
+   "done" glyph, replacing the literal interface glyph. */
 .copiedIcon {
   flex: 0 0 auto;
   width: 0.95em;
   height: 0.95em;
 }
 
-.nextStepsBtn[data-variant="primary"] {
-  border-color: var(--c-brand);
-  background-color: rgba(35, 128, 111, 0.08);
-  color: var(--c-brand);
-}
-
-.nextStepsBtn:hover {
-  border-color: var(--c-brand);
-  color: var(--c-brand);
-}
-
-.nextStepsBtn:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
+.nextStepsLink[data-variant="primary"] {
+  border-color: var(--color-signal);
+  background-color: var(--color-signal);
+  color: var(--color-text-inverse);
 }
 
 .nextStepsBtn:disabled {
-  opacity: 0.6;
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .nextStepsError {
-  font-size: 0.75rem;
-  color: #ef4444;
   margin: 0;
+  color: var(--color-destructive);
+  font-size: var(--type-metadata-size);
 }
 
 .nextStepsPreview {
@@ -108,29 +94,35 @@
 }
 
 .nextStepsPreview > summary {
-  font-size: 0.72rem;
-  color: var(--c-text-muted);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-tertiary);
   cursor: pointer;
+  font-size: var(--type-metadata-size);
   user-select: none;
-}
-
-.nextStepsPreview > summary:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
 }
 
 .nextStepsPre {
   margin: 6px 0 0;
   padding: 10px 12px;
-  font-size: 0.72rem;
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-canvas);
+  color: var(--color-text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--type-metadata-size);
   line-height: 1.5;
-  color: var(--c-text-secondary);
-  background-color: var(--c-bg-page);
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (max-width: 640px) {
+  .nextStepsLink,
+  .nextStepsBtn,
+  .nextStepsPreview > summary {
+    min-height: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

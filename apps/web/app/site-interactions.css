@@ -1,7 +1,8 @@
-/* Recruiter Radar — interaction hardening loaded after the visual finish layer. */
+/* Recruiter Radar — cross-product interaction safety.
+ * Component-specific interaction states belong to their canonical modules. */
 
 :where(a, button, input, select, textarea, summary) {
-  -webkit-tap-highlight-color: rgba(35, 128, 111, 0.14);
+  -webkit-tap-highlight-color: var(--color-selection);
 }
 
 :where(button, input, select, textarea) {
@@ -13,49 +14,19 @@
   cursor: not-allowed;
 }
 
-/* Text links that behave as product controls need a real, forgiving hit area. */
-:where(
-  a[class*="footerBrand"],
-  a[class*="footerLink"],
-  a[class*="footerOperatorEmail"],
-  a[class*="emptyStateAction"],
-  a[class*="skipLink"],
-  a[class*="pending-auth-action"][class*="brand"]
-) {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
+/* Loading placeholders describe structure; they are never ambient motion. */
+[data-skeleton="true"] {
+  animation: none !important;
+  background-image: none !important;
 }
 
-[data-product-workspace="true"] :is(
-  nav a,
-  header a[class*="Action"],
-  header a[class*="Cta"],
-  a[class*="navLink"],
-  a[class*="internalPageBackLink"],
-  a[class*="primaryAction"],
-  a[class*="secondaryAction"],
-  a[class*="accountPrimaryAction"],
-  a[class*="accountSecondaryAction"]
-),
-main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
-[data-landing-experience] :is(nav a, header a, a[class*="button"], a[class*="Button"], a[class*="action"], a[class*="Action"], button) {
-  min-height: 44px;
-}
-
-[data-product-workspace="true"] :is(
-  [class*="sidebarBrand"],
-  [class*="mobileTopbar"]
-) > a {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-}
-
+/* Disclosure-like controls use the same minimum target everywhere. */
 [data-product-workspace="true"] :is(summary, [role="button"]) {
   min-height: 44px;
 }
 
+/* Generic prose may wrap at natural word boundaries. Individual URL/provenance
+ * primitives opt into more aggressive breaking in their own modules. */
 [data-product-workspace="true"] :is(
   h1,
   h2,
@@ -69,12 +40,14 @@ main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
   [role="alert"]
 ),
 main[data-ui-system] :is(h1, h2, h3, p, li, label, a, button) {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
-[data-product-workspace="true"] :is(button, [role="button"]):disabled:hover,
-[data-product-workspace="true"] [aria-disabled="true"]:hover {
-  transform: none;
+@media (hover: hover) and (pointer: fine) {
+  [data-product-workspace="true"] :is(button, [role="button"]):disabled:hover,
+  [data-product-workspace="true"] [aria-disabled="true"]:hover {
+    transform: none;
+  }
 }
 
 [data-product-workspace="true"] :where([id]),
@@ -82,15 +55,14 @@ main[data-ui-system] :where([id]) {
   scroll-margin-top: 104px;
 }
 
+/* A keyboard-revealed skip link must not cover the first page heading. */
+main[data-ui-system] > a[href="#main-content"]:focus-visible + #main-content {
+  padding-top: 88px;
+}
+
 @media (max-width: 640px) {
   :where(input, select, textarea) {
     font-size: 16px;
-  }
-
-  [data-product-workspace="true"] :is(nav a, a[class*="Action"], button),
-  main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
-  [data-landing-experience] :is(nav a, header a, a[class*="Action"], button) {
-    min-height: 46px;
   }
 
   /* Avoid the one-pixel overshoot created by nested full-width details borders. */
@@ -98,16 +70,14 @@ main[data-ui-system] :where([id]) {
     box-sizing: border-box;
     max-width: calc(100% - 2px);
   }
+
+  main[data-ui-system] > a[href="#main-content"]:focus-visible + #main-content {
+    padding-top: 80px;
+  }
 }
 
 @media (hover: none) {
-  [data-product-workspace="true"] :is(
-    section[class*="contentCard"],
-    div[class*="metricCard"],
-    article[class*="metricCard"],
-    button,
-    a
-  ):hover {
+  [data-product-workspace="true"] :is(button, a) {
     transform: none;
   }
 }

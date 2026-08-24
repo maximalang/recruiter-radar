@@ -51,14 +51,14 @@ function Row({ setting }: { setting: LlmSettingView }) {
         display: "grid",
         gap: "8px",
         padding: "12px",
-        border: "1px solid var(--c-border, #e2e8f0)",
-        borderRadius: "12px",
+        border: "1px solid var(--color-separator)",
+        borderRadius: "var(--radius-surface)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>{label}</div>
-          <div style={{ fontSize: "0.74rem", color: "var(--c-text-muted, #667085)" }}>
+          <div style={{ fontSize: "0.74rem", color: "var(--color-text-tertiary)" }}>
             <code>{setting.key}</code> · {setting.isSet ? `сохранено${setting.isSecret ? `: ${setting.value}` : `: ${setting.value}`}` : "не задано (env по умолчанию)"}
           </div>
         </div>
@@ -70,9 +70,9 @@ function Row({ setting }: { setting: LlmSettingView }) {
               disabled={clearPending}
               style={{
                 background: "transparent",
-                color: "var(--c-text-muted, #667085)",
-                border: "1px solid var(--c-border, #e2e8f0)",
-                borderRadius: "8px",
+                color: "var(--color-text-tertiary)",
+                border: "1px solid var(--color-separator)",
+                borderRadius: "var(--radius-control)",
                 padding: "6px 12px",
                 fontSize: "0.8rem",
                 cursor: clearPending ? "wait" : "pointer",
@@ -94,10 +94,10 @@ function Row({ setting }: { setting: LlmSettingView }) {
           style={{
             flex: 1,
             minWidth: "220px",
-            fontSize: "var(--fs-base)",
+            fontSize: "var(--type-body-size)",
             padding: "8px 12px",
-            border: "1px solid var(--c-border, #e2e8f0)",
-            borderRadius: "10px",
+            border: "1px solid var(--color-separator)",
+            borderRadius: "var(--radius-surface)",
             fontFamily: setting.isSecret ? "monospace" : undefined,
           }}
         />
@@ -105,12 +105,12 @@ function Row({ setting }: { setting: LlmSettingView }) {
           type="submit"
           disabled={savePending || value.trim() === ""}
           style={{
-            background: "var(--c-brand, #1d4ed8)",
-            color: "#fff",
+            background: "var(--color-signal)",
+            color: "var(--color-surface-elevated)",
             padding: "8px 16px",
-            borderRadius: "10px",
+            borderRadius: "var(--radius-surface)",
             fontWeight: 600,
-            fontSize: "var(--fs-base)",
+            fontSize: "var(--type-body-size)",
             border: "none",
             cursor: savePending ? "wait" : "pointer",
             opacity: savePending || value.trim() === "" ? 0.6 : 1,
@@ -125,9 +125,9 @@ function Row({ setting }: { setting: LlmSettingView }) {
           style={{
             fontSize: "0.8rem",
             padding: "8px 10px",
-            borderRadius: "8px",
-            background: (saveState.ok || clearState.ok) ? "#d1fae5" : "#fee4e2",
-            color: (saveState.ok || clearState.ok) ? "#065f46" : "#b42318",
+            borderRadius: "var(--radius-control)",
+            background: (saveState.ok || clearState.ok) ? "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))" : "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))",
+            color: (saveState.ok || clearState.ok) ? "var(--color-signal)" : "var(--color-destructive)",
           }}
         >
           {saveState.message || clearState.message}
@@ -143,7 +143,7 @@ export default function AdminLlmConfigForm({ settings }: { settings: LlmSettingV
       {settings.map((s) => (
         <Row key={s.key} setting={s} />
       ))}
-      <p style={{ fontSize: "0.76rem", color: "var(--c-text-muted, #667085)", margin: 0 }}>
+      <p style={{ fontSize: "0.76rem", color: "var(--color-text-tertiary)", margin: 0 }}>
         Приоритет: значение из панели → env (OPENAI_API_KEY / OPENAI_BASE_URL /
         CODEXOID_MODEL). Изменения вступают в силу сразу, без редеплоя. API-ключ
         хранится маскированно и не попадает в логи.

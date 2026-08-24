@@ -1,71 +1,88 @@
-import { Suspense } from 'react';
-import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
 import { getLeadDetail, formatLawfulContactPath } from '@/lib/leads-data';
 import { getClientProfileById, resolveHiringMode } from '@/lib/clientProfiles';
 import { getSession } from '@/lib/auth-v2/authorization';
 import { getEffectiveEntitlement } from '@/lib/entitlements';
-import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
+import { buildFitExplanation } from '@/lib/leads/fit-explanation';
 import { buildCompanySummary } from '@/lib/leads/company-summary';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
-import { toContactPathViews, hasCorporateContact } from '@/lib/leads/contact-display';
+import { toContactPathViews } from '@/lib/leads/contact-display';
 import { filterContactPathsByPolicy } from '@/lib/contact-policy-filter';
 import { leadToCrmBlock } from '@/lib/leads-csv';
+import { formatVacanciesCount, pluralForm } from '@/lib/format/plural';
+import { formatScorePoints } from '@/lib/scoring/score-display';
 import FeedbackButtons from './feedback-buttons';
 import AiEnrichmentBlock from './ai-enrichment-block';
 import NextStepsBlock from './next-steps-block';
+import { deriveCompanyBriefDecision, type CompanyBriefPrimaryAction } from './company-brief-decision';
 import {
   InternalPageFrame,
   InternalPageHeader,
   InternalBackLink,
-  ContentCard,
-  ContentCardTitle,
-  DetailLayout,
-  GateBadgeInline,
-  ScoreGauge,
-  ScoreBandChip,
-  SignalFreshnessChip,
-  ForeignEmployerBadge,
-  ReviewStatusBadge,
-  UrgencyCueChip,
-  LeadVerdictChips,
-  EvidenceTag,
-  SourceChip,
   NotFoundState,
-  EmptyState,
-  ErrorState,
-  FitIcon,
-  internalPageClasses as ipStyles,
   GATE_DESC,
   FEEDBACK_LABELS,
 } from '../../ui/internal-page';
+import {
+  ConfidenceIndicator,
+  EvidenceTimeline,
+  Provenance,
+} from '../../ui/intelligence-primitives';
+import { ProductErrorState } from '../../ui/product-error-state';
+import { StaticEmptyState } from '../../ui/static-empty-state';
 import { buildAccountNavigation } from '../../ui/account-navigation';
-import { BriefcaseIcon, LayersIcon, CalendarIcon, HelpIcon, SearchIcon } from '../../ui/icons';
+import { SearchIcon } from '../../ui/icons';
+import styles from './lead-brief.module.css';
 
 export const dynamic = 'force-dynamic';
-
 const LEAD_DETAIL_NAV = buildAccountNavigation('leads');
 
-/** Renders the feedback-status icon component inline with its label. */
-function FeedbackStatusIcon({ icon: Icon }: { icon: (p: SVGProps<SVGSVGElement>) => ReactElement }) {
-  return <Icon className={ipStyles.chipIcon} />;
+type ConfidenceView = { level: 'high' | 'medium' | 'low'; label: string };
+
+function confidenceView(gate: string): ConfidenceView {
+  if (gate === 'A') return { level: 'high', label: 'высокая уверенность' };
+  if (gate === 'B') return { level: 'medium', label: 'достаточная уверенность' };
+  if (gate === 'C') return { level: 'medium', label: 'ограниченная уверенность' };
+  return { level: 'low', label: 'низкая уверенность' };
+}
+
+function formatRoleCount(count: number): string {
+  return `${count} ${pluralForm(count, ['роль', 'роли', 'ролей'])}`;
+}
+
+function formatSourceCount(count: number): string {
+  return `${count} ${pluralForm(count, ['источник', 'источника', 'источников'])}`;
+}
+
+function StateLink({ href, label }: { href: string; label: string }) {
+  return <Link href={href}>{label}</Link>;
+}
+
+function PrimaryDecisionAction({ action, className }: { action: CompanyBriefPrimaryAction; className: string }) {
+  return (
+    <a
+      className={className}
+      href={action.href}
+      target={action.external ? '_blank' : undefined}
+      rel={action.external ? 'noopener noreferrer' : undefined}
+      data-company-brief-primary-action
+    >
+      {action.label}{action.external ? ' ↗' : ''}
+    </a>
+  );
 }
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-
-  // Authentication and canonical access are resolved before the owner-scoped
-  // lead query. This avoids both probing a lead without access and presenting
-  // an expired session as a misleading 404.
   const authorization = await getSession({ permission: 'leads:read' });
   if (!authorization) {
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
-        <InternalPageHeader title="Возможность" subtitle="Защищённое рабочее пространство" />
-        <EmptyState
+        <InternalPageHeader title="Компания" subtitle="Защищённое рабочее пространство" />
+        <StaticEmptyState
           title="Нужен вход в аккаунт"
-          text="Войдите, чтобы открыть эту возможность в своём workspace."
-          action={{ href: `/login?returnTo=/leads/${encodeURIComponent(id)}`, label: 'Войти' }}
+          description="Войдите, чтобы открыть эту компанию в своём workspace."
+          action={<StateLink href={`/login?returnTo=/leads/${encodeURIComponent(id)}`} label="Войти" />}
         />
       </InternalPageFrame>
     );
@@ -78,23 +95,24 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   if (!entitlement) {
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
-        <InternalPageHeader title="Возможность" subtitle="Проверка доступа" />
-        <ErrorState
+        <InternalPageHeader title="Компания" subtitle="Проверка доступа" />
+        <ProductErrorState
           title="Не удалось проверить доступ"
-          description="Мы не показываем данные, пока сервер не подтвердит права аккаунта. Обновите страницу немного позже."
-          action={{ href: '/settings/access', label: 'Доступ и оплата' }}
-        />
+          description="Данные не показываются, пока сервер не подтвердит права аккаунта."
+        >
+          <StateLink href="/settings/access" label="Доступ и оплата" />
+        </ProductErrorState>
       </InternalPageFrame>
     );
   }
   if (entitlement.status !== 'active' || !entitlement.features.includes('dashboard')) {
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
-        <InternalPageHeader title="Возможность" subtitle="Доступ не активен" />
-        <EmptyState
+        <InternalPageHeader title="Компания" subtitle="Доступ не активен" />
+        <StaticEmptyState
           title="Нужен активный доступ"
-          text="Профиль и история сохранены. После активации возможность снова станет доступна."
-          action={{ href: '/settings/access', label: 'Проверить доступ' }}
+          description="Профиль и история сохранены. После активации компания снова станет доступна."
+          action={<StateLink href="/settings/access" label="Проверить доступ" />}
         />
       </InternalPageFrame>
     );
@@ -106,68 +124,45 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   } catch {
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
-        <InternalPageHeader title="Возможность" subtitle="Radar" />
-        <ErrorState
-          title="Не удалось загрузить возможность"
-          description="Это временная ошибка данных, а не признак того, что возможность удалена. Обновите страницу немного позже."
-          action={{ href: '/leads', label: 'Вернуться к возможностям' }}
-        />
+        <InternalPageHeader title="Компания" subtitle="Радар" />
+        <ProductErrorState
+          title="Не удалось загрузить компанию"
+          description="Это временная ошибка данных, а не признак удаления компании."
+        >
+          <StateLink href="/leads" label="Вернуться к компаниям" />
+        </ProductErrorState>
       </InternalPageFrame>
     );
   }
 
   if (!lead) {
-    return (
-      <main>
-        <NotFoundState
-          icon={SearchIcon}
-          title="Лид не найден"
-          backHref="/leads"
-          backLabel="Назад к списку лидов"
-        />
-      </main>
-    );
+    return <main><NotFoundState icon={SearchIcon} title="Компания не найдена" backHref="/leads" backLabel="Назад к компаниям" /></main>;
   }
 
-  const feedback = lead.feedbackStatus && lead.feedbackStatus !== 'none'
-    ? FEEDBACK_LABELS[lead.feedbackStatus] ?? { label: lead.feedbackStatus, icon: HelpIcon }
-    : null;
-
-  // Deterministic Stage 1 AI-assist: fit explanation needs the agency profile to
-  // match against. Degrade gracefully if the profile can't be loaded — the rest
-  // of the page (evidence-first) stands on its own.
-  const profileResult = await Promise.allSettled([
-    getClientProfileById(lead.clientProfileId, ownerId),
-  ]);
+  const profileResult = await Promise.allSettled([getClientProfileById(lead.clientProfileId, ownerId)]);
   const profile = profileResult[0].status === 'fulfilled' ? profileResult[0].value : null;
   const profileUnavailable = profileResult[0].status === 'rejected';
   const fit = profile
-    ? buildFitExplanation(
-        {
-          structuredReasons: lead.structuredReasons,
-          locationNames: lead.locationNames,
-          lawfulContactPath: lead.lawfulContactPath,
-          sourceFamilies: lead.sourceFamilies,
-          careerPageUrl: lead.careerPageUrl,
-          orgDomain: lead.orgDomain,
-          // Surface the matched specialization term by name on the detail page
-          // too — the full evidence stack is visible here, so the ICP
-          // re-derivation can name the niche that triggered fit.icp.match.
-          orgName: lead.orgName,
-          evidenceTitles: lead.evidenceTitles,
-        },
-        {
-          industries: profile.industries,
-          roles: profile.roles,
-          excludedIndustries: profile.excludedIndustries,
-          excludedLocations: profile.excludedLocations,
-          contactPolicy: profile.contactPolicy,
-          remoteFriendly: profile.remoteFriendly,
-          targetCity: profile.targetCity,
-          specialization: profile.specialization,
-          includeKeywords: profile.includeKeywords,
-        },
-      )
+    ? buildFitExplanation({
+        structuredReasons: lead.structuredReasons,
+        locationNames: lead.locationNames,
+        lawfulContactPath: lead.lawfulContactPath,
+        sourceFamilies: lead.sourceFamilies,
+        careerPageUrl: lead.careerPageUrl,
+        orgDomain: lead.orgDomain,
+        orgName: lead.orgName,
+        evidenceTitles: lead.evidenceTitles,
+      }, {
+        industries: profile.industries,
+        roles: profile.roles,
+        excludedIndustries: profile.excludedIndustries,
+        excludedLocations: profile.excludedLocations,
+        contactPolicy: profile.contactPolicy,
+        remoteFriendly: profile.remoteFriendly,
+        targetCity: profile.targetCity,
+        specialization: profile.specialization,
+        includeKeywords: profile.includeKeywords,
+      })
     : null;
 
   const summary = buildCompanySummary({
@@ -180,46 +175,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     locationNames: lead.locationNames,
     latestPublishedAt: lead.latestPublishedAt,
   });
-  const summaryLines = [summary.identity, summary.hiringMotion, summary.agencyRelevance].filter(
-    (l): l is string => l !== null,
-  );
-
-  // Roles: normalized/deduped, capped at 5 with a "+ ещё N" overflow. AI role
-  // titles fill in only when evidence carries none.
+  const summaryLines = [summary.identity, summary.hiringMotion, summary.agencyRelevance].filter((line): line is string => line !== null);
   const roleNames = deriveRoleNames({
     evidenceTitles: lead.evidenceTitles,
-    aiRoleTitles: lead.aiEnrichment?.detectedRoles?.map((r) => r.title) ?? null,
+    aiRoleTitles: lead.aiEnrichment?.detectedRoles?.map((role) => role.title) ?? null,
   });
   const { shown: shownRoles, more: moreRoles } = splitRolesForDisplay(roleNames, 5);
-
-  // Concrete urgency cue (burst / active / fresh / stale), shown on the verdict card.
-  // Mode-aware: an executive agency sees seniority/freshness framing, a volume
-  // agency sees hiring-scale framing, a specialist agency keeps the default
-  // ladder. Resolved from the loaded profile so 'auto' never reaches the cue.
   const resolvedHiringMode = profile ? resolveHiringMode(profile) : 'specialist';
-  const urgency = deriveUrgencyCue({
-    vacanciesCount: lead.vacanciesCount,
-    latestPublishedAt: lead.latestPublishedAt,
-    hiringMode: resolvedHiringMode,
-  });
-
-  // Auto-discovered contact surface: the system extracted concrete contact
-  // channels from the company's career-page HTML so the agency sees the actual
-  // HR mailbox / phone / Telegram — not just "there is a career page". Filtered
-  // by the client's contact policy (corporate_only by default) so a personal
-  // route is never surfaced as a safe path. Empty when the career page exposed
-  // no contact surface — the honest empty state, rendered explicitly below.
+  const urgency = deriveUrgencyCue({ vacanciesCount: lead.vacanciesCount, latestPublishedAt: lead.latestPublishedAt, hiringMode: resolvedHiringMode });
   const contactPolicy = profile?.contactPolicy ?? 'corporate_only';
-  const policyFilteredContactPaths = filterContactPathsByPolicy(lead.contactPaths, contactPolicy);
-  const contactViews = toContactPathViews(policyFilteredContactPaths);
-
-  // "Дальнейшие шаги" handoff block — built server-side so the CRM-ready text
-  // is stable and the client component only handles clipboard + open-links.
-  // Only surfaces links that actually exist; the empty-array case hides the
-  // links group inside the component.
-  const nextStepLinks: { href: string; label: string }[] = [];
-  if (lead.orgWebsite) nextStepLinks.push({ href: lead.orgWebsite, label: 'Сайт компании' });
-  if (lead.careerPageUrl) nextStepLinks.push({ href: lead.careerPageUrl, label: 'Карьерная страница' });
+  const contactViews = toContactPathViews(filterContactPathsByPolicy(lead.contactPaths, contactPolicy));
+  const lawfulPath = formatLawfulContactPath(lead.lawfulContactPath);
   const crmBlock = leadToCrmBlock({
     orgName: lead.orgName,
     score: lead.score,
@@ -240,297 +206,185 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     profileName: profile?.agencyName ?? null,
     reviewStatus: lead.reviewStatus,
   });
-  const singleExportHref = `/api/leads/${lead.id}/export`;
+  const feedback = lead.feedbackStatus && lead.feedbackStatus !== 'none'
+    ? FEEDBACK_LABELS[lead.feedbackStatus] ?? { label: lead.feedbackStatus }
+    : null;
+  const score = formatScorePoints(lead.score);
+  const latestSignal = lead.latestPublishedAt
+    ? new Date(lead.latestPublishedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+  const confidence = confidenceView(lead.confidenceGate);
+  const decision = deriveCompanyBriefDecision({
+    hasLawfulCorporateContact: contactViews.length > 0,
+    lawfulContactPathKind: lead.lawfulContactPath,
+    lawfulContactPathLabel: lawfulPath,
+    careerPageUrl: lead.careerPageUrl,
+    confidenceContext: confidence.label,
+  });
 
   return (
     <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
-      <div className={ipStyles.leadDetailContainer}>
+      <div className={styles.brief}>
         <InternalPageHeader
           title={lead.orgName}
-          subtitle={
-            lead.locationNames.length > 0
-              ? lead.locationNames.join(', ')
-              : 'Регион не указан'
-          }
-          nav={<InternalBackLink href="/leads">Возможности</InternalBackLink>}
+          subtitle={lead.locationNames.length > 0 ? lead.locationNames.join(', ') : 'Регион не указан'}
+          nav={<InternalBackLink href="/leads">Компании</InternalBackLink>}
         />
 
         {profileUnavailable ? (
-          <ErrorState
-            title="Не удалось загрузить настройки Radar"
-            description="Доказательства возможности доступны, но персональное объяснение соответствия профилю временно не рассчитано."
-            action={{ href: '/settings/radar', label: 'Открыть настройки Radar' }}
-          />
+          <div className={styles.notice}>Доказательства доступны, но персональное объяснение соответствия профилю временно не рассчитано.</div>
         ) : null}
 
-        <DetailLayout
-          main={
-            <>
-              {/* One-glance primary answer: score band + freshness + gate + roles,
-                  so the recruiter sees the verdict before reading the prose below. */}
-              <ContentCard variant="hero" className={ipStyles.leadVerdict}>
-                <div className={ipStyles.leadVerdictTop}>
-                  <ScoreGauge score={lead.score} />
-                  <LeadVerdictChips
-                    score={lead.score}
-                    confidenceGate={lead.confidenceGate}
-                    isForeignEmployer={lead.isForeignEmployer}
-                    reviewStatus={lead.reviewStatus}
-                    urgencyLevel={urgency.level}
-                    urgencyLabel={urgency.label}
-                    latestPublishedAt={lead.latestPublishedAt}
-                  />
-                </div>
-                <div className={ipStyles.leadVerdictRoles}>
-                  <span className={ipStyles.leadVerdictRolesLabel}>Открытые роли</span>
-                  {shownRoles.length > 0 ? (
-                    <div className={`${ipStyles.chipWrap} ${ipStyles.chipWrapFlush}`}>
-                      {shownRoles.map((title, i) => (
-                        <EvidenceTag key={i}>{title}</EvidenceTag>
-                      ))}
-                      {moreRoles > 0 && (
-                        <span className={ipStyles.bodyTextMuted}>+ ещё {moreRoles}</span>
-                      )}
+        <div className={styles.identityLine}>
+          <div className={styles.identityMeta}>
+            <span>{formatVacanciesCount(lead.vacanciesCount)}</span>
+            <span>{formatRoleCount(lead.distinctVacancyNamesCount)}</span>
+            {latestSignal ? <span>последний сигнал {latestSignal}</span> : null}
+            {lead.reviewStatus && lead.reviewStatus !== 'auto_approved' ? <span>на проверке</span> : null}
+          </div>
+        </div>
+
+        <section className={styles.decision} aria-label="Почему сейчас" data-company-brief-decision>
+          <div className={styles.decisionSection}>
+            <span className={styles.label}>Почему сейчас</span>
+            <p className={styles.whyNow}>{lead.whyNow?.trim() || urgency.label}</p>
+            <div className={styles.nextMeta}>
+              {urgency.label}{shownRoles.length > 0 ? ` · ${shownRoles.join(' · ')}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}` : ''}
+            </div>
+          </div>
+        </section>
+
+        <div className={styles.layout}>
+          <section className={`${styles.section} ${styles.evidenceSection}`} data-company-brief-evidence>
+            <h2>Лента подтверждений</h2>
+            <div className={styles.stats}>
+              <span>{formatVacanciesCount(lead.vacanciesCount)}</span>
+              <span>{formatRoleCount(lead.distinctVacancyNamesCount)}</span>
+              <span>{formatSourceCount(lead.sourceFamilies.length)}</span>
+            </div>
+            {lead.evidenceTitles.length > 0 ? (
+              <EvidenceTimeline>
+                {lead.evidenceTitles.map((title, index) => (
+                  <li key={`${title}:${index}`}>
+                    <div className={styles.evidenceFact}>
+                      <span className={styles.evidenceIndex}>{String(index + 1).padStart(2, '0')}</span>
+                      <span>{title}</span>
                     </div>
-                  ) : (
-                    <span className={ipStyles.bodyTextMuted}>Роли не определены</span>
-                  )}
-                </div>
-              </ContentCard>
+                  </li>
+                ))}
+              </EvidenceTimeline>
+            ) : <p className={styles.body}>Подтверждённые факты пока не сформированы.</p>}
+          </section>
 
-              {/* Primary hiring signal — only when there is an actual argument to show */}
-              {lead.whyNow && lead.whyNow.trim() && (
-                <ContentCard>
-                  <ContentCardTitle>Почему сейчас</ContentCardTitle>
-                  <p className={ipStyles.bodyText}>{lead.whyNow}</p>
-                </ContentCard>
-              )}
+          <section className={`${styles.section} ${styles.confidenceSection}`} data-company-brief-confidence>
+            <h2>Уверенность</h2>
+            <ConfidenceIndicator level={confidence.level}>{confidence.label}</ConfidenceIndicator>
+            <p className={styles.body}>{GATE_DESC[lead.confidenceGate] ?? GATE_DESC.D}</p>
+          </section>
 
-              {/* Lawful contact path */}
-              {formatLawfulContactPath(lead.lawfulContactPath) && (
-                <ContentCard>
-                  <ContentCardTitle>Безопасный путь контакта</ContentCardTitle>
-                  <p className={ipStyles.bodyText}>
-                    {formatLawfulContactPath(lead.lawfulContactPath)}
-                  </p>
-                </ContentCard>
-              )}
+          <section className={`${styles.section} ${styles.nextMoveSection}`} data-company-brief-next-move>
+            <h2>Следующий ход</h2>
+            <p className={styles.nextMove}>{decision.recommendation}</p>
+            {decision.primaryAction ? (
+              <PrimaryDecisionAction action={decision.primaryAction} className={styles.mobilePrimaryAction} />
+            ) : null}
+          </section>
 
-              {/* Auto-discovered contacts — the concrete channels the system
-                  found on the company's career page, so the agency can act
-                  without opening the page to hunt for an HR mailbox. */}
-              <ContentCard>
-                <ContentCardTitle>Найденные контакты</ContentCardTitle>
+          <div className={styles.provenanceSection} data-company-brief-provenance>
+            <Provenance>
+              <span>Источники: {lead.sourceFamilies.length > 0 ? lead.sourceFamilies.join(' · ') : 'не подтверждены'}</span>
+              {latestSignal ? <span>Последний сигнал: {latestSignal}</span> : null}
+              <span data-numeric="true">Сила сигнала: {score}</span>
+            </Provenance>
+          </div>
+
+          <aside className={styles.aside} aria-label="Действия и контекст" data-company-brief-action>
+            <div className={styles.rail}>
+              <section className={styles.railSection}>
+                <span className={styles.railTitle}>Рекомендуемый ход</span>
+                <div className={styles.railDecision}>{decision.recommendation}</div>
+                {decision.primaryAction ? (
+                  <PrimaryDecisionAction action={decision.primaryAction} className={styles.railPrimaryAction} />
+                ) : null}
+                <NextStepsBlock crmBlock={crmBlock} links={[]} singleExportHref={`/api/leads/${lead.id}/export`} />
+              </section>
+
+              <section className={styles.railSection}>
+                <span className={styles.railTitle}>Уверенность Радара</span>
+                <ConfidenceIndicator level={confidence.level}>{confidence.label}</ConfidenceIndicator>
+                <div className={styles.railMetric} data-numeric="true">Сила сигнала · {score}</div>
+              </section>
+
+              <section className={styles.railSection} id="company-brief-contact">
+                <span className={styles.railTitle}>Контакт</span>
+                {lawfulPath ? <div className={styles.railValue}>{lawfulPath}</div> : null}
                 {contactViews.length > 0 ? (
-                  <ul className={ipStyles.contactList}>
-                    {contactViews.map((c, i) => (
-                      <li key={i} className={ipStyles.contactItem}>
-                        <span className={ipStyles.contactLabel}>
-                          {c.label}
-                          {c.isHiringSurface && (
-                            <span className={ipStyles.contactHiringTag}>HR</span>
-                          )}
-                        </span>
-                        {c.href ? (
-                          <a
-                            href={c.href}
-                            target={c.href.startsWith('http') ? '_blank' : undefined}
-                            rel={c.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                            className={ipStyles.contactValue}
-                          >
-                            {c.value}
+                  <ul className={styles.contactList}>
+                    {contactViews.map((contact, index) => (
+                      <li key={index}>
+                        <span className={styles.contactLabel}>{contact.label}{contact.isHiringSurface ? ' · HR' : ''}</span>
+                        {contact.href ? (
+                          <a href={contact.href} target={contact.href.startsWith('http') ? '_blank' : undefined}
+                            rel={contact.href.startsWith('http') ? 'noopener noreferrer' : undefined} className={styles.contactValue}>
+                            {contact.value}
                           </a>
-                        ) : (
-                          <span className={ipStyles.contactValue}>{c.value}</span>
-                        )}
+                        ) : <span className={styles.contactValue}>{contact.value}</span>}
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <p className={ipStyles.bodyTextMuted}>
-                    Контакты на карьерной странице не найдены — система определила
-                    карьерную страницу, но конкретный HR-ящик или форма не видны.
-                    Откройте страницу, чтобы найти путь контакта вручную.
-                  </p>
-                )}
-              </ContentCard>
+                ) : <div className={styles.metaList}>Конкретный корпоративный контакт не найден.</div>}
+              </section>
 
-              {/* Operational handoff closes the primary mobile decision layer. */}
-              <ContentCard>
-                <NextStepsBlock
-                  crmBlock={crmBlock}
-                  links={nextStepLinks}
-                  singleExportHref={singleExportHref}
-                />
-              </ContentCard>
+              <section className={styles.railSection}>
+                <span className={styles.railTitle}>Статус</span>
+                <div className={styles.railValue}>{feedback ? feedback.label : 'Обратной связи ещё нет'}</div>
+                {lead.feedbackNote ? <p className={styles.body}>{lead.feedbackNote}</p> : null}
+                <FeedbackButtons orgId={lead.orgId} clientProfileId={lead.clientProfileId} currentStatus={lead.feedbackStatus ?? 'none'} />
+              </section>
 
-              {/* Why this lead fits the agency — deterministic, evidence-backed */}
-              {fit && !fit.isEmpty && (
-                <ContentCard variant="hero">
-                  <ContentCardTitle>Почему этот лид вам подходит</ContentCardTitle>
-                  <ul className={ipStyles.fitList}>
-                    {fit.lines.map((line, i) => (
-                      <li key={i} className={ipStyles.fitItem}>
-                        <span className={ipStyles.fitItemIcon} aria-hidden="true">
-                          <FitIcon name={FIT_DIMENSION_ICON[line.dimension]} />
-                        </span>
-                        <span>{line.text}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </ContentCard>
-              )}
-
-              {/* Company / hiring summary — deterministic synthesis, no invented facts */}
-              {summaryLines.length > 0 && (
-                <ContentCard>
-                  <ContentCardTitle>Кратко о компании и найме</ContentCardTitle>
-                  <div className={ipStyles.summaryBlock}>
-                    {summaryLines.map((line, i) => (
-                      <p
-                        key={i}
-                        className={`${ipStyles.summaryLine} ${i === 0 ? ipStyles.summaryLineLead : ''}`.trim()}
-                      >
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                  {summary.isThin && (
-                    <p className={ipStyles.summaryStrength}>
-                      Доказательств немного — данные обновятся по мере поступления сигналов.
-                    </p>
-                  )}
-                </ContentCard>
-              )}
-
-              {/* Evidence card */}
-              <ContentCard>
-                <ContentCardTitle>Доказательства</ContentCardTitle>
-                <div className={ipStyles.chipWrap}>
-                  {lead.evidenceTitles.length > 0 ? lead.evidenceTitles.map((title, i) => (
-                    <EvidenceTag key={i}>{title}</EvidenceTag>
-                  )) : (
-                    <span className={ipStyles.bodyTextMuted}>Нет данных о вакансиях</span>
-                  )}
+              <details className={styles.railDetails} data-motion-disclosure>
+                <summary>Реквизиты и служебные данные</summary>
+                <div className={styles.metaList}>
+                  {lead.orgDomain ? <span>{lead.orgDomain}</span> : null}
+                  {lead.orgWebsite ? <a href={lead.orgWebsite} target="_blank" rel="noopener noreferrer">Сайт компании</a> : null}
+                  {lead.careerPageUrl ? <a href={lead.careerPageUrl} target="_blank" rel="noopener noreferrer">Карьерная страница</a> : null}
+                  {lead.orgInn ? <span className={styles.identifier}>ИНН {lead.orgInn}</span> : null}
+                  {lead.orgOgrn ? <span className={styles.identifier}>ОГРН {lead.orgOgrn}</span> : null}
+                  {lead.sourceExternalId ? <span className={styles.identifier}>ID {lead.sourceExternalId}</span> : null}
+                  <span>Добавлено {new Date(lead.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                 </div>
-                <div className={ipStyles.evidenceStats}>
-                  <span><BriefcaseIcon className={ipStyles.chipIcon} /> {lead.vacanciesCount} вакансий</span>
-                  <span><LayersIcon className={ipStyles.chipIcon} /> {lead.distinctVacancyNamesCount} разных ролей</span>
-                  {lead.latestPublishedAt && (
-                    <span><CalendarIcon className={ipStyles.chipIcon} /> Последняя: {new Date(lead.latestPublishedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
-                  )}
+              </details>
+            </div>
+          </aside>
+
+          <div className={styles.main} data-company-brief-context>
+            {summaryLines.length > 0 ? (
+              <section className={styles.section}>
+                <h2>Контекст компании и найма</h2>
+                <div className={styles.summary}>
+                  {summaryLines.map((line, index) => <p key={index}>{line}</p>)}
+                  {summary.isThin ? <p>Доказательств пока немного; вывод будет уточняться по мере новых сигналов.</p> : null}
                 </div>
-              </ContentCard>
+              </section>
+            ) : null}
 
-              {/* AI enrichment — secondary advisory layer, only when present.
-                  Sits below evidence; never affects score/gate/evidence. */}
-              <AiEnrichmentBlock enrichment={lead.aiEnrichment} />
+            {fit && !fit.isEmpty ? (
+              <section className={styles.section}>
+                <h2>Соответствие вашему профилю</h2>
+                <ul className={styles.fitList}>{fit.lines.map((line, index) => <li key={index}>{line.text}</li>)}</ul>
+              </section>
+            ) : null}
 
-              {/* Negative signals */}
-              {lead.negativeSignals.length > 0 && (
-                <ContentCard tone="danger">
-                  <ContentCardTitle tone="danger">Факторы риска</ContentCardTitle>
-                  <ul className={ipStyles.reasonList}>
-                    {lead.negativeSignals.map((signal, i) => (
-                      <li key={i} className={ipStyles.signalItem}>{signal}</li>
-                    ))}
-                  </ul>
-                </ContentCard>
-              )}
-            </>
-          }
-          sidebar={
-            <>
-              {/* Confidence gate — the verdict score/gate live in the hero card
-                  at the top of the main column now, so the sidebar leads with
-                  the gate explanation instead of duplicating the gauge. */}
-              <ContentCard>
-                <div className={ipStyles.sidebarLabel}>Подтверждение доказательствами</div>
-                <GateBadgeInline gate={lead.confidenceGate} />
-                <p className={ipStyles.gateDescription}>{GATE_DESC[lead.confidenceGate] ?? GATE_DESC.D}</p>
-              </ContentCard>
+            <AiEnrichmentBlock enrichment={lead.aiEnrichment} />
 
-              {/* Feedback status */}
-              <ContentCard>
-                <div className={ipStyles.sidebarLabel}>Обратная связь</div>
-                {feedback ? (
-                  <div className={ipStyles.sidebarValue}>
-                    <FeedbackStatusIcon icon={feedback.icon} /> {feedback.label}
-                  </div>
-                ) : (
-                  <div className={ipStyles.sidebarValueEmpty}>Ещё нет обратной связи</div>
-                )}
-                {lead.feedbackNote && (
-                  <p className={ipStyles.feedbackNote}>
-                    {lead.feedbackNote}
-                  </p>
-                )}
-                <FeedbackButtons
-                  orgId={lead.orgId}
-                  clientProfileId={lead.clientProfileId}
-                  currentStatus={lead.feedbackStatus ?? 'none'}
-                />
-              </ContentCard>
-
-              {/* Sources */}
-              <ContentCard>
-                <div className={ipStyles.sidebarLabel}>Источники</div>
-                {lead.sourceFamilies.length > 0 ? (
-                  <div className={ipStyles.chipWrapSm}>
-                    {lead.sourceFamilies.map((src) => (
-                      <SourceChip key={src}>{src}</SourceChip>
-                    ))}
-                  </div>
-                ) : (
-                  <span className={ipStyles.bodyTextMuted}>Нет данных</span>
-                )}
-              </ContentCard>
-
-              {/* Company info */}
-              <ContentCard>
-                <div className={ipStyles.sidebarLabel}>Компания</div>
-
-                {lead.orgDomain && (
-                  <div className={ipStyles.sidebarMeta}>{lead.orgDomain}</div>
-                )}
-                {lead.orgWebsite && (
-                  <a
-                    href={lead.orgWebsite}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={ipStyles.sidebarLink}
-                  >
-                    Сайт компании →
-                  </a>
-                )}
-                {lead.careerPageUrl && (
-                  <a
-                    href={lead.careerPageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={ipStyles.sidebarLink}
-                  >
-                    Карьерная страница →
-                  </a>
-                )}
-
-                {(lead.orgInn || lead.orgOgrn) && (
-                  <div className={ipStyles.sidebarMeta}>
-                    {lead.orgInn && <div>ИНН: {lead.orgInn}</div>}
-                    {lead.orgOgrn && <div>ОГРН: {lead.orgOgrn}</div>}
-                  </div>
-                )}
-
-                {lead.sourceExternalId && (
-                  <div className={ipStyles.sidebarMeta}>ID: {lead.sourceExternalId}</div>
-                )}
-                <div className={ipStyles.sidebarMeta}>
-                  Добавлен: {new Date(lead.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </div>
-              </ContentCard>
-            </>
-          }
-        />
+            {lead.negativeSignals.length > 0 ? (
+              <section className={styles.section}>
+                <h2>Риски и ограничения</h2>
+                <ul className={styles.riskList}>{lead.negativeSignals.map((signal, index) => <li key={index}>{signal}</li>)}</ul>
+              </section>
+            ) : null}
+          </div>
+        </div>
       </div>
     </InternalPageFrame>
   );

@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 };
 
 const ADMIN_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Дашборд" },
+  { href: "/dashboard", label: "Обзор" },
   { href: "/leads", label: "Лиды" },
   { href: "/admin", label: "Оператор", active: true },
 ];
@@ -51,28 +51,28 @@ const ADMIN_NAV: NavItem[] = [
 function statusTone(status: string | undefined): { color: string; bg: string; label: string } {
   switch (status) {
     case "excellent":
-      return { color: "#065f46", bg: "#d1fae5", label: "excellent" };
+      return { color: "var(--color-signal)", bg: "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))", label: "excellent" };
     case "good":
-      return { color: "#1e40af", bg: "#dbeafe", label: "good" };
+      return { color: "var(--color-information)", bg: "color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary))", label: "good" };
     case "warning":
-      return { color: "#92400e", bg: "#fef3c7", label: "warning" };
+      return { color: "var(--color-copper)", bg: "color-mix(in srgb, var(--color-copper) 16%, var(--color-surface-primary))", label: "warning" };
     case "critical":
-      return { color: "#b42318", bg: "#fee4e2", label: "critical" };
+      return { color: "var(--color-destructive)", bg: "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))", label: "critical" };
     default:
-      return { color: "#4b5563", bg: "#f3f4f6", label: "нет данных" };
+      return { color: "var(--color-text-secondary)", bg: "var(--color-surface-secondary)", label: "нет данных" };
   }
 }
 
 // Tone helpers for the analytics cards — kept local to the operator console.
 const GATE_COLOR: Record<string, string> = {
-  A: "#047857",
-  B: "#1d4ed8",
-  C: "#b45309",
-  D: "#64748b",
+  A: "var(--color-signal)",
+  B: "var(--color-information)",
+  C: "var(--color-copper)",
+  D: "var(--color-text-tertiary)",
 };
 
 function rateColor(r: number): string {
-  return r >= 30 ? "#047857" : r >= 15 ? "#b45309" : "#b42318";
+  return r >= 30 ? "var(--color-signal)" : r >= 15 ? "var(--color-copper)" : "var(--color-destructive)";
 }
 
 export default async function AdminPage() {
@@ -93,7 +93,7 @@ export default async function AdminPage() {
             <p className={internalPageClasses.bodyTextMutedBlock}>
               Панель оператора предназначена для администратора сервиса (запуск инжеста,
               мониторинг источников, метрики качества). Обычные пользователи работают
-              в <Link href="/dashboard" style={{ color: "inherit", textDecoration: "underline" }}>дашборде</Link>.
+              в <Link href="/dashboard" style={{ color: "inherit", textDecoration: "underline" }}>разделе «Сегодня»</Link>.
             </p>
           </ContentCard>
         </div>
@@ -212,13 +212,13 @@ export default async function AdminPage() {
           </div>
           {feedbackFunnel && feedbackFunnel.length > 0 ? (
             <div style={{ marginTop: "14px", display: "grid", gap: "6px" }}>
-              <div style={{ fontSize: "0.78rem", color: "var(--c-text-muted, #667085)", fontWeight: 700 }}>
+              <div style={{ fontSize: "0.78rem", color: "var(--color-text-tertiary)", fontWeight: 700 }}>
                 Воронка обратной связи
               </div>
               {feedbackFunnel.map((row) => (
                 <div key={row.status} style={funnelRowStyle}>
-                  <span style={{ fontSize: "0.84rem", color: "var(--c-text-secondary, #475569)" }}>{row.label}</span>
-                  <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--c-text-primary, #0f172a)" }}>
+                  <span style={{ fontSize: "0.84rem", color: "var(--color-text-secondary)" }}>{row.label}</span>
+                  <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--color-text-primary)" }}>
                     {row.count}
                   </span>
                 </div>
@@ -240,13 +240,13 @@ export default async function AdminPage() {
                 const max = Math.max(...quality.gateDistribution.map((x) => x.count), 1);
                 return (
                   <div key={g.gate} style={funnelRowStyle}>
-                    <span style={{ fontSize: "0.84rem", color: GATE_COLOR[g.gate] ?? "#64748b", fontWeight: 700, minWidth: "180px" }}>
+                    <span style={{ fontSize: "0.84rem", color: GATE_COLOR[g.gate] ?? "var(--color-text-tertiary)", fontWeight: 700, minWidth: "180px" }}>
                       {GATE_LABELS[g.gate] ?? g.gate}
                     </span>
-                    <div style={{ flex: 1, height: "8px", borderRadius: "999px", background: "rgba(15,23,42,0.07)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${(g.count / max) * 100}%`, background: GATE_COLOR[g.gate] ?? "#64748b", borderRadius: "999px" }} />
+                    <div style={{ flex: 1, height: "8px", borderRadius: "var(--radius-pill)", background: "color-mix(in srgb, var(--color-information) 7%, transparent)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${(g.count / max) * 100}%`, background: GATE_COLOR[g.gate] ?? "var(--color-text-tertiary)", borderRadius: "var(--radius-pill)" }} />
                     </div>
-                    <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--c-text-secondary, #475569)", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--color-text-secondary)", whiteSpace: "nowrap" }}>
                       {g.count} · {g.percentage}%
                     </span>
                   </div>
@@ -267,17 +267,17 @@ export default async function AdminPage() {
                 <div key={row.source} style={sourceRowStyle}>
                   <div style={{ minWidth: "120px" }}>
                     <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>{row.source}</div>
-                    <div style={{ fontSize: "0.74rem", color: "var(--c-text-muted, #667085)" }}>
+                    <div style={{ fontSize: "0.74rem", color: "var(--color-text-tertiary)" }}>
                       {row.leads} лидов
                       {row.avgAgeDays != null ? ` · ср. свежесть ${row.avgAgeDays}д` : ""}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    <Tag color="#047857" bg="#d1fae5">A {row.gateA}</Tag>
-                    <Tag color="#1d4ed8" bg="#dbeafe">B {row.gateB}</Tag>
-                    <Tag color="#b45309" bg="#fef3c7">C {row.gateC}</Tag>
-                    <Tag color="#4b5563" bg="#f3f4f6">прям. {row.directHiringProof}</Tag>
-                    <Tag color="#4b5563" bg="#f3f4f6">агр. {row.platformAggregation}</Tag>
+                    <Tag color="var(--color-signal)" bg="color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))">A {row.gateA}</Tag>
+                    <Tag color="var(--color-information)" bg="color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary))">B {row.gateB}</Tag>
+                    <Tag color="var(--color-copper)" bg="color-mix(in srgb, var(--color-copper) 16%, var(--color-surface-primary))">C {row.gateC}</Tag>
+                    <Tag color="var(--color-text-secondary)" bg="var(--color-surface-secondary)">прям. {row.directHiringProof}</Tag>
+                    <Tag color="var(--color-text-secondary)" bg="var(--color-surface-secondary)">агр. {row.platformAggregation}</Tag>
                   </div>
                 </div>
               ))}
@@ -287,7 +287,7 @@ export default async function AdminPage() {
               {sourcePerformance.map((row) => (
                 <div key={row.source} style={sourceRowStyle}>
                   <span style={{ fontWeight: 700, fontSize: "0.88rem", minWidth: "120px" }}>{row.source}</span>
-                  <span style={{ fontSize: "0.82rem", color: "var(--c-text-secondary, #475569)" }}>
+                  <span style={{ fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
                     {row.leads} лидов · ср. {row.avgScore?.toFixed(1) ?? "—"} / 4
                   </span>
                 </div>
@@ -338,26 +338,26 @@ export default async function AdminPage() {
                     gap: "12px",
                     alignItems: "center",
                     padding: "10px 12px",
-                    border: "1px solid var(--c-border, #e2e8f0)",
-                    borderRadius: "12px",
+                    border: "1px solid var(--color-separator)",
+                    borderRadius: "var(--radius-surface)",
                   }}
                 >
                   <div>
                     <div style={{ fontWeight: 700, fontSize: "0.92rem" }}>{s.name}</div>
-                    <div style={{ fontSize: "0.76rem", color: "var(--c-text-muted, #667085)" }}>
+                    <div style={{ fontSize: "0.76rem", color: "var(--color-text-tertiary)" }}>
                       {s.id} · {s.category}{s.isPrimary ? " · primary" : ""}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", fontSize: "0.8rem", color: "var(--c-text-secondary, #475569)" }}>
+                  <div style={{ textAlign: "right", fontSize: "0.8rem", color: "var(--color-text-secondary)" }}>
                     <div>{s.recordsLast24h ?? 0} зап. / 24ч</div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--c-text-muted, #667085)" }}>
+                    <div style={{ fontSize: "0.72rem", color: "var(--color-text-tertiary)" }}>
                       {s.lastRun ?? "нет запуска"}
                     </div>
                   </div>
                   <span
                     style={{
                       padding: "3px 9px",
-                      borderRadius: "999px",
+                      borderRadius: "var(--radius-pill)",
                       fontSize: "0.72rem",
                       fontWeight: 700,
                       color: tone.color,
@@ -440,16 +440,16 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 
 function Metric({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
-    <div style={{ padding: "12px", borderRadius: "12px", background: "rgba(241,245,249,0.6)" }}>
-      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: accent ?? "var(--c-text-primary, #0f172a)" }}>{value}</div>
-      <div style={{ fontSize: "0.76rem", color: "var(--c-text-muted, #667085)" }}>{label}</div>
+    <div style={{ padding: "12px", borderRadius: "var(--radius-surface)", background: "color-mix(in srgb, var(--color-information) 60%, transparent)" }}>
+      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: accent ?? "var(--color-text-primary)" }}>{value}</div>
+      <div style={{ fontSize: "0.76rem", color: "var(--color-text-tertiary)" }}>{label}</div>
     </div>
   );
 }
 
 function Tag({ children, color, bg }: { children: ReactNode; color: string; bg: string }) {
   return (
-    <span style={{ padding: "3px 8px", borderRadius: "999px", fontSize: "0.72rem", fontWeight: 700, color, background: bg, whiteSpace: "nowrap" }}>
+    <span style={{ padding: "3px 8px", borderRadius: "var(--radius-pill)", fontSize: "0.72rem", fontWeight: 700, color, background: bg, whiteSpace: "nowrap" }}>
       {children}
     </span>
   );
@@ -460,8 +460,8 @@ const funnelRowStyle: CSSProperties = {
   alignItems: "center",
   gap: "12px",
   padding: "8px 12px",
-  border: "1px solid var(--c-border, #e2e8f0)",
-  borderRadius: "10px",
+  border: "1px solid var(--color-separator)",
+  borderRadius: "var(--radius-surface)",
 };
 
 const sourceRowStyle: CSSProperties = {
@@ -471,8 +471,8 @@ const sourceRowStyle: CSSProperties = {
   justifyContent: "space-between",
   flexWrap: "wrap",
   padding: "10px 12px",
-  border: "1px solid var(--c-border, #e2e8f0)",
-  borderRadius: "12px",
+  border: "1px solid var(--color-separator)",
+  borderRadius: "var(--radius-surface)",
 };
 
 /**
@@ -511,9 +511,9 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
                   minHeight: d.total > 0 ? "6px" : "2px",
                   display: "flex",
                   flexDirection: "column-reverse",
-                  borderRadius: "6px 6px 0 0",
+                  borderRadius: "var(--radius-detail) var(--radius-detail) 0 0",
                   overflow: "hidden",
-                  background: d.total > 0 ? "transparent" : "rgba(15,23,42,0.08)",
+                  background: d.total > 0 ? "transparent" : "color-mix(in srgb, var(--color-information) 8%, transparent)",
                   transition: "height 0.2s ease",
                 }}
                 title={`${d.day}: ${d.total} сигналов\n${presentSources
@@ -532,10 +532,10 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
                     })
                   : null}
               </div>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: d.total > 0 ? "var(--c-text-primary, #0f172a)" : "var(--c-text-muted, #667085)" }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: d.total > 0 ? "var(--color-text-primary)" : "var(--color-text-tertiary)" }}>
                 {d.total}
               </div>
-              <div style={{ fontSize: "0.7rem", color: "var(--c-text-muted, #667085)" }}>{dayLabel}</div>
+              <div style={{ fontSize: "0.7rem", color: "var(--color-text-tertiary)" }}>{dayLabel}</div>
             </div>
           );
         })}
@@ -543,8 +543,8 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
       {orderedSources.length > 0 ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: "10px" }}>
           {orderedSources.map((s) => (
-            <span key={s} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.72rem", color: "var(--c-text-secondary, #475569)" }}>
-              <span style={{ width: "9px", height: "9px", borderRadius: "2px", background: sourceColor(s), display: "inline-block" }} />
+            <span key={s} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.72rem", color: "var(--color-text-secondary)" }}>
+              <span style={{ width: "9px", height: "9px", borderRadius: "var(--radius-detail)", background: sourceColor(s), display: "inline-block" }} />
               {s}
             </span>
           ))}
@@ -553,4 +553,3 @@ function IngestTrendChart({ trend }: { trend: IngestTrend }) {
     </div>
   );
 }
-

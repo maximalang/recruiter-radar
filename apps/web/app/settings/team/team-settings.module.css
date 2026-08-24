@@ -1,103 +1,134 @@
 .stack {
   display: grid;
-  gap: 18px;
+  gap: 22px;
+  min-width: 0;
 }
 
 .subnav {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  width: fit-content;
+  gap: 22px;
+  width: 100%;
   max-width: 100%;
-  padding: 6px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.06);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-separator);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .subnav a {
-  padding: 9px 14px;
-  border-radius: 11px;
-  color: #526071;
-  font-size: 0.88rem;
-  font-weight: 700;
+  position: relative;
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  padding: 0 1px;
+  border-radius: 0;
+  color: var(--color-text-tertiary);
+  font-size: .82rem;
+  font-weight: 600;
   text-decoration: none;
+  transition: color var(--motion-duration-control) var(--motion-ease-standard);
+}
+
+.subnav a::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 1px;
+  background: var(--color-signal);
+  content: "";
+  opacity: 0;
+  transition: opacity var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .subnav a[aria-current="page"] {
-  background: #111827;
-  color: #fff;
+  color: var(--color-text-primary);
+}
+
+.subnav a[aria-current="page"]::after {
+  opacity: 1;
 }
 
 .hero,
 .card,
 .transferCard {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.07);
+  min-width: 0;
+  border: 0;
+  border-top: 1px solid var(--color-separator);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 28px;
-  padding: 30px;
-  background:
-    radial-gradient(circle at 90% 12%, rgba(37, 99, 235, 0.14), transparent 36%),
-    rgba(255, 255, 255, 0.94);
+  padding: 20px 0 22px;
+  border-top: 0;
+  border-bottom: 1px solid var(--color-separator);
 }
 
 .hero h2,
 .card h2,
 .transferCard h2 {
   margin: 4px 0 0;
-  color: #111827;
-  letter-spacing: -0.025em;
+  color: var(--color-text-primary);
+  letter-spacing: -.025em;
 }
 
 .hero h2 {
-  font-size: clamp(1.65rem, 3vw, 2.25rem);
+  font-size: clamp(1.55rem, 2.5vw, 2rem);
+  font-weight: 610;
 }
 
 .hero p,
 .transferCard p {
   max-width: 62ch;
   margin: 8px 0 0;
-  color: #526071;
+  color: var(--color-text-secondary);
   line-height: 1.55;
 }
 
 .heroMetric {
   display: grid;
-  min-width: 104px;
-  padding: 16px;
-  border: 1px solid rgba(35, 128, 111, 0.12);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.8);
-  text-align: center;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 0 2px 20px;
+  border: 0;
+  border-left: 1px solid var(--color-separator);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
 }
 
 .heroMetric strong {
-  color: var(--action-primary);
-  font-size: 2rem;
+  color: var(--color-text-primary);
+  font-size: 1.55rem;
+  font-weight: 580;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .heroMetric span {
-  margin-top: 5px;
-  color: #667085;
-  font-size: 0.78rem;
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: .76rem;
 }
 
 .eyebrow {
-  color: #526071;
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: none;
 }
 
 .notice {
@@ -105,28 +136,29 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 13px 15px;
-  border: 1px solid rgba(4, 120, 87, 0.14);
-  border-radius: 15px;
-  background: #f2fbf6;
-  color: #166534;
+  padding: 11px 0 11px 14px;
+  border: 0;
+  border-left: 2px solid var(--color-positive);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
 .notice[data-tone="warning"] {
-  border-color: rgba(194, 65, 12, 0.14);
-  background: #fff8f1;
-  color: #9a3412;
+  border-left-color: var(--color-destructive);
+  background: transparent;
+  color: var(--color-text-secondary);
 }
 
 .notice a {
-  color: inherit;
-  font-weight: 800;
+  color: var(--color-signal);
+  font-weight: 650;
 }
 
 .card,
 .transferCard {
-  padding: 26px;
+  padding: 20px 0 22px;
 }
 
 .sectionHeading {
@@ -137,26 +169,28 @@
 }
 
 .count {
-  min-width: 28px;
-  padding: 5px 9px;
-  border-radius: 999px;
-  background: rgba(35, 128, 111, 0.08);
-  color: var(--action-primary);
-  font-size: 0.74rem;
-  font-weight: 800;
-  text-align: center;
+  min-width: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: .72rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .muted {
   max-width: 68ch;
-  margin: 10px 0 18px;
-  color: #667085;
-  line-height: 1.6;
+  margin: 8px 0 18px;
+  color: var(--color-text-tertiary);
+  font-size: .82rem;
+  line-height: 1.55;
 }
 
 .inviteForm {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.32fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, .32fr) auto;
   align-items: end;
   gap: 12px;
 }
@@ -165,9 +199,10 @@
 .transferForm label {
   display: grid;
   gap: 7px;
-  color: #344054;
-  font-size: 0.84rem;
-  font-weight: 700;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: .8rem;
+  font-weight: 600;
 }
 
 .inviteForm input,
@@ -175,13 +210,13 @@
 .memberActions select,
 .transferForm select {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   box-sizing: border-box;
   padding: 10px 12px;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  border-radius: 12px;
-  background: #fff;
-  color: #111827;
+  border: 1px solid var(--color-separator-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-primary);
+  color: var(--color-text-primary);
   font: inherit;
 }
 
@@ -189,45 +224,41 @@
 .quietButton,
 .removeButton,
 .transferButton {
-  min-height: 42px;
+  min-height: 44px;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   font: inherit;
-  font-size: 0.84rem;
-  font-weight: 800;
+  font-size: .8rem;
+  font-weight: 650;
   cursor: pointer;
 }
 
 .primaryButton {
-  border: 1px solid var(--action-primary);
-  background: var(--action-primary);
-  color: #fff;
-  box-shadow: 0 12px 24px rgba(35, 128, 111, 0.2);
+  border: 1px solid var(--color-signal);
+  background: var(--color-signal);
+  color: var(--color-text-inverse);
+  box-shadow: none;
 }
 
 .quietButton {
-  min-height: 36px;
-  padding: 7px 10px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #fff;
-  color: #344054;
+  border: 1px solid var(--color-separator-strong);
+  background: transparent;
+  color: var(--color-text-secondary);
 }
 
 .removeButton {
-  min-height: 36px;
-  padding: 7px 10px;
-  border: 1px solid rgba(185, 28, 28, 0.14);
-  background: #fff7f7;
-  color: #991b1b;
+  border: 1px solid color-mix(in srgb, var(--color-destructive) 38%, var(--color-separator));
+  background: transparent;
+  color: var(--color-destructive);
 }
 
 .memberList,
 .inviteList {
   display: grid;
-  margin: 18px 0 0;
+  margin: 16px 0 0;
   padding: 0;
+  border-top: 1px solid var(--color-separator);
   list-style: none;
-  border-top: 1px solid rgba(15, 23, 42, 0.07);
 }
 
 .member {
@@ -235,19 +266,21 @@
   grid-template-columns: auto minmax(180px, 1fr) auto minmax(240px, auto);
   align-items: center;
   gap: 14px;
-  padding: 16px 0;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+  min-width: 0;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--color-separator-subtle);
 }
 
 .avatar {
   display: grid;
+  width: 36px;
+  height: 36px;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 13px;
-  background: linear-gradient(145deg, rgba(35, 128, 111, 0.12), var(--surface-panel));
-  color: var(--action-primary);
-  font-weight: 850;
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background: var(--color-signal-soft);
+  color: var(--color-signal);
+  font-weight: 700;
 }
 
 .memberIdentity {
@@ -256,8 +289,8 @@
 
 .memberIdentity > div {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
+  align-items: center;
   gap: 7px;
 }
 
@@ -267,42 +300,39 @@
 }
 
 .memberIdentity > div span {
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: #ecfdf3;
-  color: #087443;
-  font-size: 0.7rem;
-  font-weight: 800;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-signal);
+  font-size: .68rem;
+  font-weight: 650;
 }
 
 .memberIdentity p,
 .memberIdentity time {
   display: block;
   margin: 4px 0 0;
-  color: #667085;
-  font-size: 0.79rem;
+  color: var(--color-text-tertiary);
+  font-size: .76rem;
   line-height: 1.45;
 }
 
 .roleBadge,
 .deliveryBadge {
-  padding: 5px 9px;
-  border-radius: 999px;
-  background: #f2f4f7;
-  color: #475467;
-  font-size: 0.73rem;
-  font-weight: 800;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: .7rem;
+  font-weight: 650;
   white-space: nowrap;
 }
 
-.roleBadge[data-role="owner"] {
-  background: rgba(35, 128, 111, 0.08);
-  color: var(--action-primary);
-}
-
-.roleBadge[data-role="admin"] {
-  background: #f3f0ff;
-  color: #6941c6;
+.roleBadge[data-role="owner"],
+.roleBadge[data-role="admin"],
+.deliveryBadge[data-status="sent"] {
+  background: transparent;
+  color: var(--color-signal);
 }
 
 .memberActions,
@@ -314,9 +344,9 @@
 
 .memberActions select {
   min-width: 126px;
-  min-height: 36px;
-  padding: 7px 9px;
-  font-size: 0.8rem;
+  min-height: 44px;
+  padding: 8px 9px;
+  font-size: .78rem;
 }
 
 .inviteList > li {
@@ -324,30 +354,36 @@
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 14px;
+  min-width: 0;
   padding: 15px 0;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+  border-bottom: 1px solid var(--color-separator-subtle);
+}
+
+.inviteList > li > div {
+  min-width: 0;
+}
+
+.inviteList strong,
+.inviteList p {
+  overflow-wrap: anywhere;
 }
 
 .inviteList p {
   margin: 4px 0 0;
-  color: #667085;
-  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+  font-size: .78rem;
 }
 
 .deliveryBadge[data-status="failed"] {
-  background: #fff8f1;
-  color: #9a3412;
-}
-
-.deliveryBadge[data-status="sent"] {
-  background: #ecfdf3;
-  color: #087443;
+  background: transparent;
+  color: var(--color-destructive);
 }
 
 .transferCard {
-  border-color: rgba(194, 65, 12, 0.14);
-  background:
-    linear-gradient(145deg, rgba(255, 248, 241, 0.78), rgba(255, 255, 255, 0.96));
+  padding-left: 14px;
+  border-top-color: var(--color-separator);
+  border-left: 2px solid var(--color-destructive);
+  background: transparent;
 }
 
 .transferForm {
@@ -360,9 +396,9 @@
 }
 
 .transferButton {
-  border: 1px solid rgba(194, 65, 12, 0.2);
-  background: #fff8f1;
-  color: #9a3412;
+  border: 1px solid color-mix(in srgb, var(--color-destructive) 38%, var(--color-separator));
+  background: transparent;
+  color: var(--color-destructive);
 }
 
 .visuallyHidden {
@@ -386,8 +422,14 @@
 .quietButton:focus-visible,
 .removeButton:focus-visible,
 .transferButton:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.3);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .subnav a:hover {
+    color: var(--color-text-primary);
+  }
 }
 
 @media (max-width: 960px) {
@@ -402,19 +444,35 @@
 }
 
 @media (max-width: 720px) {
+  .stack { gap: 18px; }
+
+  .subnav { gap: 18px; }
+
   .hero {
-    align-items: flex-start;
-    padding: 22px;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+    padding: 16px 0 18px;
+  }
+
+  .heroMetric {
+    grid-template-columns: auto auto;
+    width: fit-content;
+    padding: 0;
+    border-left: 0;
   }
 
   .card,
   .transferCard {
-    padding: 20px;
+    padding-top: 18px;
+    padding-bottom: 20px;
   }
+
+  .transferCard { padding-left: 12px; }
 
   .inviteForm,
   .transferForm {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .inviteForm button,

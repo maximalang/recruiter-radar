@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 };
 
 const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Дашборд" },
+  { href: "/dashboard", label: "Обзор" },
   { href: "/admin", label: "Оператор", active: true },
 ];
 
@@ -102,7 +102,7 @@ export default async function AdminUserPage({ params, searchParams }: {
           <div style={{ display: "grid", gap: 8 }}>
             {user.diagnostics.map((item, index) => (
               <div key={item.key} style={{ display: "grid", gridTemplateColumns: "32px minmax(120px, 180px) 96px 1fr", gap: 10, alignItems: "center" }}>
-                <span aria-hidden="true" style={{ color: "#667085" }}>{index < user.diagnostics.length - 1 ? "↓" : "✓"}</span>
+                <span aria-hidden="true" style={{ color: "var(--color-text-tertiary)" }}>{index < user.diagnostics.length - 1 ? "↓" : "✓"}</span>
                 <strong>{item.label}</strong>
                 <StatusBadge status={item.status} />
                 <span className={internalPageClasses.bodyText}>{item.reason}</span>
@@ -236,10 +236,10 @@ function WorkspaceSelector({ userId, memberships, selectedId }: {
             href={`/admin/users/${userId}?workspaceId=${membership.id}`}
             aria-current={membership.id === selectedId ? "page" : undefined}
             style={{
-              border: "1px solid #cbd5e1",
-              borderRadius: 8,
+              border: "1px solid var(--color-separator-strong)",
+              borderRadius: "var(--radius-control)",
               padding: "8px 10px",
-              background: membership.id === selectedId ? "#e0e7ff" : "#fff",
+              background: membership.id === selectedId ? "color-mix(in srgb, var(--color-information) 10%, var(--color-surface-primary))" : "var(--color-surface-elevated)",
             }}
           >
             {membership.name} В· {membership.role}
@@ -256,16 +256,16 @@ function SectionGrid({ children }: { children: ReactNode }) {
 
 function Facts({ rows }: { rows: Array<[string, string]> }) {
   return <dl style={{ display: "grid", gridTemplateColumns: "minmax(130px, 0.8fr) 1.2fr", gap: "8px 12px", margin: 0 }}>
-    {rows.map(([label, value]) => <div key={label} style={{ display: "contents" }}><dt style={{ color: "#667085" }}>{label}</dt><dd style={{ margin: 0, overflowWrap: "anywhere" }}>{value}</dd></div>)}
+    {rows.map(([label, value]) => <div key={label} style={{ display: "contents" }}><dt style={{ color: "var(--color-text-tertiary)" }}>{label}</dt><dd style={{ margin: 0, overflowWrap: "anywhere" }}>{value}</dd></div>)}
   </dl>;
 }
 
 function StatusBadge({ status }: { status: DiagnosticStatus }) {
-  const tone = status === "PASS" ? ["#065f46", "#d1fae5"] : status === "WARNING" ? ["#92400e", "#fef3c7"] : ["#b42318", "#fee4e2"];
-  return <span style={{ color: tone[0], background: tone[1], padding: "3px 8px", borderRadius: 999, fontWeight: 800, fontSize: "0.72rem", textAlign: "center" }}>{status}</span>;
+  const tone = status === "PASS" ? ["var(--color-signal)", "color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary))"] : status === "WARNING" ? ["var(--color-copper)", "color-mix(in srgb, var(--color-copper) 16%, var(--color-surface-primary))"] : ["var(--color-destructive)", "color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary))"];
+  return <span style={{ color: tone[0], background: tone[1], padding: "3px 8px", borderRadius: "var(--radius-pill)", fontWeight: 800, fontSize: "0.72rem", textAlign: "center" }}>{status}</span>;
 }
 
-const cellStyle = { borderBottom: "1px solid #e2e8f0", padding: "8px", textAlign: "left" as const, whiteSpace: "nowrap" as const };
+const cellStyle = { borderBottom: "1px solid var(--color-separator)", padding: "8px", textAlign: "left" as const, whiteSpace: "nowrap" as const };
 const list = (values: readonly string[]) => values.length ? values.join(", ") : "—";
 const nullable = (value: number | null) => value === null ? "—" : String(value);
 const formatDate = (value: string | null) => value ? new Date(value).toLocaleString("ru-RU") : "—";

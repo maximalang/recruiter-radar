@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   if (!digestApiKey) {
     return NextResponse.json({
       success: false,
-      error: "DIGEST_API_KEY is not configured.",
+      error: "Service is not configured.",
       metadata: {
         timestamp: new Date().toISOString(),
         requestId: crypto.randomUUID()
@@ -35,7 +35,6 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Parse and validate input using zod
     const input = {
       clientProfileId: searchParams.get("clientProfileId")!,
       sourceKey: searchParams.get("sourceKey") || undefined,
@@ -43,7 +42,6 @@ export async function GET(request: Request) {
       cooldownDays: searchParams.get("cooldownDays") ? Number(searchParams.get("cooldownDays")) : undefined,
     };
 
-    // Input validation without zod for now
     if (!input.clientProfileId) {
       return NextResponse.json({
         success: false,
@@ -91,7 +89,6 @@ export async function GET(request: Request) {
     }, { status: 200 });
   } catch (error) {
     if (error && typeof error === 'object' && 'errors' in error) {
-      // Zod error structure
       const validationError = error as any;
       return NextResponse.json({
         success: false,
@@ -103,13 +100,16 @@ export async function GET(request: Request) {
       }, { status: 400 });
     }
 
-    const message = error instanceof Error ? error.message : "Failed to run digest.";
+    const message = error instanceof Error ? error.message : "";
     const status = message.includes("inactive") || message.includes("No active subscription") || message.includes("entitlement") ? 403 :
                    message.includes("not found") ? 404 : 500;
+    const publicMessage = status === 403 ? "entitlement_required" :
+                          status === 404 ? "client_profile_not_found" :
+                          "Failed to run digest.";
 
     return NextResponse.json({
       success: false,
-      error: message,
+      error: publicMessage,
       metadata: {
         timestamp: new Date().toISOString(),
         requestId: crypto.randomUUID()

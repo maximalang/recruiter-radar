@@ -1,5 +1,4 @@
-/* Internal page primitives — shared styles for dashboard, leads, checkout.
-   All colors reference :root tokens from page-primitives.module.css */
+/* Internal page primitives — shared styles for detail and utility surfaces. */
 
 :global([data-product-workspace="true"]) .internalPageFrameInner {
   width: 100%;
@@ -8,133 +7,34 @@
   padding: 0;
 }
 
-/* ── Skip link (a11y) ── */
 .skipLink {
   position: absolute;
-  left: 0;
   top: 0;
+  left: 0;
   z-index: 100;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   padding: 8px 16px;
-  background-color: var(--c-brand);
-  color: #ffffff;
-  font-size: 0.85rem;
+  border-radius: 0 0 var(--radius-control) 0;
+  background-color: var(--color-text-primary);
+  color: var(--color-text-inverse);
+  font-size: .85rem;
   font-weight: 600;
   text-decoration: none;
-  border-radius: 0 0 6px 0;
   transform: translateY(-100%);
 }
 
-.skipLink:focus {
+.skipLink:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
   transform: translateY(0);
-  outline: 2px solid #ffffff;
-  outline-offset: 2px;
 }
 
-/* ── Top navigation bar ── */
-.topNav {
-  background-color: var(--c-bg-card);
-  border-bottom: 1px solid var(--c-border);
-  padding: 0 16px;
-}
-
-.topNavInner {
-  max-width: 1280px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  height: 48px;
-}
-
-.topNavBrand {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--c-text-primary);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.topNavBrand:hover {
-  color: var(--c-brand);
-}
-
-.topNavBrand:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
-}
-
-.topNavBrandAccent {
-  color: var(--action-primary);
-}
-
-.topNavLinks {
-  display: flex;
-  gap: 4px;
-}
-
-.topNavLink {
-  padding: 6px 12px;
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--c-text-muted);
-  text-decoration: none;
-  border-radius: 6px;
-  transition: background-color 0.15s, color 0.15s;
-}
-
-.topNavLink:hover {
-  background-color: var(--c-bg-page);
-  color: var(--c-text-primary);
-}
-
-.topNavLink:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
-}
-
-.topNavLink[data-active="true"] {
-  color: var(--c-brand);
-  background-color: rgba(35, 128, 111, 0.06);
-  font-weight: 600;
-}
-
-@media (max-width: 640px) {
-  .topNavInner {
-    height: auto;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px 0 8px;
-  }
-  .topNavLinks {
-    width: 100%;
-    overflow-x: auto;
-    justify-content: space-between;
-    gap: 2px;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-  }
-  .topNavLinks::-webkit-scrollbar {
-    display: none;
-  }
-  .topNavLink {
-    flex: 0 0 auto;
-    min-height: 36px;
-    display: inline-flex;
-    align-items: center;
-    font-size: 0.74rem;
-    padding: 6px 7px;
-  }
-}
-
-/* ── Page frame ── */
 .internalPageFrame {
   min-height: 100vh;
-  background-color: var(--c-bg-page);
-  color: var(--c-text-primary);
+  background-color: var(--color-canvas);
+  color: var(--color-text-primary);
 }
 
 .internalPageFrameInner {
@@ -143,13 +43,6 @@
   padding: 32px 16px;
 }
 
-@media (max-width: 768px) {
-  .internalPageFrameInner {
-    padding: 20px 12px;
-  }
-}
-
-/* ── Page header ── */
 .internalPageHeader {
   margin-bottom: 30px;
 }
@@ -167,160 +60,102 @@
 
 .internalPageTitle {
   max-width: 760px;
-  font-size: clamp(2.35rem, 3.4vw, 3.25rem);
-  font-weight: 735;
-  color: #14201c;
-  letter-spacing: -0.058em;
-  line-height: 1.02;
   margin: 0;
-}
-
-.internalPageTitle::before {
-  display: block;
-  width: 22px;
-  height: 1px;
-  margin-bottom: 14px;
-  background: #23806f;
-  content: "";
+  color: var(--color-text-primary);
+  font-size: clamp(2.35rem, 3.4vw, 3.25rem);
+  font-weight: 650;
+  letter-spacing: -.045em;
+  line-height: 1.05;
 }
 
 .internalPageSubtitle {
   max-width: 680px;
-  font-size: 0.94rem;
-  color: #65706a;
-  line-height: 1.62;
   margin-top: 16px;
+  color: var(--color-text-secondary);
+  font-size: .94rem;
+  line-height: 1.62;
 }
 
-/* ── Back / nav link ── */
-.internalPageBackLink {
+.internalPageBackLink,
+.navLink {
   min-height: 44px;
-  font-size: 0.875rem;
-  color: var(--c-text-muted);
-  text-decoration: none;
   display: inline-flex;
   align-items: center;
+  color: var(--color-text-tertiary);
+  font-size: .875rem;
+  text-decoration: none;
+  transition:
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard);
+}
+
+.internalPageBackLink {
   gap: 5px;
 }
 
 .backLinkIcon {
   flex: 0 0 auto;
-  width: 0.9em;
-  height: 0.9em;
-}
-
-.internalPageBackLink:hover {
-  color: var(--c-brand);
-}
-
-.internalPageBackLink:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
+  width: .9em;
+  height: .9em;
 }
 
 .navLink {
-  font-size: 0.875rem;
-  color: var(--c-text-muted);
-  text-decoration: none;
   padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--c-border);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
 }
 
-.navLink:hover {
-  color: var(--c-brand);
-  border-color: var(--c-brand);
-}
-
-.navLink:focus-visible {
-  outline: 2px solid var(--c-brand);
+.internalPageBackLink:focus-visible,
+.navLink:focus-visible,
+.leadLink:focus-visible,
+.sidebarLink:focus-visible {
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
-/* ── Metric card ── */
-.metricGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 10px;
-  margin-bottom: 24px;
+.leadLink:focus-visible {
+  border-radius: var(--radius-detail);
 }
 
-.metricCard {
-  background-color: var(--surface-panel);
-  border-radius: 10px;
-  padding: 13px 14px;
-  border: 1px solid var(--border-subtle);
-}
-
-.metricLabel {
-  font-size: 0.7rem;
-  line-height: 1.3;
-  color: var(--ink-muted);
-  font-weight: 600;
-}
-
-.metricValue {
-  font-size: 1.35rem;
-  line-height: 1.1;
-  font-weight: 720;
-  color: var(--ink-primary);
-  margin-top: 5px;
-}
-
-.metricValue[data-tone="success"] {
-  color: var(--status-success);
-}
-
-.metricValue[data-tone="info"] {
-  color: var(--signal-primary);
-}
-
-/* ── Content card (detail sections, sidebar blocks) ── */
 .contentCard {
-  background-color: var(--surface-panel);
-  border-radius: 10px;
   padding: 18px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-surface);
+  background-color: var(--color-surface-primary);
 }
 
 .contentCard[data-tone="danger"] {
-  border-color: #fecaca;
+  border-color: color-mix(in srgb, var(--color-destructive) 16%, var(--color-surface-primary));
 }
 
-/* Hero: the decision-driver cards (why now, why it fits) carry visual weight —
-   a tinted left accent and brand-tinted surface lift them above the supporting
-   evidence/action cards without shouting. */
 .contentCard[data-variant="hero"] {
-  border-color: rgba(35, 128, 111, 0.24);
-  border-left: 3px solid var(--signal-primary);
-  background-color: rgba(35, 128, 111, 0.035);
+  border-color: color-mix(in srgb, var(--color-signal) 24%, transparent);
+  border-left: 3px solid var(--color-signal);
+  background-color: color-mix(in srgb, var(--color-signal) 3.5%, transparent);
 }
 
 .contentCard[data-variant="hero"] .contentCardTitle {
-  color: var(--action-primary);
+  color: var(--color-signal);
 }
 
-/* Muted: advisory blocks (AI hint) recede — they inform but never drive the
-   decision, so they sit visually below the deterministic evidence. */
 .contentCard[data-variant="muted"] {
-  background-color: transparent;
+  border-color: var(--color-separator);
   border-style: dashed;
-  border-color: var(--c-border);
+  background-color: transparent;
 }
 
 .contentCardTitle {
-  font-size: 0.875rem;
+  margin: 0 0 12px;
+  color: var(--color-text-secondary);
+  font-size: .875rem;
   font-weight: 600;
-  color: #374151;
-  margin-bottom: 12px;
-  margin-top: 0;
 }
 
 .contentCardTitle[data-tone="danger"] {
-  color: #991b1b;
+  color: var(--color-destructive);
 }
 
-/* ── Detail layout ── */
 .detailLayout {
   display: grid;
   grid-template-columns: 1fr 300px;
@@ -339,13 +174,6 @@
   gap: 16px;
 }
 
-@media (max-width: 768px) {
-  .detailLayout {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ── Data table ── */
 .dataTableWrap {
   overflow-x: auto;
 }
@@ -356,21 +184,21 @@
 }
 
 .dataTableHead {
-  border-bottom: 2px solid var(--c-border);
+  border-bottom: 2px solid var(--color-separator);
 }
 
 .dataTableTh {
   padding: 8px 16px;
-  text-align: left;
-  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  font-size: .75rem;
   font-weight: 600;
-  color: var(--c-text-muted);
+  letter-spacing: .05em;
+  text-align: left;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .dataTableTh[scope="col"] {
-  /* explicit scope for a11y — same styles */
+  /* Explicit scope for accessibility; visual treatment is shared. */
 }
 
 .dataTableTd {
@@ -379,554 +207,195 @@
 }
 
 .dataTableTr {
-  border-bottom: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--color-separator);
 }
 
-/* ── Score gauge ── */
-.scoreGauge {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.scoreGaugeCircle {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  font-weight: 700;
-  border: 4px solid var(--c-border);
-  color: var(--c-text-primary);
-}
-
-.scoreGaugeCircle[data-tone="success"] {
-  border-color: #10b981;
-  color: #10b981;
-}
-
-.scoreGaugeCircle[data-tone="warning"] {
-  border-color: #f59e0b;
-  color: #f59e0b;
-}
-
-.scoreGaugeCircle[data-tone="danger"] {
-  border-color: #ef4444;
-  color: #ef4444;
-}
-
-.scoreGaugeInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.scoreGaugeLabel {
-  font-size: 0.75rem;
-  color: var(--c-text-muted);
-  font-weight: 500;
-}
-
-.scoreGaugeLevel {
-  font-size: 0.85rem;
-}
-
-.scoreGaugeLevel[data-tone="success"] {
-  color: #10b981;
-}
-
-.scoreGaugeLevel[data-tone="warning"] {
-  color: #f59e0b;
-}
-
-.scoreGaugeLevel[data-tone="danger"] {
-  color: #ef4444;
-}
-
-.scoreGaugeBar {
-  margin-top: 4px;
-  width: 120px;
-  height: 4px;
-  border-radius: 2px;
-  background-color: var(--c-border);
-  overflow: hidden;
-}
-
-.scoreGaugeBarFill {
-  height: 100%;
-  border-radius: 2px;
-}
-
-.scoreGaugeBarFill[data-tone="success"] {
-  background-color: #10b981;
-}
-
-.scoreGaugeBarFill[data-tone="warning"] {
-  background-color: #f59e0b;
-}
-
-.scoreGaugeBarFill[data-tone="danger"] {
-  background-color: #ef4444;
-}
-
-/* Band + freshness row under the sidebar score gauge */
-.scoreSidebarMeta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--c-border);
-}
-
-/* ── Score bar (compact, for table rows) ── */
-.scoreBar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.scoreBarTrack {
-  flex: 1;
-  height: 6px;
-  border-radius: 3px;
-  background-color: var(--c-border);
-  overflow: hidden;
-}
-
-.scoreBarFill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.2s;
-}
-
-.scoreBarFill[data-tone="success"] {
-  background-color: #10b981;
-}
-
-.scoreBarFill[data-tone="warning"] {
-  background-color: #f59e0b;
-}
-
-.scoreBarFill[data-tone="danger"] {
-  background-color: #ef4444;
-}
-
-.scoreBarValue {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--c-text-secondary);
-  min-width: 2ch;
-}
-
-/* ── Score band chip (one-glance temperature) ── */
-.scoreBandChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 0.72rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-/* Inline-SVG chip icon — the single visual vocabulary that replaced emoji
-   markers. Scales with the chip font-size and inherits tone via currentColor. */
-.chipIcon {
-  flex: 0 0 auto;
-  width: 0.9em;
-  height: 0.9em;
-}
-
-.scoreBandChip[data-tone="success"] {
-  background-color: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-}
-
-.scoreBandChip[data-tone="warning"] {
-  background-color: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
-}
-
-.scoreBandChip[data-tone="danger"] {
-  background-color: rgba(35, 128, 111, 0.08);
-  color: var(--action-primary);
-  border: 1px solid rgba(35, 128, 111, 0.24);
-}
-
-/* ── Signal freshness chip ── */
-.freshnessChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.freshnessChip[data-tone="fresh"] {
-  color: #047857;
-}
-
-.freshnessChip[data-tone="recent"] {
-  color: var(--c-text-muted);
-}
-
-.freshnessChip[data-tone="stale"] {
-  color: #9ca3af;
-}
-
-/* ── AI-hint presence chip (lead has an attributed AI advisory layer) ── */
-.aiHintChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 0.72rem;
-  font-weight: 600;
-  background-color: var(--gate-b-bg);
-  color: var(--gate-b-color);
-  border: 1px solid rgba(35, 128, 111, 0.2);
-  white-space: nowrap;
-}
-
-/* ── Foreign-employer badge (geo gate) ── */
-.foreignBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 0.72rem;
-  font-weight: 600;
-  background-color: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-  white-space: nowrap;
-}
-
-/* ── Review-status badge (analyst gate: pending_review / approved / rejected) ──
-   auto_approved renders no badge. Tone mirrors the gate vocabulary: info for
-   "на проверке", success for "проверен", danger for "отклонён". */
 .reviewBadge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
+  border: 1px solid var(--color-separator);
   border-radius: var(--radius-pill);
-  font-size: 0.72rem;
+  font-size: .72rem;
   font-weight: 600;
   white-space: nowrap;
-  border: 1px solid transparent;
+}
+
+.reviewBadgeIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
 }
 
 .reviewBadge[data-tone="info"] {
-  background-color: rgba(35, 128, 111, 0.1);
-  color: var(--action-primary);
-  border-color: rgba(35, 128, 111, 0.3);
+  border-color: var(--color-separator-strong);
+  background: var(--color-signal-soft);
+  color: var(--color-signal-hover);
 }
 
 .reviewBadge[data-tone="success"] {
-  background-color: rgba(16, 185, 129, 0.1);
-  color: #047857;
-  border-color: rgba(16, 185, 129, 0.3);
+  border-color: color-mix(in srgb, var(--color-positive) 28%, var(--color-separator));
+  background: color-mix(in srgb, var(--color-positive) 10%, transparent);
+  color: var(--color-positive);
 }
 
 .reviewBadge[data-tone="danger"] {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #b91c1c;
-  border-color: rgba(239, 68, 68, 0.3);
+  border-color: color-mix(in srgb, var(--color-destructive) 26%, var(--color-separator));
+  background: color-mix(in srgb, var(--color-destructive) 9%, transparent);
+  color: var(--color-destructive);
 }
 
-/* ── Urgency cue chip (hiring tempo, visible without opening the lead) ── */
-.urgencyCueChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 0.72rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-/* ── Review-reason chip (why a candidate is in the review queue) ──
-   One semantic chip: foreign / gate-C / single-source. Carries the reason's
-   SVG icon + a muted info tone so it reads as "context for the analyst", not
-   a verdict (the verdict is the gate badge next to it). */
-.reviewReasonChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 0.72rem;
-  font-weight: 600;
-  white-space: nowrap;
-  background-color: rgba(148, 163, 184, 0.12);
-  color: #475569;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-}
-
-.urgencyCueChip[data-tone="success"] {
-  background-color: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-}
-
-.urgencyCueChip[data-tone="info"] {
-  background-color: rgba(35, 128, 111, 0.08);
-  color: var(--action-primary);
-  border: 1px solid rgba(35, 128, 111, 0.24);
-}
-
-.urgencyCueChip[data-tone="danger"] {
-  background-color: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
-}
-
-.urgencyCueChip[data-tone="neutral"] {
-  background-color: var(--c-surface-muted, #f3f4f6);
-  color: var(--c-text-muted);
-  border: 1px solid var(--c-border, #e5e7eb);
-}
-
-/* ── Gate badge (inline, for leads pages) ── */
-.gateBadgeInline {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.gateBadgeInline[data-gate="A"] {
-  background: var(--gate-a-bg, #d1fae5);
-  color: var(--gate-a-color, #065f46);
-}
-
-.gateBadgeInline[data-gate="B"] {
-  background: var(--gate-b-bg, rgba(35, 128, 111, 0.12));
-  color: var(--gate-b-color, var(--action-primary));
-}
-
-.gateBadgeInline[data-gate="C"] {
-  background: var(--gate-c-bg, #fef3c7);
-  color: var(--gate-c-color, #92400e);
-}
-
-.gateBadgeInline[data-gate="D"] {
-  background: var(--gate-d-bg, #f3f4f6);
-  color: var(--gate-d-color, #4b5563);
-}
-
-/* ── Feedback badge ── */
 .feedbackBadge {
   display: inline-block;
   padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-signal) 16%, var(--color-surface-primary));
   border-radius: var(--radius-pill);
-  font-size: 0.75rem;
+  background-color: color-mix(in srgb, var(--color-signal) 10%, var(--color-surface-primary));
+  color: var(--color-positive);
+  font-size: .75rem;
   font-weight: 500;
-  background-color: #f0fdf4;
-  color: #166534;
-  border: 1px solid #bbf7d0;
 }
 
-/* ── Evidence tag ── */
-.evidenceTag {
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  background-color: rgba(35, 128, 111, 0.06);
-  color: var(--action-primary);
-  border: 1px solid rgba(35, 128, 111, 0.24);
-  display: inline-block;
-}
-
-/* ── Source chip ── */
-.sourceChip {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  background-color: #f3f4f6;
-  color: var(--c-text-secondary);
-  display: inline-block;
-}
-
-/* ── Lead row specifics ── */
 .leadLink {
-  text-decoration: none;
   color: inherit;
-}
-
-.leadLink:hover {
-  color: var(--c-brand);
-}
-
-.leadLink:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
-  border-radius: 2px;
+  text-decoration: none;
+  transition: color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .leadOrgName {
+  color: var(--color-text-primary);
+  font-size: .9rem;
   font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--c-text-primary);
+}
+
+.leadLocation,
+.leadDate {
+  color: var(--color-text-tertiary);
+  font-size: .75rem;
 }
 
 .leadLocation {
-  font-size: 0.75rem;
-  color: var(--c-text-muted);
   margin-top: 2px;
 }
 
 .leadMeta {
-  font-size: 0.8rem;
-  color: var(--c-text-muted);
+  color: var(--color-text-tertiary);
+  font-size: .8rem;
 }
 
-.leadDate {
-  font-size: 0.75rem;
-  color: #9ca3af;
-}
-
-/* ── Filter active indicator ── */
 .filterActive {
   margin-left: 8px;
-  font-size: 0.75rem;
-  color: var(--c-brand);
+  color: var(--color-signal);
+  font-size: .75rem;
 }
 
-/* ── Reason / signal list ── */
 .reasonList {
-  list-style: none;
-  padding: 0;
   margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .reasonItem {
   padding: 8px 0;
-  font-size: 0.9rem;
-  color: var(--c-text-primary);
+  color: var(--color-text-primary);
+  font-size: .9rem;
 }
 
 .reasonItem + .reasonItem {
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--color-surface-secondary);
 }
 
 .signalItem {
   padding: 6px 0;
-  font-size: 0.85rem;
-  color: #991b1b;
+  color: var(--color-destructive);
+  font-size: .85rem;
 }
 
 .signalItem + .signalItem {
-  border-top: 1px solid #fee2e2;
+  border-top: 1px solid color-mix(in srgb, var(--color-destructive) 10%, var(--color-surface-primary));
 }
 
-/* ── Gate description ── */
 .gateDescription {
-  font-size: 0.75rem;
-  color: var(--c-text-muted);
   margin-top: 8px;
+  color: var(--color-text-tertiary);
+  font-size: .75rem;
   line-height: 1.4;
 }
 
-/* ── Sidebar section ── */
 .sidebarLabel {
-  font-size: 0.75rem;
-  color: var(--c-text-muted);
-  font-weight: 500;
   margin-bottom: 8px;
+  color: var(--color-text-tertiary);
+  font-size: .75rem;
+  font-weight: 500;
 }
 
 .sidebarValue {
-  font-size: 0.9rem;
-  color: var(--c-text-primary);
   margin-bottom: 12px;
+  color: var(--color-text-primary);
+  font-size: .9rem;
 }
 
 .sidebarValueEmpty {
-  font-size: 0.85rem;
-  color: #9ca3af;
   margin-bottom: 12px;
+  color: var(--color-text-tertiary);
+  font-size: .85rem;
 }
 
 .sidebarMeta {
-  font-size: 0.75rem;
-  color: #9ca3af;
   margin-top: 4px;
+  color: var(--color-text-tertiary);
+  font-size: .75rem;
 }
 
 .sidebarLink {
-  font-size: 0.85rem;
-  color: var(--c-brand);
-  text-decoration: none;
-  display: block;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   margin-bottom: 4px;
+  color: var(--color-signal);
+  font-size: .85rem;
+  text-decoration: none;
+  transition: color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
-.sidebarLink:hover {
-  text-decoration: underline;
-}
-
-.sidebarLink:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
-}
-
-/* ── Opener text ── */
 .openerText {
-  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  font-size: .9rem;
   line-height: 1.6;
-  color: #374151;
   white-space: pre-wrap;
 }
 
-/* ── Muted body text ── */
 .bodyTextMuted {
-  font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--color-text-tertiary);
+  font-size: .85rem;
 }
 
-/* ── Evidence stats row ── */
 .evidenceStats {
   display: flex;
   gap: 16px;
-  font-size: 0.8rem;
-  color: var(--c-text-muted);
+  color: var(--color-text-tertiary);
+  font-size: .8rem;
 }
 
-/* ── Empty / not-found states ── */
 .emptyState {
   min-height: 190px;
   box-sizing: border-box;
   display: grid;
   place-content: center;
-  text-align: center;
   padding: clamp(30px, 5vw, 48px) 24px;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--ink-secondary);
+  color: var(--color-text-secondary);
+  text-align: center;
 }
 
 .emptyStateIcon {
-  /* SVG glyph well — sized by the icon's em scale, muted to the page text tone
-     so the glyph reads as a calm visual anchor, not a loud decoration. */
   display: flex;
   justify-content: center;
   margin-bottom: 12px;
-  color: var(--signal-primary);
+  color: var(--color-signal);
 }
 
 .emptyStateIcon svg {
@@ -935,88 +404,67 @@
 }
 
 .emptyStateTitle {
-  color: var(--ink-primary);
-  font-size: 1.02rem;
-  font-weight: 720;
   margin-bottom: 7px;
+  color: var(--color-text-primary);
+  font-size: 1.02rem;
+  font-weight: 650;
 }
 
 .emptyStateText {
   max-width: 620px;
-  font-size: 0.88rem;
+  font-size: .88rem;
   line-height: 1.58;
 }
 
-.emptyStateAction {
+.emptyStateAction,
+.errorStateAction {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-top: 16px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: var(--radius-surface);
+  background-color: var(--color-signal);
+  color: var(--color-text-inverse);
+  font-family: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--motion-duration-control) var(--motion-ease-standard);
+}
+
+.emptyStateAction {
   justify-self: center;
   min-width: min(240px, 100%);
-  min-height: 44px;
-  margin-top: 16px;
-  padding: 9px 18px;
-  border-radius: 10px;
-  background-color: var(--action-primary);
-  color: #fff;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: opacity 0.15s ease;
-}
-
-.emptyStateAction:hover {
-  opacity: 0.9;
-}
-
-/* ── Error state — a calm, recoverable data-failure moment ── */
-/* Mirrors .emptyState's centered premium styling so an error reads as a quiet
-   "something didn't load, here's what to do", not a loud crash. tone is a
-   muted danger (not a bright red alert) to keep the page calm. */
-.errorState {
-  text-align: center;
-  padding: 40px 24px;
-  color: var(--c-text-muted);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-card-sm);
-  background-color: var(--c-bg-card);
-}
-
-.errorStateTitle {
-  font-weight: 500;
-  color: var(--c-text-primary);
-  margin-bottom: 6px;
-}
-
-.errorStateText {
-  font-size: 0.85rem;
-  line-height: 1.5;
-}
-
-.errorStateAction {
-  display: inline-block;
-  margin-top: 16px;
-  padding: 9px 18px;
-  border-radius: 10px;
-  background-color: var(--action-primary);
-  color: #fff;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-  border: 0;
-  cursor: pointer;
-  font-family: inherit;
-  transition: opacity 0.15s ease;
-}
-
-.errorStateAction:hover {
-  opacity: 0.9;
 }
 
 .emptyStateAction:focus-visible,
 .errorStateAction:focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+.errorState {
+  padding: 40px 24px;
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.errorStateTitle {
+  margin-bottom: 6px;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.errorStateText {
+  font-size: .85rem;
+  line-height: 1.5;
 }
 
 .notFoundState {
@@ -1024,24 +472,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--c-bg-page);
+  background-color: var(--color-canvas);
 }
 
 .notFoundContent {
+  color: var(--color-text-tertiary);
   text-align: center;
-  color: var(--c-text-muted);
 }
 
-/* ── Loading state ── */
 .loadingState {
   padding: 32px;
+  color: var(--color-text-tertiary);
   text-align: center;
-  color: var(--c-text-muted);
 }
 
-/* Skeleton loading — an aria-busy block with placeholder bars so a Suspense
-   gap reads as "loading this section" instead of a white flash. Calm, no
-   heavy animation: a single slow shimmer, gated by prefers-reduced-motion. */
 .loadingSkeleton {
   display: flex;
   flex-direction: column;
@@ -1051,831 +495,23 @@
 
 .loadingSkeletonLine {
   height: 14px;
-  border-radius: 7px;
-  background-color: var(--c-border);
-  opacity: 0.55;
-  /* Shimmer — subtle horizontal sweep. Pinned to the line, not the whole block,
-     so it reads as content shaping, not a busy spinner. */
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.6) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  background-repeat: no-repeat;
-  animation: loadingShimmer 1.6s ease-in-out infinite;
+  border-radius: var(--radius-control);
+  background-color: var(--color-separator);
+  opacity: .55;
 }
 
-@keyframes loadingShimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .loadingSkeletonLine {
-    animation: none;
-    opacity: 0.5;
-  }
-}
-
-/* Screen-reader-only utility — used by the skeleton's visible-to-AT loading
-   label. Kept here (not in dashboard.module.css) so the LoadingState primitive
-   is self-contained. */
 .srOnly {
   position: absolute;
   width: 1px;
   height: 1px;
-  padding: 0;
   margin: -1px;
+  padding: 0;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
+  border: 0;
   white-space: nowrap;
-  border: 0;
 }
 
-/* ── Table card container ── */
-.tableCard {
-  background-color: var(--c-bg-card);
-  border-radius: var(--radius-card-sm);
-  border: 1px solid var(--c-border);
-  overflow: hidden;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   Leads "working desk" — dense card list for daily triage.
-   Each card surfaces why-now / angle / safe contact / risk inline,
-   so the morning scan needs no drill-in to decide.
-   ══════════════════════════════════════════════════════════════ */
-
-.leadsList {
-  display: flex;
-  flex-direction: column;
-}
-
-.signalCardList {
-  gap: 0;
-  padding: 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-  background: transparent;
-}
-
-.leadCard {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  border-bottom: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  transition: background-color 0.15s ease;
-}
-
-.leadCard:last-child {
-  border-bottom: none;
-}
-
-.leadCard:hover {
-  background-color: var(--c-bg-page);
-}
-
-.signalLeadCardLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 6px 10px;
-  color: var(--c-brand);
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-decoration: none;
-  border-radius: 8px;
-}
-
-.signalLeadCardLink:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--c-brand) 35%, transparent);
-  outline-offset: 3px;
-}
-
-.signalLeadCard {
-  position: relative;
-  display: grid;
-  gap: 16px;
-  overflow: hidden;
-  padding: 20px 8px 20px 12px;
-  border: 0;
-  border-bottom: 1px solid var(--border-subtle);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.signalLeadCard::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  height: auto;
-  background: #94a3b8;
-}
-
-.signalLeadCard[data-tone="success"]::before { background: #10b981; }
-.signalLeadCard[data-tone="warning"]::before { background: #f59e0b; }
-.signalLeadCard[data-tone="danger"]::before { background: #64748b; }
-
-.signalLeadCard:last-child {
-  border-bottom: 0;
-}
-
-.signalLeadCard:hover {
-  background: rgba(255, 254, 249, .64);
-  box-shadow: none;
-}
-
-.signalLeadCardLink:hover {
-  background: rgba(35, 128, 111, 0.08);
-}
-
-.signalLeadTopbar,
-.signalLeadCompanyRow,
-.signalLeadFooter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.signalLeadSection > span {
-  color: #738198;
-  font-size: 0.67rem;
-  font-weight: 780;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.signalLeadCompanyRow {
-  align-items: flex-start;
-}
-
-.signalLeadName {
-  color: var(--c-text-primary);
-  font-size: 1.15rem;
-  font-weight: 780;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-  text-decoration: none;
-}
-
-.signalLeadMeta {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 5px;
-  color: var(--c-text-muted);
-  font-size: 0.78rem;
-}
-
-.signalLeadScore {
-  display: flex;
-  align-items: baseline;
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
-}
-
-.signalLeadScore strong {
-  color: var(--c-text-primary);
-  font-size: 1.8rem;
-  line-height: 1;
-  letter-spacing: -0.05em;
-}
-
-.signalLeadScore span {
-  color: var(--c-text-muted);
-  font-size: 0.72rem;
-}
-
-.signalLeadScoreTrack {
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--border-subtle);
-}
-
-.signalLeadScoreTrack > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: #64748b;
-}
-
-.signalLeadScoreTrack > span[data-tone="success"] { background: #10b981; }
-.signalLeadScoreTrack > span[data-tone="warning"] { background: #f59e0b; }
-
-.signalLeadSections {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.signalLeadSection {
-  display: grid;
-  align-content: start;
-  gap: 7px;
-  min-width: 0;
-  padding: 14px 16px;
-  border: 0;
-  border-right: 1px solid var(--border-subtle);
-  border-radius: 0;
-  background: transparent;
-}
-
-.signalLeadSection:last-child { border-right: 0; }
-
-.signalLeadSectionPrimary {
-  background: rgba(35, 128, 111, .035);
-}
-
-.signalLeadSection strong {
-  color: var(--c-text-primary);
-  font-size: 0.86rem;
-  line-height: 1.42;
-}
-
-.signalLeadSection p {
-  margin: 0;
-  color: var(--c-text-secondary);
-  font-size: 0.78rem;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.signalLeadFooter {
-  padding-top: 2px;
-  color: var(--c-text-secondary);
-  font-size: 0.8rem;
-}
-
-.signalLeadFooter strong {
-  color: var(--c-brand);
-  font-size: 0.84rem;
-}
-
-/* Priority rail — color-coded by score tone, anchors the vertical scan */
-.leadCardRail {
-  flex: 0 0 4px;
-  align-self: stretch;
-  background-color: var(--c-border);
-}
-
-.leadCardRail[data-tone="success"] { background-color: #10b981; }
-.leadCardRail[data-tone="warning"] { background-color: #f59e0b; }
-.leadCardRail[data-tone="danger"] { background-color: #ef4444; }
-.leadCardRail[data-tone="neutral"] { background-color: #9ca3af; }
-
-.leadCardBody {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* ── Head: org name + tags on the left, score + date on the right ── */
-.leadCardHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.leadCardHeadMain {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.leadCardOrg {
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--c-text-primary);
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.leadLink:hover .leadCardOrg {
-  color: var(--c-brand);
-}
-
-.leadCardTags {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-/* Chip sub-group — a visual cluster inside the head tag row. "decision" groups
-   the verdict (band + gate); "status" groups the workflow state (review +
-   feedback). A slightly larger gap + subtle separator after the decision group
-   separates the verdict from the workflow state at a glance, without a heavy
-   divider line (calm premium tone). */
-.leadCardTagGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.leadCardTagGroup[data-chip-group="decision"] {
-  margin-right: 4px;
-  padding-right: 10px;
-  border-right: 1px solid var(--c-border);
-}
-
-/* On narrow viewports the divider can crowd — drop it so the groups stack
-   cleanly while still reading as distinct clusters via the gap. */
-@media (max-width: 480px) {
-  .leadCardTagGroup[data-chip-group="decision"] {
-    border-right: none;
-    padding-right: 0;
-    margin-right: 0;
-  }
-}
-
-.leadCardHeadAside {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.leadCardScore {
-  width: 150px;
-}
-
-/* ── Why-now / angle: the two decision lines ── */
-.leadFieldRow {
-  display: flex;
-  gap: 8px;
-  font-size: 0.875rem;
-  line-height: 1.45;
-  color: var(--c-text-primary);
-}
-
-.leadFieldLabel {
-  flex: 0 0 auto;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--c-text-muted);
-  padding-top: 2px;
-  width: 92px;
-}
-
-.leadFieldValue {
-  min-width: 0;
-  color: var(--c-text-secondary);
-  overflow-wrap: anywhere;
-}
-
-.leadFieldRow[data-kind="why"] .leadFieldValue {
-  color: var(--c-text-primary);
-  font-weight: 500;
-}
-
-/* Fit line: the "почему подходит этому агентству" lead-in, accented positive. */
-.leadFieldRow[data-kind="fit"] .leadFieldLabel {
-  color: #10b981;
-}
-.leadFieldRow[data-kind="fit"] .leadFieldValue {
-  color: var(--c-text-primary);
-}
-
-/* ── Footer: safe contact + vacancies + sources + evidence ── */
-.leadCardFooter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 2px;
-}
-
-.leadContactChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 9px;
-  border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  font-weight: 500;
-  background-color: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-}
-
-.leadMetaChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.78rem;
-  color: var(--c-text-muted);
-}
-
-.leadMetaChip + .leadMetaChip::before {
-  content: "·";
-  margin-right: 4px;
-  color: var(--c-border);
-}
-
-.leadRiskRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.leadRiskChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 9px;
-  border-radius: var(--radius-pill);
-  font-size: 0.72rem;
-  background-color: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
-
-/* ── Action column: open + quick affordance ── */
-.leadCardAction {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  padding: 16px 18px 16px 8px;
-}
-
-.leadOpenBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: var(--radius-pill);
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--c-brand);
-  background-color: rgba(35, 128, 111, 0.06);
-  border: 1px solid transparent;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.leadOpenBtn:hover {
-  background-color: rgba(35, 128, 111, 0.1);
-  border-color: rgba(35, 128, 111, 0.2);
-}
-
-.leadOpenBtn:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
-}
-
-/* ── List toolbar: count + legend ── */
-.leadsListToolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--c-border);
-  background-color: var(--c-bg-page);
-}
-
-.leadsListCount {
-  font-size: 0.8rem;
-  color: var(--c-text-muted);
-}
-
-.leadsListCount strong {
-  color: var(--c-text-primary);
-  font-weight: 700;
-}
-
-.leadsListLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  font-size: 0.72rem;
-  color: var(--c-text-muted);
-}
-
-.leadsListLegendItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.leadsListLegendDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.leadsListLegendDot[data-tone="success"] { background-color: #10b981; }
-.leadsListLegendDot[data-tone="warning"] { background-color: #f59e0b; }
-.leadsListLegendDot[data-tone="danger"] { background-color: #ef4444; }
-
-/* ── Reduce motion ── */
-@media (prefers-reduced-motion: reduce) {
-  .scoreBarFill,
-  .contentCard,
-  .metricCard,
-  .leadCard,
-  .leadOpenBtn {
-    transition: none;
-  }
-  .signalLeadDisclosureBody {
-    transition: none;
-  }
-}
-
-.signalLeadLinkIcon,
-.signalLeadDisclosureIcon {
-  flex: 0 0 auto;
-  width: 1em;
-  height: 1em;
-}
-
-.signalLeadDisclosure {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.signalLeadDisclosure > summary {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  color: var(--c-text-secondary);
-  cursor: pointer;
-  list-style: none;
-}
-
-.signalLeadDisclosure > summary::-webkit-details-marker {
-  display: none;
-}
-
-.signalLeadDisclosure > summary:focus-visible {
-  border-radius: 6px;
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.signalLeadDisclosure > summary small {
-  color: var(--c-text-muted);
-  font-size: 0.7rem;
-}
-
-.signalLeadDisclosure[open] .signalLeadDisclosureIcon {
-  transform: rotate(90deg);
-}
-
-.signalLeadDisclosureBody,
-.signalLeadDisclosure:not([open]) > .signalLeadDisclosureBody {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    grid-template-rows var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter),
-    opacity var(--rr-motion-duration-disclosure) var(--rr-motion-ease-enter),
-    visibility var(--rr-motion-duration-disclosure) allow-discrete;
-}
-
-.signalLeadDisclosure[open] > .signalLeadDisclosureBody {
-  grid-template-rows: 1fr;
-  opacity: 1;
-  visibility: visible;
-}
-
-.signalLeadDisclosureInner {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.signalLeadDisclosure[open] .signalLeadDisclosureInner {
-  padding: 4px 0 12px;
-}
-
-.signalLeadDisclosureInner section {
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--surface-panel);
-}
-
-.signalLeadDisclosureInner section > span {
-  color: var(--c-text-muted);
-  font-size: 0.67rem;
-  font-weight: 750;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.signalLeadDisclosureInner ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.signalLeadDisclosureInner li {
-  padding: 3px 7px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  color: var(--c-text-secondary);
-  font-size: 0.7rem;
-}
-
-.signalLeadDisclosureInner p {
-  margin: 0;
-  color: var(--c-text-muted);
-  font-size: 0.72rem;
-  line-height: 1.45;
-}
-
-/* ── Responsive: tablet and below ── */
-@media (max-width: 768px) {
-  .internalPageHeaderTop {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .metricGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .evidenceStats {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-}
-
-/* ── Responsive: mobile ── */
-@media (max-width: 640px) {
-  .metricGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-    margin-bottom: 20px;
-  }
-
-  .metricCard {
-    min-width: 0;
-    padding: 10px 8px;
-  }
-
-  .metricLabel {
-    font-size: 0.63rem;
-    overflow-wrap: anywhere;
-  }
-
-  .metricValue {
-    font-size: 1.2rem;
-  }
-
-  .emptyState {
-    min-height: 168px;
-    padding: 28px 16px;
-  }
-
-  /* Tap-target floor: interactive controls must be ≥44px tall for comfortable
-     touch use (WCAG 2.5.5 / Apple HIG). The full-width action button already
-     stretches horizontally; this guarantees vertical reach. */
-  .leadOpenBtn {
-    min-height: 44px;
-    padding-top: 10px;
-    padding-bottom: 10px;
-  }
-
-  .dataTableWrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .scoreGauge {
-    gap: 12px;
-  }
-
-  .scoreGaugeCircle {
-    width: 64px;
-    height: 64px;
-    font-size: 1.25rem;
-  }
-
-  /* Leads cards: stack the action under the body, collapse field labels */
-  .leadCard {
-    flex-wrap: wrap;
-  }
-
-  /* Rail would collapse to a 0-height nub once the body wraps to its own
-     row — re-flow it as a full-width 4px top bar so the tone stays visible. */
-  .leadCardRail {
-    flex: 0 0 100%;
-    height: 4px;
-  }
-
-  .leadCardBody {
-    flex: 1 1 100%;
-    padding: 14px 14px 8px;
-  }
-
-  .leadCardHead {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .leadCardHeadAside {
-    align-items: flex-start;
-  }
-
-  .leadCardScore {
-    width: 100%;
-    max-width: 220px;
-  }
-
-  .leadFieldRow {
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .leadFieldLabel {
-    width: auto;
-    padding-top: 0;
-  }
-
-  .leadCardAction {
-    flex: 1 1 100%;
-    padding: 0 14px 14px;
-  }
-
-  .leadOpenBtn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .signalLeadCard {
-    padding: 18px 16px;
-    gap: 14px;
-  }
-
-  .signalLeadTopbar,
-  .signalLeadCompanyRow,
-  .signalLeadFooter {
-    align-items: flex-start;
-  }
-
-  .signalLeadTopbar,
-  .signalLeadFooter {
-    flex-direction: column;
-  }
-
-  .signalLeadSections {
-    grid-template-columns: 1fr;
-  }
-
-  .signalLeadDisclosure > summary {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .signalLeadDisclosure > summary small {
-    grid-column: 2;
-  }
-
-  .signalLeadDisclosureInner {
-    grid-template-columns: 1fr;
-  }
-
-  .leadsListToolbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-}
-
-/* ── Checkout / narrow layout ── */
 .narrowLayout {
   max-width: 720px;
   margin: 0 auto;
@@ -1885,142 +521,120 @@
 }
 
 .bodyText {
-  color: var(--c-text-secondary);
-  line-height: 1.6;
   margin: 0 0 16px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
 }
 
 .fieldRow {
-  font-size: 0.85rem;
-  color: var(--c-text-muted);
   margin-bottom: 8px;
+  color: var(--color-text-tertiary);
+  font-size: .85rem;
 }
 
 .fieldRowStrong {
-  color: var(--c-text-primary);
+  color: var(--color-text-primary);
 }
 
 .bodyTextMutedBlock {
-  font-size: 0.85rem;
-  color: var(--c-text-muted);
   margin: 0 0 16px;
+  color: var(--color-text-tertiary);
+  font-size: .85rem;
 }
 
-/* ── Lead detail layout ── */
-.leadDetailContainer {
-  max-width: 960px;
-  margin: 0 auto;
-}
-
-/* ── Chip / tag wrapping ── */
-.chipWrap {
+.chipWrap,
+.chipWrapSm {
   display: flex;
-  gap: 8px;
   flex-wrap: wrap;
+}
+
+.chipWrap {
+  gap: 8px;
   margin-bottom: 12px;
 }
 
 .chipWrapSm {
-  display: flex;
   gap: 6px;
-  flex-wrap: wrap;
 }
 
 .chipWrapFlush {
   margin-bottom: 0;
 }
 
-/* ── Feedback note (italic muted) ── */
 .feedbackNote {
-  font-size: 0.8rem;
-  color: var(--c-text-muted);
-  margin-top: 4px;
+  margin: 4px 0 12px;
+  color: var(--color-text-tertiary);
+  font-size: .8rem;
   font-style: italic;
-  margin-bottom: 12px;
 }
 
-/* ── Fit explanation ("почему подходит") ── */
-.fitList {
-  list-style: none;
-  padding: 0;
+.fitList,
+.contactList {
   margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  list-style: none;
+}
+
+.fitItem,
+.contactItem {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--color-text-primary);
+  font-size: .9rem;
+  line-height: 1.5;
 }
 
 .fitItem {
-  display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 8px 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--c-text-primary);
 }
 
-.fitItem + .fitItem {
-  border-top: 1px solid #f3f4f6;
+.contactItem {
+  align-items: center;
+  gap: 12px;
+}
+
+.fitItem + .fitItem,
+.contactItem + .contactItem {
+  border-top: 1px solid var(--color-surface-secondary);
 }
 
 .fitItemIcon {
   flex: none;
-  font-size: 0.95rem;
+  font-size: .95rem;
   line-height: 1.5;
-}
-
-/* ── Auto-discovered contacts ("Найденные контакты") ── */
-.contactList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.contactItem {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--c-text-primary);
-}
-
-.contactItem + .contactItem {
-  border-top: 1px solid #f3f4f6;
 }
 
 .contactLabel {
+  min-width: 140px;
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--c-text-secondary);
-  font-size: 0.82rem;
-  min-width: 140px;
+  color: var(--color-text-secondary);
+  font-size: .82rem;
 }
 
 .contactHiringTag {
   display: inline-block;
   padding: 1px 6px;
-  border-radius: 999px;
-  background: rgba(16, 185, 129, 0.12);
-  color: rgb(5, 122, 85);
-  font-size: 0.68rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-signal) 12%, transparent);
+  color: var(--color-signal);
+  font-size: .68rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: .02em;
 }
 
 .contactValue {
+  color: var(--color-signal);
   font-weight: 500;
-  color: var(--c-brand, var(--action-primary));
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
-/* ── Company / hiring summary ── */
 .summaryBlock {
   display: flex;
   flex-direction: column;
@@ -2028,186 +642,84 @@
 }
 
 .summaryLine {
-  font-size: 0.9rem;
-  line-height: 1.55;
-  color: var(--c-text-secondary);
   margin: 0;
+  color: var(--color-text-secondary);
+  font-size: .9rem;
+  line-height: 1.55;
 }
 
 .summaryLineLead {
-  color: var(--c-text-primary);
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
 .summaryStrength {
-  font-size: 0.72rem;
-  color: var(--c-text-muted);
   margin-top: 4px;
+  color: var(--color-text-tertiary);
+  font-size: .72rem;
 }
 
-/* ── Lead detail verdict hero ── */
-/* The one-glance primary answer at the top of the lead detail main column:
-   score gauge + chips (band/gate/freshness) + the top open roles. Lifts the
-   verdict above the prose so a recruiter decides before reading. */
-.leadVerdict {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.leadVerdictTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.leadVerdictChips {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* Verdict chip sub-group — "decision" (band + gate + urgency) vs "meta"
-   (foreign + review + freshness). A subtle divider after the decision group
-   separates the verdict from the metadata at a glance. Drops on narrow
-   viewports so the two clusters stack cleanly while still reading as distinct. */
-.leadVerdictChipGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.leadVerdictChipGroup[data-chip-group="decision"] {
-  margin-right: 4px;
-  padding-right: 12px;
-  border-right: 1px solid var(--c-border);
-}
-
-@media (max-width: 480px) {
-  .leadVerdictChipGroup[data-chip-group="decision"] {
-    border-right: none;
-    padding-right: 0;
-    margin-right: 0;
+@media (hover: hover) and (pointer: fine) {
+  .internalPageBackLink:hover,
+  .leadLink:hover {
+    color: var(--color-signal);
   }
-}
 
-/* sr-only on mobile, visible on desktop. Used by ScoreGauge's level label so
-   the "Высокий/Средний/Низкий" read doesn't duplicate the band chip on a narrow
-   screen but stays visible + announced on desktop. Desktop ≥641px shows it. */
-.srOnlyMobile {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-@media (min-width: 641px) {
-  .srOnlyMobile {
-    position: static;
-    width: auto;
-    height: auto;
-    margin: 0;
-    overflow: visible;
-    clip: auto;
+  .navLink:hover {
+    border-color: var(--color-signal);
+    color: var(--color-signal);
   }
-}
 
-.leadVerdictRoles {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(35, 128, 111, 0.12);
-}
-
-.leadVerdictRolesLabel {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--c-text-muted);
-}
-
-@media (max-width: 640px) {
-  .leadVerdictTop {
-    flex-direction: column;
-    align-items: flex-start;
+  .sidebarLink:hover {
+    text-decoration: underline;
   }
-}
 
-/* Core decision surfaces read as one workspace, not a stack of nested cards. */
-.leadDetailContainer {
-  max-width: 1180px;
-}
-
-.leadDetailContainer .detailLayout {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
-  gap: clamp(28px, 4vw, 52px);
-}
-
-.leadDetailContainer .detailMain {
-  gap: 0;
-}
-
-.leadDetailContainer .detailMain > .contentCard {
-  padding: 22px 0;
-  border: 0;
-  border-top: 1px solid var(--border-subtle);
-  border-radius: 0;
-  background: transparent;
-}
-
-.leadDetailContainer .detailMain > .contentCard:first-child {
-  margin-bottom: 10px;
-  padding: 20px;
-  border: 1px solid rgba(35, 128, 111, .24);
-  border-left: 3px solid var(--signal-primary);
-  border-radius: 14px;
-  background: rgba(35, 128, 111, .035);
-}
-
-.leadDetailContainer .detailSidebar {
-  align-self: start;
-  gap: 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.leadDetailContainer .detailSidebar > .contentCard {
-  padding: 18px 0;
-  border: 0;
-  border-bottom: 1px solid var(--border-subtle);
-  border-radius: 0;
-  background: transparent;
-}
-
-.leadDetailContainer .detailSidebar > .contentCard:last-child {
-  border-bottom: 0;
+  .emptyStateAction:hover,
+  .errorStateAction:hover {
+    background-color: var(--color-signal-hover);
+  }
 }
 
 @media (max-width: 768px) {
-  .leadDetailContainer .detailLayout {
-    grid-template-columns: 1fr;
-    gap: 26px;
+  .internalPageFrameInner {
+    padding: 20px 12px;
   }
 
-  .leadDetailContainer .detailSidebar { margin-top: 4px; }
+  .detailLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .internalPageHeaderTop {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .evidenceStats {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 
 @media (max-width: 640px) {
-  .signalLeadSection {
-    border-right: 0;
-    border-bottom: 1px solid var(--border-subtle);
+  .emptyState {
+    min-height: 168px;
+    padding: 28px 16px;
   }
 
-  .signalLeadSection:last-child { border-bottom: 0; }
+  .dataTableWrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .internalPageBackLink,
+  .navLink,
+  .leadLink,
+  .sidebarLink,
+  .emptyStateAction,
+  .errorStateAction {
+    transition: none;
+  }
 }

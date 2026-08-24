@@ -33,6 +33,10 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const safeLinks = links.flatMap((link) => {
+    const href = safeExternalHref(link.href);
+    return href ? [{ ...link, href }] : [];
+  });
 
   function handleCopy() {
     // Clipboard API with a graceful fallback for non-secure contexts / older
@@ -71,15 +75,16 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
     <div className={s.nextSteps}>
       <div className={s.nextStepsLabel}>Дальнейшие шаги</div>
 
-      {links.length > 0 && (
+      {safeLinks.length > 0 && (
         <div className={s.nextStepsLinks}>
-          {links.map((l) => (
+          {safeLinks.map((l, index) => (
             <a
               key={l.href}
               href={l.href}
               target="_blank"
               rel="noopener noreferrer"
               className={s.nextStepsLink}
+              data-variant={index === 0 ? 'primary' : undefined}
             >
               {l.label} ↗
             </a>
@@ -92,7 +97,6 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
           type="button"
           onClick={handleCopy}
           className={s.nextStepsBtn}
-          data-variant="primary"
           disabled={isPending}
         >
           {copied ? <><CheckIcon className={s.copiedIcon} aria-hidden="true" /> Скопировано</> : 'Скопировать для CRM'}
@@ -109,12 +113,21 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
 
       {copyError && <p className={s.nextStepsError}>{copyError}</p>}
 
-      <details className={s.nextStepsPreview}>
+      <details className={s.nextStepsPreview} data-motion-disclosure>
         <summary>Что попадёт в CRM</summary>
         <pre className={s.nextStepsPre}>{crmBlock}</pre>
       </details>
     </div>
   );
+}
+
+function safeExternalHref(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function legacyCopy(text: string): boolean {

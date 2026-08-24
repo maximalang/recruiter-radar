@@ -210,7 +210,7 @@ function MarketStep({ snapshot }: { snapshot: OnboardingSnapshot }) {
     <section className={styles.stepPanel} aria-labelledby="market-step-title">
       <p className={styles.kicker}>Шаг 3 из 4</p>
       <h2 id="market-step-title">Где искать клиентов</h2>
-      <p className={styles.stepLead}>Задайте рынок и тип компаний. Детальные пороги останутся в расширенных настройках Radar.</p>
+      <p className={styles.stepLead}>Задайте рынок и тип компаний. Детальные пороги останутся в расширенных настройках Радара.</p>
       <form action={saveOnboardingAction} className={styles.form}>
         <input type="hidden" name="step" value="market" />
         <ProfileCheckboxes legend="Отрасли" name="industries" options={INDUSTRY_OPTIONS} selected={snapshot.data.industries ?? []} />
@@ -240,7 +240,7 @@ function DeliveryStep({ snapshot }: { snapshot: OnboardingSnapshot }) {
   return (
     <section className={styles.stepPanel} aria-labelledby="delivery-step-title">
       <p className={styles.kicker}>Шаг 4 из 4</p>
-      <h2 id="delivery-step-title">Как получать новые возможности</h2>
+      <h2 id="delivery-step-title">Как получать новые компании</h2>
       <p className={styles.stepLead}>
         Выберите один основной канал. Настройку можно изменить позже; пропуск явно оставит доставку выключенной.
       </p>
@@ -292,7 +292,7 @@ function CompleteStep({ snapshot }: { snapshot: OnboardingSnapshot }) {
 
   return (
     <section className={styles.stepPanel} aria-labelledby="complete-step-title">
-      <p className={styles.kicker}>Radar готов</p>
+      <p className={styles.kicker}>Радар готов</p>
       <h2 id="complete-step-title">Основа радара готова</h2>
       <p className={styles.stepLead}>
         Профиль создан. Радар готов анализировать рынок после проверки настроек.
@@ -361,7 +361,7 @@ export function OnboardingView(props: {
     : STEP_LABELS.findIndex((step) => step.key === props.snapshot.step);
 
   return (
-    <main className={styles.shell} data-ui-system="recruiter-radar-v7">
+    <main className={styles.shell} data-ui-system="recruiter-radar">
       <header className={styles.header}>
         <Link href="/" className={styles.brand} aria-label="Recruiter Radar">
           <BrandLogo size="small" tone="dark" />

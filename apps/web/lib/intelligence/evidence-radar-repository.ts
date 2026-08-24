@@ -68,6 +68,26 @@ export type EvidenceRadarLead = {
 
 type EvidenceRadarDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
 
+function safeExternalUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || value.trim() === '') return null
+  try {
+    const url = new URL(value.trim())
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null
+  } catch {
+    return null
+  }
+}
+
+function safeContactHref(value: unknown): string | null {
+  if (typeof value !== 'string' || value.trim() === '') return null
+  const href = value.trim()
+  if (/^mailto:[^\s<>"'`?&#@]+@[^\s<>"'`?&#@]+\.[^\s<>"'`?&#@]+$/i.test(href)) {
+    return href
+  }
+  if (/^tel:\+?\d{5,20}$/i.test(href)) return href
+  return safeExternalUrl(href)
+}
+
 export async function listEvidenceRadarLeads(
   input: { workspaceId: string | number; limit?: number },
   db: EvidenceRadarDb | null = getPool(),
@@ -256,8 +276,12 @@ export async function listEvidenceRadarLeads(
     staffingNeed: row.staffingNeed,
     specialization: row.specialization,
     independentSourceCount: Number(row.independentSourceCount),
-    evidence: Array.isArray(row.evidence) ? row.evidence : [],
-    contactPaths: Array.isArray(row.contactPaths) ? row.contactPaths : [],
+    evidence: Array.isArray(row.evidence)
+      ? row.evidence.map((item) => ({ ...item, canonicalUrl: safeExternalUrl(item.canonicalUrl) }))
+      : [],
+    contactPaths: Array.isArray(row.contactPaths)
+      ? row.contactPaths.map((item) => ({ ...item, href: safeContactHref(item.href) }))
+      : [],
     riskReasons: Array.isArray(row.riskReasons) ? row.riskReasons : [],
     temporalContext: summarizeOpportunityTemporalContext(row.temporalEvents),
   }))

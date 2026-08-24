@@ -13,7 +13,7 @@
 
 .eyebrow {
   margin: 0 0 4px;
-  color: var(--c-brand, #153f35);
+  color: var(--color-signal);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -30,7 +30,7 @@
 .step > p,
 .restrictions p {
   margin: 6px 0 0;
-  color: var(--c-text-muted, #667085);
+  color: var(--color-text-tertiary);
   font-size: 0.86rem;
   line-height: 1.5;
   max-width: 68ch;
@@ -41,13 +41,13 @@
   flex: 0 0 190px;
   flex-direction: column;
   gap: 6px;
-  color: var(--c-text-muted, #667085);
+  color: var(--color-text-tertiary);
   font-size: 0.78rem;
 }
 
 .progress progress {
   width: 100%;
-  accent-color: var(--c-brand, #153f35);
+  accent-color: var(--color-signal);
 }
 
 .form,
@@ -64,7 +64,7 @@
   margin: 0;
   padding: 0 0 24px;
   border: 0;
-  border-bottom: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+  border-bottom: 1px solid var(--color-separator);
 }
 
 .step legend {
@@ -81,7 +81,7 @@
   width: 24px;
   height: 24px;
   place-items: center;
-  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.12));
+  border: 1px solid var(--color-separator);
   border-radius: 50%;
   font-size: 0.75rem;
 }
@@ -106,40 +106,42 @@
 
 .chips span {
   display: inline-flex;
-  min-height: 36px;
+  min-height: 44px;
   align-items: center;
   padding: 7px 11px;
-  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.1));
-  border-radius: 10px;
-  background: var(--c-bg-card, #fff);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface-primary);
   font-size: 0.84rem;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition:
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .chips input:focus-visible + span {
-  outline: 2px solid var(--c-brand, #153f35);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
 .chips input:checked + span {
-  border-color: var(--c-brand, #153f35);
-  background: rgba(35, 128, 111, 0.08);
+  border-color: var(--color-signal);
+  background: color-mix(in srgb, var(--color-signal) 8%, transparent);
 }
 
 .scopeNote,
 .preview,
 .empty {
   padding: 10px 12px;
-  border-left: 3px solid var(--c-border, #d0d5dd);
-  background: var(--c-bg-subtle, #f8fafc);
-  color: var(--c-text-muted, #475467);
+  border-left: 3px solid var(--color-separator);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-tertiary);
   font-size: 0.82rem;
   line-height: 1.45;
 }
 
 .scopeNote[data-tone='broad'],
 .scopeNote[data-tone='narrow'] {
-  border-left-color: var(--c-warning, #b54708);
+  border-left-color: var(--color-warning);
 }
 
 .twoCol,
@@ -158,15 +160,23 @@
 
 .case {
   padding: 10px 12px;
-  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
-  border-radius: 10px;
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-surface);
 }
 
 .case summary {
-  min-height: 24px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
   cursor: pointer;
   font-size: 0.86rem;
   font-weight: 600;
+}
+
+.case summary:focus-visible,
+.restrictionList button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .caseFields {
@@ -184,7 +194,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  border-left-color: var(--c-brand, #153f35);
+  border-left-color: var(--color-signal);
 }
 
 .submitRow {
@@ -192,13 +202,13 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 14px;
-  color: var(--c-text-muted, #667085);
+  color: var(--color-text-tertiary);
   font-size: 0.8rem;
 }
 
 .restrictions {
   padding-top: 24px;
-  border-top: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+  border-top: 1px solid var(--color-separator);
 }
 
 .restrictions h3 {
@@ -227,8 +237,8 @@
   justify-content: space-between;
   gap: 12px;
   padding: 8px 10px;
-  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
-  border-radius: 10px;
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-surface);
 }
 
 .restrictionList li span {
@@ -236,15 +246,15 @@
   flex-direction: column;
   gap: 2px;
   font-size: 0.8rem;
-  color: var(--c-text-muted, #667085);
+  color: var(--color-text-tertiary);
 }
 
 .restrictionList button {
-  min-height: 36px;
+  min-height: 44px;
   padding: 6px 10px;
   border: 0;
   background: transparent;
-  color: var(--c-danger, #b42318);
+  color: var(--color-destructive);
   cursor: pointer;
   font: inherit;
   font-size: 0.8rem;
@@ -266,9 +276,10 @@
   .restrictionControls {
     grid-template-columns: 1fr;
   }
+}
 
-  .chips span,
-  .restrictionList button {
-    min-height: 44px;
+@media (prefers-reduced-motion: reduce) {
+  .chips span {
+    transition: none;
   }
 }

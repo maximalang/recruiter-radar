@@ -48,29 +48,56 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
       .filter((element): element is HTMLElement => Boolean(element));
     const toneElements = Array.from(document.querySelectorAll<HTMLElement>("[data-header-tone]"));
 
-    const activeObserver = new IntersectionObserver((entries) => {
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((left, right) => Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top));
-      const nearest = visible[0]?.target as HTMLElement | undefined;
-      if (nearest?.id) setActiveId(nearest.id);
-    }, { rootMargin: "-20% 0px -66% 0px", threshold: [0, 0.01, 0.25] });
+    let activeFrame = 0;
+    const updateActiveSection = () => {
+      window.cancelAnimationFrame(activeFrame);
+      activeFrame = window.requestAnimationFrame(() => {
+        const marker = Math.max(72, Math.min(window.innerHeight * 0.2, 160));
+        const current = sectionElements.reduce<HTMLElement | null>((match, element) => (
+          element.getBoundingClientRect().top <= marker ? element : match
+        ), null);
+        setActiveId(current?.id ?? "");
+      });
+    };
+
+    const resolveToneByGeometry = () => {
+      // Short mobile sections can cross the decision band without ever leaving
+      // the previous marker (the hero keeps intersecting the band), so no
+      // entry reports a transition. Resolve the nearest marker above the
+      // decision line directly, mirroring updateActiveSection.
+      const fallbackMarker = Math.max(72, Math.min(window.innerHeight * 0.2, 160));
+      const current = toneElements.reduce<HTMLElement | null>((match, element) => (
+        element.getBoundingClientRect().top <= fallbackMarker ? element : match
+      ), null);
+      const nextTone = current?.dataset.headerTone;
+      if (nextTone === "dark" || nextTone === "light") setTone(nextTone);
+    };
 
     const toneObserver = new IntersectionObserver((entries) => {
       const visible = entries
         .filter((entry) => entry.isIntersecting)
         .sort((left, right) => Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top));
       const nearest = visible[0]?.target as HTMLElement | undefined;
+      if (!nearest) {
+        resolveToneByGeometry();
+        return;
+      }
       const nextTone = nearest?.dataset.headerTone;
       if (nextTone === "dark" || nextTone === "light") setTone(nextTone);
     }, { rootMargin: "-4% 0px -88% 0px", threshold: [0, 0.01] });
 
-    sectionElements.forEach((element) => activeObserver.observe(element));
     toneElements.forEach((element) => toneObserver.observe(element));
+    updateActiveSection();
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("resize", updateActiveSection);
+    window.addEventListener("hashchange", updateActiveSection);
 
     return () => {
-      activeObserver.disconnect();
+      window.cancelAnimationFrame(activeFrame);
       toneObserver.disconnect();
+      window.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("resize", updateActiveSection);
+      window.removeEventListener("hashchange", updateActiveSection);
     };
   }, []);
 
@@ -145,12 +172,12 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     </a>
   );
 
-  const logoTone = tone === "light" && !scrolled && !menuOpen ? "light" : "dark";
+  const logoTone = scrolled || menuOpen ? "light" : tone;
 
   return (
     <header
       className={headerStyles.header}
-      data-brand-header="recruiter-radar-v3"
+      data-brand-header="recruiter-radar"
       data-scrolled={scrolled || undefined}
       data-tone={tone}
       data-menu-open={menuOpen || undefined}

@@ -9,23 +9,14 @@ import {
   buildCheckoutHref,
   type PublicPreviewInput,
 } from "../../lib/publicProduct";
-import { TargetIcon } from "../ui/icons";
 import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
 import panelStyles from "./conversion-panel.module.css";
-import finalStyles from "./final-radar.module.css";
-import styles from "./landing.module.css";
 
 const PILOT_BULLETS = [
   "Ежедневный приоритет компаний",
   "Почему сейчас + факты и источники",
-  "Настройка под нишу и географию",
+  "Профиль по нише и географии",
 ] as const;
-
-const LANDING_PLAN_DESCRIPTIONS = {
-  pilot: "Короткий запуск, чтобы проверить Recruiter Radar на своей специализации.",
-  monthly: "Для регулярного поиска новых клиентских возможностей.",
-  quarterly: "Для агентств, которые используют радар как постоянный канал поиска клиентов.",
-} as const;
 
 export default function ConversionPanel(props: {
   previewInput: PublicPreviewInput;
@@ -36,96 +27,92 @@ export default function ConversionPanel(props: {
   const secondaryPlans = PUBLIC_PLANS.filter((plan) => plan.code !== "pilot");
 
   return (
-    <section className={styles.conversionPanel} aria-label="Тарифы и ответы" data-conversion-scenes="continuous" data-conversion-panel>
+    <section className={panelStyles.panel} aria-label="Тарифы и ответы" data-conversion-scenes="continuous" data-conversion-panel>
       <div
         id="pricing"
-        className={`${styles.pricingStage} ${panelStyles.anchor} ${panelStyles.pricing} ${panelStyles.viewportSurface}`}
+        className={`${panelStyles.anchor} ${panelStyles.pricing}`}
         data-header-tone="light"
         data-pricing-surface="true"
-        data-pricing-layout="unified-grid"
+        data-pricing-layout="pilot-decision"
         data-motion-reveal="section"
       >
-        <div className={styles.pricingIntro} data-pricing-intro>
+        <div className={panelStyles.pricingIntro} data-pricing-intro>
           <span>Попробуйте на своей нише</span>
-          <h2>Проверьте радар на своей нише за 7 дней.</h2>
-          <p>
-            За неделю станет понятно, находит ли радар новые релевантные компании, даёт ли понятный повод для обращения и хватает ли фактов перед первым контактом.{" "}
-            {props.paymentConfigured
-              ? "Разовая оплата. Без автопродления."
-              : "Оставьте заявку на 7-дневный пилот без списания. Профиль сохранится — оплату можно завершить после подключения платежей."}
-          </p>
+          <h2>Попробовать 7 дней — {pilotPlan.price}</h2>
+          <p>Проверьте радар на своей нише за 7 дней: находит ли он релевантные компании и даёт ли достаточно фактов для первого контакта.</p>
         </div>
 
-        <div className={`${styles.pilotOffer} ${panelStyles.pilotOffer}`} data-pricing-primary="true">
-          <div className={styles.pilotMeta}>
-            <span>Неделя</span>
-            <strong>{pilotPlan.cadence}</strong>
-          </div>
-          <div className={styles.pilotPrice}>
-            <strong>{pilotPlan.price}</strong>
-          </div>
-          <p>{LANDING_PLAN_DESCRIPTIONS.pilot}</p>
-          <ul>
-            {PILOT_BULLETS.map((bullet) => <li key={bullet}><ArrowGlyph size={14} />{bullet}</li>)}
-          </ul>
-          <Link
-            href={buildCheckoutHref({ ...props.previewInput, planCode: pilotPlan.code })}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
-            data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricingPilot}
+        <div className={panelStyles.pricingDecision}>
+          <div
+            className={panelStyles.pilotOffer}
+            data-pricing-primary="true"
+            data-pilot-entry="primary"
           >
-            {props.paymentConfigured ? "Запустить на 7 дней" : "Оставить заявку на пилот"} <ArrowGlyph />
-          </Link>
-          <small data-consent-safe-copy>{props.paymentConfigured
-            ? "Разовая оплата · без автопродления"
-            : "Заявка без списания · профиль сохранится"}</small>
-        </div>
+            <div className={panelStyles.pilotTopline}>
+              <div className={panelStyles.pilotMeta}>
+                <span className={panelStyles.pilotEyebrow}>Пилот</span>
+                <strong>{pilotPlan.cadence}</strong>
+              </div>
+              <div className={panelStyles.pilotPrice}>{pilotPlan.price}</div>
+            </div>
+            <ul>
+              {PILOT_BULLETS.map((bullet) => <li key={bullet}><ArrowGlyph size={14} />{bullet}</li>)}
+            </ul>
+            <Link
+              className={panelStyles.pilotCta}
+              prefetch={false}
+              href={buildCheckoutHref({ ...props.previewInput, planCode: pilotPlan.code })}
+              data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
+              data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricingPilot}
+            >
+              {props.paymentConfigured ? "Запустить на 7 дней" : "Оставить заявку на пилот"} <ArrowGlyph />
+            </Link>
+            <small data-consent-safe-copy>{props.paymentConfigured
+              ? "Разовая оплата · без автопродления"
+              : "Оставьте заявку на 7-дневный пилот без списания · профиль сохранится"}</small>
+          </div>
 
-        <div className={`${styles.secondaryOffers} ${panelStyles.secondaryOffers}`} aria-label="Продолжение после пилота" data-pricing-secondary="true">
-          <span className={styles.secondaryOfferLabel}>Продолжите, если радар подходит вашей нише</span>
-          {secondaryPlans.map((plan) => {
-            const quarterly = plan.code === "quarterly";
-            return (
-              <article key={plan.code} data-plan-code={plan.code} data-recommended={plan.isPrimary || undefined}>
-                <div className={panelStyles.offerTopline}>
-                  <span>{plan.name}</span>
-                  <b>{plan.cadence}</b>
-                </div>
-                <strong>{plan.price}</strong>
-                <small className={panelStyles.planEquivalent}>
-                  {quarterly ? "≈ 2 330 ₽ за 30 дней" : plan.monthlyEquivalent}
-                </small>
-                <p>{LANDING_PLAN_DESCRIPTIONS[plan.code]}</p>
-                <div className={panelStyles.planProof}>
-                  <span>{quarterly ? "Экономия 1 980 ₽" : "На 30% выгоднее недели"}</span>
-                </div>
-                <Link
-                  href={buildCheckoutHref({ ...props.previewInput, planCode: plan.code })}
-                  data-analytics-event={LANDING_ANALYTICS_EVENT.continuationCtaClicked}
-                  data-analytics-context={quarterly ? LANDING_ANALYTICS_CONTEXT.quarterly : LANDING_ANALYTICS_CONTEXT.monthly}
-                >
-                  {quarterly ? "Подключить квартал" : "Подключить месяц"} <ArrowGlyph />
-                </Link>
-              </article>
-            );
-          })}
+          <div className={panelStyles.secondaryOffers} aria-label="Продолжение после пилота" data-pricing-secondary="true">
+            <span className={panelStyles.secondaryOfferLabel}>После пилота</span>
+            {secondaryPlans.map((plan) => {
+              const quarterly = plan.code === "quarterly";
+              return (
+                <article key={plan.code} data-plan-code={plan.code}>
+                  <div>
+                    <span>{plan.name}</span>
+                    <small>{plan.cadence}</small>
+                  </div>
+                  <strong>{plan.price}</strong>
+                  <Link
+                    prefetch={false}
+                    href={buildCheckoutHref({ ...props.previewInput, planCode: plan.code })}
+                    data-analytics-event={LANDING_ANALYTICS_EVENT.continuationCtaClicked}
+                    data-analytics-context={quarterly ? LANDING_ANALYTICS_CONTEXT.quarterly : LANDING_ANALYTICS_CONTEXT.monthly}
+                  >
+                    {quarterly ? "Квартал" : "Месяц"} <ArrowGlyph />
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       <div
         id="faq"
-        className={`${styles.faqStage} ${panelStyles.anchor} ${panelStyles.faq} ${panelStyles.viewportSurface}`}
+        className={`${panelStyles.anchor} ${panelStyles.faq}`}
         data-header-tone="light"
         data-faq-surface="true"
-        data-faq-layout="editorial"
+        data-faq-layout="centered"
         data-motion-reveal="section"
       >
-        <div className={styles.faqHeading} data-faq-heading>
-          <span>Коротко о главном</span>
+        <div className={panelStyles.faqHeading} data-faq-heading>
+          <span>FAQ · Коротко о главном</span>
           <h2>Что важно знать перед запуском.</h2>
           <p>Как появляются компании, откуда берутся данные и что происходит после оплаты.</p>
           <small data-faq-trust>Пример можно настроить без регистрации.</small>
         </div>
-        <div className={styles.faqList} data-faq-list>
+        <div className={panelStyles.faqList} data-faq-list>
           {props.faqItems.map((item, index) => (
             <details key={item.question} open={index === 0} data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened} data-faq-item>
               <summary><span>{String(index + 1).padStart(2, "0")}</span>{item.question}<i aria-hidden="true"><PlusGlyph /></i></summary>
@@ -137,31 +124,45 @@ export default function ConversionPanel(props: {
 
       <div
         id="conversion-final"
-        className={`${styles.finalCall} ${panelStyles.final}`}
+        className={panelStyles.final}
         data-header-tone="dark"
         data-motion-reveal="section"
       >
-        <span>7 ДНЕЙ / СВОЯ НИША</span>
-        <h2>Посмотрите, кому стоит написать сейчас.</h2>
-        <p>Настройте специализацию и географию. За 7 дней радар соберёт приоритет компаний, факты и понятный повод для первого контакта.</p>
-        <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
-          <li>990 ₽ / 7 дней</li>
-          <li>Без автопродления</li>
-          <li>Факты по каждой компании</li>
-          <li>Сообщения отправляете вы</li>
-        </ul>
-        <div className={finalStyles.radar} data-final-radar-composition="signal-lock" aria-hidden="true">
-          <TargetIcon className={finalStyles.glyph} />
+        <div className={panelStyles.finalCopy}>
+          <svg className={panelStyles.finalField} viewBox="0 0 520 320" aria-hidden="true" focusable="false" data-final-radar="echo">
+            <defs>
+              <radialGradient id="final-echo-halo" cx="50%" cy="50%" r="50%">
+                <stop className={panelStyles.finalHaloCore} offset="0" />
+                <stop offset="1" stopColor="var(--color-signal)" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <path className={panelStyles.finalArc} d="M 60 318 A 258 258 0 0 1 518 296" />
+            <circle className={panelStyles.finalOrbit} cx="330" cy="196" r="118" pathLength={100} strokeDasharray="14 86" />
+            <circle className={panelStyles.finalSignal} cx="330" cy="196" r="3.4" />
+            <circle cx="352" cy="176" r="1.7" /><circle cx="309" cy="212" r="1.5" />
+            <circle className={panelStyles.finalEchoCopper} cx="368" cy="214" r="2.1" />
+          </svg>
+          <span className={panelStyles.finalEyebrow}>7 дней / своя ниша</span>
+          <h2>Посмотрите, кому стоит написать сейчас.</h2>
+          <p>Радар покажет приоритет компаний, проверяемые факты и конкретный повод для первого контакта.</p>
         </div>
-        <div className={styles.finalActions}>
+        <div className={panelStyles.finalDecision}>
+          <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
+            <li>{pilotPlan.price} / 7 дней</li>
+            <li>Без автопродления</li>
+            <li>Проверяемые факты</li>
+            <li>Сообщения отправляете вы</li>
+          </ul>
           <Link
+            className={panelStyles.finalCta}
+            prefetch={false}
             href={buildCheckoutHref({ ...props.previewInput, planCode: pilotPlan.code })}
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.closing}
           >
             {props.paymentConfigured ? `Запустить на 7 дней — ${pilotPlan.price}` : "Оставить заявку на пилот"} <ArrowGlyph />
           </Link>
-          <a href="#preview-configurator">Сначала посмотреть пример <ArrowGlyph /></a>
+          <a className={panelStyles.finalSecondaryLink} href="#preview-configurator">Сначала посмотреть пример</a>
         </div>
       </div>
     </section>

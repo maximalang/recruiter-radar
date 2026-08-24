@@ -46,22 +46,26 @@ function lead(cardId: string, organizationName: string, city: string): EvidenceR
   }
 }
 
-describe('EvidenceRadarMap selection', () => {
-  it('presents the selected lead in recruiter decision order without internal English labels', () => {
+function evidence(id: string, occurredAt: string) {
+  return {
+    id,
+    eventType: 'hiring_growth',
+    sourceRegistryId: `source-${id}`,
+    occurredAt,
+    detectedAt: occurredAt,
+    sourceFamily: 'career-pages',
+    confidence: 0.9,
+    canonicalUrl: 'https://example.test/careers',
+    primarySource: true,
+  }
+}
+
+const REFERENCE_TIMESTAMP = Date.parse('2026-08-17T10:00:00.000Z')
+
+describe('EvidenceRadarMap V1-V6 contract', () => {
+  it('presents selected company in Why Now → Evidence → Action order', () => {
     const radarLead = lead('77', 'Альфа', 'Москва')
-    radarLead.evidence = [
-      {
-        id: 'evidence-1',
-        eventType: 'hiring_growth',
-        sourceRegistryId: 'source-registry-1',
-        occurredAt: '2026-08-11T00:00:00.000Z',
-        detectedAt: '2026-08-11T01:00:00.000Z',
-        sourceFamily: 'career-pages',
-        confidence: 0.9,
-        canonicalUrl: 'https://example.test/careers',
-        primarySource: true,
-      },
-    ]
+    radarLead.evidence = [evidence('evidence-1', '2026-08-11T00:00:00.000Z')]
     radarLead.score.contributions = [
       {
         eventId: 'evidence-1',
@@ -71,37 +75,93 @@ describe('EvidenceRadarMap selection', () => {
       },
     ]
 
-    const { container } = render(<EvidenceRadarMap leads={[radarLead]} />)
-    const card = container.querySelector('[data-evidence-lead-card]')
+    const { container } = render(<EvidenceRadarMap leads={[radarLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
+    const card = container.querySelector('[data-evidence-lead-detail]')
     expect(card).not.toBeNull()
     const text = card?.textContent ?? ''
 
-    expect(text).toContain('Подтверждённая возможность')
-    expect(text).toContain('Сила возможности')
-    expect(text).toContain('Достоверность')
-    expect(text).toContain('Срочность')
-    expect(text).toContain('Доступность контакта')
+    expect(text).toContain('Компания с подтверждённым сигналом')
+    expect(container.querySelector('[aria-label="Сила сигнала 82 из 100"]')).not.toBeNull()
+    expect(text).toContain('Почему сейчас')
+    expect(text).toContain('Подтверждения')
     expect(text).toContain('Рост найма')
     expect(text).toContain('достоверность 90%')
+    expect(text).toContain('Контакт')
+    expect(text).toContain('Следующий ход')
+    expect(text).toContain('Диагностика оценки')
     expect(text).toContain('Интенсивность найма')
     expect(text).not.toMatch(/Evidence lead|Opportunity|Confidence|Urgency|Contactability|Hiring Growth|confidence 90%|hiring_intent/)
 
     const positions = [
       'Альфа',
       'Почему сейчас',
-      'Сила возможности',
-      'Доказательства',
-      'Безопасный путь контакта',
-      'Следующий шаг',
+      'Подтверждения',
+      'Контакт',
+      'Следующий ход',
       'Диагностика оценки',
     ].map((label) => text.indexOf(label))
     expect(positions.every((position) => position >= 0)).toBe(true)
     expect(positions).toEqual([...positions].sort((left, right) => left - right))
   })
 
-  it('keeps a 44px semantic marker and updates the live detail without losing focus', () => {
+  it('uses recency × evidence confidence in compact and full comparison modes', () => {
+    const alphaLead = lead('77', 'Альфа', 'Москва')
+    alphaLead.evidence = [evidence('alpha-evidence', '2026-08-15T00:00:00.000Z')]
+    const betaLead = lead('78', 'Бета', 'Казань')
+    betaLead.evidence = [evidence('beta-evidence', '2026-08-10T00:00:00.000Z')]
+    const gammaLead = lead('79', 'Гамма', 'Самара')
+    gammaLead.evidence = [evidence('gamma-evidence', '2026-08-12T00:00:00.000Z')]
+
+    const { container } = render(<EvidenceRadarMap leads={[alphaLead, betaLead, gammaLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
+
+    expect(screen.getByText('Свежесть, подтверждение и релевантность')).toBeInTheDocument()
+    expect(screen.getByText('X — свежесть')).toBeInTheDocument()
+    expect(screen.getByText('Y — подтверждение')).toBeInTheDocument()
+    expect(container.querySelector('[data-evidence-radar-map]')).toHaveAttribute('data-density', 'compact')
+    expect(screen.getAllByText(/релевантность 80/)).toHaveLength(3)
+    expect(container.querySelector('[data-recency]')).not.toBeNull()
+    expect(container.querySelector('[data-confidence]')).not.toBeNull()
+    expect(container.querySelector('[data-region-code]')).toBeNull()
+  })
+
+  it('uses a compact evidence strip without axes or a duplicate ranked list for sparse data', () => {
+    const radarLead = lead('77', 'Альфа', 'Москва')
+    radarLead.evidence = [evidence('evidence-1', '2026-08-15T00:00:00.000Z')]
+
+    const { container } = render(<EvidenceRadarMap leads={[radarLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
+
+    expect(container.querySelector('[data-sparse-evidence-strip]')).not.toBeNull()
+    expect(container.querySelector('[data-evidence-radar-map]')).toHaveAttribute('data-density', 'sparse')
+    expect(screen.queryByText('X — свежесть')).not.toBeInTheDocument()
+    expect(screen.queryByText('Y — подтверждение')).not.toBeInTheDocument()
+    expect(screen.queryByText('Сигналы по приоритету')).not.toBeInTheDocument()
+    expect(screen.getByText('1 компания')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Альфа, Москва' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('selects the first Radar-priority company rather than the repository input order', () => {
+    const alphaLead = lead('77', 'Альфа', 'Москва')
+    alphaLead.score.leadScore = 99
+    alphaLead.score.opportunityScore = 40
+    alphaLead.evidence = [evidence('alpha-evidence', '2026-08-16T00:00:00.000Z')]
+
+    const betaLead = lead('78', 'Бета', 'Казань')
+    betaLead.score.leadScore = 70
+    betaLead.score.opportunityScore = 95
+    betaLead.evidence = [evidence('beta-evidence', '2026-08-15T00:00:00.000Z')]
+
+    render(<EvidenceRadarMap leads={[alphaLead, betaLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
+
+    expect(screen.getByRole('button', { name: 'Альфа, Москва' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Бета, Казань' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent('Выбрано: Бета, Казань')
+    expect(screen.getByRole('heading', { name: 'Бета' })).toBeInTheDocument()
+  })
+
+  it('keeps 44px semantic markers and updates live detail without losing focus', () => {
     const { container } = render(
       <EvidenceRadarMap
+        referenceTimestamp={REFERENCE_TIMESTAMP}
         leads={[
           lead('77', 'Альфа', 'Москва'),
           lead('78', 'Бета', 'Казань'),
@@ -112,7 +172,6 @@ describe('EvidenceRadarMap selection', () => {
     const alpha = screen.getByRole('button', { name: 'Альфа, Москва' })
     const beta = screen.getByRole('button', { name: 'Бета, Казань' })
     expect(alpha).toHaveAttribute('aria-pressed', 'true')
-    expect(alpha).toHaveAttribute('data-motion-interactive')
 
     beta.focus()
     fireEvent.click(beta)
@@ -122,19 +181,29 @@ describe('EvidenceRadarMap selection', () => {
     expect(alpha).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByRole('status')).toHaveTextContent('Выбрано: Бета, Казань')
     expect(screen.getByRole('heading', { name: 'Бета' })).toBeInTheDocument()
-    expect(container.querySelector('[data-evidence-lead-card]')).toHaveAttribute(
-      'data-motion-disclosure',
-    )
+    expect(container.querySelector('[data-evidence-lead-detail]')).not.toBeNull()
   })
 
-  it('marks deterministic evidence dots for short selected-state reveal', () => {
-    const { container } = render(
-      <EvidenceRadarMap leads={[lead('77', 'Альфа', 'Москва')]} />,
-    )
+  it('renders evidence points only for real evidence rows, never from source-count decoration', () => {
+    const radarLead = lead('77', 'Альфа', 'Москва')
+    radarLead.independentSourceCount = 7
+    radarLead.evidence = [
+      evidence('evidence-1', '2026-08-15T00:00:00.000Z'),
+      evidence('evidence-2', '2026-08-14T00:00:00.000Z'),
+    ]
 
-    const dots = container.querySelectorAll('[data-evidence-source]')
-    expect(dots).toHaveLength(2)
-    expect(dots[0]).toHaveStyle('--source-index: 0')
-    expect(dots[1]).toHaveStyle('--source-index: 1')
+    const { container } = render(<EvidenceRadarMap leads={[radarLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
+    expect(container.querySelectorAll('[data-evidence-source]')).toHaveLength(2)
+  })
+
+  it('uses the shared Russian plural rules for Radar company and evidence counts', () => {
+    const radarLead = lead('77', 'Альфа', 'Москва')
+    radarLead.independentSourceCount = 1
+    radarLead.evidence = [evidence('evidence-1', '2026-08-15T00:00:00.000Z')]
+
+    render(<EvidenceRadarMap leads={[radarLead]} referenceTimestamp={REFERENCE_TIMESTAMP} />)
+
+    expect(screen.getByText('1 компания')).toBeInTheDocument()
+    expect(screen.getByText('1 независимый источник')).toBeInTheDocument()
   })
 })

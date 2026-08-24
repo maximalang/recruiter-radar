@@ -1,4 +1,4 @@
-/* Feedback buttons — references :root tokens via internal-page.module.css */
+/* Feedback controls — Calm Intelligence workflow states on the shared semantic foundation. */
 
 .feedbackGroup {
   margin-bottom: 8px;
@@ -9,12 +9,10 @@
 }
 
 .feedbackGroupLabel {
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--c-text-muted);
   margin-bottom: 4px;
+  color: var(--color-text-tertiary);
+  font-size: var(--type-label-size);
+  font-weight: 600;
 }
 
 .feedbackBtnRow {
@@ -24,22 +22,23 @@
 }
 
 .feedbackBtn {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  font-weight: 500;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-secondary);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-secondary);
   cursor: pointer;
+  font-size: var(--type-metadata-size);
+  font-weight: 500;
   transition:
-    color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    background-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    border-color var(--rr-motion-duration-control) var(--rr-motion-ease-standard),
-    box-shadow var(--rr-motion-duration-control) var(--rr-motion-ease-standard);
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 /* Inline-SVG triage icon — inherits the button tone via currentColor. */
@@ -54,49 +53,54 @@
   height: 100%;
 }
 
-.feedbackBtn:focus-visible {
-  outline: 2px solid var(--c-brand);
+.feedbackBtn:focus-visible,
+.noteInput:focus-visible,
+.noteSave:focus-visible,
+.noteSkip:focus-visible {
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
-.feedbackBtn:disabled {
+.feedbackBtn:disabled,
+.noteSave:disabled,
+.noteSkip:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
 
 .feedbackBtn[data-active="true"][data-tone="success"] {
-  border-color: #10b981;
-  box-shadow: inset 0 0 0 1px #10b981;
-  background-color: rgba(16, 185, 129, 0.1);
-  color: #10b981;
+  border-color: var(--color-positive);
+  box-shadow: none;
+  background-color: color-mix(in srgb, var(--color-positive) 8%, var(--color-surface-primary));
+  color: var(--color-positive);
 }
 
 .feedbackBtn[data-active="true"][data-tone="neutral"] {
-  border-color: #6b7280;
-  box-shadow: inset 0 0 0 1px #6b7280;
-  background-color: rgba(107, 114, 128, 0.1);
-  color: #6b7280;
+  border-color: var(--color-separator-strong);
+  box-shadow: none;
+  background-color: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
 }
 
 .feedbackBtn[data-active="true"][data-tone="warning"] {
-  border-color: #f59e0b;
-  box-shadow: inset 0 0 0 1px #f59e0b;
-  background-color: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  border-color: var(--color-warning);
+  box-shadow: none;
+  background-color: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface-primary));
+  color: var(--color-warning);
 }
 
 .feedbackBtn[data-active="true"][data-tone="info"] {
-  border-color: var(--signal-support);
-  box-shadow: inset 0 0 0 1px var(--signal-support);
-  background-color: rgba(35, 128, 111, 0.1);
-  color: var(--signal-support);
+  border-color: var(--color-information);
+  box-shadow: none;
+  background-color: color-mix(in srgb, var(--color-information) 8%, var(--color-surface-primary));
+  color: var(--color-information);
 }
 
 .feedbackBtn[data-active="true"][data-tone="danger"] {
-  border-color: #ef4444;
-  box-shadow: inset 0 0 0 1px #ef4444;
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  border-color: var(--color-destructive);
+  box-shadow: none;
+  background-color: color-mix(in srgb, var(--color-destructive) 8%, var(--color-surface-primary));
+  color: var(--color-destructive);
 }
 
 .noteRow {
@@ -110,71 +114,63 @@
 .noteInput {
   flex: 1 1 200px;
   min-width: 0;
+  min-height: 44px;
   padding: 6px 10px;
-  font-size: 0.78rem;
-  border-radius: 6px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-primary);
+  font-size: var(--type-metadata-size);
 }
 
-.noteInput:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 1px;
+.noteSave,
+.noteSkip {
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  font-size: var(--type-metadata-size);
+  font-weight: 600;
+  transition:
+    color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard),
+    border-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .noteSave {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border: 1px solid var(--c-brand);
-  background-color: var(--c-brand);
-  color: #fff;
-  cursor: pointer;
-}
-
-.noteSave:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
-}
-
-.noteSave:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  border: 1px solid var(--color-signal);
+  background-color: var(--color-signal);
+  color: var(--color-text-inverse);
 }
 
 .noteSkip {
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-muted);
-  cursor: pointer;
+  border: 1px solid var(--color-separator);
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-tertiary);
 }
 
-.noteSkip:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
-}
+@media (hover: hover) and (pointer: fine) {
+  .noteSave:hover {
+    border-color: var(--color-signal-hover);
+    background-color: var(--color-signal-hover);
+  }
 
-.noteSkip:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  .noteSkip:hover {
+    background-color: var(--color-surface-secondary);
+  }
 }
 
 .errorText {
-  font-size: 0.75rem;
-  color: #ef4444;
   margin-top: 6px;
+  color: var(--color-destructive);
+  font-size: var(--type-metadata-size);
 }
 
 .statusText {
   min-height: 1.05rem;
   margin: 6px 0 0;
-  color: var(--c-text-muted);
-  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  font-size: var(--type-metadata-size);
 }
 
 .statusText:empty {
@@ -183,16 +179,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .feedbackBtn {
+  .feedbackBtn,
+  .noteSave,
+  .noteSkip {
     transition: none;
   }
 }
 
 @media (max-width: 640px) {
-  /* Tap-target floor: triage buttons must be ≥44px tall for comfortable touch
-     use (WCAG 2.5.5 / Apple HIG). */
   .feedbackBtn {
-    min-height: 44px;
     padding: 10px 14px;
   }
 }

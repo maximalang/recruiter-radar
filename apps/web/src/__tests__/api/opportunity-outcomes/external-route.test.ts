@@ -17,10 +17,13 @@ describe('external opportunity outcome route', () => {
   const originalLedger = process.env.OPPORTUNITY_OUTCOMES_ENABLED
   const originalExternal =
     process.env.OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED
+  const originalWebhookSecret = process.env.OPPORTUNITY_OUTCOMES_WEBHOOK_SECRET
 
-  afterAll(() => {
+  afterEach(() => {
     restore('OPPORTUNITY_OUTCOMES_ENABLED', originalLedger)
     restore('OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED', originalExternal)
+    restore('OPPORTUNITY_OUTCOMES_WEBHOOK_SECRET', originalWebhookSecret)
+    jest.clearAllMocks()
   })
 
   it('remains unavailable even when the legacy global-secret flag is set', async () => {
@@ -43,7 +46,52 @@ describe('external opportunity outcome route', () => {
     expect(resolveOpportunityPublicReference).not.toHaveBeenCalled()
     expect(recordOpportunityOutcome).not.toHaveBeenCalled()
   })
+
+  it('stays fail-closed before reading a declared oversized payload', async () => {
+    enableExternalIngest()
+    const request = new NextRequest(
+      'https://recruiter-radar.ru/api/opportunities/outcomes/external',
+      {
+        method: 'POST',
+        headers: { 'content-length': String((16 * 1024) + 1) },
+        body: '{}',
+      },
+    )
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({ error: 'not_found' })
+    expect(request.bodyUsed).toBe(false)
+    expect(resolveOpportunityPublicReference).not.toHaveBeenCalled()
+    expect(recordOpportunityOutcome).not.toHaveBeenCalled()
+  })
+
+  it('stays fail-closed before reading an oversized payload without content-length', async () => {
+    enableExternalIngest()
+    const request = new NextRequest(
+      'https://recruiter-radar.ru/api/opportunities/outcomes/external',
+      {
+        method: 'POST',
+        body: 'x'.repeat((16 * 1024) + 1),
+      },
+    )
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({ error: 'not_found' })
+    expect(request.bodyUsed).toBe(false)
+    expect(resolveOpportunityPublicReference).not.toHaveBeenCalled()
+    expect(recordOpportunityOutcome).not.toHaveBeenCalled()
+  })
 })
+
+function enableExternalIngest() {
+  process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+  process.env.OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED = 'true'
+  process.env.OPPORTUNITY_OUTCOMES_WEBHOOK_SECRET = 'test-webhook-secret'
+}
 
 function restore(name: string, value: string | undefined) {
   if (value === undefined) delete process.env[name]

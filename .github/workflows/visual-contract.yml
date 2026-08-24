@@ -1,0 +1,25 @@
+name: Visual contract
+
+on:
+  push:
+    branches: [main, develop, 'codex/**', 'chatgpt/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semantic-visual-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Enforce semantic visual system
+        run: node scripts/ci/no-hardcoded-visual-values.mjs

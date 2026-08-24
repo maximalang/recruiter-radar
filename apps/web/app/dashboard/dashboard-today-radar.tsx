@@ -1,122 +1,130 @@
 import Link from "next/link";
-
 import type { LeadItem } from "@/lib/leads-data";
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from "@/lib/leads/lead-quality";
-import {
-  EmptyState,
-  ForeignEmployerBadge,
-  ScoreBandChip,
-  ScoreBar,
-  SignalFreshnessChip,
-  UrgencyCueChip,
-} from "../ui/internal-page";
+import { formatVacanciesCount, pluralForm } from "@/lib/format/plural";
+import { formatSignalFreshness } from "../ui/internal-page";
+import { StaticEmptyState } from "../ui/static-empty-state";
 import { TargetIcon } from "../ui/icons";
 import styles from "./dashboard-workspace.module.css";
 
 interface DashboardTodayRadarProps {
-  /** Top candidates worth contacting now, ranked by score. */
   topLeads: LeadItem[];
-  /** Count of candidates awaiting analyst review. */
   pendingReview: number;
-  /** Resolved hiring mode per active client profile id. */
   hiringModeByProfileId?: Record<string, "specialist" | "executive" | "volume">;
   lastRunAt: string | null;
 }
 
-export default function DashboardTodayRadar({
-  topLeads,
-  pendingReview,
-  hiringModeByProfileId,
-  lastRunAt,
-}: DashboardTodayRadarProps) {
+function confidenceLabel(gate: LeadItem["confidenceGate"]) {
+  if (gate === "A") return "высокое подтверждение";
+  if (gate === "B") return "достаточное подтверждение";
+  if (gate === "C") return "требует проверки";
+  return "недостаточно подтверждений";
+}
+
+function formatEvidenceCount(count: number) {
+  return `${count} ${pluralForm(count, ["подтверждение", "подтверждения", "подтверждений"])}`;
+}
+
+function formatSourceCount(count: number) {
+  return `${count} ${pluralForm(count, ["источник", "источника", "источников"])}`;
+}
+
+function formatRunTime(value: string | null) {
+  if (!value) return "время последнего сканирования ещё не зафиксировано";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "время последнего сканирования уточняется";
+  return `сканирование ${new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date)}`;
+}
+
+export default function DashboardTodayRadar({ topLeads, pendingReview, hiringModeByProfileId, lastRunAt }: DashboardTodayRadarProps) {
+  const recentSignals = topLeads.filter((lead) => Boolean(lead.latestPublishedAt)).slice(0, 3);
+
   return (
     <section className={styles.todayRadarSection} aria-labelledby="today-radar-heading">
       <div className={styles.todayRadarHeader}>
-        <h2 id="today-radar-heading" className={styles.analyticsHeading}>
-          Возможности на сегодня
-        </h2>
-        <Link href="/review" className={styles.todayRadarReviewPill} data-pending={pendingReview > 0}>
-          На проверке: {pendingReview}
-        </Link>
+        <div>
+          <span className={styles.sectionEyebrow}>Приоритет</span>
+          <h2 id="today-radar-heading" className={styles.analyticsHeading}>Что требует внимания</h2>
+        </div>
       </div>
 
       {topLeads.length === 0 ? (
-        <EmptyState
+        <StaticEmptyState
           icon={TargetIcon}
-          title={lastRunAt ? "Подходящих компаний пока нет" : "Первый запуск Radar ещё не завершён"}
-          text={lastRunAt ? "Последний запуск завершён, но компании не прошли ваши текущие фильтры. Можно расширить рынок или дождаться свежих сигналов." : "Профиль сохранён. После первого сканирования здесь появятся компании с evidence и рекомендуемым действием."}
-          action={{ href: "/settings/radar", label: "Проверить настройки Radar" }}
+          title={lastRunAt ? "Подходящих компаний пока нет" : "Первое сканирование ещё не завершено"}
+          description={lastRunAt ? "Последний запуск завершён, но компании не прошли текущие условия. Можно уточнить профиль или дождаться новых сигналов." : "После первого сканирования здесь появятся компании, причины приоритета и подтверждения."}
+          action={<Link href="/settings/radar">Проверить профиль радара</Link>}
         />
       ) : (
         <div className={styles.todayRadarList}>
-          {topLeads.map((lead, index) => {
+          {topLeads.slice(0, 5).map((lead, index) => {
             const roleNames = deriveRoleNames({ evidenceTitles: lead.evidenceTitles });
             const { shown: shownRoles, more: moreRoles } = splitRolesForDisplay(roleNames, 2);
             const hiringMode = hiringModeByProfileId?.[lead.clientProfileId] ?? "specialist";
-            const urgency = deriveUrgencyCue({
-              vacanciesCount: lead.vacanciesCount,
-              latestPublishedAt: lead.latestPublishedAt,
-              hiringMode,
-            });
+            const urgency = deriveUrgencyCue({ vacanciesCount: lead.vacanciesCount, latestPublishedAt: lead.latestPublishedAt, hiringMode });
+            const freshness = formatSignalFreshness(lead.latestPublishedAt)?.label ?? "свежесть уточняется";
+            const roles = shownRoles.length > 0 ? `${shownRoles.join(" · ")}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ""}` : "роли уточняются";
 
             return (
-              <Link
-                key={lead.id}
-                href={`/leads/${lead.id}`}
-                className={styles.todayRadarCard}
-                data-rank={index}
-              >
-                <div className={styles.todayRadarCardTop}>
-                  <span className={styles.todayRadarOrg}>{lead.orgName}</span>
-                  <ScoreBandChip score={lead.score} />
-                  <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
-                </div>
-
-                <div className={styles.todayRadarScore}>
-                  <ScoreBar score={lead.score} />
-                </div>
-
-                <div className={styles.todayRadarFreshness}>
-                  <UrgencyCueChip level={urgency.level} label={urgency.label} />
-                  {lead.latestPublishedAt ? (
-                    <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
-                  ) : null}
-                </div>
-
-                {lead.whyNow ? (
-                  <div className={styles.todayRadarLine}>
-                    <span className={styles.todayRadarLineLabel}>Почему сейчас</span>
-                    <span className={styles.todayRadarLineText}>{lead.whyNow}</span>
-                  </div>
-                ) : null}
-
-                {lead.evidenceTitles.length > 0 ? (
-                  <div className={styles.todayRadarLine}>
-                    <span className={styles.todayRadarLineLabel}>Evidence</span>
-                    <span className={styles.todayRadarLineText}>{lead.evidenceTitles.slice(0, 2).join(" · ")}</span>
-                  </div>
-                ) : null}
-
-                {lead.opener ? (
-                  <div className={styles.todayRadarLine}>
-                    <span className={styles.todayRadarLineLabel}>Следующий шаг</span>
-                    <span className={styles.todayRadarLineText}>{lead.opener}</span>
-                  </div>
-                ) : null}
-
-                <div className={styles.todayRadarLine}>
-                  <span className={styles.todayRadarLineLabel}>Роли</span>
-                  <span className={styles.todayRadarLineText}>
-                    {shownRoles.length > 0
-                      ? `${shownRoles.join(" · ")}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ""}`
-                      : "роли не определены"}
-                  </span>
-                </div>
+              <Link key={lead.id} href={`/leads/${lead.id}`} className={styles.todayRadarRow}>
+                <span className={styles.todayRank}>{String(index + 1).padStart(2, "0")}</span>
+                <span className={styles.todayIdentity}>
+                  <strong>{lead.orgName}</strong>
+                  <small>{lead.locationNames.slice(0, 2).join(", ") || "география уточняется"}</small>
+                </span>
+                <span className={styles.todayDecision}>
+                  <strong>{lead.whyNow || urgency.label}</strong>
+                  <small>{freshness} · {roles}</small>
+                </span>
+                <span className={styles.todayEvidence}>
+                  <strong>{formatEvidenceCount(lead.evidenceTitles.length)}</strong>
+                  <small>{formatSourceCount(lead.sourceFamilies.length)} · {formatVacanciesCount(lead.vacanciesCount)}</small>
+                </span>
+                <span className={styles.todayConfidence}>{confidenceLabel(lead.confidenceGate)}</span>
+                <span className={styles.todayAction}>Открыть</span>
               </Link>
             );
           })}
         </div>
       )}
+
+      <div className={styles.todayChanges} aria-labelledby="today-changes-heading">
+        <div className={styles.todayChangesHeader}>
+          <span className={styles.sectionEyebrow}>Изменения</span>
+          <h3 id="today-changes-heading">Последние сигналы</h3>
+        </div>
+        {recentSignals.length > 0 ? (
+          <div className={styles.todayChangesList}>
+            {recentSignals.map((lead) => (
+              <Link key={lead.id} href={`/leads/${lead.id}`} className={styles.todayChangeRow}>
+                <span>
+                  <strong>{lead.orgName}</strong>
+                  <small>{formatSignalFreshness(lead.latestPublishedAt)?.label ?? "свежесть уточняется"}</small>
+                </span>
+                <span className={styles.todayChangeEvidence}>{formatEvidenceCount(lead.evidenceTitles.length)}</span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.todayChangesEmpty}>Свежие подтверждения появятся здесь после следующего наблюдаемого сигнала.</p>
+        )}
+        <p className={styles.todayChangesMeta}>{formatRunTime(lastRunAt)}</p>
+      </div>
+
+      <div className={styles.todayWorkflow} aria-labelledby="today-workflow-heading">
+        <span className={styles.sectionEyebrow}>Работа</span>
+        <h3 id="today-workflow-heading">Рабочий контур</h3>
+        <Link href="/review" className={styles.todayWorkflowRow}>
+          <span>На проверке</span>
+          <strong>{pendingReview}</strong>
+          <i aria-hidden="true">→</i>
+        </Link>
+      </div>
     </section>
   );
 }

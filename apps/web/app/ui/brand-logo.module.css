@@ -3,7 +3,7 @@
   align-items: center;
   gap: 0.62rem;
   min-width: 0;
-  color: var(--ink-primary, #101412);
+  color: var(--color-text-primary);
   line-height: 1;
 }
 
@@ -31,8 +31,8 @@
   color: inherit;
 }
 
-.logo[data-tone="dark"] .wordmark {
-  color: var(--rr-paper, #f4f1e8);
+.logo[data-tone="dark"] {
+  color: var(--color-canvas);
 }
 
 .logo[data-size="small"] {

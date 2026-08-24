@@ -1,8 +1,29 @@
 import type { OutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
+import {
+  isCommercialOutcomeEvent,
+  isOutcomeEventType,
+} from '@/lib/opportunities/outcome-domain'
 
-import styles from './opportunities.module.css'
+import styles from './opportunity-funnel.module.css'
+
+const COMMERCIAL_LIFECYCLE_EVENTS = new Set([
+  'meeting_completed',
+  'meeting_cancelled',
+  'meeting_no_show',
+])
 
 export function OpportunityFunnel(props: { summary: OutcomeFunnelSummary }) {
+  const hasCommercialData =
+    props.summary.effectiveActivityCounts.some((item) => {
+      if (item.eventCount <= 0 && item.opportunityCount <= 0) return false
+      if (!isOutcomeEventType(item.eventType)) return false
+      return isCommercialOutcomeEvent(item.eventType) ||
+        COMMERCIAL_LIFECYCLE_EVENTS.has(item.eventType)
+    }) ||
+    props.summary.terminalOutcomes.completed > 0
+
+  if (!hasCommercialData) return null
+
   return (
     <section className={styles.funnel} aria-labelledby="outcome-funnel-title">
       <div className={styles.funnelHeading}>
@@ -41,9 +62,9 @@ export function OpportunityFunnel(props: { summary: OutcomeFunnelSummary }) {
             'раз',
           )} · ${item.opportunityCount} ${plural(
             item.opportunityCount,
-            'возможность',
-            'возможности',
-            'возможностей',
+            'ситуация',
+            'ситуации',
+            'ситуаций',
           )}`).join(' · ') ||
           'событий нет'}
       </p>
@@ -89,8 +110,7 @@ export function OpportunityFunnel(props: { summary: OutcomeFunnelSummary }) {
             {props.summary.terminalOutcomes.completed} завершённых
           </small>
           <small>
-            Denominator: effective won + effective lost; отменённые исходы
-            исключены.
+            Считаются только эффективные выигрыши и потери; отменённые исходы исключены.
           </small>
         </div>
       </div>

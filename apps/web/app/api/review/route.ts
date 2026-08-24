@@ -1,38 +1,12 @@
 import { NextResponse } from "next/server";
 import { getPool } from "../../../lib/db";
-import { formatReason, type ScoringReason } from "../../../lib/scoring/scoring-reasons";
-import { extractPayloadFields } from "../../../lib/leads-data";
 import { updateDigestOrgStateFeedback } from "../../../lib/digestFeedback";
 import { getSession } from "../../../lib/auth-v2/authorization";
 import { hasFeatureAccess } from "../../../lib/entitlements";
+import { listPendingReviewCandidates } from "../../../lib/review-data";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-/**
- * Format reasons from DB (handles both legacy string[] and new ScoringReason[]).
- * Returns Russian display strings for the review UI.
- */
-function formatReasonsFromRaw(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-
-  const result: string[] = [];
-  for (const item of raw) {
-    if (typeof item === "string") {
-      // Legacy format — pass through
-      result.push(item);
-    } else if (
-      typeof item === "object" &&
-      item !== null &&
-      "key" in item &&
-      "component" in item
-    ) {
-      // New ScoringReason format — render Russian label
-      result.push(formatReason(item as ScoringReason));
-    }
-  }
-  return result;
-}
 
 /**
  * GET /api/review — list pending review candidates.
@@ -52,8 +26,17 @@ export async function GET(request: Request) {
     );
   }
 
-  const limit = Math.min(Number(searchParams.get("limit") ?? 50), 200);
-  const offset = Math.max(Number(searchParams.get("offset") ?? 0), 0);
+  const rawLimit = searchParams.get("limit");
+  const rawOffset = searchParams.get("offset");
+  const limit = rawLimit === null ? 50 : Number(rawLimit);
+  const offset = rawOffset === null ? 0 : Number(rawOffset);
+
+  if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+    return NextResponse.json({ error: "limit must be an integer between 1 and 200." }, { status: 400 });
+  }
+  if (!Number.isInteger(offset) || offset < 0) {
+    return NextResponse.json({ error: "offset must be a non-negative integer." }, { status: 400 });
+  }
 
   // Owner-scope: reject reads of another tenant's review queue. The JOIN +
   // owner predicate below also defends against a forged clientProfileId.
@@ -76,86 +59,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const countResult = await pool.query<{ count: string }>(`
-      SELECT COUNT(*) AS count
-      FROM digest_candidates dc
-      JOIN client_profiles cp
-        ON cp.id = dc.client_profile_id
-      WHERE dc.client_profile_id = $1
-        AND cp.owner_id = $2
-        AND dc.review_status = 'pending_review'
-    `, [clientProfileId, ownerId]);
-
-    const total = parseInt(countResult.rows[0]?.count ?? "0", 10);
-
-    const itemsResult = await pool.query<{
-      id: string;
-      org_id: string;
-      org_name: string;
-      score: number;
-      vacancies_count: number;
-      distinct_vacancy_names_count: number;
-      latest_published_at: string | null;
-      reasons: unknown;
-      source_families: unknown;
-      payload: unknown;
-      created_at: string;
-    }>(`
-      SELECT
-        dc.id::TEXT AS id,
-        dc.org_id::TEXT AS org_id,
-        dc.source_display_name AS org_name,
-        dc.total_score AS score,
-        dc.vacancies_count,
-        dc.distinct_vacancy_names_count,
-        dc.latest_published_at,
-        dc.reasons,
-        dc.source_families,
-        dc.payload,
-        dc.created_at::TEXT AS created_at
-      FROM digest_candidates dc
-      JOIN client_profiles cp
-        ON cp.id = dc.client_profile_id
-      WHERE dc.client_profile_id = $1
-        AND cp.owner_id = $2
-        AND dc.review_status = 'pending_review'
-      ORDER BY dc.total_score DESC, dc.created_at DESC
-      LIMIT $3 OFFSET $4
-    `, [clientProfileId, ownerId, limit, offset]);
-
-    const items = itemsResult.rows.map((row) => {
-      // Confidence gate, evidence titles, location names, and the foreign-
-      // employer flag live in payload — they are not real columns on
-      // digest_candidates. Read them via the canonical extractor
-      // (snake_case/camelCase tolerant, safe empty-array degradation).
-      // T4.5: isForeignEmployer is now surfaced so the review card can show the
-      // foreign reason chip instead of a hardcoded false. No new SQL — derived
-      // from the payload the route already reads.
-      const { confidenceGate, evidenceTitles, locationNames, isForeignEmployer } = extractPayloadFields(row.payload);
-      return {
-        id: row.id,
-        orgId: row.org_id,
-        orgName: row.org_name ?? "Неизвестная компания",
-        score: row.score,
-        confidenceGate,
-        isForeignEmployer,
-        vacanciesCount: row.vacancies_count,
-        distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-        latestPublishedAt: row.latest_published_at,
-        reasons: formatReasonsFromRaw(row.reasons),
-        sourceFamilies: Array.isArray(row.source_families)
-          ? row.source_families.filter((s: unknown): s is string => typeof s === "string")
-          : [],
-        evidenceTitles,
-        locationNames,
-        createdAt: row.created_at,
-      };
+    const result = await listPendingReviewCandidates({
+      pool,
+      clientProfileId,
+      ownerId,
+      limit,
+      offset,
     });
-
-    return NextResponse.json({ items, total, limit, offset });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to fetch review queue.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ ...result, limit, offset });
+  } catch {
+    return NextResponse.json({ error: "Failed to fetch review queue." }, { status: 500 });
   }
 }
 
@@ -269,15 +182,13 @@ export async function POST(request: Request) {
           digestCandidateId: payload.candidateId,
           action: "badfit",
         });
-      } catch (suppressError) {
-        // The review_status UPDATE already succeeded — log the suppression
-        // failure but don't fail the whole request. The candidate is rejected;
-        // suppression is a best-effort coherence bonus.
-        const message = suppressError instanceof Error ? suppressError.message : "suppression failed";
+      } catch {
+        // The review_status UPDATE already succeeded, so preserve the successful
+        // review result without exposing internal suppression/database details.
         return NextResponse.json({
           ok: true,
           candidate: result.rows[0],
-          warning: `Rejected, but suppression failed: ${message}`,
+          warning: "Rejected, but suppression failed.",
         });
       }
     }
@@ -286,8 +197,7 @@ export async function POST(request: Request) {
       ok: true,
       candidate: result.rows[0],
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update review status.";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Failed to update review status." }, { status: 500 });
   }
 }
