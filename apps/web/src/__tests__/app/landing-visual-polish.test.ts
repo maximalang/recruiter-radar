@@ -19,11 +19,11 @@ describe("polished unified landing visual contract", () => {
     const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
     const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(heroScene).toContain('data-hero-layout="ambient-radar"');
+    expect(heroScene).toContain('data-hero-layout="morning-list"');
     expect(heroScene).toContain('data-theme="inverse"');
     expect(heroScene).toContain('data-hero-visual');
     expect(heroScene).toContain("HeroSignalField");
-    expect(heroScene).toContain("Радар новых клиентов для агентств");
+    expect(heroScene).toContain("Открыть живой пример");
     expect(heroScene).not.toContain("HeroRadar");
     expect(heroScene).not.toContain("HeroInstrument");
     expect(existsSync(retiredRadar)).toBe(false);

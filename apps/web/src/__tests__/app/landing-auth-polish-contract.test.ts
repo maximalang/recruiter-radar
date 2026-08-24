@@ -36,9 +36,9 @@ describe("landing visual and login reliability polish", () => {
     const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
     const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(hero).toContain('data-hero-layout="ambient-radar"');
+    expect(hero).toContain('data-hero-layout="morning-list"');
     expect(hero).toContain("HeroSignalField");
-    expect(hero).toContain("Радар новых клиентов для агентств");
+    expect(hero).toContain("Открыть живой пример");
     expect(hero).not.toContain("HeroRadar");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);

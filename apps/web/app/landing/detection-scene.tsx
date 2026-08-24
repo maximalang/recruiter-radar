@@ -16,29 +16,16 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
       aria-labelledby="detection-title"
       data-theme="inverse"
       data-header-tone="dark"
-      data-hero-layout="ambient-radar"
+      data-hero-layout="morning-list"
       data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}
     >
-      <div className={sceneStyles.fieldFigure} data-hero-visual data-mobile-hero-signal>
-        <HeroSignalField />
-      </div>
-
-      <div className={sceneStyles.kicker}>
-        <span className={sceneStyles.kickerRule} aria-hidden="true" />
-        <span>Радар новых клиентов для агентств</span>
-        <span className={sceneStyles.kickerMeta}>Сигнал → факт → повод</span>
-      </div>
-
       <div className={sceneStyles.copy} data-hero-copy>
         <p className={sceneStyles.serviceLabel}>Поиск новых клиентов для рекрутинговых агентств</p>
         <h1 id="detection-title" className={sceneStyles.title} data-hero-title>
-          Компании, которым стоит написать сегодня.
+          Утренний список компаний, где найм уже идёт
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Recruiter Radar отслеживает публичный найм и находит компании, где потребность в подборе растёт. Вы получаете приоритетный список: почему компания актуальна сейчас, какие факты это подтверждают и с чего начать контакт.
-        </p>
-        <p className={sceneStyles.visuallyHidden}>
-          Схема показывает несколько подтверждающих сигналов найма, объединённых в одну клиентскую возможность.
+          Каждое утро — приоритетный список компаний со свежими сигналами найма: почему компания актуальна, какие факты это подтверждают и с чего начать контакт.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a
@@ -47,7 +34,7 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Посмотреть пример <ArrowGlyph />
+            Открыть живой пример <ArrowGlyph />
           </a>
           <span className={sceneStyles.actionHint}>Настройте нишу и географию · без регистрации</span>
         </div>
@@ -57,6 +44,10 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
             ? "7 дней · 990 ₽ · без автопродления · сообщения отправляете вы"
             : "7 дней · заявка без списания · сообщения отправляете вы"}
         </p>
+      </div>
+
+      <div className={sceneStyles.fieldFigure} data-hero-visual data-mobile-hero-signal aria-hidden="true">
+        <HeroSignalField />
       </div>
     </section>
   );
