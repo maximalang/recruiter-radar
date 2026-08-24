@@ -1,0 +1,132 @@
+name: HH Production Pipeline Proof
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/rf-source-intelligence-v2']
+    paths:
+      - '.github/workflows/hh-production-proof.yml'
+      - 'packages/db/scripts/ingest-hh.mjs'
+      - 'packages/db/scripts/verify-hh-live-pipeline.mjs'
+      - 'packages/db/scripts/verify-source-production-proof.mjs'
+      - 'packages/db/scripts/adapters/source-production-proof.mjs'
+      - 'packages/db/scripts/adapters/**'
+      - 'packages/db/migrations/**'
+      - 'packages/db/schema/**'
+      - 'packages/db/package.json'
+      - 'package-lock.json'
+  schedule:
+    - cron: '17 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hh-production-proof-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hh-production-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: recruiter_radar_hh_proof
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d recruiter_radar_hh_proof"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/recruiter_radar_hh_proof
+      HH_USER_AGENT: ${{ secrets.HH_USER_AGENT || vars.HH_USER_AGENT }}
+      HH_ACCESS_TOKEN: ${{ secrets.HH_ACCESS_TOKEN }}
+      HH_CLIENT_ID: ${{ secrets.HH_CLIENT_ID }}
+      HH_CLIENT_SECRET: ${{ secrets.HH_CLIENT_SECRET }}
+      HH_LIVE_VERIFY: '1'
+      SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK: isolated
+      SOURCE_ENV_FILE_DISABLED: 'true'
+      # The proof must fetch a complete result window, not a truncated sample.
+      # A scoped query (keyword + area + role + experience) keeps `found` inside
+      # the page budget so the coverage check stays fail-closed without failing
+      # an isolated run. A 12-hour lookback further bounds the window.
+      HH_SEARCH_TEXT: 'recruiter'
+      HH_AREA: '1'
+      HH_PROFESSIONAL_ROLE: '96'
+      HH_EXPERIENCE: 'between1And3'
+      HH_LOOKBACK_HOURS: '12'
+      HH_PER_PAGE: '100'
+      HH_PAGES: '20'
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate HH proof credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${HH_USER_AGENT:-}" ]]; then
+            echo 'HH_USER_AGENT is not configured.' >&2
+            exit 1
+          fi
+          if [[ -n "${HH_ACCESS_TOKEN:-}" ]]; then
+            echo 'Using HH_ACCESS_TOKEN credential set.'
+            exit 0
+          fi
+          if [[ -n "${HH_CLIENT_ID:-}" && -n "${HH_CLIENT_SECRET:-}" ]]; then
+            echo 'Using HH_CLIENT_ID + HH_CLIENT_SECRET credential set.'
+            exit 0
+          fi
+          echo 'No accepted HH credential set is configured for production proof.' >&2
+          exit 1
+
+      - name: Prepare disposable database
+        shell: bash
+        run: |
+          set -euo pipefail
+          if node -e "const p=require('./packages/db/package.json'); process.exit(p.scripts && p.scripts.migrate ? 0 : 1)"; then
+            npm run migrate --workspace packages/db
+          else
+            echo 'packages/db has no migrate script; applying schema bootstrap and forward migrations.'
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f packages/db/migrations/0001_init.sql
+            # 0001_init.sql is the authoritative baseline for the migration chain.
+            # Apply only post-baseline forward migrations below.
+            while IFS= read -r migration; do
+              [[ "$migration" == *.down.sql ]] && continue
+              [[ "$(basename "$migration")" == "0001_init.sql" ]] && continue
+              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+            done < <(find packages/db/migrations -maxdepth 1 -type f -name '*.sql' | sort)
+          fi
+
+      - name: Produce HH evidence to signal to lineage proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node packages/db/scripts/verify-hh-live-pipeline.mjs > artifacts/hh-production-proof.json
+          node packages/db/scripts/verify-source-production-proof.mjs \
+            artifacts/hh-production-proof.json \
+            --source=hh \
+            --max-age-hours=24
+
+      - name: Upload HH production proof
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hh-production-proof-${{ github.sha }}
+          path: artifacts/hh-production-proof.json
+          if-no-files-found: error
+          retention-days: 14

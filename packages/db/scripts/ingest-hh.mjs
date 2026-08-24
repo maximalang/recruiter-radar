@@ -321,7 +321,7 @@ async function upsertOrgSourceRef(client, vacancy) {
     const insertedOrgResult = await client.query(
       `
         INSERT INTO orgs (name, website_url)
-        VALUES ($1, $2)
+        VALUES ($1::TEXT, $2::TEXT)
         RETURNING id
       `,
       [vacancy.orgName, vacancy.employerSiteUrl || null],
@@ -352,12 +352,12 @@ async function setOrgDomain(client, orgId, vacancy) {
     await client.query(
       `
         UPDATE orgs
-        SET domain = $2
+        SET domain = $2::TEXT
         WHERE id = $1
           AND (domain IS NULL OR BTRIM(domain) = '')
           AND NOT EXISTS (
             SELECT 1 FROM orgs other
-            WHERE other.id <> orgs.id AND LOWER(other.domain) = LOWER($2)
+            WHERE other.id <> orgs.id AND LOWER(other.domain) = LOWER($2::TEXT)
           )
       `,
       [orgId, domain],
@@ -378,13 +378,13 @@ async function updateOrgSourceRef(client, orgId, vacancy) {
       UPDATE orgs
       SET
         name = CASE
-          WHEN $2 IS NOT NULL AND BTRIM($2) <> '' AND (name IS NULL OR BTRIM(name) = '' OR name = $3)
-            THEN $2
+          WHEN $2::TEXT IS NOT NULL AND BTRIM($2::TEXT) <> '' AND (name IS NULL OR BTRIM(name) = '' OR name = $3::TEXT)
+            THEN $2::TEXT
           ELSE name
         END,
         website_url = CASE
-          WHEN $4 IS NOT NULL AND BTRIM($4) <> '' AND (website_url IS NULL OR BTRIM(website_url) = '')
-            THEN $4
+          WHEN $4::TEXT IS NOT NULL AND BTRIM($4::TEXT) <> '' AND (website_url IS NULL OR BTRIM(website_url) = '')
+            THEN $4::TEXT
           ELSE website_url
         END
       WHERE id = $1
@@ -402,13 +402,13 @@ async function updateOrgSourceRef(client, orgId, vacancy) {
       UPDATE org_source_refs
       SET
         display_name = CASE
-          WHEN $4 IS NULL OR BTRIM($4) = '' THEN display_name
-          WHEN display_name IS NULL OR BTRIM(display_name) = '' THEN $4
+          WHEN $4::TEXT IS NULL OR BTRIM($4::TEXT) = '' THEN display_name
+          WHEN display_name IS NULL OR BTRIM(display_name) = '' THEN $4::TEXT
           ELSE display_name
         END
-      WHERE org_id = $1
-        AND source = $2
-        AND source_key = ANY($3)
+      WHERE org_id = $1::BIGINT
+        AND source = $2::TEXT
+        AND source_key = ANY($3::TEXT[])
     `,
     [orgId, hhSource, buildOrgSourceKeys(vacancy), vacancy.orgDisplayName],
   );
@@ -432,7 +432,7 @@ async function upsertOrgSourceKeys(client, orgId, vacancy) {
           display_name,
           metadata
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES ($1::BIGINT, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB)
         ON CONFLICT (source, source_key) DO UPDATE
         SET
           external_id = COALESCE(EXCLUDED.external_id, org_source_refs.external_id),

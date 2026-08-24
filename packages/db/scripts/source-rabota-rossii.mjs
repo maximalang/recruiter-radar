@@ -23,36 +23,26 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
 const SOURCE_ID = 'rabota-rossii';
 const API_URL = 'https://opendata.trudvsem.ru/api/v1/vacancies';
-// trudvsem open-data caps a single response at 100 records but exposes the full
-// match count via meta.total (often thousands). One page therefore surfaces a
-// tiny slice of the available hiring signal, so we page through up to
-// RABOTA_ROSSII_PAGES windows of `limit` records each, advancing the offset and
-// stopping early once meta.total is exhausted or the API returns an empty page.
-const DEFAULT_PAGES = 5;
-const MAX_PAGES = 50;
 
-// trudvsem caps the GLOBAL (region-less) result window at offset < 50, so the
-// federal feed alone surfaces at most ~50 records no matter how large meta.total
-// is. Each region code exposes its own independent window, so iterating the major
-// RF economic centres multiplies real coverage. This curated default activates
-// when RABOTA_ROSSII_REGION_CODES is unset; operators can override with their own
-// comma-separated list, or set it to "federal" to force the single region-less feed.
-// Codes are trudvsem's 13-digit OKTMO-style region_code values (live-probed 2026-06-30).
-const DEFAULT_REGION_CODES = Object.freeze([
-  '7700000000000', // Москва
-  '7800000000000', // Санкт-Петербург
-  '5000000000000', // Московская область
-  '6600000000000', // Свердловская область
-  '5400000000000', // Новосибирская область
-  '1600000000000', // Республика Татарстан
-  '2300000000000', // Краснодарский край
-  '0200000000000', // Республика Башкортостан
-  '7400000000000', // Челябинская область
-  '6300000000000', // Самарская область
-  '5200000000000', // Нижегородская область
-  '6100000000000', // Ростовская область
+// Trudvsem documents `offset` as the PAGE NUMBER (0-based), not an absolute
+// record offset. With limit=100, offsets 0,1,2... cover consecutive pages.
+// The old implementation used 0,100,200... and therefore skipped 99 pages
+// between requests. Keep the page budget bounded but large enough for the
+// recent-change window; the loop stops on meta.total or an empty page.
+const DEFAULT_LIMIT = 100;
+const DEFAULT_PAGES = 50;
+const MAX_PAGES = 100;
+const DEFAULT_MODIFIED_LOOKBACK_HOURS = 24;
+const MAX_MODIFIED_LOOKBACK_HOURS = 168;
+
+// Optional region fan-out remains available for diagnostics or targeted runs.
+// The default is now the nationwide official endpoint with modifiedFrom, which
+// covers every RF region without the former curated 12-region recall ceiling.
+const LEGACY_DEFAULT_REGION_CODES = Object.freeze([
+  '7700000000000', '7800000000000', '5000000000000', '6600000000000',
+  '5400000000000', '1600000000000', '2300000000000', '0200000000000',
+  '7400000000000', '6300000000000', '5200000000000', '6100000000000',
 ]);
-
 
 const runtime = createStandardSourceRuntime({
   sourceId: SOURCE_ID,
@@ -60,13 +50,15 @@ const runtime = createStandardSourceRuntime({
   evidenceRole: 'primary_platform',
   sourceRecordType: 'job_posting',
   inputFileEnvName: 'RABOTA_ROSSII_INPUT_FILE',
-  usageText: 'Input: set RABOTA_ROSSII_INPUT_FILE or RABOTA_ROSSII_SEARCH_TEXT.',
+  usageText: 'Input: set RABOTA_ROSSII_INPUT_FILE, or use the credential-free official incremental API (RABOTA_ROSSII_SEARCH_TEXT is optional).',
   extractRecords: extractRabotaRossiiRecords,
   normalizeRecord: normalizeRabotaRossiiRecord,
   buildSummaryExtras: (input) => input.inputMode === 'live-public'
     ? {
       liveProvider: input.liveProvider,
       searchText: input.searchText,
+      modifiedFrom: input.modifiedFrom,
+      modifiedTo: input.modifiedTo,
       offset: input.offset,
       limit: input.limit,
       pages: input.pages,
@@ -78,131 +70,156 @@ const runtime = createStandardSourceRuntime({
     : {},
 });
 
-export function resolveRabotaRossiiInput() {
+export function resolveRabotaRossiiInput({ now = new Date() } = {}) {
   const inputFilePath = process.env.RABOTA_ROSSII_INPUT_FILE?.trim();
+  if (inputFilePath) return runtime.resolveFileInput(inputFilePath);
 
-  if (inputFilePath) {
-    return runtime.resolveFileInput(inputFilePath);
+  const searchText = process.env.RABOTA_ROSSII_SEARCH_TEXT?.trim() || null;
+  const singleRegion = normalizeRegionCode(process.env.RABOTA_ROSSII_REGION_CODE);
+  const rawRegionCodes = process.env.RABOTA_ROSSII_REGION_CODES?.trim();
+  const parsedRegionCodes = parseCommaSeparated(rawRegionCodes)
+    .map(normalizeRegionCode)
+    .filter(Boolean);
+
+  let regionCodes = null;
+  if (!singleRegion && rawRegionCodes && /^legacy-major$/i.test(rawRegionCodes)) {
+    regionCodes = [...LEGACY_DEFAULT_REGION_CODES];
+  } else if (!singleRegion && rawRegionCodes && !/^federal$/i.test(rawRegionCodes)) {
+    regionCodes = [...new Set(parsedRegionCodes)];
   }
 
-  const searchText = process.env.RABOTA_ROSSII_SEARCH_TEXT?.trim();
-
-  if (searchText) {
-    // trudvsem caps the GLOBAL (region-less) result window at offset < 50 — once
-    // the offset reaches 50 the feed returns an empty page regardless of how
-    // large meta.total is. Region-scoped queries each expose their own
-    // independent window, so iterating region codes is the real coverage lever,
-    // far more than offset paging on the federal feed.
-    //
-    // Resolution precedence:
-    //   1. RABOTA_ROSSII_REGION_CODE (single, explicit) — kept for back-compat.
-    //   2. RABOTA_ROSSII_REGION_CODES = "federal" — opt back into the single
-    //      region-less feed (no region iteration).
-    //   3. RABOTA_ROSSII_REGION_CODES = "a,b,c" — operator-supplied region list.
-    //   4. unset — the curated DEFAULT_REGION_CODES (major RF economic centres),
-    //      so the coverage win is active in production without manual config.
-    const singleRegion = process.env.RABOTA_ROSSII_REGION_CODE?.trim() || null;
-    const rawRegionCodes = process.env.RABOTA_ROSSII_REGION_CODES?.trim();
-    const parsedRegionCodes = parseCommaSeparated(rawRegionCodes);
-
-    let regionCodes;
-    if (singleRegion) {
-      regionCodes = null; // single-region mode handled via regionCode below
-    } else if (rawRegionCodes && /^federal$/i.test(rawRegionCodes)) {
-      regionCodes = null; // explicit opt-out → region-less federal feed
-    } else if (parsedRegionCodes.length > 0) {
-      regionCodes = parsedRegionCodes;
-    } else {
-      regionCodes = [...DEFAULT_REGION_CODES];
-    }
-
-    return {
-      inputMode: 'public-pending',
-      searchText,
-      regionCode: singleRegion,
-      regionCodes,
-      offset: clampInteger(process.env.RABOTA_ROSSII_OFFSET, 0, 0, 100000),
-      limit: clampInteger(process.env.RABOTA_ROSSII_LIMIT, 50, 1, 100),
-      pages: clampInteger(process.env.RABOTA_ROSSII_PAGES, DEFAULT_PAGES, 1, MAX_PAGES),
-    };
-  }
-
-  throw new Error(
-    'No input configured for rabota-rossii. Set RABOTA_ROSSII_INPUT_FILE for file mode or RABOTA_ROSSII_SEARCH_TEXT for official live-public API mode.',
+  const lookbackHours = clampInteger(
+    process.env.RABOTA_ROSSII_MODIFIED_LOOKBACK_HOURS,
+    DEFAULT_MODIFIED_LOOKBACK_HOURS,
+    1,
+    MAX_MODIFIED_LOOKBACK_HOURS,
   );
+  const explicitModifiedFrom = toTimestampOrNull(process.env.RABOTA_ROSSII_MODIFIED_FROM);
+  const explicitModifiedTo = toTimestampOrNull(process.env.RABOTA_ROSSII_MODIFIED_TO);
+  const modifiedFrom = explicitModifiedFrom
+    ?? new Date(now.getTime() - lookbackHours * 3_600_000).toISOString();
+
+  return {
+    inputMode: 'public-pending',
+    searchText,
+    regionCode: singleRegion,
+    regionCodes,
+    modifiedFrom,
+    modifiedTo: explicitModifiedTo,
+    offset: clampInteger(process.env.RABOTA_ROSSII_OFFSET, 0, 0, 100000),
+    limit: clampInteger(process.env.RABOTA_ROSSII_LIMIT, DEFAULT_LIMIT, 1, 100),
+    pages: clampInteger(process.env.RABOTA_ROSSII_PAGES, DEFAULT_PAGES, 1, MAX_PAGES),
+  };
 }
 
-/**
- * Fetch one region's (or the federal feed's) records, paging through
- * `limit`-sized offset windows until meta.total is covered, the page budget is
- * spent, or the API returns an empty page. Returns the raw records plus the
- * meta.total the feed reported and how many pages were actually requested.
- */
-async function fetchRegionRecords({ searchText, regionCode, offset, limit, pages, userAgent }) {
+export function buildRabotaRossiiApiUrl({
+  searchText = null,
+  regionCode = null,
+  offset = 0,
+  limit = DEFAULT_LIMIT,
+  modifiedFrom = null,
+  modifiedTo = null,
+} = {}) {
+  const normalizedRegion = normalizeRegionCode(regionCode);
+  const url = normalizedRegion
+    ? new URL(`${API_URL}/region/${normalizedRegion}`)
+    : new URL(API_URL);
+  const normalizedSearch = toNonEmptyText(searchText);
+  if (normalizedSearch) url.searchParams.set('text', normalizedSearch);
+  url.searchParams.set('offset', String(clampInteger(offset, 0, 0, 100000)));
+  url.searchParams.set('limit', String(clampInteger(limit, DEFAULT_LIMIT, 1, 100)));
+  const from = toTimestampOrNull(modifiedFrom);
+  const to = toTimestampOrNull(modifiedTo);
+  if (from) url.searchParams.set('modifiedFrom', from);
+  if (to) url.searchParams.set('modifiedTo', to);
+  return url.toString();
+}
+
+export function buildRabotaRossiiPageOffsets({ offset = 0, pages = DEFAULT_PAGES } = {}) {
+  const firstPage = clampInteger(offset, 0, 0, 100000);
+  const pageCount = clampInteger(pages, DEFAULT_PAGES, 1, MAX_PAGES);
+  return Array.from({ length: pageCount }, (_, index) => firstPage + index);
+}
+
+async function fetchPartitionRecords({
+  searchText,
+  regionCode,
+  modifiedFrom,
+  modifiedTo,
+  offset,
+  limit,
+  pages,
+  userAgent,
+  fetchJsonImpl = fetchJson,
+}) {
   const records = [];
   let apiTotal = null;
   let pagesFetched = 0;
 
-  for (let page = 0; page < pages; page += 1) {
-    const pageOffset = offset + page * limit;
-    const url = new URL(API_URL);
-    url.searchParams.set('text', searchText);
-    url.searchParams.set('offset', String(pageOffset));
-    url.searchParams.set('limit', String(limit));
-
-    if (regionCode) {
-      url.searchParams.set('region_code', regionCode);
-    }
-
-    const body = await fetchJson(url.toString(), {
+  for (const pageOffset of buildRabotaRossiiPageOffsets({ offset, pages })) {
+    const url = buildRabotaRossiiApiUrl({
+      searchText,
+      regionCode,
+      offset: pageOffset,
+      limit,
+      modifiedFrom,
+      modifiedTo,
+    });
+    const body = await fetchJsonImpl(url, {
       sourceName: SOURCE_ID,
       headers: { 'user-agent': userAgent },
     });
-
     const pageRecords = extractRabotaRossiiRecords(body);
     pagesFetched += 1;
 
     const total = Number(body?.meta?.total);
-    if (Number.isFinite(total)) {
-      apiTotal = total;
-    }
-
-    if (pageRecords.length === 0) {
-      break;
-    }
+    if (Number.isFinite(total) && total >= 0) apiTotal = total;
+    if (pageRecords.length === 0) break;
 
     records.push(...pageRecords);
-
-    if (apiTotal !== null && pageOffset + pageRecords.length >= apiTotal) {
-      break;
-    }
+    // `offset` is page-indexed: page N covers records N*limit...(N+1)*limit-1.
+    if (apiTotal !== null && (pageOffset + 1) * limit >= apiTotal) break;
+    if (pageRecords.length < limit) break;
   }
 
   return { records, apiTotal, pagesFetched };
 }
 
-export async function resolveRabotaRossiiLiveInput({ searchText, regionCode, regionCodes = null, offset, limit, pages = DEFAULT_PAGES }) {
+export async function resolveRabotaRossiiLiveInput({
+  searchText = null,
+  regionCode = null,
+  regionCodes = null,
+  modifiedFrom = null,
+  modifiedTo = null,
+  offset = 0,
+  limit = DEFAULT_LIMIT,
+  pages = DEFAULT_PAGES,
+  fetchJsonImpl = fetchJson,
+}) {
   const userAgent = process.env.RABOTA_ROSSII_USER_AGENT?.trim()
     || 'RecruiterRadar/1.0 (rabota-rossii source; contact: ops@example.com)';
-
-  // Multi-region mode: iterate each supplied region's independent window. Single
-  // region (or federal) mode preserves the original single-window behaviour the
-  // confidence verifier and existing callers depend on.
   const regions = Array.isArray(regionCodes) && regionCodes.length > 0
-    ? regionCodes
-    : [regionCode ?? null];
+    ? regionCodes.map(normalizeRegionCode).filter(Boolean)
+    : [normalizeRegionCode(regionCode)];
 
   const records = [];
   let apiTotal = 0;
   let pagesFetched = 0;
-
   for (const region of regions) {
-    const result = await fetchRegionRecords({ searchText, regionCode: region, offset, limit, pages, userAgent });
+    const result = await fetchPartitionRecords({
+      searchText,
+      regionCode: region,
+      modifiedFrom,
+      modifiedTo,
+      offset,
+      limit,
+      pages,
+      userAgent,
+      fetchJsonImpl,
+    });
     records.push(...result.records);
     pagesFetched += result.pagesFetched;
-    if (result.apiTotal !== null) {
-      apiTotal += result.apiTotal;
-    }
+    if (result.apiTotal !== null) apiTotal += result.apiTotal;
   }
 
   return runtime.buildInputFromRecords({
@@ -213,24 +230,22 @@ export async function resolveRabotaRossiiLiveInput({ searchText, regionCode, reg
     extra: {
       liveProvider: 'trudvsem-opendata',
       searchText,
+      modifiedFrom,
+      modifiedTo,
       offset,
       limit,
       pages,
       pagesFetched,
       regionsFetched: regions.length,
       apiTotal,
-      zeroReason: records.length === 0 ? 'no-vacancies-for-query' : null,
+      zeroReason: records.length === 0 ? 'no-vacancies-in-incremental-window' : null,
     },
   });
 }
 
 export async function resolveRabotaRossiiConfiguredInput() {
   const input = resolveRabotaRossiiInput();
-
-  if (input.inputMode === 'public-pending') {
-    return resolveRabotaRossiiLiveInput(input);
-  }
-
+  if (input.inputMode === 'public-pending') return resolveRabotaRossiiLiveInput(input);
   return input;
 }
 
@@ -245,52 +260,39 @@ export async function runRabotaRossiiCli(argv = process.argv.slice(2)) {
 }
 
 function extractRabotaRossiiRecords(body) {
-  if (Array.isArray(body)) {
-    return body;
-  }
-
-  if (Array.isArray(body?.records)) {
-    return body.records;
-  }
-
-  if (Array.isArray(body?.results?.vacancies)) {
-    return body.results.vacancies;
-  }
-
+  if (Array.isArray(body)) return body;
+  if (Array.isArray(body?.records)) return body.records;
+  if (Array.isArray(body?.results?.vacancies)) return body.results.vacancies;
   return [];
 }
 
 function normalizeRabotaRossiiRecord(record, { fetchedAt, lineNumber }) {
-  if (!record || typeof record !== 'object' || Array.isArray(record)) {
-    return null;
-  }
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
 
-  const company = record.company && typeof record.company === 'object' ? record.company : {};
-  const companyName = toNonEmptyText(record.company_name ?? record.org_name ?? company.name);
-  const inn = normalizeLegalInn(record.inn ?? company.inn);
-  const ogrn = normalizeLegalOgrn(record.ogrn ?? company.ogrn ?? company.companycode);
-  const companyWebsiteUrl = toUrlOrNull(record.company_website_url ?? record.website_url ?? company.site);
-  const companyDomain = normalizeDomain(record.company_domain ?? record.domain);
-  const jobTitle = toNonEmptyText(record.job_title ?? record['job-name'] ?? record.job_name ?? record.name);
-  const externalId = toNonEmptyText(record.external_id ?? record.id);
-  const sourceUrl = toUrlOrNull(record.job_posting_url ?? record.vac_url ?? record.url);
-  // Freshness signal = last time the employer re-confirmed the posting, not when
-  // it was first created. trudvsem keeps long-lived vacancies whose `creation-date`
-  // is often 6–18 months old while `date_modify` tracks the employer's most recent
-  // update — that re-confirmation is the real hiring-actuality signal for the radar.
-  // Prioritising `date_modify` (then created-date fallbacks) is what lets the live
-  // feed clear the 60% active-30d freshness gate honestly; the original creation
-  // date is preserved separately below for downstream urgency (long-standing roles).
-  const occurredAt = toTimestampOrNull(record.date_modify ?? record.published_at ?? record['creation-date'] ?? record.creation_date)
+  // API responses normally wrap each item as { vacancy: {...} }. Accept both
+  // wrapped live records and flat reviewed snapshots without weakening schema.
+  const raw = record.vacancy && typeof record.vacancy === 'object' && !Array.isArray(record.vacancy)
+    ? record.vacancy
+    : record;
+  const company = raw.company && typeof raw.company === 'object' ? raw.company : {};
+  const companyName = toNonEmptyText(raw.company_name ?? raw.org_name ?? company.name);
+  const inn = normalizeLegalInn(raw.inn ?? company.inn);
+  const ogrn = normalizeLegalOgrn(raw.ogrn ?? company.ogrn ?? company.companycode);
+  const companyWebsiteUrl = toUrlOrNull(raw.company_website_url ?? raw.website_url ?? company.site);
+  const companyDomain = normalizeDomain(raw.company_domain ?? raw.domain);
+  const jobTitle = toNonEmptyText(raw.job_title ?? raw['job-name'] ?? raw.job_name ?? raw.name);
+  const externalId = toNonEmptyText(raw.external_id ?? raw.id);
+  const sourceUrl = toUrlOrNull(raw.job_posting_url ?? raw.vac_url ?? raw.url);
+  const occurredAt = toTimestampOrNull(raw.date_modify ?? raw.published_at ?? raw['creation-date'] ?? raw.creation_date)
     ?? fetchedAt;
-  const creationDateRaw = toTimestampOrNull(record['creation-date'] ?? record.creation_date);
-  const location = toNonEmptyText(record.location ?? record.region?.name);
-  const salaryText = toNonEmptyText(record.salary);
-  const salaryMin = toNonEmptyText(record.salary_min);
-  const salaryMax = toNonEmptyText(record.salary_max);
-  const currency = toNonEmptyText(record.currency);
-  const schedule = toNonEmptyText(record.schedule);
-  const category = toNonEmptyText(record.category?.specialisation ?? record.category);
+  const creationDateRaw = toTimestampOrNull(raw['creation-date'] ?? raw.creation_date);
+  const location = toNonEmptyText(raw.location ?? raw.region?.name);
+  const salaryText = toNonEmptyText(raw.salary);
+  const salaryMin = toNonEmptyText(raw.salary_min);
+  const salaryMax = toNonEmptyText(raw.salary_max);
+  const currency = toNonEmptyText(raw.currency);
+  const schedule = toNonEmptyText(raw.schedule);
+  const category = toNonEmptyText(raw.category?.specialisation ?? raw.category);
   const rfQuality = buildRfJobQuality({
     companyName,
     jobTitle,
@@ -302,10 +304,7 @@ function normalizeRabotaRossiiRecord(record, { fetchedAt, lineNumber }) {
     board: SOURCE_ID,
   });
 
-  if (!jobTitle) {
-    return null;
-  }
-
+  if (!jobTitle) return null;
   const identity = buildCompanyIdentity({
     companyName,
     companyDomain,
@@ -315,10 +314,7 @@ function normalizeRabotaRossiiRecord(record, { fetchedAt, lineNumber }) {
     fallbackName: companyName,
     lineNumber,
   });
-
-  if (!identity) {
-    return null;
-  }
+  if (!identity) return null;
 
   return {
     ...identity,
@@ -341,7 +337,7 @@ function normalizeRabotaRossiiRecord(record, { fetchedAt, lineNumber }) {
       job_title: jobTitle,
       job_posting_url: sourceUrl,
       location,
-      region_code: toNonEmptyText(record.region?.region_code),
+      region_code: toNonEmptyText(raw.region?.region_code),
       salary: salaryText,
       salary_min: salaryMin,
       salary_max: salaryMax,
@@ -358,13 +354,15 @@ function normalizeRabotaRossiiRecord(record, { fetchedAt, lineNumber }) {
       is_hybrid: rfQuality.workModeFlags.hybrid,
       is_rotational: rfQuality.workModeFlags.rotational,
       vacancy_freshness: rfQuality.freshness,
-      // Original creation date retained alongside freshness so downstream urgency
-      // scoring can still see long-standing / repeatedly-reposted roles even though
-      // freshness is now driven by date_modify.
       creation_date_raw: creationDateRaw,
       quality_penalties: rfQuality.qualityPenalties,
     },
   };
+}
+
+function normalizeRegionCode(value) {
+  const text = toNonEmptyText(value);
+  return text && /^\d{13}$/.test(text) ? text : null;
 }
 
 function buildSummary({ companyName, location, salaryText }) {

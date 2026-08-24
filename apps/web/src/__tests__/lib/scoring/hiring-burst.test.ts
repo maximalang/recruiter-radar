@@ -81,6 +81,22 @@ describe('detectHiringBurst', () => {
     expect(result.recentCount).toBe(1)
   })
 
+  it('fails closed for future-dated vacancies instead of treating them as fresh', () => {
+    const result = detectHiringBurst({
+      vacancies: [
+        vac({ id: 'v-1', publishedAt: new Date(NOW + 1 * DAY_MS).toISOString() }),
+        vac({ id: 'v-2', publishedAt: new Date(NOW + 2 * DAY_MS).toISOString() }),
+        vac({ id: 'v-3', publishedAt: new Date(NOW + 3 * DAY_MS).toISOString() }),
+      ],
+      now: () => NOW,
+    })
+
+    expect(result.isBurst).toBe(false)
+    expect(result.recentCount).toBe(0)
+    expect(result.freshCount).toBe(0)
+    expect(result.score).toBe(0)
+  })
+
   it('rewards role diversity — same role 5x scores lower than 5 distinct roles', () => {
     const sameRole = detectHiringBurst({
       vacancies: Array.from({ length: 5 }, (_, i) =>

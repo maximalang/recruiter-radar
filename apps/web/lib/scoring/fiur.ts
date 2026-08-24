@@ -204,7 +204,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 function ageDays(publishedAt: string, now: number): number {
   const t = Date.parse(publishedAt)
-  if (Number.isNaN(t)) return Number.POSITIVE_INFINITY
+  if (Number.isNaN(t) || t > now) return Number.POSITIVE_INFINITY
   return Math.max(0, (now - t) / DAY_MS)
 }
 

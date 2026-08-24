@@ -37,6 +37,21 @@ jobs:
           node --test packages/db/scripts/adapters/gdelt-doc-client.test.mjs
           node --test packages/db/scripts/source-transparent-business-fns.test.mjs
           node --test packages/db/scripts/sync-fedresurs-snapshot.test.mjs
+          node --test packages/db/scripts/source-rabota-rossii-pagination.test.mjs
+          node --test packages/db/scripts/adapters/hh-incremental-coverage.test.mjs
+          node --test packages/db/scripts/adapters/superjob-incremental-coverage.test.mjs
+          node --test packages/db/scripts/source-superjob-publisher-gate.test.mjs
+          node --test packages/db/scripts/adapters/source-escalation.test.mjs
+          node --test packages/db/scripts/adapters/source-transport-health-store.test.mjs
+          node --test packages/db/scripts/adapters/organization-resolution.test.mjs
+          node --test packages/db/scripts/adapters/rf-source-intelligence-v2.test.mjs
+          node --test packages/db/scripts/adapters/rf-job-board-discovery.test.mjs
+          node --test packages/db/scripts/adapters/rf-job-board-detail-fallback.test.mjs
+          node --test packages/db/scripts/adapters/rf-employer-profile-enrichment.test.mjs
+          node --test packages/db/scripts/adapters/rf-candidate-org-bootstrap.test.mjs
+          node --test packages/db/scripts/adapters/rf-hiring-discovery-candidates.test.mjs
+          node --test packages/db/scripts/adapters/rf-hiring-candidate-reconciliation.test.mjs
+          node --test packages/db/scripts/adapters/source-production-readiness.test.mjs
           node packages/db/scripts/verify-funding-business-signals-smoke.mjs
           node packages/db/scripts/verify-rf-source-expansion-smoke.mjs
       - name: Verify source activation contracts
