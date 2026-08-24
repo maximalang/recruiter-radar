@@ -150,14 +150,21 @@ describe('source live readiness contract', () => {
     expect(rabotaRossii).toEqual(expect.objectContaining({
       configured: true,
       liveReachable: true,
-      liveVerified: true,
-      finalState: 'digest-eligible',
+      // The 2026-08-12 proof is historical evidence past the production-proof
+      // freshness window (d29e3d50); it stays auditable but no longer asserts
+      // live health until a fresh production run refreshes it.
+      liveVerified: false,
+      liveProofFresh: false,
+      readinessDrift: [expect.objectContaining({ code: 'production-proof-stale' })],
+      finalState: 'blocked',
     }))
 
     const superjob = report.sources.find((source: { id: string }) => source.id === 'superjob')
     expect(superjob).toEqual(expect.objectContaining({
       configured: false,
-      liveVerified: true,
+      // SuperJob's proof is past the freshness window like the other sources,
+      // but its unregistered status keeps the registration-required state.
+      liveVerified: false,
       registrationRequired: true,
       providerRequired: false,
       finalState: 'registration-required',
@@ -180,7 +187,13 @@ describe('source live readiness contract', () => {
 
     for (const sourceId of ['greenhouse', 'lever', 'ashby', 'recruitee', 'workable', 'smartrecruiters']) {
       expect(report.sources.find((source: { id: string }) => source.id === sourceId)).toEqual(
-        expect.objectContaining({ configured: true, liveVerified: true, finalState: 'digest-eligible' }),
+        expect.objectContaining({
+          configured: true,
+          // Historical proofs past the freshness window keep audit evidence but
+          // lose live-verified status until a fresh production run refreshes them.
+          liveVerified: false,
+          finalState: 'blocked',
+        }),
       )
     }
   })
@@ -201,7 +214,11 @@ describe('source live readiness contract', () => {
       expect.objectContaining({ configured: false, registrationRequired: true, liveVerified: false }),
     )
     expect(report.sources.find((source: { id: string }) => source.id === 'career-pages')).toEqual(
-      expect.objectContaining({ configured: true, liveVerified: true }),
+      expect.objectContaining({
+        configured: true,
+        // Proof freshness expired; configuration is still detected from env.
+        liveVerified: false,
+      }),
     )
   })
 
@@ -213,7 +230,11 @@ describe('source live readiness contract', () => {
     })
     const databaseOnlyReport = JSON.parse(databaseOnly.stdout)
     expect(databaseOnlyReport.sources.find((source: { id: string }) => source.id === 'career-pages'))
-      .toEqual(expect.objectContaining({ configured: true, liveVerified: true, finalState: 'digest-eligible' }))
+      .toEqual(expect.objectContaining({
+        configured: true,
+        liveVerified: false,
+        finalState: 'blocked',
+      }))
 
     const linkedinInput = spawnSync(process.execPath, [verifierPath, '--json'], {
       cwd: repoRoot,
