@@ -321,7 +321,7 @@ async function upsertOrgSourceRef(client, vacancy) {
     const insertedOrgResult = await client.query(
       `
         INSERT INTO orgs (name, website_url)
-        VALUES ($1, $2)
+        VALUES ($1::TEXT, $2::TEXT)
         RETURNING id
       `,
       [vacancy.orgName, vacancy.employerSiteUrl || null],
@@ -357,7 +357,7 @@ async function setOrgDomain(client, orgId, vacancy) {
           AND (domain IS NULL OR BTRIM(domain) = '')
           AND NOT EXISTS (
             SELECT 1 FROM orgs other
-            WHERE other.id <> orgs.id AND LOWER(other.domain) = LOWER($2)
+            WHERE other.id <> orgs.id AND LOWER(other.domain) = LOWER($2::TEXT)
           )
       `,
       [orgId, domain],
