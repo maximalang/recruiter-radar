@@ -12,6 +12,12 @@ concurrency:
   group: source-refresh-prod
   cancel-in-progress: false
 
+env:
+  # Max tolerated failed sources per run before a partial (207) result is
+  # escalated to a hard failure. Explicit so degradation stays observable but
+  # bounded, and real outages never hide inside "partial success".
+  SOURCE_REFRESH_MAX_FAILED_SOURCES: '0'
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -36,6 +42,14 @@ jobs:
           docker compose exec -T web node --input-type=module - <<'NODE'
           const http = await import('node:http')
           const SOURCE_REFRESH_CLIENT_TIMEOUT_MS = 15 * 60 * 1000
+          // Budget is substituted by GitHub Actions at workflow-parse time
+          // (runner-side env does NOT survive SSH + docker compose exec).
+          // Integer-only literal, validated fail-closed below.
+          const MAX_FAILED_SOURCES_RAW = '${{ env.SOURCE_REFRESH_MAX_FAILED_SOURCES }}'
+          if (!/^\d+$/.test(MAX_FAILED_SOURCES_RAW)) {
+            throw new Error(`SOURCE_REFRESH_MAX_FAILED_SOURCES must be a non-negative integer literal, got: ${MAX_FAILED_SOURCES_RAW}`)
+          }
+          const MAX_FAILED_SOURCES = Number(MAX_FAILED_SOURCES_RAW)
           const key = process.env.CRON_API_KEY?.trim()
           if (!key) throw new Error('CRON_API_KEY is not configured in the web runtime.')
           const payload = '{}'
@@ -56,9 +70,10 @@ jobs:
               incoming.on('data', (chunk) => { rawBody += chunk })
               incoming.on('error', reject)
               incoming.on('end', () => {
-                let body = {}
-                try { body = JSON.parse(rawBody) } catch {}
-                resolve({ status: incoming.statusCode ?? 0, body })
+                let body
+                let parseError = null
+                try { body = JSON.parse(rawBody) } catch (error) { parseError = error }
+                resolve({ status: incoming.statusCode ?? 0, body: body ?? null, parseError })
               })
             })
             request.setTimeout(SOURCE_REFRESH_CLIENT_TIMEOUT_MS, () => {
@@ -68,7 +83,66 @@ jobs:
             request.end(payload)
           })
           const body = response.body
-          console.log(JSON.stringify({
+          const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+          const isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0
+          const isCriticality = (value) => value === 'required' || value === 'optional' || value === 'unknown'
+          // Same single effective-failure rule as the route (BLOCKER fix):
+          // rate-limited results arrive with success:true but mean a missed
+          // refresh window; deferred is an expected scheduler overlap.
+          const isEffectiveFailure = (result) => result?.success === false || result?.outcome === 'rate-limited'
+          const data = isRecord(body) && isRecord(body.data) ? body.data : null
+          const details = Array.isArray(data?.details) ? data.details : []
+          const failedDetails = details.filter(isEffectiveFailure)
+          const failedSources = failedDetails.map((result) => ({
+            source: typeof result?.source === 'string' && result.source.trim() !== '' ? result.source : 'unknown',
+            outcome: typeof result?.outcome === 'string' && result.outcome.trim() !== '' ? result.outcome : 'failed',
+            criticality: result?.criticality,
+          }))
+          const counterNames = ['total', 'succeeded', 'failed', 'deferred', 'credentialGated', 'rateLimited', 'failedRequired', 'failedOptional']
+          const typedCounters = data !== null && counterNames.every((name) => isNonNegativeInteger(data[name]))
+          const typedDetails = Array.isArray(data?.details) && data.details.every((result) =>
+            isRecord(result)
+            && typeof result.source === 'string'
+            && result.source.trim() !== ''
+            && typeof result.success === 'boolean'
+            && typeof result.outcome === 'string'
+            && result.outcome.trim() !== ''
+            && isCriticality(result.criticality)
+          )
+          const computedFailedRequired = failedSources.filter((result) => result.criticality !== 'optional').length
+          const computedFailedOptional = failedSources.filter((result) => result.criticality === 'optional').length
+          const computedDeliveryImpactingFailure = failedSources.some((result) =>
+            result.outcome !== 'deferred' && result.criticality !== 'optional'
+          )
+          const countersConsistent = typedCounters
+            && typedDetails
+            && data.total === details.length
+            && data.succeeded === details.filter((result) => !isEffectiveFailure(result)).length
+            && data.failed === failedDetails.length
+            && data.failed === failedSources.length
+            && data.failedRequired === computedFailedRequired
+            && data.failedOptional === computedFailedOptional
+            && data.failedRequired + data.failedOptional === data.failed
+            && data.deferred === details.filter((result) => result.outcome === 'deferred').length
+            && data.credentialGated === details.filter((result) => result.outcome === 'credential-gated').length
+            && data.rateLimited === details.filter((result) => result.outcome === 'rate-limited').length
+            && typeof data.deliveryImpactingFailure === 'boolean'
+            && data.deliveryImpactingFailure === computedDeliveryImpactingFailure
+          const noActiveProfilesPayload = response.status === 422
+            && isRecord(body)
+            && body.success === false
+            && body.error === 'No active client profiles; source refresh skipped.'
+            && typeof body.hint === 'string'
+            && Object.keys(body).sort().join(',') === 'error,hint,success'
+          const statusInvariant = response.status === 200
+            ? isRecord(body) && body.success === true && data?.failed === 0 && data?.succeeded === data?.total
+            : response.status === 207
+              ? isRecord(body) && body.success === false && data !== null && data.failed > 0
+              : false
+          const validPayload = (response.status === 200 || response.status === 207)
+            && countersConsistent
+            && statusInvariant
+          const summary = {
             status: response.status,
             success: body?.success ?? false,
             total: body?.data?.total ?? 0,
@@ -77,15 +151,52 @@ jobs:
             deferred: body?.data?.deferred ?? 0,
             credentialGated: body?.data?.credentialGated ?? 0,
             rateLimited: body?.data?.rateLimited ?? 0,
-            failedSources: (body?.data?.details ?? [])
-              .filter((result) => result?.success === false)
-              .map((result) => ({ source: result?.source ?? 'unknown', outcome: result?.outcome ?? 'failed' })),
-            rateLimitedSources: (body?.data?.details ?? [])
+            failedRequired: body?.data?.failedRequired ?? null,
+            failedOptional: body?.data?.failedOptional ?? null,
+            deliveryImpactingFailure: body?.data?.deliveryImpactingFailure ?? null,
+            failedSources,
+            rateLimitedSources: details
               .filter((result) => result?.outcome === 'rate-limited')
               .map((result) => result?.source ?? 'unknown'),
-          }))
-          if (response.status === 200) process.exit(0)
-          if (response.status === 422) process.exit(0)
-          throw new Error(`source-refresh returned HTTP ${response.status}`)
+          }
+          console.log(JSON.stringify(summary))
+          // 422 is a green no-op only for the exact documented no-active-profiles
+          // response. Any other 422 must fail closed as an upstream contract error.
+          if (noActiveProfilesPayload) process.exit(0)
+          if (!validPayload) {
+            throw new Error(
+              `source-refresh returned an invalid or unparseable payload (HTTP ${response.status}`
+              + `${response.parseError ? ', JSON parse error: ' + response.parseError.message : ''})`,
+            )
+          }
+          if (response.status !== 200 && response.status !== 207) {
+            throw new Error(`source-refresh returned HTTP ${response.status}`)
+          }
+          // Delivery-impact gate (BLOCKER fix): a 207 is green only when every
+          // failed source is optional. Any required/unknown failure — or a
+          // payload from an older build without criticality fields — fails the
+          // step so digest/evidence/FIUR degradation is never masked.
+          // A fully successful run (HTTP 200, failed === 0) needs no criticality
+          // evidence — nothing failed. The strict gate applies to partials only.
+          if (
+            !(response.status === 200 && summary.success === true && summary.failed === 0)
+            && (summary.deliveryImpactingFailure !== false || summary.failedRequired > 0)
+          ) {
+            console.log(`::error::source-refresh has delivery-impacting failures (required/unknown sources failed): ${JSON.stringify(summary.failedSources.filter((f) => f.criticality !== 'optional'))}`)
+            process.exit(1)
+          }
+          if (summary.failedSources.some((f) => f.criticality === 'unknown')) {
+            console.log(`::error::source-refresh failure criticality could not be determined for some sources: ${JSON.stringify(summary.failedSources.filter((f) => f.criticality === 'unknown'))}`)
+            process.exit(1)
+          }
+          // Optional-only failures are degraded-but-allowed within budget:
+          // observable warning, not a red step.
+          if (summary.failed > MAX_FAILED_SOURCES) {
+            console.log(`::warning::source-refresh optional failed sources (${summary.failed}) exceed the allowed budget (${MAX_FAILED_SOURCES}): ${JSON.stringify(summary.failedSources)}`)
+            process.exit(1)
+          }
+          if (response.status === 207) {
+            console.log(`::warning::source-refresh completed partially: ${summary.failed}/${summary.total} optional sources failed (within budget ${MAX_FAILED_SOURCES}); failedSources=${JSON.stringify(summary.failedSources)}`)
+          }
           NODE
           SSH_EOF
