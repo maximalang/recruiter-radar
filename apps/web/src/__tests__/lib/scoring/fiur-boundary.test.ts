@@ -102,6 +102,19 @@ describe('FIUR boundary & invariant tests', () => {
       )
     })
 
+    it('does not award urgency to future-dated vacancies', () => {
+      const now = Date.parse('2026-05-27T12:00:00.000Z')
+      const result = computeFiur({
+        company: baseCompany,
+        vacancies: [vacancy({ publishedAt: '2026-05-28T12:00:00.000Z' })],
+        clientProfile: baseProfile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+        now: () => now,
+      })
+
+      expect(result.urgency).toBe(0)
+    })
+
     it('holds with market conditions', () => {
       const result = computeFiur({
         company: baseCompany,
