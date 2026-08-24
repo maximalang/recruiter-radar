@@ -52,22 +52,17 @@ jobs:
       HH_LIVE_VERIFY: '1'
       SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK: isolated
       SOURCE_ENV_FILE_DISABLED: 'true'
-      # The proof must fetch a complete window, not a truncated sample. A
-      # 12-hour lookback bounds the result set so the coverage check passes
-      # within a small page budget while still exercising the full pipeline.
-      HH_SEARCH_TEXT: 'recruiter'
-      HH_LOOKBACK_HOURS: '12'
-      HH_PER_PAGE: '100'
-      HH_PAGES: '20'
-      # The proof uses a deliberately narrow, non-zero live query so the
-      # complete result window remains bounded and coverage truncation stays
-      # fail-closed.
+      # The proof must fetch a complete result window, not a truncated sample.
+      # A scoped query (keyword + area + role + experience) keeps `found` inside
+      # the page budget so the coverage check stays fail-closed without failing
+      # an isolated run. A 12-hour lookback further bounds the window.
       HH_SEARCH_TEXT: 'recruiter'
       HH_AREA: '1'
       HH_PROFESSIONAL_ROLE: '96'
       HH_EXPERIENCE: 'between1And3'
-      HH_PAGES: '20'
+      HH_LOOKBACK_HOURS: '12'
       HH_PER_PAGE: '100'
+      HH_PAGES: '20'
 
     steps:
       - uses: actions/checkout@v7
