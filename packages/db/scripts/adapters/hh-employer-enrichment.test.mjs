@@ -105,6 +105,70 @@ test('entry age exactly at TTL is stale, while TTL minus 1ms remains a cache hit
   assert.equal(fresh.requested, 0);
 });
 
+test('fresh write ages from injected now and becomes a TTL miss', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'hh-employer-ttl-write-clock-'));
+  const cachePath = join(directory, 'cache.json');
+  const firstNow = new Date('2026-01-01T00:00:00.000Z');
+  const secondNow = new Date('2026-01-01T02:00:00.000Z');
+  let calls = 0;
+  const fetchJsonImpl = async (url) => {
+    calls += 1;
+    const id = new URL(url).pathname.split('/').pop();
+    return { id, name: `Employer ${calls}`, site_url: `https://e${calls}.example.ru/` };
+  };
+
+  const first = await fetchHhEmployerDetails({
+    employerIds: ['10'],
+    userAgent: 'RecruiterRadar test',
+    env: { HH_ACCESS_TOKEN: 'token' },
+    fetchJsonImpl,
+    cachePath,
+    cacheTtlHours: 1,
+    now: firstNow,
+  });
+  assert.equal(first.cacheHits, 0);
+  assert.equal(JSON.parse(readFileSync(cachePath, 'utf8')).entries['10'].storedAt, firstNow.toISOString());
+
+  const second = await fetchHhEmployerDetails({
+    employerIds: ['10'],
+    userAgent: 'RecruiterRadar test',
+    env: { HH_ACCESS_TOKEN: 'token' },
+    fetchJsonImpl,
+    cachePath,
+    cacheTtlHours: 1,
+    now: secondNow,
+  });
+  assert.equal(second.cacheHits, 0);
+  assert.equal(second.requested, 1);
+  assert.equal(calls, 2);
+});
+
+test('future cache timestamps fail closed as misses', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'hh-employer-future-cache-'));
+  const cachePath = join(directory, 'cache.json');
+  const now = new Date('2026-01-01T00:00:00.000Z');
+  writeFileSync(cachePath, JSON.stringify({ version: 1, entries: {
+    '10': { storedAt: '2026-01-01T01:00:00.000Z', detail: { id: '10', name: 'Future', siteUrl: 'https://future.example.ru/' } },
+  } }), 'utf8');
+
+  let calls = 0;
+  const result = await fetchHhEmployerDetails({
+    employerIds: ['10'],
+    userAgent: 'RecruiterRadar test',
+    env: { HH_ACCESS_TOKEN: 'token' },
+    fetchJsonImpl: async () => {
+      calls += 1;
+      return { id: '10', name: 'Fresh', site_url: 'https://fresh.example.ru/' };
+    },
+    cachePath,
+    cacheTtlHours: 168,
+    now,
+  });
+  assert.equal(result.cacheHits, 0);
+  assert.equal(result.requested, 1);
+  assert.equal(calls, 1);
+});
+
 test('mixed cache pruning keeps fresh entries and removes stale entries from persisted file', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'hh-employer-mixed-pruning-'));
   const cachePath = join(directory, 'cache.json');

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fetch as undiciFetch } from 'undici';
@@ -75,7 +76,9 @@ export async function fetchHhEmployerDetails({
   let cacheDirty = false;
   for (const [id, entry] of Object.entries(cache.entries)) {
     const storedAtMs = Date.parse(entry?.storedAt ?? '');
-    if (!entry?.detail || !Number.isFinite(storedAtMs) || (Number.isFinite(nowMs) && nowMs - storedAtMs >= ttlMs)) {
+    if (!entry?.detail || !Number.isFinite(storedAtMs) || (
+      Number.isFinite(nowMs) && (storedAtMs > nowMs || nowMs - storedAtMs >= ttlMs)
+    )) {
       delete cache.entries[id];
       cacheDirty = true;
       continue;
@@ -150,7 +153,10 @@ export async function fetchHhEmployerDetails({
           // Only successfully verified employer payloads enter the cache, so a
           // transient failure is retried on the next run instead of being
           // pinned as stale "knowledge".
-          cache.entries[employerId] = { storedAt: new Date().toISOString(), detail };
+          cache.entries[employerId] = {
+            storedAt: new Date(nowMs).toISOString(),
+            detail,
+          };
           cacheDirty = true;
         }
       } catch (error) {
@@ -262,7 +268,7 @@ async function persistEmployerDetailCache(cachePath, cache, maxEntries) {
   pruneEmployerDetailCache(cache, maxEntries);
   // Atomic tmp+rename write so a crashed run never leaves a truncated cache.
   await mkdir(dirname(cachePath), { recursive: true });
-  const temporaryPath = `${cachePath}.${process.pid}.tmp`;
+  const temporaryPath = `${cachePath}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(temporaryPath, `${JSON.stringify({ version: 1, entries: cache.entries }, null, 2)}\n`, 'utf8');
   await rename(temporaryPath, cachePath);
 }
