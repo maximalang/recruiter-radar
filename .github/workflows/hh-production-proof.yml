@@ -52,6 +52,12 @@ jobs:
       HH_LIVE_VERIFY: '1'
       SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK: isolated
       SOURCE_ENV_FILE_DISABLED: 'true'
+      # The proof runs a narrow scoped search, not the production broad
+      # incremental window: a keyword query keeps the result set inside the
+      # 1-page budget so coverage_truncation cannot fail an isolated run.
+      HH_SEARCH_TEXT: 'recruiter'
+      HH_PER_PAGE: '2'
+      HH_PAGES: '1'
 
     steps:
       - uses: actions/checkout@v7
