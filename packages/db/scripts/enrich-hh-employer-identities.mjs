@@ -16,6 +16,7 @@ import {
   resolveHhProxyFetch,
 } from './adapters/hh.mjs';
 import { loadEnvFile } from './lib/common-utils.mjs';
+import { resolveHhEmployerDetailCachePath } from './lib/hh-employer-cache-path.mjs';
 
 const { Client } = pg;
 loadEnvFile();
@@ -23,6 +24,7 @@ loadEnvFile();
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const userAgent = process.env.HH_USER_AGENT?.trim();
 const limit = resolveLimit(process.env.HH_EMPLOYER_IDENTITY_LIMIT);
+const cachePath = resolveHhEmployerDetailCachePath(process.env.HH_EMPLOYER_DETAIL_CACHE_PATH);
 const jsonOutput = process.argv.includes('--json');
 
 assert.ok(databaseUrl, 'DATABASE_URL is required.');
@@ -59,6 +61,7 @@ try {
     env: process.env,
     dispatcher: resolveHhProxyDispatcher(process.env),
     transportFetch: resolveHhProxyFetch(process.env) ?? undefined,
+    cachePath,
     maxEmployers: limit,
   });
   stats.detailsRequested = details.requested;
