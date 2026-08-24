@@ -14,6 +14,17 @@ const accessibilityAuditScript = fileURLToPath(new URL("./verify-landing-accessi
 const keyboardAuditScript = fileURLToPath(new URL("./verify-landing-keyboard.mjs", import.meta.url));
 const maxAttempts = 2;
 
+// CI-friendly matrix: the audit mode is mandatory and propagated to every
+// child. enabled → build WITH NEXT_PUBLIC_YANDEX_METRIKA_ID; disabled → build
+// WITHOUT it. A mode/bundle mismatch fails fast inside each child.
+const landingAuditMode = process.env.LANDING_AUDIT_MODE === "enabled"
+  ? "enabled"
+  : process.env.LANDING_AUDIT_MODE === "disabled" ? "disabled" : null;
+if (!landingAuditMode) {
+  process.stderr.write('LANDING_AUDIT_MODE must be set to "enabled" or "disabled"\n');
+  process.exit(1);
+}
+
 function wait(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

@@ -168,6 +168,59 @@ describe("polished unified landing visual contract", () => {
     expect(responsiveAudit).toContain("'/payment-and-refund'");
     expect(productionAudit).toContain('LANDING_REQUIRE_ANALYTICS_CONSENT === "true"');
     expect(productionAudit).toContain("analytics consent control is required for this audit");
+    // Deterministic audit lifecycle: derive the ACTUAL executed child list from
+    // the runner source instead of hardcoding helpers, so any new or renamed
+    // child of `test:landing:e2e` is automatically covered. Every executed
+    // Playwright helper must settle via load + explicit readiness, never
+    // networkidle (keep-alive sessions hold the network busy indefinitely).
+    const normalize = (text: string) => text.replace(/\r\n/g, "\n");
+    const landingPageSource = source("app/landing/landing-page.tsx");
+    const runnerSource = normalize(source("scripts/run-landing-production-audit.mjs"));
+    const captureReviewSource = normalize(source("scripts/capture-landing-review.mjs"));
+    const productionAuditNormalized = normalize(productionAudit);
+    // Build-time analytics capability must be visible in the page DOM as a
+    // safe boolean marker (no id/secrets), so audits can prove the audited
+    // bundle matches the requested mode without trusting runtime env.
+    expect(landingPageSource).toContain('data-landing-analytics={isYandexMetrikaConfigured() ? "enabled" : "disabled"}');
+    expect(productionAuditNormalized).toContain('getAttribute("data-landing-analytics")');
+    expect(productionAuditNormalized).toContain("LANDING_AUDIT_MODE=enabled requires an analytics-enabled production bundle");
+    expect(productionAuditNormalized).toContain("LANDING_AUDIT_MODE=disabled requires an analytics-disabled production bundle");
+    // The runner resolves the production audit through the shared path helper
+    // (not an inline literal), and the mode guard lives in the runner itself.
+    expect(runnerSource).toContain("resolveAuditScriptPath(import.meta.url)");
+    expect(runnerSource).toContain('LANDING_AUDIT_MODE must be set to "enabled" or "disabled"');
+    // Child scripts appear as fileURLToPath(new URL("./name.mjs", ...)) plus the
+    // auditScript resolved via landing-audit-path (verify-landing-production.mjs).
+    const runnerChildMatches = runnerSource.matchAll(/fileURLToPath\(new URL\("\.\/([\w.-]+\.mjs)"/g);
+    const runnerChildFiles = Array.from(
+      new Set([...Array.from(runnerChildMatches, (match) => match[1]), "verify-landing-production.mjs"]),
+    ).sort();
+    expect(runnerChildFiles.length).toBeGreaterThanOrEqual(4);
+    for (const childFile of runnerChildFiles) {
+      const childPath = resolve(WEB_ROOT, "scripts", childFile);
+      expect(existsSync(childPath)).toBe(true);
+      const childSource = normalize(readFileSync(childPath, "utf8"));
+      if (!childSource.includes("chromium")) continue;
+      expect(childSource).not.toContain('waitUntil: "networkidle"');
+      expect(childSource).not.toContain('waitForLoadState("networkidle")');
+      if (childSource.includes("page.goto") || childSource.includes("page.reload")) {
+        expect(childSource).toContain('waitUntil: "load"');
+        expect(childSource).toContain('document.readyState === "complete"');
+      }
+    }
+    for (const auditSource of [productionAudit, source("scripts/verify-landing-axe.mjs"), source("scripts/capture-landing-review.mjs"), source("scripts/verify-landing-accessibility.mjs"), source("scripts/verify-landing-keyboard.mjs")]) {
+      expect(auditSource).not.toContain('waitUntil: "networkidle"');
+      expect(auditSource).not.toContain('waitForLoadState("networkidle")');
+    }
+    expect(productionAuditNormalized).toContain("analyticsEventsSkipped = analyticsAuditMode === \"disabled\"");
+    expect(productionAuditNormalized).toContain("analytics disabled — event contracts skipped");
+    expect(productionAuditNormalized).toContain('interactionAnalytics: !analyticsEventsSkipped');
+    expect(productionAuditNormalized).toContain('privacyAnalytics: !analyticsEventsSkipped');
+    // Explicit audit mode: enabled fails fast on a disabled bundle; the mode is
+    // mandatory so neither run silently degrades. Late console errors from any
+    // capture phase must still reach the gate (per-viewport finally).
+    expect(captureReviewSource).toContain("} finally {\n      recordConsoleMessages(viewport.name, page);");
+    expect(productionAudit).toContain('const heroEvent = waitForLandingEvent');
     expect(productionAudit).toContain('name: "mobile-320x568"');
     expect(productionAudit).toContain('async function revealAllMotionSections');
     expect(productionAudit).toContain('[data-motion-reveal="section"]');

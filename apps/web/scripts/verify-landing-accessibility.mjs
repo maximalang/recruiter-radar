@@ -45,9 +45,22 @@ async function preparePage(context, label, url = baseUrl) {
     contentType: "application/javascript",
     body: "/* deterministic analytics loader stub for focused accessibility audit */",
   }));
-  await page.goto(url, { waitUntil: "networkidle" });
+  await page.goto(url, { waitUntil: "load", timeout: 30_000 });
+  // Bounded readiness instead of networkidle: keep-alive sessions and analytics
+  // stubs can hold the network busy forever. DOM landmarks plus hydration state
+  // are deterministic; a short settle window lets late layout settle without
+  // masking genuinely pending requests (console/pageerror gates still fire).
+  await page.waitForLoadState("load", { timeout: 30_000 });
   await page.locator('[data-landing-experience="signal-lock"]').waitFor({ state: "attached" });
   await page.locator("#scene-detection").waitFor({ state: "visible" });
+  await page.waitForFunction(
+    () => document.readyState === "complete"
+      && Array.from(document.querySelectorAll("script"))
+        .some((script) => script.src.includes("/_next/static/chunks/")),
+    undefined,
+    { timeout: 30_000 },
+  );
+  await page.waitForTimeout(160);
 
   const consent = page.getByRole("button", { name: "Разрешить", exact: true });
   if (await consent.isVisible()) {
