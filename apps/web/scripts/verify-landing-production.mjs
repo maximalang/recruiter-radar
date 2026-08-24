@@ -617,6 +617,19 @@ async function assertInteractionContracts(browser) {
   await waitForLanding(page);
   await resolveAnalyticsConsent(page);
 
+  // The click listeners live in the hydrated LandingAnalytics client component.
+  // waitForLanding above only proves the SSR HTML is attached; on a cold server
+  // or slow machine hydration can still be pending when we get here, and an
+  // early click would silently produce no POST /api/landing-events (the delegated
+  // listener is not installed yet) — a harness timeout that looks like a product
+  // regression. Wait for hydration deterministically before any interaction:
+  await page.waitForFunction(
+    () => Array.from(document.querySelectorAll("script")).some((script) => script.src.includes("/_next/static/chunks/")),
+    undefined,
+    { timeout: 30_000 },
+  );
+  await page.waitForLoadState("networkidle");
+
   const heroEvent = waitForLandingEvent(page, "preview_started", "hero_primary");
   await Promise.all([
     heroEvent,

@@ -2,13 +2,16 @@ import { spawn } from "node:child_process";
 import { readdir, rename } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 import { resolveAuditScriptPath } from "./landing-audit-path.mjs";
 
+// fileURLToPath instead of .pathname: URL.pathname on Windows yields "/C:/..."
+// which breaks child-process spawn (double-drive "C:\C:\..." path).
 const auditScript = resolveAuditScriptPath(import.meta.url);
-const reviewCaptureScript = new URL("./capture-landing-review.mjs", import.meta.url).pathname;
-const accessibilityAuditScript = new URL("./verify-landing-accessibility.mjs", import.meta.url).pathname;
-const keyboardAuditScript = new URL("./verify-landing-keyboard.mjs", import.meta.url).pathname;
+const reviewCaptureScript = fileURLToPath(new URL("./capture-landing-review.mjs", import.meta.url));
+const accessibilityAuditScript = fileURLToPath(new URL("./verify-landing-accessibility.mjs", import.meta.url));
+const keyboardAuditScript = fileURLToPath(new URL("./verify-landing-keyboard.mjs", import.meta.url));
 const maxAttempts = 2;
 
 function wait(milliseconds) {
