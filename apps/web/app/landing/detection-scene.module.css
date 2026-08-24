@@ -200,12 +200,12 @@
 .productShot {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 24%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-overlay);
   background:
     linear-gradient(180deg,
       color-mix(in srgb, var(--color-surface-elevated) 92%, transparent),
       color-mix(in srgb, var(--color-surface-primary) 96%, transparent));
-  box-shadow: 0 32px 90px rgba(10, 16, 14, .5), 0 4px 18px rgba(10, 16, 14, .35);
+  box-shadow: var(--shadow-overlay);
   text-align: left;
 }
 .shotBar {
@@ -232,7 +232,7 @@
   margin-left: auto;
   padding: .22rem .6rem;
   border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 46%, transparent);
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   color: var(--color-signal-on-dark);
   font-family: var(--font-mono);
   font-size: .58rem;
@@ -259,7 +259,7 @@
   padding: .38rem .55rem;
   margin: -.38rem -.55rem;
   border-left: 2px solid var(--color-signal);
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
   background: color-mix(in srgb, var(--color-signal) 9%, transparent);
   color: var(--color-text-primary);
   font-weight: 600;
@@ -312,7 +312,7 @@
   margin-left: .45rem;
   padding: .1rem .38rem;
   border: 1px solid color-mix(in srgb, var(--color-text-primary) 22%, transparent);
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   color: color-mix(in srgb, var(--color-text-primary) 60%, transparent);
   font-family: var(--font-mono);
   font-size: .52rem;
