@@ -39,7 +39,7 @@ describe("landing restoration narrative", () => {
     expect(hero).toContain('data-hero-layout="morning-list"');
     expect(hero).toContain('data-theme="inverse"');
     expect(hero).toContain("data-payment-offer=");
-    expect(hero).toContain("Открыть живой пример");
+    expect(hero).toContain("Открыть пример");
     expect(hero).toContain("data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("без автопродления · сообщения отправляете вы");

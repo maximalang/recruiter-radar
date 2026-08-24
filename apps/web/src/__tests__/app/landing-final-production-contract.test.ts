@@ -19,7 +19,7 @@ describe("landing final production contract", () => {
     expect(hero).toContain("Утренний список компаний, где найм уже идёт");
     expect(hero).toContain('data-hero-layout="morning-list"');
     expect(hero).toContain('data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
-    expect(hero).toContain("Открыть живой пример");
+    expect(hero).toContain("Открыть пример");
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain('data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}');
     expect(hero).toContain('data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}');

@@ -37,7 +37,7 @@ describe("landing visual and login reliability polish", () => {
 
       expect(hero).toContain('data-hero-layout="morning-list"');
       expect(hero).toContain("HeroProductPreview");
-      expect(hero).toContain("Открыть живой пример");
+      expect(hero).toContain("Открыть пример");
       expect(hero).not.toContain("HeroRadar");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);
