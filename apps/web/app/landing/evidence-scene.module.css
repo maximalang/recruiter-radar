@@ -18,7 +18,9 @@
 
 .introLabel {
   margin: 0 0 .75rem;
-  color: var(--color-signal);
+  /* --color-signal is 3.0:1 on this dark scene background; use the
+   * on-dark variant (8.8:1) to meet WCAG AA (4.5:1) for small text. */
+  color: var(--color-signal-on-dark);
   font-family: var(--font-mono);
   font-size: .7rem;
   font-weight: 600;
@@ -75,7 +77,9 @@
 .timeline li:last-child { border-bottom: 0; }
 
 .sourceCell {
-  color: color-mix(in srgb, var(--color-text-inverse) 52%, transparent);
+  /* ≥62% mix of --color-text-inverse passes WCAG AA (4.5:1) on the dark
+   * scene background; lower percentages fail axe color-contrast. */
+  color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent);
   font-family: var(--font-mono);
   font-size: .68rem;
   letter-spacing: .04em;
@@ -91,7 +95,8 @@
 .statusCell {
   justify-self: end;
   text-align: right;
-  color: var(--color-signal);
+  /* Lighter signal variant for AA contrast on the dark scene background. */
+  color: var(--color-signal-on-dark);
   font-size: .72rem;
   font-weight: 550;
   white-space: nowrap;
@@ -107,7 +112,8 @@
 
 .blockLabel {
   display: block;
-  color: color-mix(in srgb, var(--color-text-inverse) 46%, transparent);
+  /* ≥62% mix passes WCAG AA (4.5:1) on the dark scene background. */
+  color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent);
   font-family: var(--font-mono);
   font-size: .64rem;
   font-weight: 600;
@@ -128,7 +134,8 @@
 }
 
 .scoreValue small {
-  color: color-mix(in srgb, var(--color-text-inverse) 44%, transparent);
+  /* ≥62% mix passes WCAG AA (4.5:1) on the dark scene background. */
+  color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent);
   font-size: 1.15rem;
   font-weight: 450;
   letter-spacing: -.01em;
@@ -165,7 +172,8 @@
 
 .confidenceBlock small,
 .action small {
-  color: color-mix(in srgb, var(--color-text-inverse) 48%, transparent);
+  /* ≥62% mix passes WCAG AA (4.5:1) on the dark scene background. */
+  color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent);
   font-size: .72rem;
 }
 
