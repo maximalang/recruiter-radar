@@ -60,7 +60,7 @@ test('transport degradation moves the static+structured dependency group togethe
 
   const blockedHealth = evaluateTransportHealth([
     { at: '2026-08-19T04:00:00Z', stage: 'static-http', outcome: 'blocked' },
-  ]);
+  ], undefined, new Date('2026-08-19T05:00:00Z'));
   const blockedSelection = selectTransportStages(['static-http', 'rendered-dom'], blockedHealth);
   assert.equal(blockedSelection.stoppedByPolicy, true);
   assert.deepEqual(blockedSelection.stages, []);
