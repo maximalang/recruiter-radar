@@ -57,6 +57,7 @@ jobs:
       # budget stays within HH's result-window limit.
       HH_PAGES: '20'
       HH_PER_PAGE: '100'
+      HH_MIN_PARTITION_MINUTES: '5'
 
     steps:
       - uses: actions/checkout@v7
