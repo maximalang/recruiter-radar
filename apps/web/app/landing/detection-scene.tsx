@@ -5,7 +5,7 @@ import {
   LANDING_ANALYTICS_EVENT,
 } from "../../lib/landing-analytics-contract";
 import { ArrowGlyph } from "./brand-glyphs";
-import HeroSignalField from "./hero-signal-field";
+import HeroProductPreview from "./hero-product-preview";
 import sceneStyles from "./detection-scene.module.css";
 
 export default function DetectionScene(props: { previewHref: string; paymentConfigured: boolean }) {
@@ -46,8 +46,8 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
         </p>
       </div>
 
-      <div className={sceneStyles.fieldFigure} data-hero-visual data-mobile-hero-signal aria-hidden="true">
-        <HeroSignalField />
+      <div className={sceneStyles.fieldFigure} data-hero-visual data-mobile-hero-signal>
+        <HeroProductPreview />
       </div>
     </section>
   );
