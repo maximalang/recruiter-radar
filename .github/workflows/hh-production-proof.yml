@@ -90,10 +90,9 @@ jobs:
             npm run migrate --workspace packages/db
           else
             echo 'packages/db has no migrate script; applying schema bootstrap and forward migrations.'
-            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f packages/db/schema/init.sql
-            # schema/init.sql already contains the full baseline schema, so the
-            # 0001_init.sql forward migration would recreate the same ENUMs and
-            # fail. Skip it; apply only post-baseline forward migrations.
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f packages/db/migrations/0001_init.sql
+            # 0001_init.sql is the authoritative baseline for the migration chain.
+            # Apply only post-baseline forward migrations below.
             while IFS= read -r migration; do
               [[ "$migration" == *.down.sql ]] && continue
               [[ "$(basename "$migration")" == "0001_init.sql" ]] && continue
