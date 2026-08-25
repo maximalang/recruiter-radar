@@ -22,7 +22,7 @@ export function buildLandingJsonLd(paymentConfigured: boolean): string {
         email: OPERATOR_REQUISITES.email,
         telephone: OPERATOR_REQUISITES.phone,
         description:
-          "Информационно-аналитический онлайн-сервис для рекрутинговых агентств: ежедневный радар компаний с активным наймом.",
+          "Информационно-аналитический онлайн-сервис для рекрутинговых агентств: радар компаний с активным наймом.",
         address: {
           "@type": "PostalAddress",
           addressLocality: OPERATOR_REQUISITES.city,

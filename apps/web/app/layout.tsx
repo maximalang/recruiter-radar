@@ -32,7 +32,7 @@ const appleIcon = `/app-icons/app-icon-180.png?v=${brandVersion}`;
 
 export const metadata: Metadata = {
   title: "Recruiter Radar",
-  description: "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
+  description: "Радар компаний с активным наймом для рекрутеров и агентств.",
   metadataBase: new URL(OPERATOR_REQUISITES.website),
   alternates: { canonical: "/" },
   manifest: `/manifest.webmanifest?v=${brandVersion}`,
