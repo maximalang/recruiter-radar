@@ -117,6 +117,9 @@ describe("landing final production contract", () => {
       source("app/landing/workspace-scene.tsx"),
       source("app/landing/hero-product-preview.tsx"),
       source("app/home-page-content.tsx"),
+      source("app/api/telegram/webhook/route.ts"),
+      source("lib/email/digestEmail.ts"),
+      source("lib/pricingCatalog.ts"),
     ];
 
     for (const file of cadenceFiles) {

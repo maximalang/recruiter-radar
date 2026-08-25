@@ -264,7 +264,7 @@ function renderHtml(leads: LeadItem[], ctx: DigestEmailContext): string {
     `<tr><td style="padding:0 0 18px 0;color:${COLORS.muted};font-size:14px;">${escapeHtml(subhead)}</td></tr>` +
     `<tr><td>${cards}</td></tr>` +
     `<tr><td style="padding:8px 0 0 0;color:${COLORS.muted};font-size:12px;line-height:1.5;">` +
-    `Ежедневный радар Recruiter Radar. Доказательства и «почему сейчас» — внутри карточки.` +
+    `Радар Recruiter Radar. Доказательства и «почему сейчас» — внутри карточки.` +
     `</td></tr>` +
     `</table></td></tr></table></body></html>`
   );
