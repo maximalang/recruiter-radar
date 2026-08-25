@@ -13,7 +13,7 @@ import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
 import panelStyles from "./conversion-panel.module.css";
 
 const PILOT_BULLETS = [
-  "Ежедневный приоритет компаний",
+  "Приоритет компаний вашей ниши",
   "Почему сейчас + факты и источники",
   "Профиль по нише и географии",
 ] as const;

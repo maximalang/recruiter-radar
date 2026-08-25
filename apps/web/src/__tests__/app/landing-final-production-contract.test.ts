@@ -16,7 +16,7 @@ describe("landing final production contract", () => {
     const heroCss = source("app/landing/detection-scene.module.css");
 
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
-    expect(hero).toContain("Утренний список компаний, где найм уже идёт");
+    expect(hero).toContain("Список компаний, где найм уже идёт");
     expect(hero).toContain('data-hero-layout="morning-list"');
     expect(hero).toContain('data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
     expect(hero).toContain("Открыть пример");
@@ -105,5 +105,36 @@ describe("landing final production contract", () => {
     expect(faq).not.toContain("email digest");
     expect(faq).not.toContain("browser push");
     expect(faq).not.toContain("signed HTTPS webhook");
+  });
+
+  test("landing makes no delivery-cadence promises and demo dates stay fixed", () => {
+    // Regression guard for the critic blocker: while Source Refresh Clock has
+    // no live-proof, landing copy must not promise a daily/morning cadence and
+    // demo freshness must come from a fixed labeled scenario, not `new Date()`.
+    const cadenceFiles = [
+      source("app/landing/detection-scene.tsx"),
+      source("app/landing/conversion-panel.tsx"),
+      source("app/landing/workspace-scene.tsx"),
+      source("app/landing/hero-product-preview.tsx"),
+      source("app/home-page-content.tsx"),
+    ];
+
+    for (const file of cadenceFiles) {
+      expect(file).not.toMatch(/каждое утро/i);
+      expect(file).not.toMatch(/каждый день/i);
+      expect(file).not.toMatch(/ежедневн/i);
+    }
+    expect(source("app/landing/detection-scene.tsx")).not.toMatch(/утренн/i);
+
+    // Demo story freshness is an explicit fixed date, never "today".
+    const demoStory = source("lib/landing-demo.ts");
+    expect(demoStory).toContain("демо-сценарий");
+    expect(demoStory).toMatch(/12 мая/);
+    expect(demoStory).not.toMatch(/freshness:\s*"сегодня"/);
+
+    // Demo fallback items use hard-coded dates; no wall-clock generation.
+    const publicProduct = source("lib/publicProduct.ts");
+    expect(publicProduct).toContain('demoAnchorDate = "2026-05-12T09:00:00.000Z"');
+    expect(publicProduct).toMatch(/function buildPublicDemoDigestItems\(\)/);
   });
 });

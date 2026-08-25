@@ -12,7 +12,7 @@ export default function HeroProductPreview() {
       className={sceneStyles.productShot}
       data-hero-product-preview="demo"
       role="img"
-      aria-label="Пример карточки компании из утреннего списка: повод для контакта, подтверждающие факты и официальный путь контакта. Демо-данные."
+      aria-label="Пример карточки компании из радара: повод для контакта, подтверждающие факты с датой и официальный путь контакта. Демо-данные."
     >
       <div className={sceneStyles.shotBar} aria-hidden="true">
         <span className={sceneStyles.shotDot} />
@@ -23,7 +23,7 @@ export default function HeroProductPreview() {
       </div>
       <div className={sceneStyles.shotBody}>
         <div className={sceneStyles.shotSide} aria-hidden="true">
-          <span className={sceneStyles.shotSideActive}>Сегодняшний список</span>
+          <span className={sceneStyles.shotSideActive}>Список возможностей</span>
           <span>Инженерный подбор · Москва</span>
           <span>10 компаний с поводами</span>
           <span className={sceneStyles.shotSideNote}>Демо-данные</span>
@@ -34,7 +34,7 @@ export default function HeroProductPreview() {
           <dl className={sceneStyles.shotTable}>
             <div className={sceneStyles.shotRow}>
               <dt>Факт</dt>
-              <dd>Открыли 14 инженерных вакансий за последние дни</dd>
+              <dd>Открыли 14 инженерных вакансий за 6 дней · факт от 12 мая, демо</dd>
             </div>
             <div className={sceneStyles.shotRow}>
               <dt>Подтверждение</dt>

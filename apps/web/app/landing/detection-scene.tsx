@@ -22,10 +22,10 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
       <div className={sceneStyles.copy} data-hero-copy>
         <p className={sceneStyles.serviceLabel}>Публичные данные о найме · источник и дата по каждому факту</p>
         <h1 id="detection-title" className={sceneStyles.title} data-hero-title>
-          Утренний список компаний, где найм уже идёт
+          Список компаний, где найм уже идёт
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Каждое утро — приоритетный список компаний со свежими сигналами найма: почему компания актуальна, какие факты это подтверждают и с чего начать контакт.
+          Приоритетный список компаний со свежими сигналами найма: почему компания актуальна, какие факты это подтверждают и с чего начать контакт.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a

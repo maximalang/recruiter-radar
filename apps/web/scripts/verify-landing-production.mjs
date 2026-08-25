@@ -156,7 +156,7 @@ async function assertRequiredSurface(page, label) {
   }
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
-  assert.match(await page.locator("h1").innerText(), /Утренний список компаний, где найм уже идёт/);
+  assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
   assert.match(await page.locator("#scene-workspace").innerText(), /пример выдачи за сегодня|приоритет по вашему профилю/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
@@ -757,7 +757,7 @@ async function assertNoJs(browser) {
   for (const selector of requiredSelectors) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
-  assert.match(await page.locator("h1").innerText(), /Утренний список компаний, где найм уже идёт/);
+  assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
   const noJsWorkspaceText = await page.locator("#scene-workspace").innerText();
   assert.match(noJsWorkspaceText, /интерактивный пример/i);
   assert.match(noJsWorkspaceText, /показать компании/i);

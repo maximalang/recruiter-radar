@@ -193,7 +193,7 @@ function WorkspaceResultsContent(
   const visibleItems = previewState.items.slice(0, 5);
   const statusLabel = previewState.isPersonalized
     ? `Выдача по вашему профилю · ${previewState.isLive ? "свежие данные" : "демо"}`
-    : "Пример выдачи за сегодня · демо";
+    : "Пример выдачи · демо-сценарий от 12 мая";
 
   return (
     <div

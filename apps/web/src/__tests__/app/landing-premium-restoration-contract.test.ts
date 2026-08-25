@@ -93,10 +93,10 @@ describe("landing premium restoration contract", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const heroCss = source("app/landing/detection-scene.module.css");
 
-    // The morning-list description names the product value directly; no extra
-    // screen-reader-only scheme account is needed on top of it.
+    // The priority-list description names the product value directly and makes
+    // no delivery-cadence promise; no extra screen-reader account is needed.
     expect(hero).toContain(
-      "Каждое утро — приоритетный список компаний со свежими сигналами найма: почему компания актуальна, какие факты это подтверждают и с чего начать контакт.",
+      "Приоритетный список компаний со свежими сигналами найма: почему компания актуальна, какие факты это подтверждают и с чего начать контакт.",
     );
     expect(heroCss).toContain(".visuallyHidden");
   });
