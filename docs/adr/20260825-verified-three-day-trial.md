@@ -1,6 +1,6 @@
 # ADR: Verified three-day trial with an immutable trial profile
 
-- **Status:** Proposed — contract and threat model only; runtime implementation is a separate vertical PR.
+- **Status:** Proposed contract; runtime implementation is a separate vertical PR and remains disabled until provider and production gates pass.
 - **Owner:** backend/auth boundary
 - **Scope:** trial activation, profile mutability, entitlement boundaries, and provider rollout.
 
@@ -49,25 +49,28 @@ email, phone number, Telegram username, or message payload. The binding hash is
 kept after account deletion under a documented retention and appeal policy, so a
 new account cannot reset the same trial. The exact pair `(verified_email,
 verified_telegram_actor)` is the one-time key; broad email-only or Telegram-only
-blocking requires a separate product/privacy decision.
+blocking is stricter in this implementation: each verified component also has a
+unique anti-abuse index; @user/@rr-support must approve that privacy policy
+before merge.
 
-The claim has a unique binding key and an idempotency key. A retry of the same
-activation returns the original result; a different account or request with the
-same binding fails closed with `trial_already_used`. Concurrent activations are
-serialized by the database uniqueness/row-lock path, not by a client-side flag.
+The claim has durable unique binding keys. A retry of the same activation returns
+`already_claimed`; a different account or request with the same binding fails
+closed. Concurrent activations are serialized by the database
+uniqueness/row-lock path, not by a client-side flag.
 
 ### 2. Trial entitlement has one narrow mutation service
 
-Self-serve code calls a dedicated `activateVerifiedThreeDayTrial` service. It
+Self-serve code calls a dedicated `activateVerifiedTrial` service. It
 must not accept `durationDays`, arbitrary plan names, or an operator source.
 The service transaction:
 
 1. locks the authenticated account and the durable claim key;
 2. re-checks verified email and verified Telegram state;
-3. creates or reuses exactly one trial entitlement with the fixed three-day
-   window;
-4. creates the single trial profile and its lock record;
-5. writes an audit event with non-sensitive identifiers and the decision;
+3. verifies exactly one active pre-activation profile exists in the requested
+   workspace; activation fails closed when it does not;
+4. creates exactly one trial entitlement with the fixed three-day window and a
+   durable claim/profile lock record;
+5. retains claim and entitlement rows as the non-sensitive audit trail;
 6. commits atomically.
 
 The existing generic entitlement grant functions remain for explicitly scoped
@@ -77,8 +80,9 @@ verification state is unavailable.
 
 ### 3. Profile mutability is a service and database invariant
 
-The trial profile is created once as part of activation and is immutable while
-trial access is active. The following are denied with a stable domain error:
+The user completes the initial profile before activation; activation binds that
+single existing profile and makes it immutable while trial access is active.
+The following are denied with a stable domain error:
 
 - editing any profile field;
 - changing `is_active` or delivery/profile filters;
@@ -94,10 +98,10 @@ the trial policy is locked. Service guards return a user-safe 403/409 response;
 the database guard is the race-condition backstop. There is no unlogged support
 or admin bypass in the first implementation.
 
-After the three-day window, the profile remains read-only until a non-trial
-active entitlement exists. A paid/admin entitlement may unlock the normal
-profile policy through a separately audited transition; expiration alone never
-creates a new trial or grants edit rights.
+After the three-day window, the database guard stops applying the active-trial
+lock. A separate entitlement/policy transition must decide whether normal
+profile edits are allowed; expiration alone never creates a new trial or grants
+new entitlement access.
 
 ### 4. Authentication provider rollout is incremental
 
