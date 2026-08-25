@@ -1,12 +1,13 @@
 # Rebase/merge guide: codex/seo-aeo-infra × #234 (codex/landing-hero-concept2)
 
 Дата: 25.08.2026 · Автор: @rr-mkt-seo · Проверено `git merge-tree --write-tree` локально.
-Обновление: перепроверено на копирайт-head `7868353c` (timeline-fix) — конфликт тот же один, рецепт не меняется.
+Обновление 1: перепроверено на копирайт-head `7868353c` — конфликт тот же один, рецепт не меняется.
+Обновление 2 (финал): перепроверено на verdict-head **`6781bad9`** — конфликт тот же единственный, рецепт в силе. Именно этот head допущен вердиктом @rr-critic.
 
 ## Факт
 
 - `main × #234 (e9cf06d6)`: merge-tree exit 0 — чисто.
-- `7868353c × codex/seo-aeo-infra (a21531eb)`: exit 1 — ровно один конфликт
+- `6781bad9 × codex/seo-aeo-infra (c3d2e3bf)`: exit 1 — ровно один конфликт
   в `apps/web/app/home-page-content.tsx`, блок `export const metadata`.
 
 ## Причина
