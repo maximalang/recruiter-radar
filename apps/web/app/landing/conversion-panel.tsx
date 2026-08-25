@@ -39,7 +39,7 @@ export default function ConversionPanel(props: {
         <div className={panelStyles.pricingIntro} data-pricing-intro>
           <span>Попробуйте на своей нише</span>
           <h2>Попробовать 7 дней — {pilotPlan.price}</h2>
-          <p>Полноценная неделя работы: каждый день радар приносит приоритетные компании вашей ниши — с поводом, фактами и источниками. Оплата разовая, без автопродления.</p>
+          <p>Полноценная неделя работы с радаром: приоритетные компании вашей ниши с поводом, фактами и источниками. Оплата разовая, без автопродления.</p>
         </div>
 
         <div className={panelStyles.pricingDecision}>
