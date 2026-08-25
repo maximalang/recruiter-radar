@@ -38,7 +38,7 @@ describe("SEO/AEO infrastructure contracts", () => {
   });
 
   it("llms.txt route exposes product facts without invented claims or banned copywriting", () => {
-    const llms = source("app/llms.txt.ts");
+    const llms = source("app/llms.txt/route.ts");
     expect(llms).toContain("OPERATOR_REQUISITES");
     expect(llms).toContain("PUBLIC_PLANS");
     // Banned marketing claims never appear.

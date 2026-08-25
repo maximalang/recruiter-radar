@@ -10,7 +10,7 @@ const SITE_URL = OPERATOR_REQUISITES.website;
  * и answer-движков. Только подтверждённые факты продукта; цены и реквизиты
  * тянутся из тех же модулей, что и лендинг, чтобы не расходиться.
  */
-export default function llmsTxt() {
+export function GET() {
   const pilot = PUBLIC_PLANS.find((p) => p.code === "pilot");
   const monthly = PUBLIC_PLANS.find((p) => p.code === "monthly");
   const quarterly = PUBLIC_PLANS.find((p) => p.code === "quarterly");
