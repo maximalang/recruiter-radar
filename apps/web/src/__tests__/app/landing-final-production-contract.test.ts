@@ -140,6 +140,34 @@ describe("landing final production contract", () => {
       /за последние (семь|7) дней/,
     );
 
+    // No relative freshness for demo facts anywhere on the landing surface:
+    // every dated event is anchored to the fixed scenario (12 мая 2026).
+    const relativeFreshnessFiles = [
+      source("app/landing/signal-timeline.tsx"),
+      source("app/landing/workspace-scene.tsx"),
+      source("app/landing/evidence-scene.tsx"),
+      source("app/landing/hero-product-preview.tsx"),
+      source("app/landing/detection-scene.tsx"),
+      source("lib/landing-demo.ts"),
+      source("app/landing/landing-copy.ts"),
+    ];
+
+    for (const file of relativeFreshnessFiles) {
+      expect(file).not.toMatch(/дней назад/i);
+      expect(file).not.toMatch(/дня назад/i);
+      expect(file).not.toMatch(/\bвчера\b/i);
+      expect(file).not.toMatch(/час назад/i);
+      expect(file).not.toMatch(/только что/i);
+      expect(file).not.toMatch(/за последние \d+ (дн|нед)/i);
+    }
+
+    // Timeline and demo story agree with the fixed anchor dates.
+    const timeline = source("app/landing/signal-timeline.tsx");
+    expect(timeline).toContain("6 мая · демо-сценарий");
+    expect(timeline).toContain("10 мая · демо-сценарий");
+    expect(timeline).toContain("11 мая · демо-сценарий");
+    expect(timeline).toContain("STORY.company.freshness");
+
     // Demo fallback items use hard-coded dates; no wall-clock generation.
     const publicProduct = source("lib/publicProduct.ts");
     expect(publicProduct).toContain('demoAnchorDate = "2026-05-12T09:00:00.000Z"');
