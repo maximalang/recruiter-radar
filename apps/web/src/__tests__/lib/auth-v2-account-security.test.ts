@@ -374,6 +374,8 @@ describe("auth v2 account security", () => {
     expect(allSql).toContain("UPDATE notification_delivery_attempts");
     expect(allSql).toContain("UPDATE notification_inbound_events");
     expect(allSql).toContain("UPDATE web_push_subscriptions");
+    expect(allSql).toContain("UPDATE trial_claims");
+    expect(allSql).toContain("UPDATE entitlement_grants");
     expect(allSql).toContain("secret_ciphertext = 'purged'");
     expect(allSql).toContain("destination_id = NULL");
     expect(allSql).toContain("digest_email = NULL");

@@ -1,5 +1,6 @@
 import { Pool, type PoolClient } from "pg";
 import { getPool as getSharedPool } from "./db-pool";
+import { isTrialProfileImmutableError } from "./trial";
 import type { AgencyProfile } from "./scoring/scoring-pipeline";
 
 type ClientProfilesDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
@@ -592,6 +593,9 @@ export async function saveClientProfile(input: {
           hiringMode
         ]);
   } catch (err) {
+    if (isTrialProfileImmutableError(err)) {
+      throw new Error("Профиль нельзя изменять во время активного триала.");
+    }
     if (isUniqueViolation(err, "client_profiles_telegram_chat_id_unique")) {
       throw new Error(
         "Этот Telegram-аккаунт уже привязан к другому профилю. Отвяжите его там или обратитесь в поддержку."

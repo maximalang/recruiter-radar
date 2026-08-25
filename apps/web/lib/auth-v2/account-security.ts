@@ -12,6 +12,7 @@ import {
 } from "./rate-limits";
 import { normalizeAuthEmail } from "./security";
 import { acquireAuthOwnerDeletionFence } from "./owner-write-fence";
+import { closeTrialClaimsForAccountDeletion } from "../trial";
 import {
   RecentAuthenticationRequiredError,
   requireRecentAuthentication,
@@ -1038,6 +1039,7 @@ export async function requestAccountDeletion(input: {
          AND subscription.revoked_at IS NULL`,
       [session.userId, now],
     );
+    await closeTrialClaimsForAccountDeletion(client, session.userId, now);
     await client.query(
       `UPDATE client_profiles AS profile
        SET is_active = FALSE,
