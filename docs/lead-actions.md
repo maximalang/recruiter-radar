@@ -23,20 +23,40 @@ state so a call is not collapsed into a generic reply or conversion.
 
 ## Signed callback wire format
 
+New buttons emit the compact versioned format:
+
+```text
+d2:<client_profile_id_base36>:<org_id_base36>:<action_code>:<hmac_tag>
+```
+
+- `d2` is the current emitter version. PostgreSQL `BIGSERIAL` identifiers are
+  encoded as lowercase base36, keeping the maximum signed 64-bit ID within
+  Telegram's 64-byte `callback_data` limit.
+- `action_code` is one byte (`a`, `b`, `s`, `c`, `r`, `m`, `w`, `d`; `v` is the
+  audit-only `shown` event).
+- The HMAC-SHA256 input is the full unsigned d2 payload:
+  `<version>:<client_profile_id_base36>:<org_id_base36>:<action_code>`.
+
+During migration, verification also accepts the legacy decimal format:
+
 ```text
 d:<client_profile_id>:<org_id>:<action_code>:<hmac_tag>
 ```
 
-- `action_code` is one byte (`a`, `b`, `s`, `c`, `r`, `m`, `w`, `d`; `v` is the
-  audit-only `shown` event).
-- `hmac_tag` is the first 22 base64url characters of HMAC-SHA256 over
-  `<client_profile_id>:<org_id>:<action_code>`.
+For legacy `d`, the HMAC-SHA256 input remains
+`<client_profile_id>:<org_id>:<action_code>`. Legacy callbacks are accepted for
+backward compatibility but are never emitted by new keyboards. Both formats
+use the first 22 base64url characters of the HMAC tag.
+
+For both versions:
+
 - The secret is read only from the runtime secret store; it is never persisted
   in callback data or logged.
 - UTF-8 byte length is checked against Telegram's 64-byte `callback_data`
   limit before a button is emitted and again before verification.
-- Verification rejects unknown action codes, malformed positive integer IDs,
-  wrong tag length, missing secret, and non-constant-time tag comparison.
+- Verification rejects unknown versions/action codes, malformed positive
+  integer IDs, IDs above PostgreSQL `BIGSERIAL` maximum, wrong tag length,
+  missing secret, and non-constant-time tag comparison.
 
 ## Idempotency and audit
 
