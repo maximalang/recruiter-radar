@@ -129,10 +129,28 @@ describe("landing final production contract", () => {
     }
     expect(source("app/landing/detection-scene.tsx")).not.toMatch(/утренн/i);
 
+    // Relative-freshness phrasing is banned on the landing: demo facts must
+    // carry an absolute, labeled scenario date instead of "N days ago".
+    for (const file of [
+      source("app/landing/signal-timeline.tsx"),
+      source("app/landing/hero-product-preview.tsx"),
+      source("lib/landing-demo.ts"),
+    ]) {
+      expect(file).not.toMatch(/дней назад|дня назад|час назад|только что/i);
+      expect(file).not.toMatch(/(^|[^\S])вчера(?![а-я])/i);
+    }
+    const timeline = source("app/landing/signal-timeline.tsx");
+    expect(timeline).toContain("6 мая · демо-сценарий");
+    expect(timeline).toContain("10 мая · демо-сценарий");
+    expect(timeline).toContain("11 мая · демо-сценарий");
+    expect(timeline).toContain("STORY.company.freshness");
+
     // Demo story freshness is an explicit fixed date, never "today".
     const demoStory = source("lib/landing-demo.ts");
     expect(demoStory).toContain("демо-сценарий");
     expect(demoStory).toMatch(/12 мая/);
+    expect(demoStory).toContain('eventDate: "6 мая · демо-сценарий"');
+    expect(demoStory).toContain('eventDate: "10 мая · демо-сценарий"');
     expect(demoStory).not.toMatch(/freshness:\s*"сегодня"/);
 
     // Demo fallback items use hard-coded dates; no wall-clock generation.
