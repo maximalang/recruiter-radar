@@ -216,7 +216,7 @@ export function deriveNegativeSignals(input: {
 /**
  * Valid feedback status values — MUST match the DB enum `digest_feedback_status`
  * exactly (packages/db/schema/init.sql). The enum is:
- *   none, contacted, replied, won, badfit, snooze, dismissed
+ *   none, contacted, replied, meeting, won, badfit, snooze, dismissed
  *
  * This set was previously drifted (listed accepted/later/call/client, which are
  * NOT in the enum) — clicking in-app "Беру"/"Позже" threw `invalid input value
@@ -232,7 +232,7 @@ export function deriveNegativeSignals(input: {
  * label, not a scheduling action.
  */
 export const VALID_FEEDBACK_STATUSES = new Set([
-  'none', 'contacted', 'replied', 'won', 'badfit', 'snooze', 'dismissed',
+  'none', 'contacted', 'replied', 'meeting', 'won', 'badfit', 'snooze', 'dismissed',
 ] as const);
 
 export type FeedbackStatus = Exclude<typeof VALID_FEEDBACK_STATUSES extends Set<infer T> ? T : never, 'none'>;
@@ -921,7 +921,7 @@ export async function updateLeadFeedback(input: {
   // Validate feedback status
   const status = input.feedbackStatus;
   if (!VALID_FEEDBACK_STATUSES.has(status as never) || status === 'none') {
-    return { ok: false, error: `Invalid feedback status: "${status}". Must be one of: contacted, replied, won, badfit, snooze, dismissed.` };
+    return { ok: false, error: `Invalid feedback status: "${status}". Must be one of: contacted, replied, meeting, won, badfit, snooze, dismissed.` };
   }
 
   // feedback_note is allowed on the "not a fit" rejection states (badfit,

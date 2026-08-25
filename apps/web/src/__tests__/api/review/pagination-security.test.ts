@@ -7,7 +7,7 @@ jest.mock('@/lib/db', () => ({
 
 jest.mock('@/lib/digestFeedback', () => ({
   updateDigestOrgStateFeedback: jest.fn(),
-  DIGEST_FEEDBACK_ACTIONS: ['accepted', 'badfit', 'dismissed', 'snooze', 'contacted', 'replied', 'won'],
+  DIGEST_FEEDBACK_ACTIONS: ['accepted', 'badfit', 'dismissed', 'snooze', 'contacted', 'replied', 'meeting', 'won'],
   isDigestFeedbackAction: jest.fn(),
   DEFAULT_BADFIT_SUPPRESSION_DAYS: 30,
   buildDigestFeedbackActionPlan: jest.fn(),

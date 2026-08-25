@@ -24,7 +24,7 @@ import type {
   DigestDbClient
 } from "./db-types";
 
-export const ACTIONABLE_LEAD_STATUSES = ["contacted", "replied", "won", "badfit", "snooze"] as const;
+export const ACTIONABLE_LEAD_STATUSES = ["contacted", "replied", "meeting", "won", "badfit", "snooze"] as const;
 export type ActionableLeadStatus = (typeof ACTIONABLE_LEAD_STATUSES)[number];
 export type LeadStatus = ActionableLeadStatus | "new" | "saved" | "dismissed";
 

@@ -16,8 +16,24 @@ const TELEGRAM_DIGEST_FEEDBACK_ACTIONS = [
     label: "Позже"
   },
   {
+    key: "contacted",
+    label: "Уже написал"
+  },
+  {
+    key: "replied",
+    label: "Ответили"
+  },
+  {
+    key: "meeting",
+    label: "Созвон"
+  },
+  {
+    key: "won",
+    label: "Клиент"
+  },
+  {
     key: "dismissed",
-    label: "Скрыть"
+    label: "Скрыть похожие"
   }
 ] as const;
 
@@ -31,28 +47,36 @@ const ACTION_TO_CODE = {
   accepted: "a",
   badfit: "b",
   snooze: "s",
+  contacted: "c",
+  replied: "r",
+  meeting: "m",
+  won: "w",
   dismissed: "d",
 } as const;
 
-const CODE_TO_ACTION: Record<string, "shown" | "accepted" | "badfit" | "snooze" | "dismissed"> = {
+const CODE_TO_ACTION: Record<string, "shown" | "accepted" | "badfit" | "snooze" | "contacted" | "replied" | "meeting" | "won" | "dismissed"> = {
   v: "shown",
   a: "accepted",
   b: "badfit",
   s: "snooze",
+  c: "contacted",
+  r: "replied",
+  m: "meeting",
+  w: "won",
   d: "dismissed",
 };
 
 export type SignedDigestFeedbackCallback = {
   client_profile_id: string;
   org_id: string;
-  action: "shown" | "accepted" | "badfit" | "snooze" | "dismissed";
+  action: "shown" | "accepted" | "badfit" | "snooze" | "contacted" | "replied" | "meeting" | "won" | "dismissed";
   sig: string;
 };
 
 export type UnsignedDigestFeedbackCallback = {
   client_profile_id: string;
   org_id: string;
-  action: "shown" | "accepted" | "badfit" | "snooze" | "dismissed";
+  action: "shown" | "accepted" | "badfit" | "snooze" | "contacted" | "replied" | "meeting" | "won" | "dismissed";
 };
 
 export function buildTelegramDigestAuditItems(items: readonly HhDigestItem[]) {
@@ -104,21 +128,24 @@ function buildItemFeedbackRows(clientProfileId: string, item: HhDigestItem) {
         })
       }
     ],
-    TELEGRAM_DIGEST_FEEDBACK_ACTIONS.map((action) => ({
-      text: action.label,
-      callback_data: buildFeedbackCallbackData({
-        clientProfileId,
-        org_id,
-        action: action.key
-      })
-    }))
+    ...chunk(
+      TELEGRAM_DIGEST_FEEDBACK_ACTIONS.map((action) => ({
+        text: action.label,
+        callback_data: buildFeedbackCallbackData({
+          clientProfileId,
+          org_id,
+          action: action.key
+        })
+      })),
+      4,
+    ),
   ];
 }
 
 function buildFeedbackCallbackData(input: {
   clientProfileId: string;
   org_id: string;
-  action: "shown" | "accepted" | "badfit" | "snooze" | "dismissed";
+  action: "shown" | "accepted" | "badfit" | "snooze" | "contacted" | "replied" | "meeting" | "won" | "dismissed";
 }): string {
   const unsigned: UnsignedDigestFeedbackCallback = {
     client_profile_id: input.clientProfileId,
@@ -132,6 +159,14 @@ function buildFeedbackCallbackData(input: {
     throw new Error("digest feedback callback_data exceeds Telegram limit");
   }
   return data;
+}
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const rows: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    rows.push(items.slice(index, index + size));
+  }
+  return rows;
 }
 
 function signDigestFeedbackCallback(unsigned: UnsignedDigestFeedbackCallback): string {

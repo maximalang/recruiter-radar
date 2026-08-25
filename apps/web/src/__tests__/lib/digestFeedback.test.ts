@@ -4,8 +4,8 @@ import {
 } from '@/lib/digestFeedback'
 
 describe('buildDigestFeedbackActionPlan', () => {
-  it('makes accepted/contacted/replied/won permanently suppressed', () => {
-    for (const action of ['accepted', 'contacted', 'replied', 'won'] as const) {
+  it('makes accepted/contacted/replied/meeting/won permanently suppressed', () => {
+    for (const action of ['accepted', 'contacted', 'replied', 'meeting', 'won'] as const) {
       const plan = buildDigestFeedbackActionPlan({ action })
       expect(plan.suppressedSql).toBe("'infinity'::timestamptz")
       expect(plan.extraParams).toEqual([])

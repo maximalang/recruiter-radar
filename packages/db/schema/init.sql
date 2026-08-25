@@ -43,6 +43,7 @@ CREATE TYPE digest_feedback_status AS ENUM (
   'none',
   'contacted',
   'replied',
+  'meeting',
   'won',
   'badfit',
   'snooze',

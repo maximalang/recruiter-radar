@@ -25,7 +25,7 @@ jest.mock('@/lib/clientProfiles', () => ({
 }));
 jest.mock('@/lib/leads-data', () => ({
   getLeadsForAllProfiles: jest.fn(),
-  VALID_FEEDBACK_STATUSES: new Set(['none', 'contacted', 'replied', 'won', 'badfit', 'snooze', 'dismissed']),
+  VALID_FEEDBACK_STATUSES: new Set(['none', 'contacted', 'replied', 'meeting', 'won', 'badfit', 'snooze', 'dismissed']),
 }));
 jest.mock('@/lib/entitlements', () => ({ hasFeatureAccess: jest.fn() }));
 

@@ -176,6 +176,7 @@ function getDigestFeedbackConfirmationText(action: DigestFeedbackAction): string
     case "dismissed": return "Отмечено: скрыто";
     case "contacted": return "Отмечено: написал";
     case "replied": return "Отмечено: ответили";
+    case "meeting": return "Отмечено: созвон";
     case "won": return "Отмечено: клиент";
   }
 }

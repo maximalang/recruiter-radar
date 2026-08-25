@@ -1,3 +1,15 @@
+/**
+ * @typedef {'accepted'|'badfit'|'dismissed'|'snooze'|'contacted'|'replied'|'meeting'|'won'} DigestFeedbackAction
+ * @typedef {Object} DigestFeedbackInput
+ * @property {string|number} clientProfileId
+ * @property {string|number|null} [orgId]
+ * @property {string|number|null} [digestCandidateId]
+ * @property {DigestFeedbackAction} action
+ * @property {string|null} [note]
+ * @property {number|null} [snoozeDays]
+ * @property {number|null} [suppressionDays]
+ */
+
 export const DIGEST_FEEDBACK_ACTIONS = [
   'accepted',
   'badfit',
@@ -5,6 +17,7 @@ export const DIGEST_FEEDBACK_ACTIONS = [
   'snooze',
   'contacted',
   'replied',
+  'meeting',
   'won',
 ];
 
@@ -13,10 +26,12 @@ const MAX_SUPPRESSION_DAYS = 365;
 const DEFAULT_SNOOZE_DAYS = 7;
 const MAX_SNOOZE_DAYS = 90;
 
+/** @param {unknown} value @returns {value is DigestFeedbackAction} */
 export function isDigestFeedbackAction(value) {
   return typeof value === 'string' && DIGEST_FEEDBACK_ACTIONS.includes(value);
 }
 
+/** @param {{ action: DigestFeedbackAction, paramOffset?: number, snoozeDays?: number|null, suppressionDays?: number|null }} input */
 export function buildDigestFeedbackActionPlan(input) {
   const offset = input.paramOffset ?? 0;
   switch (input.action) {
@@ -33,6 +48,15 @@ export function buildDigestFeedbackActionPlan(input) {
     case 'replied':
       return {
         feedbackStatus: 'replied',
+        cooldownSql: 'NULL',
+        suppressedSql: "'infinity'::timestamptz",
+        cooldownUpdateSql: 'NULL',
+        suppressedUpdateSql: "'infinity'::timestamptz",
+        extraParams: [],
+      };
+    case 'meeting':
+      return {
+        feedbackStatus: 'meeting',
         cooldownSql: 'NULL',
         suppressedSql: "'infinity'::timestamptz",
         cooldownUpdateSql: 'NULL',
@@ -78,6 +102,7 @@ export function buildDigestFeedbackActionPlan(input) {
   }
 }
 
+/** @param {DigestFeedbackInput} input @param {{ query: Function }} db */
 export async function updateDigestOrgStateFeedbackCore(input, db) {
   if (!db) {
     throw new Error('DATABASE_URL is not set.');
