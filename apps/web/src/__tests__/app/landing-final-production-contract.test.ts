@@ -135,6 +135,11 @@ describe("landing final production contract", () => {
     expect(demoStory).toMatch(/12 мая/);
     expect(demoStory).not.toMatch(/freshness:\s*"сегодня"/);
 
+    // Demo evidence facts carry an absolute date too; no relative windows.
+    expect(source("app/landing/landing-copy.ts")).not.toMatch(
+      /за последние (семь|7) дней/,
+    );
+
     // Demo fallback items use hard-coded dates; no wall-clock generation.
     const publicProduct = source("lib/publicProduct.ts");
     expect(publicProduct).toContain('demoAnchorDate = "2026-05-12T09:00:00.000Z"');

@@ -96,7 +96,7 @@ describe("landing premium restoration contract", () => {
     // The priority-list description names the product value directly and makes
     // no delivery-cadence promise; no extra screen-reader account is needed.
     expect(hero).toContain(
-      "Приоритетный список компаний со свежими сигналами найма: почему компания актуальна, какие факты это подтверждают и с чего начать контакт.",
+      "Приоритетный список компаний с активным наймом: почему компания актуальна, какие факты это подтверждают и с чего начать контакт.",
     );
     expect(heroCss).toContain(".visuallyHidden");
   });
