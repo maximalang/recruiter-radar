@@ -25,7 +25,7 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
           Список компаний, где найм уже идёт
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Приоритетный список компаний со свежими сигналами найма: почему компания актуальна, какие факты это подтверждают и с чего начать контакт.
+          Приоритетный список компаний с сигналами найма: почему компания в списке, какие факты это подтверждают и с чего начать контакт.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a

@@ -157,7 +157,7 @@ async function assertRequiredSurface(page, label) {
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
   assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
-  assert.match(await page.locator("#scene-workspace").innerText(), /пример выдачи за сегодня|приоритет по вашему профилю/i);
+  assert.match(await page.locator("#scene-workspace").innerText(), /пример выдачи · демо-сценарий|обезличенный пример/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
   assert.ok(await page.locator("#scene-evidence [data-proof-event]").count() >= 3);

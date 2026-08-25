@@ -144,7 +144,7 @@ export default function ConversionPanel(props: {
           </svg>
           <span className={panelStyles.finalEyebrow}>7 дней / своя ниша</span>
           <h2>Посмотрите, кому стоит написать сейчас.</h2>
-          <p>Вы увидите компании своей ниши со свежими сигналами найма: что изменилось, чем подтверждено и с чего начать разговор.</p>
+          <p>Вы увидите компании своей ниши с активным наймом: что изменилось, чем подтверждено и с чего начать разговор.</p>
         </div>
         <div className={panelStyles.finalDecision}>
           <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
