@@ -8,6 +8,7 @@ import {
   sendTelegramNotification,
   sendVkNotification,
 } from "./notification-providers";
+import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { decryptNotificationSecret, redactProviderSecret } from "./notification-secrets";
 import type { NotificationProvider } from "./notifications";
 
@@ -23,6 +24,7 @@ type RouteRow = {
   provider: NotificationProvider;
   secretCiphertext: string;
   endpointId: string;
+  endpointType: string;
   destinationId: string;
   routeId: string;
   minScore: number | null;
@@ -90,6 +92,22 @@ function leadWhyNow(lead: DigestLeadRow): string | null {
     if (first) return first.trim();
   }
   return null;
+}
+
+export function buildTelegramDeliveryReplyMarkup(input: {
+  endpointType: string;
+  clientProfileId: string;
+  leads: readonly Pick<DigestLeadRow, "orgId" | "orgName">[];
+}) {
+  if (input.endpointType !== "telegram_private_chat") return null;
+  return buildTelegramDigestFeedbackReplyMarkup({
+    clientProfileId: input.clientProfileId,
+    items: input.leads.map((lead, index) => ({
+      rank: index + 1,
+      org_id: lead.orgId,
+      employer_name: lead.orgName,
+    })),
+  });
 }
 
 function filterLeadsForRoute(route: RouteRow, leads: DigestLeadRow[]): DigestLeadRow[] {
@@ -454,6 +472,7 @@ export async function dispatchDigestNotifications(input: {
         a.provider,
         a.secret_ciphertext AS "secretCiphertext",
         e.id::text AS "endpointId",
+        e.endpoint_type AS "endpointType",
         e.destination_id AS "destinationId",
         r.id::text AS "routeId",
         r.min_score::float8 AS "minScore",
@@ -545,12 +564,18 @@ export async function dispatchDigestNotifications(input: {
           route.secretCiphertext,
           accountAad(route.accountId, route.ownerId),
         );
+        const replyMarkup = buildTelegramDeliveryReplyMarkup({
+          endpointType: route.endpointType,
+          clientProfileId: String(input.clientProfileId),
+          leads,
+        });
         providerMessageId = (
           await sendTelegramNotification({
             botToken: credentials.botToken,
             chatId: route.destinationId,
             text: renderTelegramDigest(leads),
             parseMode: "HTML",
+            replyMarkup: replyMarkup ?? undefined,
           })
         ).providerMessageId;
       } else if (route.provider === "vk") {

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { updateDigestOrgStateFeedback } from "@/lib/digestFeedback";
 import {
   bindNotificationEndpoint,
+  authorizeTelegramCallbackOrigin,
   decryptTelegramAccountCredentials,
   getNotificationAccountByPublicId,
   recordNotificationInboundEvent,
@@ -33,6 +34,7 @@ type TelegramUpdate = {
     id?: string;
     data?: string;
     from?: { id?: string | number; username?: string };
+    message?: { chat?: { id?: string | number; type?: "private" | "group" | "supergroup" | "channel" } };
   };
 };
 
@@ -125,6 +127,26 @@ export async function POST(
         callbackQueryId: callbackId,
         botToken: credentials.botToken,
         text: "Эта карточка относится к другому профилю",
+      }).catch(() => {});
+      return NextResponse.json({ ok: true, ignored: true });
+    }
+    const callbackAuthorized = await authorizeTelegramCallbackOrigin({
+      accountId: account.id,
+      clientProfileId: String(account.clientProfileId),
+      chatId:
+        update.callback_query?.message?.chat?.id == null
+          ? null
+          : String(update.callback_query.message.chat.id),
+      actorId:
+        update.callback_query?.from?.id == null
+          ? null
+          : String(update.callback_query.from.id),
+    });
+    if (!callbackAuthorized) {
+      await answerTelegramCallbackQuery({
+        callbackQueryId: callbackId,
+        botToken: credentials.botToken,
+        text: "Кнопка недоступна в этом чате",
       }).catch(() => {});
       return NextResponse.json({ ok: true, ignored: true });
     }

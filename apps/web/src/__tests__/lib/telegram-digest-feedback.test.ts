@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto'
+
 import {
   buildTelegramDigestFeedbackReplyMarkup,
   verifyDigestFeedbackCallback,
@@ -82,5 +84,50 @@ describe('native Telegram digest feedback controls', () => {
 
     expect(verifyDigestFeedbackCallback(meetingCallback)?.action).toBe('meeting')
     expect(verifyDigestFeedbackCallback(tamperedCallback)).toBeNull()
+  })
+
+  it('accepts legacy decimal callbacks during codec migration', () => {
+    const sig = createHmac('sha256', CALLBACK_SECRET)
+      .update('7:42:a')
+      .digest('base64url')
+      .slice(0, 22)
+
+    expect(verifyDigestFeedbackCallback(`d:7:42:a:${sig}`)).toEqual(
+      expect.objectContaining({
+        client_profile_id: '7',
+        org_id: '42',
+        action: 'accepted',
+      }),
+    )
+  })
+
+  it('returns null instead of throwing when callback secret is unavailable', () => {
+    const markup = buildTelegramDigestFeedbackReplyMarkup({
+      clientProfileId: '7',
+      items: [item],
+    })!
+    const callbackData = markup.inline_keyboard[1][0].callback_data
+    delete process.env.DIGEST_CALLBACK_SECRET
+
+    expect(verifyDigestFeedbackCallback(callbackData)).toBeNull()
+    process.env.DIGEST_CALLBACK_SECRET = CALLBACK_SECRET
+  })
+
+  it('keeps callbacks within Telegram limits at the BIGSERIAL maximum', () => {
+    const maxBigSerial = '9223372036854775807'
+    const markup = buildTelegramDigestFeedbackReplyMarkup({
+      clientProfileId: maxBigSerial,
+      items: [{ ...item, org_id: maxBigSerial }],
+    })!
+    const callbackData = markup.inline_keyboard[1][0].callback_data
+
+    expect(Buffer.byteLength(callbackData, 'utf8')).toBeLessThanOrEqual(64)
+    expect(verifyDigestFeedbackCallback(callbackData)).toEqual(
+      expect.objectContaining({
+        client_profile_id: maxBigSerial,
+        org_id: maxBigSerial,
+        action: 'accepted',
+      }),
+    )
   })
 })

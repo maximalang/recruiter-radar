@@ -1,5 +1,31 @@
-import { notificationRetryDelaySeconds } from '../../../lib/notification-dispatch';
+import {
+  buildTelegramDeliveryReplyMarkup,
+  notificationRetryDelaySeconds,
+} from '../../../lib/notification-dispatch';
 import { classifyNotificationProviderError } from '../../../lib/notification-providers';
+
+describe('custom Telegram delivery controls', () => {
+  const callbackSecret = ['telegram', 'feedback', 'test', 'secret'].join('-');
+
+  beforeEach(() => {
+    process.env.DIGEST_CALLBACK_SECRET = callbackSecret;
+  });
+
+  afterEach(() => {
+    delete process.env.DIGEST_CALLBACK_SECRET;
+  });
+
+  it('adds signed controls only to private-chat endpoints', () => {
+    const input = {
+      clientProfileId: '7',
+      leads: [{ orgId: '42', orgName: 'ООО «Пример»' }],
+    };
+
+    expect(buildTelegramDeliveryReplyMarkup({ endpointType: 'telegram_private_chat', ...input })).not.toBeNull();
+    expect(buildTelegramDeliveryReplyMarkup({ endpointType: 'telegram_group', ...input })).toBeNull();
+    expect(buildTelegramDeliveryReplyMarkup({ endpointType: 'telegram_channel', ...input })).toBeNull();
+  });
+});
 
 describe('notification retry policy', () => {
   it.each([

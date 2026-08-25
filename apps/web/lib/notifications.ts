@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 
+import { isAuthorizedTelegramCallbackOrigin } from "./telegram-callback-authorization";
 import { acquireAuthOwnerWriteFence } from "./auth-v2/owner-write-fence";
 import { getPool } from "./db-pool";
 import {
@@ -806,6 +807,42 @@ export async function getNotificationAccountByPublicId(
     [publicId, provider],
   );
   return result.rowCount === 1 ? result.rows[0] : null;
+}
+
+export async function authorizeTelegramCallbackOrigin(input: {
+  accountId: string;
+  clientProfileId: string;
+  chatId: string | null;
+  actorId: string | null;
+}): Promise<boolean> {
+  if (!input.chatId || !input.actorId || input.actorId !== input.chatId) return false;
+  const pool = getPool();
+  if (!pool) return false;
+
+  const endpoint = await pool.query<{
+    endpointType: string;
+    destinationId: string | null;
+  }>(
+    `
+      SELECT endpoint_type AS "endpointType", destination_id AS "destinationId"
+      FROM notification_endpoints
+      WHERE provider_account_id = $1
+        AND client_profile_id = $2
+        AND status = 'active'
+        AND endpoint_type = 'telegram_private_chat'
+        AND destination_id = $3
+      LIMIT 1
+    `,
+    [input.accountId, input.clientProfileId, input.chatId],
+  );
+  if (endpoint.rowCount !== 1) return false;
+
+  return isAuthorizedTelegramCallbackOrigin({
+    endpointType: endpoint.rows[0].endpointType,
+    destinationId: endpoint.rows[0].destinationId,
+    chatId: input.chatId,
+    actorId: input.actorId,
+  });
 }
 
 export function decryptTelegramAccountCredentials(account: AccountRow): TelegramCredentials {

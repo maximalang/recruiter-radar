@@ -2,6 +2,12 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { HhDigestItem } from "./hhDigest";
 
+export type TelegramReplyMarkup = {
+  inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+};
+
+export type TelegramDigestFeedbackItem = Pick<HhDigestItem, "rank" | "org_id" | "employer_name">;
+
 const TELEGRAM_DIGEST_FEEDBACK_ACTIONS = [
   {
     key: "accepted",
@@ -37,10 +43,12 @@ const TELEGRAM_DIGEST_FEEDBACK_ACTIONS = [
   }
 ] as const;
 
-// Telegram limits callback_data to 64 bytes. We use 1-char action codes and a
-// 22-char base64url HMAC tag (128 bits) to stay well under that ceiling.
+// Telegram limits callback_data to 64 bytes. Version 2 encodes BIGSERIAL
+// identifiers in base36 and signs the versioned canonical payload.
 const TELEGRAM_CALLBACK_DATA_LIMIT = 64;
 const DIGEST_FEEDBACK_SIG_LENGTH = 22;
+const DIGEST_FEEDBACK_CALLBACK_VERSION = "d2";
+const MAX_POSTGRES_BIGINT = BigInt("9223372036854775807");
 
 const ACTION_TO_CODE = {
   shown: "v",
@@ -89,7 +97,7 @@ export function buildTelegramDigestAuditItems(items: readonly HhDigestItem[]) {
 
 export function buildTelegramDigestFeedbackReplyMarkup(input: {
   clientProfileId: string;
-  items: readonly HhDigestItem[];
+  items: readonly TelegramDigestFeedbackItem[];
 }) {
   const clientProfileId = normalizePositiveIntegerString(input.clientProfileId);
 
@@ -110,7 +118,7 @@ export function buildTelegramDigestFeedbackReplyMarkup(input: {
   };
 }
 
-function buildItemFeedbackRows(clientProfileId: string, item: HhDigestItem) {
+function buildItemFeedbackRows(clientProfileId: string, item: TelegramDigestFeedbackItem) {
   const org_id = normalizePositiveIntegerString(item.org_id);
 
   if (!org_id) {
@@ -147,14 +155,16 @@ function buildFeedbackCallbackData(input: {
   org_id: string;
   action: "shown" | "accepted" | "badfit" | "snooze" | "contacted" | "replied" | "meeting" | "won" | "dismissed";
 }): string {
-  const unsigned: UnsignedDigestFeedbackCallback = {
-    client_profile_id: input.clientProfileId,
-    org_id: input.org_id,
-    action: input.action,
-  };
-  const sig = signDigestFeedbackCallback(unsigned);
   const code = ACTION_TO_CODE[input.action];
-  const data = `d:${input.clientProfileId}:${input.org_id}:${code}:${sig}`;
+  const encodedClientProfileId = encodeBigSerialBase36(input.clientProfileId);
+  const encodedOrgId = encodeBigSerialBase36(input.org_id);
+  if (!encodedClientProfileId || !encodedOrgId) {
+    throw new Error("digest feedback callback identifiers are invalid");
+  }
+
+  const unsignedPayload = `${DIGEST_FEEDBACK_CALLBACK_VERSION}:${encodedClientProfileId}:${encodedOrgId}:${code}`;
+  const sig = signDigestFeedbackPayload(unsignedPayload);
+  const data = `${DIGEST_FEEDBACK_CALLBACK_VERSION}:${encodedClientProfileId}:${encodedOrgId}:${code}:${sig}`;
   if (Buffer.byteLength(data, "utf8") > TELEGRAM_CALLBACK_DATA_LIMIT) {
     throw new Error("digest feedback callback_data exceeds Telegram limit");
   }
@@ -169,13 +179,11 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   return rows;
 }
 
-function signDigestFeedbackCallback(unsigned: UnsignedDigestFeedbackCallback): string {
+function signDigestFeedbackPayload(payload: string): string {
   const secret = (process.env.DIGEST_CALLBACK_SECRET ?? "").trim();
   if (!secret) {
     throw new Error("DIGEST_CALLBACK_SECRET is not configured.");
   }
-  const code = ACTION_TO_CODE[unsigned.action];
-  const payload = `${unsigned.client_profile_id}:${unsigned.org_id}:${code}`;
   const hmac = createHmac("sha256", secret);
   hmac.update(payload);
   return hmac.digest("base64url").slice(0, DIGEST_FEEDBACK_SIG_LENGTH);
@@ -185,23 +193,30 @@ export function verifyDigestFeedbackCallback(data: string | null): SignedDigestF
   if (!data) return null;
   if (Buffer.byteLength(data, "utf8") > TELEGRAM_CALLBACK_DATA_LIMIT) return null;
   const parts = data.split(":");
-  if (parts.length !== 5 || parts[0] !== "d") return null;
-  const [, clientProfileId, orgId, code, sig] = parts;
-  if (!isPositiveIntegerString(clientProfileId) || !isPositiveIntegerString(orgId)) return null;
+  if (parts.length !== 5) return null;
+  const [version, encodedClientProfileId, encodedOrgId, code, sig] = parts;
   const action = CODE_TO_ACTION[code];
-  if (!action) return null;
-  if (sig.length !== DIGEST_FEEDBACK_SIG_LENGTH) return null;
+  if (!action || sig.length !== DIGEST_FEEDBACK_SIG_LENGTH) return null;
+  if (!(process.env.DIGEST_CALLBACK_SECRET ?? "").trim()) return null;
 
-  const secret = (process.env.DIGEST_CALLBACK_SECRET ?? "").trim();
-  if (!secret) return null;
+  let clientProfileId: string | null = null;
+  let orgId: string | null = null;
+  let unsignedPayload: string | null = null;
+  if (version === "d") {
+    if (!isPositiveIntegerString(encodedClientProfileId) || !isPositiveIntegerString(encodedOrgId)) return null;
+    clientProfileId = encodedClientProfileId;
+    orgId = encodedOrgId;
+    unsignedPayload = `${clientProfileId}:${orgId}:${code}`;
+  } else if (version === DIGEST_FEEDBACK_CALLBACK_VERSION) {
+    clientProfileId = decodeBigSerialBase36(encodedClientProfileId);
+    orgId = decodeBigSerialBase36(encodedOrgId);
+    if (!clientProfileId || !orgId) return null;
+    unsignedPayload = `${DIGEST_FEEDBACK_CALLBACK_VERSION}:${encodedClientProfileId}:${encodedOrgId}:${code}`;
+  } else {
+    return null;
+  }
 
-  const unsigned: UnsignedDigestFeedbackCallback = {
-    client_profile_id: clientProfileId,
-    org_id: orgId,
-    action,
-  };
-
-  const expectedSig = signDigestFeedbackCallback(unsigned);
+  const expectedSig = signDigestFeedbackPayload(unsignedPayload);
 
   // timing-safe compare to prevent brute-force of the HMAC
   const expectedBuf = Buffer.from(expectedSig, "utf8");
@@ -209,25 +224,40 @@ export function verifyDigestFeedbackCallback(data: string | null): SignedDigestF
   if (expectedBuf.length !== receivedBuf.length) return null;
   if (!timingSafeEqual(expectedBuf, receivedBuf)) return null;
 
-  return { ...unsigned, sig };
+  return {
+    client_profile_id: clientProfileId,
+    org_id: orgId,
+    action,
+    sig,
+  };
 }
 
 function isPositiveIntegerString(value: string | null | undefined): value is string {
-  return typeof value === "string" && /^\d+$/.test(value);
+  if (typeof value !== "string" || !/^[1-9]\d{0,18}$/.test(value)) return false;
+  return BigInt(value) <= MAX_POSTGRES_BIGINT;
 }
 
 function normalizePositiveIntegerString(value: string | null | undefined): string | null {
-  if (typeof value !== "string") {
-    return null;
+  if (!isPositiveIntegerString(value)) return null;
+  return BigInt(value).toString(10);
+}
+
+function encodeBigSerialBase36(value: string): string | null {
+  if (!isPositiveIntegerString(value)) return null;
+  return BigInt(value).toString(36);
+}
+
+function decodeBigSerialBase36(value: string | undefined): string | null {
+  if (!value || !/^[0-9a-z]+$/.test(value)) return null;
+  let decoded = BigInt("0");
+  for (const character of value) {
+    const codePoint = character.charCodeAt(0);
+    const digit = codePoint <= 57 ? codePoint - 48 : codePoint - 87;
+    if (digit < 0 || digit >= 36) return null;
+    decoded = decoded * BigInt("36") + BigInt(digit);
+    if (decoded > MAX_POSTGRES_BIGINT) return null;
   }
-
-  const normalizedValue = value.trim();
-
-  if (!/^\d+$/.test(normalizedValue)) {
-    return null;
-  }
-
-  return normalizedValue;
+  return decoded > BigInt("0") ? decoded.toString(10) : null;
 }
 
 function truncateLabel(value: string): string {
