@@ -20,7 +20,7 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
       data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}
     >
       <div className={sceneStyles.copy} data-hero-copy>
-        <p className={sceneStyles.serviceLabel}>Поиск новых клиентов для рекрутинговых агентств</p>
+        <p className={sceneStyles.serviceLabel}>Публичные данные о найме · источник и дата по каждому факту</p>
         <h1 id="detection-title" className={sceneStyles.title} data-hero-title>
           Утренний список компаний, где найм уже идёт
         </h1>
