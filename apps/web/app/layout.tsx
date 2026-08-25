@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { IBM_Plex_Mono, Inter } from "next/font/google";
 
+import { OPERATOR_REQUISITES } from "@/lib/operatorRequisites";
 import { PushReadinessBoot } from "./push-readiness-boot";
 import { shouldRunAuthV2SessionRefresh } from "@/lib/auth-v2/config";
 import { AuthSessionRefresh } from "./auth-session-refresh";
@@ -32,6 +33,8 @@ const appleIcon = `/app-icons/app-icon-180.png?v=${brandVersion}`;
 export const metadata: Metadata = {
   title: "Recruiter Radar",
   description: "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
+  metadataBase: new URL(OPERATOR_REQUISITES.website),
+  alternates: { canonical: "/" },
   manifest: `/manifest.webmanifest?v=${brandVersion}`,
   applicationName: "Recruiter Radar",
   icons: {
