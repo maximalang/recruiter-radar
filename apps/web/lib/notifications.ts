@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import type { PoolClient } from "pg";
+import type { Pool, PoolClient } from "pg";
 
 import { isAuthorizedTelegramCallbackOrigin } from "./telegram-callback-authorization";
 import { acquireAuthOwnerWriteFence } from "./auth-v2/owner-write-fence";
@@ -67,6 +67,8 @@ type AccountRow = {
   secretCiphertext: string;
   providerMetadata: Record<string, unknown> | null;
 };
+
+type NotificationQueryDb = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
 type TelegramCredentials = {
   botToken: string;
@@ -936,15 +938,14 @@ export async function recordNotificationInboundEvent(input: {
   providerEventId?: string | null;
   eventType: string;
   payload: unknown;
-  status?: "received" | "processed" | "ignored" | "failed";
+  status?: "received" | "processing" | "processed" | "ignored" | "failed";
   errorMessage?: string | null;
+  semanticKey?: string | null;
 }): Promise<boolean> {
   const pool = getPool();
   if (!pool) return false;
   const raw = JSON.stringify(input.payload);
-  const eventHash = hashNotificationToken(
-    `${input.provider}:${input.providerEventId ?? "none"}:${raw}`,
-  );
+  const eventHash = buildNotificationInboundEventHash(input);
   const result = await pool.query(
     `
       INSERT INTO notification_inbound_events (
@@ -968,4 +969,226 @@ export async function recordNotificationInboundEvent(input: {
     ],
   );
   return result.rowCount === 1;
+}
+
+export const INBOUND_CLAIM_STALE_SECONDS = 120;
+
+type NotificationInboundIdentity = {
+  provider: NotificationProvider;
+  providerEventId?: string | null;
+  payload: unknown;
+  semanticKey?: string | null;
+};
+
+function buildNotificationInboundEventHash(input: NotificationInboundIdentity): string {
+  const raw = JSON.stringify(input.payload);
+  const semanticKey = input.semanticKey?.trim()
+    || (input.providerEventId ? `provider-event:${input.providerEventId}` : `payload:${raw}`);
+  return hashNotificationToken(`${input.provider}:semantic:${semanticKey}`);
+}
+
+export type NotificationInboundClaim =
+  | { ownsClaim: true; eventId: string; claimToken: string }
+  | { ownsClaim: false; eventId: string; status: "received" | "processing" | "processed" | "ignored" | "failed" };
+
+export async function recordNotificationInboundClaim(input: {
+  accountId: string;
+  provider: NotificationProvider;
+  providerEventId?: string | null;
+  eventType: string;
+  payload: unknown;
+  semanticKey?: string | null;
+}, db?: NotificationQueryDb): Promise<NotificationInboundClaim> {
+  const pool = db ?? getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const raw = JSON.stringify(input.payload);
+  const eventHash = buildNotificationInboundEventHash(input);
+  const claimToken = randomUUID();
+  const result = await pool.query<{
+    id: string;
+    ownsClaim: boolean;
+    claimToken: string | null;
+    status: "processing";
+  }>(
+    `
+      INSERT INTO notification_inbound_events (
+        provider_account_id, endpoint_id, provider, provider_event_id,
+        event_type, event_hash, payload, status,
+        processing_claimed_at, processing_claim_token
+      ) VALUES ($1, NULL, $2, $3, $4, $5, $6::jsonb, 'processing', NOW(), $7::text)
+      ON CONFLICT (provider_account_id, event_hash) DO UPDATE SET
+        provider_event_id = EXCLUDED.provider_event_id,
+        event_type = EXCLUDED.event_type,
+        payload = EXCLUDED.payload,
+        status = 'processing',
+        error_message = NULL,
+        processed_at = NULL,
+        processing_claimed_at = NOW(),
+        processing_claim_token = $7::text
+      WHERE notification_inbound_events.status NOT IN ('processed', 'ignored')
+        AND (
+          notification_inbound_events.status IN ('received', 'failed')
+          OR notification_inbound_events.processing_claimed_at IS NULL
+          OR notification_inbound_events.processing_claimed_at
+               < NOW() - ($8::text || ' seconds')::interval
+        )
+      RETURNING
+        id::TEXT AS id,
+        processing_claim_token = $7::text AS "ownsClaim",
+        processing_claim_token AS "claimToken",
+        status
+    `,
+    [
+      input.accountId,
+      input.provider,
+      input.providerEventId ?? null,
+      input.eventType,
+      eventHash,
+      raw,
+      claimToken,
+      String(INBOUND_CLAIM_STALE_SECONDS),
+    ],
+  );
+
+  const row = result.rows[0];
+  if (row) {
+    return row.ownsClaim
+      ? { ownsClaim: true, eventId: row.id, claimToken: row.claimToken ?? claimToken }
+      : { ownsClaim: false, eventId: row.id, status: row.status };
+  }
+
+  const existing = await pool.query<{
+    id: string;
+    status: "received" | "processing" | "processed" | "ignored" | "failed";
+  }>(
+    `
+      SELECT id::TEXT AS id, status
+      FROM notification_inbound_events
+      WHERE provider_account_id = $1 AND event_hash = $2
+      LIMIT 1
+    `,
+    [input.accountId, eventHash],
+  );
+  if (!existing.rows[0]) {
+    throw new Error("Notification inbound claim disappeared before it could be observed.");
+  }
+  return {
+    ownsClaim: false,
+    eventId: existing.rows[0].id,
+    status: existing.rows[0].status,
+  };
+}
+
+export async function runNotificationInboundTransaction<T>(input: {
+  accountId: string;
+  provider: NotificationProvider;
+  providerEventId?: string | null;
+  eventType: string;
+  payload: unknown;
+  semanticKey?: string | null;
+}, handler: (
+  claim: Extract<NotificationInboundClaim, { ownsClaim: true }>,
+  db: Pick<PoolClient, "query">,
+) => Promise<{ status: "processed" | "ignored" | "failed"; value: T }>): Promise<
+  | { duplicate: true; status: "received" | "processing" | "processed" | "ignored" | "failed" }
+  | { duplicate: false; value: T }
+> {
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const poolClient = typeof (pool as { connect?: unknown }).connect === "function"
+    ? await pool.connect()
+    : null;
+  const client = poolClient ?? pool;
+  let transactionOpen = poolClient !== null;
+  try {
+    if (poolClient) await client.query("BEGIN");
+    const claim = await recordNotificationInboundClaim(input, client);
+    if (!claim.ownsClaim) {
+      if (poolClient) {
+        await client.query("COMMIT");
+        transactionOpen = false;
+      }
+      return { duplicate: true, status: claim.status };
+    }
+
+    const outcome = await handler(claim, client);
+    const finalized = await finalizeNotificationInboundEvent({
+      accountId: input.accountId,
+      eventId: claim.eventId,
+      status: outcome.status,
+      claimToken: claim.claimToken,
+    }, client);
+    if (!finalized) throw new Error("Notification inbound claim was lost before finalization.");
+    if (poolClient) {
+      await client.query("COMMIT");
+      transactionOpen = false;
+    }
+    return { duplicate: false, value: outcome.value };
+  } catch (error) {
+    if (poolClient && transactionOpen) await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    if (poolClient && transactionOpen) poolClient.release();
+    else if (poolClient) poolClient.release();
+  }
+}
+
+/**
+ * Terminal-state writer for an inbound event previously claimed by
+ * recordNotificationInboundClaim. The WHERE clause on
+ * processing_claim_token makes the update idempotent and owner-checked: only
+ * the worker that inserted (or re-claimed) the row may finalize it. Pass
+ * token = null to clear any stale claim without marking terminal progress.
+ */
+export async function finalizeNotificationInboundEvent(input: {
+  accountId: string;
+  eventId: string;
+  status: "processed" | "ignored" | "failed";
+  claimToken: string | null;
+  errorMessage?: string | null;
+}, db?: NotificationQueryDb): Promise<boolean> {
+  const pool = db ?? getPool();
+  if (!pool) return false;
+  if (input.claimToken === null) {
+    const cleared = await pool.query(
+      `
+        UPDATE notification_inbound_events
+        SET status = $3, processed_at = NOW(),
+            error_message = $4,
+            processing_claimed_at = NULL, processing_claim_token = NULL
+        WHERE provider_account_id = $1 AND id = $2::bigint
+          AND status NOT IN ('processed', 'ignored')
+      `,
+      [
+        input.accountId,
+        input.eventId,
+        input.status,
+        input.errorMessage ? redactProviderSecret(input.errorMessage).slice(0, 1000) : null,
+      ],
+    );
+    return cleared.rowCount === 1;
+  }
+  if (input.claimToken === "") {
+    // Empty token means the caller never observed a concrete claim; refusing
+    // here keeps a stale-claim takeover from finalizing someone else's row.
+    return false;
+  }
+  const finalized = await pool.query(
+    `
+      UPDATE notification_inbound_events
+      SET status = $3, processed_at = NOW(),
+          error_message = $4,
+          processing_claimed_at = NULL, processing_claim_token = NULL
+      WHERE provider_account_id = $1 AND id = $2::bigint
+        AND processing_claim_token = $5
+    `,
+    [
+      input.accountId,
+      input.eventId,
+      input.status,
+      input.errorMessage ? redactProviderSecret(input.errorMessage).slice(0, 1000) : null,
+      input.claimToken,
+    ],
+  );
+  return finalized.rowCount === 1;
 }

@@ -81,6 +81,87 @@ describe("Telegram webhook failure hardening", () => {
     expect(JSON.stringify(body)).not.toContain("DATABASE_URL");
   });
 
+  test("rejects group callback origins before feedback mutation", async () => {
+    const query = jest.fn().mockResolvedValue({ rows: [{ id: 77, ownsClaim: true, status: "processing" }] });
+    mockGetPool.mockReturnValue({ query } as never);
+    mockVerifyCallback.mockReturnValue({
+      client_profile_id: "7",
+      org_id: "8",
+      digest_candidate_id: null,
+      action: "accepted",
+      exp: Math.floor(Date.now() / 1000) + 60,
+    } as never);
+
+    const response = await POST(webhookRequest({
+      update_id: 5,
+      callback_query: {
+        id: "callback-5",
+        data: "signed",
+        from: { id: 12345 },
+        message: { chat: { id: -100123, type: "group" } },
+      },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, ignored: true });
+    expect(mockCheckOwnership).not.toHaveBeenCalled();
+    expect(mockAnswerTelegramCallbackQuery).toHaveBeenCalledWith({
+      callbackQueryId: "callback-5",
+      botToken: "1234567890:***",
+    });
+  });
+
+  test("rejects inline or forwarded callbacks without a private message self-origin", async () => {
+    const query = jest.fn().mockResolvedValue({ rows: [{ id: 78, ownsClaim: true, status: "processing" }] });
+    mockGetPool.mockReturnValue({ query } as never);
+    mockVerifyCallback.mockReturnValue({
+      client_profile_id: "7",
+      org_id: "8",
+      digest_candidate_id: null,
+      action: "accepted",
+    } as never);
+
+    const response = await POST(webhookRequest({
+      update_id: 6,
+      callback_query: { id: "callback-6", data: "signed", from: { id: 12345 } },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, ignored: true });
+    expect(mockCheckOwnership).not.toHaveBeenCalled();
+    expect(mockUpdateFeedback).not.toHaveBeenCalled();
+  });
+
+  test("allows only a private callback whose actor matches the chat", async () => {
+    const query = jest.fn().mockResolvedValue({ rows: [{ id: 79, ownsClaim: true, status: "processing" }] });
+    mockGetPool.mockReturnValue({ query } as never);
+    mockCheckOwnership.mockResolvedValueOnce(true);
+    mockVerifyCallback.mockReturnValue({
+      client_profile_id: "7",
+      org_id: "8",
+      digest_candidate_id: null,
+      action: "accepted",
+    } as never);
+
+    const response = await POST(webhookRequest({
+      update_id: 7,
+      callback_query: {
+        id: "callback-7",
+        data: "signed",
+        from: { id: 12345 },
+        message: { chat: { id: 12345, type: "private" } },
+      },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, replaySafe: true });
+    expect(mockCheckOwnership).toHaveBeenCalledWith("12345", "7");
+    expect(mockUpdateFeedback).toHaveBeenCalledWith(expect.objectContaining({
+      clientProfileId: "7",
+      orgId: "8",
+      action: "accepted",
+    }), expect.anything());
+  });
   test("secondary failure-state persistence errors do not mask the public processing response", async () => {
     const query = jest.fn()
       .mockResolvedValueOnce({ rows: [{ id: 77, ownsClaim: true, status: "processing" }] })
@@ -96,7 +177,12 @@ describe("Telegram webhook failure hardening", () => {
 
     const response = await POST(webhookRequest({
       update_id: 4,
-      callback_query: { id: "callback-4", data: "signed", from: { id: 12345 } },
+      callback_query: {
+        id: "callback-4",
+        data: "signed",
+        from: { id: 12345 },
+        message: { chat: { id: 12345, type: "private" } },
+      },
     }));
     const body = await response.json();
 

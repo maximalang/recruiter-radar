@@ -284,6 +284,7 @@ export async function sendBatchDigestForRun(input: {
       evidence_titles: evidenceTitles,
       candidate_source_keys: [],
       location_names: locationNames,
+      digest_candidate_id: String(row.id),
     });
   });
 

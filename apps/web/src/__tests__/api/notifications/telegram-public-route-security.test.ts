@@ -7,6 +7,7 @@ jest.mock('@/lib/notifications', () => ({
   decryptTelegramAccountCredentials: jest.fn(),
   getNotificationAccountByPublicId: jest.fn(),
   recordNotificationInboundEvent: jest.fn(),
+  runNotificationInboundTransaction: jest.fn(),
 }))
 jest.mock('@/lib/notification-secrets', () => ({
   timingSafeTextEqual: jest.fn(() => true),
@@ -26,6 +27,7 @@ import {
   decryptTelegramAccountCredentials,
   getNotificationAccountByPublicId,
   recordNotificationInboundEvent,
+  runNotificationInboundTransaction,
 } from '@/lib/notifications'
 import { answerTelegramCallbackQuery } from '@/lib/telegram'
 import { verifyDigestFeedbackCallback } from '@/lib/telegramDigestFeedback'
@@ -34,6 +36,7 @@ const mockAuthorize = jest.mocked(authorizeTelegramCallbackOrigin)
 const mockDecrypt = jest.mocked(decryptTelegramAccountCredentials)
 const mockGetAccount = jest.mocked(getNotificationAccountByPublicId)
 const mockRecordInbound = jest.mocked(recordNotificationInboundEvent)
+const mockRunInbound = jest.mocked(runNotificationInboundTransaction)
 const mockAnswer = jest.mocked(answerTelegramCallbackQuery)
 const mockVerify = jest.mocked(verifyDigestFeedbackCallback)
 const mockUpdateFeedback = jest.mocked(updateDigestOrgStateFeedback)
@@ -61,6 +64,13 @@ beforeEach(() => {
     username: 'test_bot',
   })
   mockRecordInbound.mockResolvedValue(true)
+  mockRunInbound.mockImplementation(async (_input, handler) => {
+    const outcome = await handler(
+      { ownsClaim: true, eventId: 'inbound-1', claimToken: 'claim-1' },
+      { query: jest.fn() },
+    )
+    return { duplicate: false, value: outcome.value }
+  })
   mockAnswer.mockResolvedValue(undefined)
   mockVerify.mockReturnValue({
     client_profile_id: '7',
@@ -111,6 +121,25 @@ describe('custom Telegram callback authorization', () => {
       clientProfileId: '7',
       orgId: '42',
       action: 'accepted',
+    }, expect.anything())
+  })
+
+  it('returns retryable failure when mutation throws after the inbound claim', async () => {
+    mockRunInbound.mockRejectedValueOnce(new Error('state mutation failed'))
+
+    const response = await POST(requestFor({
+      id: 3,
+      from: { id: 123 },
+      message: { chat: { id: 123, type: 'private' } },
+    }), routeContext())
+
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ ok: false, retryable: true })
+    expect(mockUpdateFeedback).not.toHaveBeenCalled()
+    expect(mockAnswer).toHaveBeenCalledWith({
+      callbackQueryId: 'callback-3',
+      botToken: 'test-bot-token',
+      text: 'Не удалось сохранить фидбек',
     })
   })
 })

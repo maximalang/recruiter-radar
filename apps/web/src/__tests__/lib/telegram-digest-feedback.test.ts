@@ -24,6 +24,7 @@ const item: HhDigestItem = {
   candidate_source_keys: ['hh:42'],
   location_names: ['Москва'],
   confidence_gate: 'A',
+  digest_candidate_id: '43',
 }
 
 describe('native Telegram digest feedback controls', () => {
@@ -51,8 +52,9 @@ describe('native Telegram digest feedback controls', () => {
       'Ответили',
       'Созвон',
       'Клиент',
-      'Скрыть похожие',
+      'Скрыть',
     ])
+    expect(actionButtons.every((button) => button.callback_data.startsWith('d3:'))).toBe(true)
 
     const parsedActions = actionButtons.map((button) => {
       expect(Buffer.byteLength(button.callback_data, 'utf8')).toBeLessThanOrEqual(64)
@@ -125,9 +127,27 @@ describe('native Telegram digest feedback controls', () => {
     expect(verifyDigestFeedbackCallback(callbackData)).toEqual(
       expect.objectContaining({
         client_profile_id: maxBigSerial,
-        org_id: maxBigSerial,
+        org_id: null,
+        digest_candidate_id: maxBigSerial,
         action: 'accepted',
       }),
     )
+  })
+
+  it('rejects an expired d3 callback even when its signature is valid', () => {
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date('2026-08-27T00:00:00.000Z'))
+    try {
+      const markup = buildTelegramDigestFeedbackReplyMarkup({
+        clientProfileId: '7',
+        items: [item],
+      })!
+      const callbackData = markup.inline_keyboard[1][0].callback_data
+      expect(verifyDigestFeedbackCallback(callbackData)).not.toBeNull()
+      jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000 + 1000)
+      expect(verifyDigestFeedbackCallback(callbackData)).toBeNull()
+    } finally {
+      jest.useRealTimers()
+    }
   })
 })

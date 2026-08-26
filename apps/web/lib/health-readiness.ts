@@ -1,5 +1,5 @@
 export const EXPECTED_LATEST_MIGRATION =
-  '20260825090000_add_meeting_digest_feedback_status'
+  '20260826090000_add_notification_inbound_claim'
 
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/
 

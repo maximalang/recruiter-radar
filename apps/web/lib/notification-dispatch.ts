@@ -97,7 +97,7 @@ function leadWhyNow(lead: DigestLeadRow): string | null {
 export function buildTelegramDeliveryReplyMarkup(input: {
   endpointType: string;
   clientProfileId: string;
-  leads: readonly Pick<DigestLeadRow, "orgId" | "orgName">[];
+  leads: readonly Pick<DigestLeadRow, "id" | "orgId" | "orgName">[];
 }) {
   if (input.endpointType !== "telegram_private_chat") return null;
   return buildTelegramDigestFeedbackReplyMarkup({
@@ -106,6 +106,7 @@ export function buildTelegramDeliveryReplyMarkup(input: {
       rank: index + 1,
       org_id: lead.orgId,
       employer_name: lead.orgName,
+      digest_candidate_id: lead.id,
     })),
   });
 }
