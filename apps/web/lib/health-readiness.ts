@@ -1,5 +1,5 @@
 export const EXPECTED_LATEST_MIGRATION =
-  '20260817150000_timeweb_mcp_sessions_multi_session'
+  '20260825120000_add_verified_trial_profile_guard'
 
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/
 

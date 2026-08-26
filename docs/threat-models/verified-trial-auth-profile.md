@@ -11,7 +11,7 @@ change is authorized by this document.
 | Trial entitlement | Entitlement service ↔ database | Exactly 3×24 hours from server activation |
 | Client profile | UI/API/payment/Telegram/admin ↔ profile service | Owner-scoped and immutable during trial |
 | Auth identity | Provider ↔ account-linking service | Verified subject, no silent account takeover |
-| Audit event | Domain service ↔ audit store | Append-only decision trail without raw PII |
+| Claim/grant audit | Domain service ↔ database | Durable decision trail without raw PII |
 
 The browser, Telegram update body, OAuth redirect parameters, provider email
 claim, and client-supplied profile id are untrusted. PostgreSQL constraints and
@@ -21,7 +21,7 @@ triggers are trusted backstops, not optional optimizations.
 
 | Threat | Example | Required control | Regression evidence |
 |---|---|---|---|
-| Trial replay | Re-submit activation after success | Durable unique binding claim + idempotency key | Same request returns original result; second binding fails |
+| Trial replay | Re-submit activation after success | Durable unique binding claim + idempotency key, component anti-abuse indexes, and user lock | Same binding returns `already_claimed`; second binding fails |
 | Account deletion reset | Delete account, register again, activate | Retained keyed binding hash with retention/appeal policy | Delete/recreate test remains `trial_already_used` |
 | Concurrent activation | Two tabs activate at the same time | Transaction lock + unique constraint; no client flag | Parallel activation yields one entitlement/profile |
 | Profile replacement | Delete profile and create a new one | DB `DELETE`/`INSERT` guard tied to active claim | SQL race test rejects both bypass attempts |
