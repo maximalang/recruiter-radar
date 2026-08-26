@@ -15,7 +15,7 @@ they do not send outreach or expose personal contact data.
 | Ответили | `replied` | `replied` | Record a reply and suppress resurfacing. |
 | Созвон | `meeting` | `meeting` | Record a scheduled/held call and suppress resurfacing. |
 | Клиент | `won` | `won` | Record conversion and suppress resurfacing. |
-| Скрыть похожие | `dismissed` | `dismissed` | Suppress this candidate and similar resurfacing for the bounded period. |
+| Скрыть похожие | `dismissed` | `dismissed` | Suppress this exact candidate for the bounded period. Look-alike/ER-key suppression across similarly named orgs is not implemented yet and is deferred to a future sprint. |
 
 `accepted` is intentionally an alias for the existing `contacted` terminal
 state; it does not invent a separate business state. `meeting` is a first-class
