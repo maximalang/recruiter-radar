@@ -35,6 +35,30 @@ export const metadata: Metadata = {
   description: "Радар компаний с активным наймом для рекрутеров и агентств.",
   metadataBase: new URL(OPERATOR_REQUISITES.website),
   alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "Recruiter Radar",
+    locale: "ru_RU",
+    url: "/",
+    title: "Recruiter Radar — компании, которым стоит написать сегодня",
+    description:
+      "Радар компаний с активным наймом для рекрутинговых агентств: почему сейчас, доказательства и безопасный путь контакта.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Recruiter Radar — радар активного найма для рекрутинговых агентств",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Recruiter Radar — компании, которым стоит написать сегодня",
+    description:
+      "Радар компаний с активным наймом для рекрутинговых агентств: почему сейчас, доказательства и безопасный путь контакта.",
+    images: ["/twitter-image.png"],
+  },
   manifest: `/manifest.webmanifest?v=${brandVersion}`,
   applicationName: "Recruiter Radar",
   icons: {
