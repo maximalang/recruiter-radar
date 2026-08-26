@@ -21,7 +21,7 @@ triggers are trusted backstops, not optional optimizations.
 
 | Threat | Example | Required control | Regression evidence |
 |---|---|---|---|
-| Trial replay | Re-submit activation after success | Durable unique binding claims, component anti-abuse indexes, and user lock | Same binding returns `already_claimed`; second binding fails |
+| Trial replay | Re-submit activation after success | Durable unique binding claim + idempotency key, component anti-abuse indexes, and user lock | Same binding returns `already_claimed`; second binding fails |
 | Account deletion reset | Delete account, register again, activate | Retained keyed binding hash with retention/appeal policy | Delete/recreate test remains `trial_already_used` |
 | Concurrent activation | Two tabs activate at the same time | Transaction lock + unique constraint; no client flag | Parallel activation yields one entitlement/profile |
 | Profile replacement | Delete profile and create a new one | DB `DELETE`/`INSERT` guard tied to active claim | SQL race test rejects both bypass attempts |

@@ -33,6 +33,7 @@ describe("verified trial profile guard migration", () => {
     expect(migration).toContain("expires_at = activated_at + INTERVAL '3 days'");
     expect(migration).not.toMatch(/email TEXT|telegram_chat_id TEXT|raw_.*binding/i);
     expect(compact).toContain("ADD COLUMN IF NOT EXISTS telegram_verified_at TIMESTAMPTZ");
+    expect(compact).toContain("to_regclass('public.entitlement_grants')");
   });
 
   test("serializes every profile mutation and fails closed during an active claim", () => {

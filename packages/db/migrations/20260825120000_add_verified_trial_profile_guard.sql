@@ -11,7 +11,7 @@ CREATE TABLE trial_claims (
   user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
   workspace_id BIGINT REFERENCES workspaces(id) ON DELETE SET NULL,
   client_profile_id BIGINT REFERENCES client_profiles(id) ON DELETE SET NULL,
-  entitlement_grant_id BIGINT REFERENCES entitlement_grants(id) ON DELETE SET NULL,
+  entitlement_grant_id BIGINT,
   email_binding_hash CHAR(64) NOT NULL,
   telegram_binding_hash CHAR(64) NOT NULL,
   binding_hash CHAR(64) NOT NULL,
@@ -36,6 +36,20 @@ CREATE TABLE trial_claims (
   CONSTRAINT trial_claims_expiry_after_activation_check
     CHECK (expires_at > activated_at)
 );
+
+DO $$
+BEGIN
+  IF to_regclass('public.entitlement_grants') IS NOT NULL THEN
+    ALTER TABLE trial_claims
+      ADD CONSTRAINT trial_claims_entitlement_grant_id_fkey
+      FOREIGN KEY (entitlement_grant_id)
+      REFERENCES entitlement_grants(id)
+      ON DELETE SET NULL;
+  ELSE
+    RAISE NOTICE 'entitlement_grants table does not exist yet; trial claim FK will be added by a later reconciliation';
+  END IF;
+END;
+$$;
 
 CREATE UNIQUE INDEX trial_claims_binding_hash_uidx
   ON trial_claims (binding_hash);

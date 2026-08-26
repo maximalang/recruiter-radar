@@ -56,7 +56,8 @@ before merge.
 The claim has durable unique binding keys. A retry of the same activation returns
 `already_claimed`; a different account or request with the same binding fails
 closed. Concurrent activations are serialized by the database
-uniqueness/row-lock path, not by a client-side flag.
+uniqueness/row-lock path, not by a client-side flag. The stable account-level
+error for a previously consumed trial is `trial_already_used`.
 
 ### 2. Trial entitlement has one narrow mutation service
 
