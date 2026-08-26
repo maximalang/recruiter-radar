@@ -14,6 +14,7 @@ assert.ok(process.env.DATABASE_URL?.trim(), 'DATABASE_URL is required.');
 
 const verifiers = [
   'verify-source-identity-lineage.mjs',
+  'verify-source-identity-boundary-quarantine.mjs',
   'verify-mixed-ranking-smoke.mjs',
   'verify-digest-selection-smoke.mjs',
   'verify-rf-context-corroboration-smoke.mjs',
