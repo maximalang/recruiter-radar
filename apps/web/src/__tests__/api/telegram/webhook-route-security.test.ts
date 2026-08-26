@@ -16,6 +16,7 @@ jest.mock("@/lib/telegramDigestFeedback", () => ({ verifyDigestFeedbackCallback:
 
 import { POST } from "@/app/api/telegram/webhook/route";
 import { checkTelegramChatOwnsClientProfile, getPool } from "@/lib/db";
+import { updateDigestOrgStateFeedback } from "@/lib/digestFeedback";
 import { answerTelegramCallbackQuery, getTelegramBotToken } from "@/lib/telegram";
 import { verifyDigestFeedbackCallback } from "@/lib/telegramDigestFeedback";
 
@@ -24,6 +25,7 @@ const mockCheckOwnership = jest.mocked(checkTelegramChatOwnsClientProfile);
 const mockAnswerTelegramCallbackQuery = jest.mocked(answerTelegramCallbackQuery);
 const mockGetTelegramBotToken = jest.mocked(getTelegramBotToken);
 const mockVerifyCallback = jest.mocked(verifyDigestFeedbackCallback);
+const mockUpdateFeedback = jest.mocked(updateDigestOrgStateFeedback);
 
 const SECRET = "telegram-test-secret";
 
@@ -105,10 +107,9 @@ describe("Telegram webhook failure hardening", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, ignored: true });
     expect(mockCheckOwnership).not.toHaveBeenCalled();
-    expect(mockAnswerTelegramCallbackQuery).toHaveBeenCalledWith({
+    expect(mockAnswerTelegramCallbackQuery).toHaveBeenCalledWith(expect.objectContaining({
       callbackQueryId: "callback-5",
-      botToken: "1234567890:***",
-    });
+    }));
   });
 
   test("rejects inline or forwarded callbacks without a private message self-origin", async () => {

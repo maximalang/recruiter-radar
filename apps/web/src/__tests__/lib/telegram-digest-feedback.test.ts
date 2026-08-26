@@ -124,10 +124,26 @@ describe('native Telegram digest feedback controls', () => {
     const callbackData = markup.inline_keyboard[1][0].callback_data
 
     expect(Buffer.byteLength(callbackData, 'utf8')).toBeLessThanOrEqual(64)
+    // The v3 token carries the digest-candidate identity with expiry+nonce;
+    // verification decodes identifiers back to canonical decimal strings.
     expect(verifyDigestFeedbackCallback(callbackData)).toEqual(
       expect.objectContaining({
         client_profile_id: maxBigSerial,
-        org_id: null,
+        digest_candidate_id: '43',
+        action: 'accepted',
+      }),
+    )
+
+    const candidateMaxMarkup = buildTelegramDigestFeedbackReplyMarkup({
+      clientProfileId: maxBigSerial,
+      items: [{ ...item, digest_candidate_id: maxBigSerial }],
+    })!
+    const candidateMaxCallback = candidateMaxMarkup.inline_keyboard[1][0].callback_data
+
+    expect(Buffer.byteLength(candidateMaxCallback, 'utf8')).toBeLessThanOrEqual(64)
+    expect(verifyDigestFeedbackCallback(candidateMaxCallback)).toEqual(
+      expect.objectContaining({
+        client_profile_id: maxBigSerial,
         digest_candidate_id: maxBigSerial,
         action: 'accepted',
       }),

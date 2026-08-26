@@ -18,7 +18,7 @@ describe('custom Telegram delivery controls', () => {
   it('adds signed controls only to private-chat endpoints', () => {
     const input = {
       clientProfileId: '7',
-      leads: [{ orgId: '42', orgName: 'ООО «Пример»' }],
+      leads: [{ id: '501', orgId: '42', orgName: 'ООО «Пример»' }],
     };
 
     expect(buildTelegramDeliveryReplyMarkup({ endpointType: 'telegram_private_chat', ...input })).not.toBeNull();

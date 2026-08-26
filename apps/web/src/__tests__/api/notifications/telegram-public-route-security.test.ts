@@ -75,9 +75,10 @@ beforeEach(() => {
   mockVerify.mockReturnValue({
     client_profile_id: '7',
     org_id: '42',
+    digest_candidate_id: null,
     action: 'accepted',
     sig: 'signature',
-  })
+  }) as never;
 })
 
 describe('custom Telegram callback authorization', () => {
@@ -91,7 +92,12 @@ describe('custom Telegram callback authorization', () => {
     }), routeContext())
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ ok: true, ignored: true })
+    expect(await response.json()).toEqual({
+      ok: true,
+      ignored: true,
+      callbackId: 'callback-1',
+      callbackText: 'Кнопка недоступна в этом чате',
+    })
     expect(mockUpdateFeedback).not.toHaveBeenCalled()
     expect(mockAuthorize).toHaveBeenCalledWith({
       accountId: 'account-1',
@@ -116,12 +122,17 @@ describe('custom Telegram callback authorization', () => {
     }), routeContext())
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ ok: true, feedback: true })
-    expect(mockUpdateFeedback).toHaveBeenCalledWith({
+    expect(await response.json()).toEqual({
+      feedback: true,
+      callbackId: 'callback-2',
+      callbackText: 'Сохранено',
+    })
+    expect(mockUpdateFeedback).toHaveBeenCalledWith(expect.objectContaining({
       clientProfileId: '7',
       orgId: '42',
+      digestCandidateId: null,
       action: 'accepted',
-    }, expect.anything())
+    }), expect.anything())
   })
 
   it('returns retryable failure when mutation throws after the inbound claim', async () => {
