@@ -19,5 +19,3 @@ apps/web/lib/digest-evidence-query.ts text eol=lf
 *.ico binary
 *.pdf binary
 *.zip binary
-documents/** text eol=lf
-manifest.json text eol=lf
