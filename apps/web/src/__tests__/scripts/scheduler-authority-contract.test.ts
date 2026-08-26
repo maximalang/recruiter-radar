@@ -68,13 +68,16 @@ describe('production scheduler authority', () => {
     expect(sourceRefreshWorkflow).toContain("await import('node:http')")
     expect(sourceRefreshWorkflow).toContain('SOURCE_REFRESH_CLIENT_TIMEOUT_MS = 15 * 60 * 1000')
     expect(sourceRefreshWorkflow).toContain('request.setTimeout(SOURCE_REFRESH_CLIENT_TIMEOUT_MS')
-    expect(sourceRefreshWorkflow).toContain('succeeded: body?.data?.succeeded ?? 0')
-    expect(sourceRefreshWorkflow).toContain('credentialGated: body?.data?.credentialGated ?? 0')
-    expect(sourceRefreshWorkflow).toContain('rateLimited: body?.data?.rateLimited ?? 0')
-    expect(sourceRefreshWorkflow).toContain('failedSources:')
-    expect(sourceRefreshWorkflow).toContain('rateLimitedSources:')
-    expect(sourceRefreshWorkflow).toContain("if (response.status === 200) process.exit(0)")
-    expect(sourceRefreshWorkflow).toContain("if (response.status === 422) process.exit(0)")
+    // Protocol v2: bounded-body capture is hash-chained; the summary reads from
+    // the parsed body and records criticality/failedRequired for fail-closed policy.
+    expect(sourceRefreshWorkflow).toContain('const { createHash } = await import(\'node:crypto\')')
+    expect(sourceRefreshWorkflow).toContain('succeeded: parsed?.data?.succeeded ?? 0')
+    expect(sourceRefreshWorkflow).toContain('credentialGated: parsed?.data?.credentialGated ?? 0')
+    expect(sourceRefreshWorkflow).toContain('rateLimited: parsed?.data?.rateLimited ?? 0')
+    expect(sourceRefreshWorkflow).toContain("['green', 'degraded', 'failing'].includes(criticality)")
+    expect(sourceRefreshWorkflow).toContain('!Number.isInteger(failedRequired)')
+    // 200 with route-reported required failures or criticality=failing must exit non-zero.
+    expect(sourceRefreshWorkflow).toContain('HTTP 200 but route-reported required failures — fail closed')
     expect(sourceRefreshWorkflow).not.toContain('[200, 207, 422].includes(response.status)')
     expect(sourceRefreshWorkflow).not.toContain('result.error')
   })
