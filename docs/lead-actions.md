@@ -23,32 +23,39 @@ state so a call is not collapsed into a generic reply or conversion.
 
 ## Signed callback wire format
 
-New buttons emit the compact versioned format:
+New candidate-bound buttons emit the current compact versioned format:
 
 ```text
-d2:<client_profile_id_base36>:<org_id_base36>:<action_code>:<hmac_tag>
+d3:<client_profile_id_base36>:<digest_candidate_id_base36>:<expiry_base36>:<nonce>:<action_code>:<hmac_tag16>
 ```
 
-- `d2` is the current emitter version. PostgreSQL `BIGSERIAL` identifiers are
-  encoded as lowercase base36, keeping the maximum signed 64-bit ID within
-  Telegram's 64-byte `callback_data` limit.
+- `d3` is the current emitter version. It binds feedback to the exact digest
+  candidate, carries a seven-day expiry (`expiry_base36`), and includes a
+  random nonce. PostgreSQL `BIGSERIAL` identifiers are encoded as lowercase
+  base36 to keep the signed payload within Telegram's 64-byte
+  `callback_data` limit.
 - `action_code` is one byte (`a`, `b`, `s`, `c`, `r`, `m`, `w`, `d`; `v` is the
   audit-only `shown` event).
-- The HMAC-SHA256 input is the full unsigned d2 payload:
-  `<version>:<client_profile_id_base36>:<org_id_base36>:<action_code>`.
+- The HMAC-SHA256 input is the full unsigned d3 payload:
+  `<version>:<client_profile_id_base36>:<digest_candidate_id_base36>:<expiry_base36>:<nonce>:<action_code>`.
+  The callback carries the first 16 base64url characters of the HMAC tag.
 
-During migration, verification also accepts the legacy decimal format:
+During the codec migration, verification remains compatible with legacy
+formats, but they are verify-only and are not emitted by new keyboards:
 
 ```text
-d:<client_profile_id>:<org_id>:<action_code>:<hmac_tag>
+d2:<client_profile_id_base36>:<org_id_base36>:<action_code>:<hmac_tag22>
+d:<client_profile_id>:<org_id>:<action_code>:<hmac_tag22>
 ```
 
-For legacy `d`, the HMAC-SHA256 input remains
-`<client_profile_id>:<org_id>:<action_code>`. Legacy callbacks are accepted for
-backward compatibility but are never emitted by new keyboards. Both formats
-use the first 22 base64url characters of the HMAC tag.
+`d2` and `d` identify an organization, not a digest candidate; they carry no
+expiry or nonce. Their HMAC inputs remain respectively
+`<version>:<client_profile_id_base36>:<org_id_base36>:<action_code>` and
+`<client_profile_id>:<org_id>:<action_code>`, with the first 22 base64url
+characters of the tag. They remain accepted only for backward-compatible
+verification and must not be described as candidate-bound or expiry-protected.
 
-For both versions:
+For all versions:
 
 - The secret is read only from the runtime secret store; it is never persisted
   in callback data or logged.
@@ -56,7 +63,7 @@ For both versions:
   limit before a button is emitted and again before verification.
 - Verification rejects unknown versions/action codes, malformed positive
   integer IDs, IDs above PostgreSQL `BIGSERIAL` maximum, wrong tag length,
-  missing secret, and non-constant-time tag comparison.
+  missing secret, expired d3 callbacks, and non-constant-time tag comparison.
 
 ## Idempotency and audit
 
