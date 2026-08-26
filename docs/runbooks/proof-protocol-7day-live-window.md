@@ -79,17 +79,54 @@ last_successful_normalization_at, consecutive_failures, …) и смежные
 зафиксированы, чтобы отчёты были сопоставимы во времени):
 
 ```sql
+-- L2 lineage v2: expected-source CTE + LEFT JOIN, чтобы ПОЛНОСТЬЮ отсутствующий
+-- источник появлялся явной missing-строкой (а не исчезал из результата GROUP BY),
+-- и чтобы предикат требовал свежий accepted/fresh-identity исход, а не любой success.
+WITH expected(source_id) AS (
+  VALUES ('egrul-fns'),
+         ('transparent-business-fns'),
+         ('fns-open-data'),
+         ('cbr-registry'),
+         ('rosstat-open-data'),
+         ('rospatent-open-data')
+),
+observed AS (
+  SELECT
+    source_id,
+    COUNT(*) FILTER (
+      WHERE completed_at > NOW() - INTERVAL '7 days') AS attempts_7d,
+    COUNT(*) FILTER (
+      WHERE outcome = 'success'
+        AND upserted_count > 0
+        AND completed_at > NOW() - INTERVAL '7 days') AS accepted_success_7d,
+    COUNT(*) FILTER (
+      WHERE outcome = 'expected-zero'
+        AND completed_at > NOW() - INTERVAL '7 days'
+        AND content_hash = (previous observation's content_hash)) AS declared_zero_7d,
+    MAX(completed_at) FILTER (WHERE outcome = 'success') AS last_success,
+    SUM(duplicate_records) FILTER (
+      WHERE completed_at > NOW() - INTERVAL '7 days') AS dupes_7d
+  FROM source_run_observations
+  GROUP BY source_id
+)
 SELECT
-  source_id,
-  COUNT(*) FILTER (WHERE completed_at > NOW() - INTERVAL '7 days') AS attempts_7d,
-  COUNT(*) FILTER (WHERE outcome = 'success' AND completed_at > NOW() - INTERVAL '7 days') AS success_7d,
-  MAX(completed_at) FILTER (WHERE outcome = 'success') AS last_success,
-  SUM(duplicate_records) FILTER (WHERE completed_at > NOW() - INTERVAL '7 days') AS dupes_7d
-FROM source_run_observations
-WHERE source_id IN ('egrul-fns','transparent-business-fns','fns-open-data',
-                    'cbr-registry','rosstat-open-data','rospatent-open-data')
-GROUP BY source_id;
--- pass-критерий: success_7d >= 1 AND last_success >= NOW() - INTERVAL '7d+grace'
+  e.source_id,
+  COALESCE(o.attempts_7d, 0)          AS attempts_7d,
+  COALESCE(o.accepted_success_7d, 0)  AS accepted_success_7d,
+  o.last_success,
+  COALESCE(o.dupes_7d, 0)             AS dupes_7d,
+  CASE WHEN o.source_id IS NULL THEN 'MISSING_SOURCE'
+       WHEN COALESCE(o.accepted_success_7d, 0) > 0 THEN 'LINEAGE_OK'
+       ELSE 'NO_ACCEPTED_EVIDENCE' END AS lineage_verdict
+FROM expected e
+LEFT JOIN observed o USING (source_id)
+ORDER BY e.source_id;
+-- pass-критерий: для КАЖДОГО из шести источников
+--   lineage_verdict = LINEAGE_OK
+--   OR (declared_zero_7d >= 1 AND upstream identity/delta подтверждены — см. §17.3),
+-- плюс last_success >= NOW() - INTERVAL '7d+grace'.
+-- MISSING_SOURCE строка обязана фейлить verdict: отсутствующая шестая строка — не «пусто»,
+-- а провал комплектности окна.
 ```
 
 **L3 — live-пруф (реальная среда).** Контролируемый прогон против production:
@@ -201,8 +238,9 @@ egrul-fns) и только вторичные поля их контекстно
 ```text
 MAX_DEGRADED_OPTIONAL_SOURCES_PER_DAY = 2
     # максимум optional-источников со статусом red/unknown за один UTC-день;
-    # шестая шестёрка: egrul-fns required всегда зелёный для GREEN_DAY,
-    # значит минимум 4 из 5 optional должны быть зелёными
+    # шестёрка: egrul-fns required; среди оставшихся ПЯТИ optional при двух
+    # деградировавших остаются минимум 3 здоровых optional (граница «2-of-5»);
+    # у required своя собственная семантика красного дня, бюджетом это не покрывается
 MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2
     # один и тот же optional-источник может быть не-зелёным максимум 2 UTC-дня подряд;
     # третий день подряд => день автоматически RED_DAY
@@ -215,16 +253,17 @@ MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2
 ## 8. Схема дневного immutable-снапшота покрытия
 
 (d) Каждый UTC-день получает ровно один снапшот `source-refresh-coverage`, версия
-схемы 1:
+схемы 2:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "evidence_type": "source-refresh-coverage",
   "evidence_day_utc": "2026-08-26",
   "produced_at": "2026-08-27T00:10:00.000Z",
   "producer": {
-    "repo_sha": "<git SHA запускающего деплоя>",
+    "repo_sha": "<ПОЛНЫЙ 40-hex git SHA запускающего деплоя>",
+    "workflow_run_url": "https://github.com/<org>/<repo>/actions/runs/<run_id>",
     "policy_sha256": "<sha256(packages/db/source-policy.json)>",
     "schedules_sha256": "<sha256(apps/web/lib/sources/source-schedules.ts)>"
   },
@@ -238,9 +277,9 @@ MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2
       "records_fetched": 120,
       "records_accepted": 118,
       "duplicate_records": 2,
-      "latency_ms": 3400,
       "error_code": null,
-      "observation_row_ids": [101]
+      "upstream_identity": {"content_hash": "<16..64hex>", "version_id": null, "upstream_updated_at": null},
+      "close_condition": {"awaited_launch_after": "...", "satisfied_by_run_id": "...", "satisfied_at": "..."}
     }
   ],
   "degradation_events": [
@@ -256,7 +295,9 @@ MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2
     "MAX_DEGRADED_OPTIONAL_SOURCES_PER_DAY": 2,
     "MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE": 2
   },
-  "config_version_hash": "<sha256(repo_sha|policy_sha256|schedules_sha256)>",
+  "snapshot_hash": "<sha256 канонического JSON без самого поля snapshot_hash>",
+  "predecessor_snapshot_hash": "<snapshot_hash предыдущего дня окна | null у genesis>",
+  "tick_partitioning": {"rule": "floor-to-hour tick slot", "grace_ms": 900000, "ticks_observed": ["..."]},
   "day_status": "GREEN_DAY",
   "immutability": "append-only; изменения запрещены, исправления — новым файлом-заменой со ссылкой"
 }
@@ -267,13 +308,19 @@ MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2
 - `runs[]` обязан содержать все шесть источников; отсутствие элемента — дефект сборки
   снапшота, а не просто «нет данных»: такой снапшот не публикуется, день считается
   покрытым только полноценным файлом.
+- `observation_row_ids` выведен из употребления: реальная связь с БД идёт через
+  `upstream_identity` + `close_condition.satisfied_by_run_id` (§17.3); поле оставлено
+  пустым массивом только для совместимости схемы v2 и не проверяется гейтом.
 - Все счётчики ограниченные: id источников, статусы, исходы, числа, коды ошибок.
   Никогда — сырые provider payload'ы, персональные контакты, креды, тела upstream-ошибок.
-- Связь с БД: `observation_row_ids` ссылается на `source_run_observations.id`, поэтому
-  снапшот проверяем SQL-ом L2 в любой момент без чтения чего-либо ещё.
+- Связь с БД (v2): lineage проверяется SQL-ом L2 по §3 (`expected` VALUES CTE + LEFT JOIN),
+  а не через `observation_row_ids`.
 - `config_version_hash` фиксирует конфигурацию дня; два дня с разным hash внутри окна
   не блокируют окно, но об этом обязана быть запись в отчёте окна (детерминированность
   окон при смене версии конфигурации проверяется вручную @rr-support).
+- Устаревшее поле `config_version_hash` заменено связкой `snapshot_hash` +
+  `predecessor_snapshot_hash` + producer-поля (§17.4): хеш цепочка и identity деплоя
+  дают более сильную гарантию, чем один агрегатный хеш конфигурации.
 
 Снапшоты генерируются кодом приложения (не руками): коллектор после суточного цикла
 читает `source_run_observations` за прошлый UTC-день, вычисляет статусы §5, применяет
@@ -296,10 +343,17 @@ MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2
 4. Окно проходит тогда и только тогда, когда последние 7 последовательных дней — все
    `GREEN_DAY`. Одна `RED_DAY`-дата выбраковывает всю кандидатную двойку окон, куда она
    входит; отсчёт нового окна начинается со следующей полной зелёной последовательности.
-5. Механическая формула проверки: взять последние N published coverage-файлов по
-   `docs/evidence/source-refresh-coverage/…` (§10) и проверить
-   `count == 7 AND every(day_status == 'GREEN_DAY')`. Никакого человеческого «скорее
-   всего ок» между файлами.
+5. Механическая формула проверки: гейт `scripts/check-coverage-window.mjs` v2 берёт
+   7 дат окна и по каждой проверяет (§17.4–17.5):
+
+   - published snapshot `<D>.json` существует, schema_version=2, producer identity валиден,
+     `snapshot_hash` воспроизводится при пересчёте, `predecessor_snapshot_hash` совпадает
+     с предыдущим опубликованным днём цепочки;
+   - day_status == GREEN_DAY, границы §7 внутри bound'ов из `bounds_applied`, §16
+     close_condition закрыт для всех шести слотов.
+   Никакого человеческого «скорее всего ок» между файлами. Unsigned/hand-made snapshot
+   (нет producer, нет хеша, сломанная цепочка) — fail-closed NOT_READY, не повод для ручной
+   интерпретации.
 6. До выполнения внешней верификации планировщика действует прежняя граница
    `{productionScheduled:false, scheduleVerification:"external-after-merge"}`: даже 7
    зелёных дней после merge не объявляются proof'ом, пока внешний чек не исполнен.
@@ -447,3 +501,101 @@ verdict: live | stale | blocked      # stale/blocked требует причин
 
 Инструментальная поддержка правила: `scripts/build-coverage-snapshot.mjs` отказывается
 писать снапшот при невыполненном условии покрытия (b2/b3-требование задачи t_06de2f59).
+
+## 17. Протокол v2: due-каденция, tick ledger, identity-контракт и provenance
+
+Закрытие blocker-review PR #240. Каждое правило инструментировано; номера сценариев
+регрессионных тестов — из §18.
+
+### 17.1 Due/not-due решается scheduler-evidence, а не отсутствием строки (B1)
+
+1. Источник без фактического исхода за день классифицируется только через состояния:
+   `not_due` (scheduler явно ответил deferred с `due=false` / будущим
+   `next_eligible_run_at`), `overdue_deferred` (deferred есть, но attest'а будущей
+   eligibility нет), `unknown-missing-launch` (строк нет вовсе).
+2. Только `not_due` не считается деградацией; `overdue_deferred` и
+   `unknown-missing-launch` для required дают RED_DAY немедленно, для optional идут в
+   бюджет §7.
+3. Произвольный переиспользующий fallback «взять зелёный предыдущий день» запрещён
+   полностью: параметр `COVERAGE_ALLOW_PREVIOUS_DAY` удалён из контракта builder'а.
+   Зелёность дня D определяется исключительно строками с tick-атрибуцией дня D и
+   последующим закрытием §16.
+
+### 17.2 Часовой tick ledger: expected-vs-observed (B3)
+
+1. Workflow `source-refresh-clock.yml` печатает строку `source-refresh-provenance:`
+   (`repository`, `run_id`, `run_number`, `attempt`, `scheduled_at`, `git_sha`,
+   `http_status`, `body_sha256`) и загружает артефакт `proof-evidence/` с телом ответа;
+   collector `scripts/collect-refresh-logs.mjs` строит по каждому запуску summary
+   `<run_id>.json` со `schema_version: 2`.
+2. Каждый сканированный запуск даёт файл: успех, 422 no-op, malformed/missing-payload —
+   всё записывается (`schema_errors[]` + `tick_result`). Тихих пропусков каталогов нет.
+3. Политика выхода workflow (fail-closed): HTTP 200 → exit 0 при отсутствии
+   route-заявленных required-failures; HTTP 422 → явный no-op tick (`no-active-profiles`),
+   job завершается warning'ом и НЕ считается success evidence'ом; всё остальное
+   (207 с required failure, 207 сверх бюджета §7, 5xx, timeout, malformed, missing
+   details) — non-zero exit + RED evidence ряда.
+4. Нет delta между ожидаемыми 24 tick'ами суток и наблюдаемыми launch'ами = дефект дня,
+   а не молчаливая норма; missing tick неотличим от инцидента по построению ledger'а.
+
+### 17.3 Zero-success подлежит identity/delta контракту (B2)
+
+1. `expected-zero`/`idempotent-replay` классифицируются `green_noop` только если все
+   четыре условия выполняются одновременно:
+   - policy contract источника декларирует `allow_zero_success=true` с allowlist причин
+     (`config.json.zero_contracts`, canonical: `no-new-signals`,
+     `derived-events-empty`; `source-unavailable` — деградация, а не zero-contract);
+   - конкретная причина прогона входит в allowlist;
+   - доступен upstream identity (`content_hash`/versionId/upstreamUpdatedAt);
+   - delta verdict против published snapshot вчера ∈ {upstream-changed, unchanged,
+     baseline-established}.
+2. Произвольный `diagnostics.zeroReason` или пустая identity ⇒ `red` c
+   `error_code=zero-reason-not-in-policy | zero-without-upstream-identity`. Регрессия на
+   adversarial harness PR #240 («шести источникам произвольный expected-zero») покрывает это.
+3. L2-предикат fresh-identity см. SQL в §3 (`declared_zero_7d` требует сравнения content_hash
+   соседних наблюдений); сверка полей БД — задача миграции identity-колонок, до её
+   применения declared-zero не апгрейдится до LINEAGE_OK автоматически.
+
+### 17.4 Attribution дней по tick-slot и immutable close watermark (B4)
+
+1. Каждому запуску присваивается scheduled tick slot: floor(started_at − grace) до часа,
+   grace = 15 минут. День D содержит tick'и `[D 00:00Z, D+1 00:00Z)` — интервалы соседних
+   дней НЕ пересекаются: run 2026-08-21T00:45Z принадлежит ТОЛЬКО дню 2026-08-21.
+2. Late run обрабатывается как собственный tick своего часа (не ретроактивный исход чужого
+   дня); закрывающие runs следующего дня участвуют только в close_condition дня D,
+   но не в его day-level статусах.
+3. После истечения последних tick'ов дня день закрывается watermark'ом: снапшот
+   публикуется только когда у каждого слота есть subsequent non-deferred attempt позже
+   `D 23:00Z` (§16); иначе `<day>.pending.json` (PENDING_CLOSE), не учитываемый окном.
+
+### 17.5 Producer identity, хеш-цепочка и анти-tamper (B5)
+
+1. Снапшот подписан fields-provenance вместо криптоподписи: producer (`repo_sha`
+   полный 40-hex, `workflow_run_url`), `policy_sha256`/`schedules_sha256` из config
+   manifest, `snapshot_hash = sha256(канонический JSON поля без snapshot_hash)`,
+   `predecessor_snapshot_hash` предыдущего опубликованного дня (null у genesis).
+2. Гейт окна recompute'ит каждый `snapshot_hash`, проверяет непрерывность цепочки в
+   окне, соответствие repo_sha деплою и sha конфигурации manifest'у. Любой разрыв =
+   NOT_READY fail-closed; fabricated unsigned окно (регрессия attacker-модели PR #240)
+   отвергается механически.
+3. Ручные правки published snapshot эквивалентны tamper: recompute ломается и гейт
+   падает; легальный путь исправления — superseded-file механика §10.1.
+4. Артефакты workflow содержат тело upstream-ответа только в пределах минимальности:
+   ошибки/счётчики/source ids/критичность; тела provider payload'ов, персональные
+   контакты, креды в evidence запрещены (§12.5).
+
+### 17.6 HTTP-политика тика: сверка критичности route ↔ orchestration
+
+Целевой контракт route `/api/cron/source-refresh` (см. §11): `data.criticality ∈
+{green, degraded, failing}`, `failedRequired`, `failedOptional`,
+`deliveryImpactingFailure`. До внедрения этих полей workflow валидирует их наличие при
+не-422 статусах и фейлит закрыто: отсутствие критичности в response — schema error,
+а не «по умолчанию зелёно». Допустимые исходы тика сведены в таблицу:
+
+| HTTP | Ответ | criticality/required | Exit workflow | Ledger-ряд |
+| --- | --- | --- | --- | --- |
+| 200 | details[] | green/degraded, failedRequired=0 | 0 | success |
+| 207 | details[] | optional-only в бюджете §7 | 0 | degraded_ok |
+| 207 | details[] | required failure ИЛИ вне бюджета | ≠0 | red |
+| 422 | envelope | — | 4→warning | no_op (НЕ success) |
+| прочее/timeout/malformed | что угодно | — | ≠0 | red/schema-error |

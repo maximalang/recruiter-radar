@@ -17,6 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Checkout scripts (provenance + validators)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Setup SSH
         run: |
           set -euo pipefail
@@ -25,16 +30,21 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Trigger cadence-aware source refresh
+      - name: Trigger cadence-aware source refresh (bounded-body capture)
+        id: refresh
+        env:
+          EXPECTED_SCHEDULED_AT_TICK: ${{ github.event.schedule || 'manual' }}
         run: |
           set -euo pipefail
+          mkdir -p proof-evidence
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
-            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} <<'SSH_EOF'
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} <<'SSH_EOF' | tee proof-evidence/refresh.log
           set -euo pipefail
           cd /opt/recruiter-radar
           docker compose exec -T web node --input-type=module - <<'NODE'
           const http = await import('node:http')
+          const { createHash } = await import('node:crypto')
           const SOURCE_REFRESH_CLIENT_TIMEOUT_MS = 15 * 60 * 1000
           const key = process.env.CRON_API_KEY?.trim()
           if (!key) throw new Error('CRON_API_KEY is not configured in the web runtime.')
@@ -56,9 +66,7 @@ jobs:
               incoming.on('data', (chunk) => { rawBody += chunk })
               incoming.on('error', reject)
               incoming.on('end', () => {
-                let body = {}
-                try { body = JSON.parse(rawBody) } catch {}
-                resolve({ status: incoming.statusCode ?? 0, body })
+                resolve({ status: incoming.statusCode ?? 0, rawBody })
               })
             })
             request.setTimeout(SOURCE_REFRESH_CLIENT_TIMEOUT_MS, () => {
@@ -67,25 +75,92 @@ jobs:
             request.on('error', reject)
             request.end(payload)
           })
-          const body = response.body
+          // B3: the exact upstream response body is durable provenance; emit it as one
+          // JSON line plus a bounded summary. Never print CRON_API_KEY or provider payloads.
+          const bodySha256 = createHash('sha256').update(response.rawBody).digest('hex')
+          console.log(`source-refresh-provenance: repository=${process.env.GITHUB_REPOSITORY ?? ''} run_id=${process.env.GITHUB_RUN_ID ?? ''} run_number=${process.env.GITHUB_RUN_NUMBER ?? ''} attempt=${process.env.GITHUB_RUN_ATTEMPT ?? '1'} scheduled_at=${process.env.EXPECTED_SCHEDULED_AT_TICK ?? ''} git_sha=${process.env.GITHUB_SHA ?? ''} http_status=${response.status} body_sha256=${bodySha256}`)
+          console.log(`source-refresh-provenance: body=${response.rawBody}`)
+          let parsed = null
+          try { parsed = JSON.parse(response.rawBody) } catch {}
+          const details = parsed?.data?.details ?? []
+          if (!Array.isArray(details) && response.status !== 422) {
+            console.error('response is missing data.details[] and status is not a documented no-op — fail closed')
+            process.exit(2)
+          }
+          if (parsed === null && response.status !== 422) {
+            console.error('response body is not valid JSON — fail closed')
+            process.exit(2)
+          }
+          const criticality = parsed?.data?.criticality ?? null
+          const failedRequired = Number(parsed?.data?.failedRequired ?? NaN)
+          if (parsed !== null && Array.isArray(details)) {
+            if (typeof criticality !== 'string' || !['green', 'degraded', 'failing'].includes(criticality)) {
+              console.error(`missing or unknown data.criticality ("${String(criticality)}") — fail closed`)
+              process.exit(2)
+            }
+            if (!Number.isInteger(failedRequired)) {
+              console.error('missing integer data.failedRequired — fail closed')
+              process.exit(2)
+            }
+          }
           console.log(JSON.stringify({
             status: response.status,
-            success: body?.success ?? false,
-            total: body?.data?.total ?? 0,
-            succeeded: body?.data?.succeeded ?? 0,
-            failed: body?.data?.failed ?? 0,
-            deferred: body?.data?.deferred ?? 0,
-            credentialGated: body?.data?.credentialGated ?? 0,
-            rateLimited: body?.data?.rateLimited ?? 0,
-            failedSources: (body?.data?.details ?? [])
-              .filter((result) => result?.success === false)
-              .map((result) => ({ source: result?.source ?? 'unknown', outcome: result?.outcome ?? 'failed' })),
-            rateLimitedSources: (body?.data?.details ?? [])
-              .filter((result) => result?.outcome === 'rate-limited')
-              .map((result) => result?.source ?? 'unknown'),
+            success: parsed?.success ?? false,
+            total: parsed?.data?.total ?? 0,
+            succeeded: parsed?.data?.succeeded ?? 0,
+            failed: parsed?.data?.failed ?? 0,
+            deferred: parsed?.data?.deferred ?? 0,
+            credentialGated: parsed?.data?.credentialGated ?? 0,
+            rateLimited: parsed?.data?.rateLimited ?? 0,
+            criticality,
+            failedRequired,
+            failedOptional: Number.isInteger(parsed?.data?.failedOptional) ? parsed.data.failedOptional : null,
+            deliveryImpactingFailure: typeof parsed?.data?.deliveryImpactingFailure === 'boolean' ? parsed.data.deliveryImpactingFailure : null,
           }))
-          if (response.status === 200) process.exit(0)
-          if (response.status === 422) process.exit(0)
+          // B3 policy: only full success (200) and the explicit no-active-profiles no-op
+          // (422) exit green; everything else (207 with required failures, 207 over budget,
+          // 5xx, timeouts, malformed) fails the tick. Criticality comes from the route.
+          if (response.status === 200) {
+            if (failedRequired > 0 || criticality === 'failing') {
+              console.error('HTTP 200 but route-reported required failures — fail closed')
+              process.exit(3)
+            }
+            process.exit(0)
+          }
+          if (response.status === 422) {
+            console.error('no-active-profiles no-op tick recorded in evidence; NOT counted as success')
+            process.exit(4)
+          }
           throw new Error(`source-refresh returned HTTP ${response.status}`)
           NODE
           SSH_EOF
+
+      - name: Classify tick outcome
+        id: classify
+        if: always()
+        run: |
+          set -euo pipefail
+          code="${{ steps.refresh.outputs.conclusion }}"
+          echo "tick_conclusion=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Upload proof evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-refresh-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: proof-evidence/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Enforce tick policy
+        # B3: success/no-op distinction must be visible at job level — noop keeps job "neutral"
+        # via non-blocking annotation while still producing its artifact for the collector.
+        if: always()
+        run: |
+          set -euo pipefail
+          status=$(grep -oE 'http_status=[0-9]+' proof-evidence/refresh.log | head -1 | cut -d= -f2 || true)
+          case "${status}" in
+            200) echo "tick OK (full success)"; exit 0 ;;
+            422) echo "::warning::no-active-profiles no-op tick (recorded, not a success evidence)"; exit 0 ;;
+            *) echo "::error::clock tick failed: HTTP ${status:-unknown}"; exit 1 ;;
+          esac

@@ -185,6 +185,7 @@
     "verify:telegram-company-channels:smoke": "node --test packages/db/scripts/adapters/telegram-company-channels.test.mjs",
     "source:derive:temporal-intelligence": "node packages/db/scripts/derive-source-temporal-intelligence.mjs",
     "verify:source:temporal-health": "node --test packages/db/scripts/lib/source-temporal-intelligence.test.mjs packages/db/scripts/lib/source-health-recorder.test.mjs",
+    "verify:source:refresh-clock-protocol": "node --test scripts/source-refresh-clock-regression.test.mjs",
     "docs:generate:source-status": "node packages/db/scripts/generate-source-status-docs.mjs",
     "verify:docs:source-status": "node packages/db/scripts/generate-source-status-docs.mjs --check",
     "verify:company-site:smoke": "node packages/db/scripts/verify-company-site-smoke.mjs",

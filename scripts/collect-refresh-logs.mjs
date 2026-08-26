@@ -1,26 +1,29 @@
 #!/usr/bin/env node
 /**
- * Source Refresh Clock run-log collector (protocol §4-§6, §8; blocker B4).
+ * Source Refresh Clock run-log collector v2 (protocol §4-§6, §8, §10; blockers B2, B3).
  *
- * Reads sequentially-numbered GitHub Actions run logs of the `Source Refresh Clock` workflow,
- * re-parses each run's HTTP response JSON (the route never prints per-source lines), and emits
- * one deterministic per-run summary file <REFRESH_RUNS_DIR>/<run_id>.json.
+ * Reads recursively-numbered GitHub Actions run log trees of the `Source Refresh Clock`
+ * workflow, re-parses each run's HTTP response JSON (the route never prints per-source lines),
+ * and emits one deterministic per-run summary file <REFRESH_RUNS_DIR>/<run_id>.json.
  *
- * Sources of truth:
- *   - response `data.details[]`: IngestResult rows { source, success, outcome, fetchedCount,
- *     upsertedCount, diagnostics };
- *   - diagnostic outcome classification: (source-criticality column documented in docs/source-registry.md).
+ * v2 contract (fail closed):
+ *   - EVERY scanned run produces a summary file: success payloads, HTTP 422 no-active-profiles
+ *     no-ops (entry keyed `no-active-profiles`, tick_result=noop) and malformed/no-payload logs
+ *     (`schema_errors[]` + exit non-zero afterwards in the builder) — silent skips would be
+ *     indistinguishable from missed ticks (B3);
+ *   - provenance lines (`source-refresh-provenance:` repository/run_id/run_number/attempt/
+ *     scheduled_at/git_sha/http_status/body_sha256) are captured verbatim; body_sha256 ties the
+ *     summary to the raw-response artifact uploaded by the workflow;
+ *   - upstream content identity per row ({contentHash, versionId, upstreamUpdatedAt}) is carried
+ *     verbatim into `upstream` when present, else null — zero contracts alone cannot green a day;
+ *   - scheduler truth (due / next_eligible_run_at) is carried into `scheduler` when the route
+ *     exposes it, so the builder can separate not-due from overdue-deferred (B1);
+ *   - zero/refresh outcomes require the collector-level allowlist reason
+ *     ('no-new-signals', 'derived-events-empty', 'source-unavailable'); arbitrary zeroReason
+ *     values fail closed to red with error_code=zero-reason-not-in-policy (B2).
  *
- * Outcome -> coverage status mapping (per refresh contract + protocol §5):
- *   ingested | ingested-with-duplicates | idempotent-replay | expected-zero
- *       with upsertedCount/normalizedCount > 0 OR expected-zero ...
- *         -> 'success' when records accepted > 0 or outcome is expected-zero;
- *   deferred                     -> 'deferred' (scheduler overlap; may resolve next run)
- *   rate-limited                 -> red for required sources, red-marker for optional degradation
- *   credential-gated | failed | missing-summary | invalid-summary | unexpected-zero |
- *   normalization-zero | ingestion-zero  -> red (fail closed)
- *
- * Usage: REFRESH_RUNS_DIR=... SOURCE_REFRESH_LOGS_DIR=... node scripts/collect-refresh-logs.mjs
+ * Usage: REFRESH_RUNS_DIR=... SOURCE_REFRESH_LOGS_DIR=... CONFIG_MANIFEST=<config.json> \
+ *        node scripts/collect-refresh-logs.mjs
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,138 +32,255 @@ import process from 'node:process';
 const logsDir = process.env.SOURCE_REFRESH_LOGS_DIR ?? '';
 const runsDir = process.env.REFRESH_RUNS_DIR ?? '';
 const workflowName = process.env.SOURCE_REFRESH_WORKFLOW_NAME ?? 'Source Refresh Clock';
-const CRITICALITY_MAP_PATH = process.env.CONFIG_MANIFEST ?? '';
+const manifestPath = process.env.CONFIG_MANIFEST ?? '';
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
   process.exit(1);
 }
 
-if (!logsDir) fail('SOURCE_REFRESH_LOGS_DIR must point to downloaded run log directories');
+if (!logsDir || !fs.existsSync(logsDir)) fail('SOURCE_REFRESH_LOGS_DIR must point to downloaded run log directories');
 if (!runsDir) fail('REFRESH_RUNS_DIR must point to the output directory');
+if (!manifestPath || !fs.existsSync(manifestPath)) {
+  fail('CONFIG_MANIFEST must point to the regenerated config.json (zero contracts + bounds)');
+}
 
-/** ------- §5 pass/fail taxonomy -------------------------------------------------------- */
+/** Collector-side allowlist mirror of source-ingest.ts + scheduler zeroReason vocabulary. */
+const POLICY_ZERO_REASONS = new Set(['no-new-signals', 'derived-events-empty', 'source-unavailable']);
+
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+if (!manifest.zero_contracts || typeof manifest.zero_contracts !== 'object') {
+  fail('config manifest is missing zero_contracts (regenerate via generate-refresh-config-manifest.mjs)');
+}
+
+fs.mkdirSync(runsDir, { recursive: true });
+
+function extractProvenance(text) {
+  const out = {};
+  // Scan every provenance LINE, then all key=value pairs on it. A single anchored
+  // matchAll would capture only the first pair and silently drop run_id/status/sha.
+  for (const lineMatch of text.matchAll(/^.*source-refresh-provenance:.*$/gm)) {
+    for (const kv of lineMatch[0].matchAll(/(\w+)=([^\s]+)/g)) {
+      out[kv[1]] = kv[2];
+    }
+  }
+  return out;
+}
+
 /**
- * status ∈ green | green_noop | deferred | red.
- * - green:      failure-free run with actually processed records (evidence-bearing);
- * - green_noop: failure-free auditable no-op (idempotent-replay / expected-zero / zero-upsert);
- *               must stay distinguishable from green per §5, and is caught by the rolling
- *               7-day acceptance-recency check rather than painted red here;
- * - deferred:   scheduler overlap, may resolve against a sibling/next run;
- * - red:        everything else fails closed (rate-limited, credential-gated, failed,
- *               *-zero, missing-summary, invalid-summary).
+ * Parse one candidate JSON text. Returns `{kind:'details', details, startedAt}`,
+ * `{kind:'envelope', error}`, or null when the payload is not a source-refresh HTTP body.
  */
+function parsePayload(raw) {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+  if (Array.isArray(parsed?.data?.details)) {
+    return { kind: 'details', details: parsed.data.details, startedAt: parsed?.data?.startedAt ?? null };
+  }
+  if (typeof parsed?.data === 'object' && parsed.data !== null && !Array.isArray(parsed.data.details)) {
+    throw new Error('data.details is missing or not an array');
+  }
+  if (typeof parsed?.error === 'string' && parsed?.success !== true) {
+    // Structured failure envelope without details[] (e.g. 422 no_active_profiles).
+    return { kind: 'envelope', error: parsed.error };
+  }
+  return null;
+}
+
 function classifySourceRow(row) {
   const outcome = row.outcome;
   const accepted = row.upsertedCount ?? row.diagnostics?.normalizedCount ?? 0;
   switch (outcome) {
     case 'ingested':
     case 'ingested-with-duplicates':
-      return accepted > 0 ? 'green' : 'green_noop';
+      return accepted > 0 ? { status: 'green' } : { status: 'red', errorCode: 'zero-upsert-success' };
     case 'idempotent-replay':
-    case 'expected-zero':
-      return 'green_noop';
+    case 'expected-zero': {
+      const reason = row.diagnostics?.zeroReason ?? null;
+      if (!reason || !POLICY_ZERO_REASONS.has(reason)) {
+        return { status: 'red', errorCode: 'zero-reason-not-in-policy' };
+      }
+      return { status: 'green_noop_pending_identity' };
+    }
     case 'deferred':
-      return 'deferred';
+      return { status: 'deferred' };
     default:
-      return 'red';
+      return { status: 'red', errorCode: 'outcome-not-in-policy' };
   }
 }
 
-/** Fetch a GitHub run-jobs/logs artifact list via REST using GH_TOKEN (optional convenience). */
-async function gh(pathname) {
-  const token = process.env.GH_TOKEN;
-  if (!token) fail('GH_TOKEN required for remote listing');
-  const res = await fetch(`https://api.github.com${pathname}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-  });
-  if (!res.ok) fail(`GitHub API ${res.status} for ${pathname}`);
-  return res.json();
+/** Recursively walk a run-log directory collecting *.txt paths (GitHub artifacts nest per job/step). */
+function walkLogFiles(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walkLogFiles(p));
+    else if (entry.name.endsWith('.txt')) out.push(p);
+  }
+  return out.sort();
 }
 
-// --------- input loading --------------------------------------------------------------
-fs.mkdirSync(runsDir, { recursive: true });
-
-/**
- * Local mode: read already-downloaded run-log directories from SOURCE_REFRESH_LOGS_DIR.
- * Expected layout: <logsDir>/<run_id>/0_setup.txt .. N_sources.txt (gh run download layout)
- * A run directory qualifies when at least one .txt file embeds the source-refresh JSON payload.
- */
+const seenBodyHashes = new Set();
 const runDirs = fs.readdirSync(logsDir).filter((d) => fs.statSync(path.join(logsDir, d)).isDirectory());
 let processed = 0;
+
 for (const runId of runDirs) {
   const outPath = path.join(runsDir, `${runId}.json`);
   if (fs.existsSync(outPath)) continue; // idempotent re-run of collector
-  const files = fs.readdirSync(path.join(logsDir, runId)).filter((f) => f.endsWith('.txt'));
+  const txtFiles = walkLogFiles(path.join(logsDir, runId));
+  const provAccumulator = {};
   let found = null;
-  for (const f of files) {
-    const text = fs.readFileSync(path.join(logsDir, runId, f), 'utf8');
-    // The workflow stores the FULL raw HTTP body via $GITHUB_STEP_SUMMARY and echoes it to the job log.
-    // Try direct parse first (body printed verbatim), then extract bracketed substring as fallback.
-    const candidates = [];
-    if (text.includes('"data"') && text.includes('"details"')) {
+  let malformedMessage = null;
+
+  for (const filePath of txtFiles) {
+    const text = fs.readFileSync(filePath, 'utf8');
+    Object.assign(provAccumulator, extractProvenance(text));
+    if (provAccumulator.body_sha256) seenBodyHashes.add(provAccumulator.body_sha256);
+
+    // Direct parse: pure-JSON steps (the body-echo step) parse wholesale.
+    try {
+      const hit = parsePayload(text);
+      if (hit) {
+        found = hit;
+        break;
+      }
+    } catch (err) {
+      if (!malformedMessage) malformedMessage = `${path.relative(logsDir, filePath)}: ${err.message}`;
+    }
+
+    // Embedded parse: mixed-step logs carrying the body inline.
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (!found && start !== -1 && end > start) {
       try {
-        candidates.push(JSON.parse(text));
-      } catch {
-        /* fall through to extraction below */
-      }
-      const start = text.indexOf('{');
-      const end = text.lastIndexOf('}');
-      if (start !== -1 && end > start) {
-        try {
-          candidates.push(JSON.parse(text.slice(start, end + 1)));
-        } catch {
-          /* keep null */
+        const hit = parsePayload(text.slice(start, end + 1));
+        if (hit) {
+          found = hit;
+          break;
         }
+      } catch (err) {
+        if (!malformedMessage) malformedMessage = `${path.relative(logsDir, filePath)}: ${err.message}`;
       }
     }
-    for (const parsed of candidates.filter(Boolean)) {
-      const details = parsed?.data?.details;
-      if (!Array.isArray(details)) continue;
-      found = { details, startedAt: parsed?.data?.startedAt ?? null };
-      break;
-    }
-    if (found) break;
-    // Also capture workflow metadata lines for provenance.
   }
-  if (!found) continue; // unrelated run dir — skip silently
+
+  const prov = provAccumulator;
+  const httpStatus = intOrNull(prov.http_status);
   processed += 1;
-  /** derive run window metadata from response body or fallback to directory mtime */
-  const anyFile = path.join(logsDir, runId);
-  const stat = fs.statSync(anyFile);
-  const rawStartedAt = found.startedAt ?? null;
-  let startedAtMs = rawStartedAt == null ? Number.NaN : Date.parse(rawStartedAt);
-  if (Number.isNaN(startedAtMs) && rawStartedAt != null) startedAtMs = Date.parse(`${rawStartedAt}Z`);
-  const startedAtIso =
-    !Number.isNaN(startedAtMs)
-      ? new Date(startedAtMs).toISOString()
-      : new Date(stat.mtimeMs).toISOString();
+  const stat = fs.statSync(path.join(logsDir, runId));
+
+  let sources = {};
+  let schemaErrors = [];
+  let tickResult = 'unknown';
+
+  if (!found) {
+    // B3: unparseable clock log is a durable fail-closed schema_error entry, never a silent skip.
+    schemaErrors = [
+      malformedMessage ?? `no parseable source-refresh payload found in ${txtFiles.length} log file(s)`,
+    ];
+    tickResult = 'schema-error';
+  } else if (found.kind === 'details') {
+    for (const row of found.details) {
+      if (!row || typeof row.source !== 'string' || !row.source) {
+        schemaErrors.push('details row missing string source id');
+        continue;
+      }
+      const classification = classifySourceRow(row);
+      const schedulerRaw = row.scheduler ?? {};
+      const hasScheduler =
+        Boolean(schedulerRaw && typeof schedulerRaw === 'object') &&
+        (schedulerRaw.next_eligible_run_at != null || schedulerRaw.due != null);
+      const upstreamRaw = row.upstreamIdentity ?? null;
+      const hasUpstream =
+        Boolean(upstreamRaw && typeof upstreamRaw === 'object') &&
+        ((upstreamRaw.contentHash ?? '') !== '' ||
+          upstreamRaw.versionId != null ||
+          upstreamRaw.upstreamUpdatedAt != null);
+      const srcEntry = {
+        outcome: row.outcome,
+        success: row.success === true,
+        records_fetched: row.fetchedCount ?? null,
+        records_accepted: row.upsertedCount ?? row.diagnostics?.normalizedCount ?? 0,
+        duplicate_records: row.diagnostics?.duplicateCount ?? null,
+        error_code: classification.errorCode ?? row.error ?? row.diagnostics?.zeroReason ?? null,
+        status: classification.status,
+        scheduler: hasScheduler
+          ? {
+              due: schedulerRaw.due === true,
+              ...(schedulerRaw.next_eligible_run_at != null
+                ? { next_eligible_run_at: String(schedulerRaw.next_eligible_run_at) }
+                : {}),
+            }
+          : null,
+        upstream: hasUpstream
+          ? {
+              content_hash: String(upstreamRaw.contentHash ?? ''),
+              version_id: upstreamRaw.versionId == null ? null : String(upstreamRaw.versionId),
+              upstream_updated_at:
+                upstreamRaw.upstreamUpdatedAt == null ? null : String(upstreamRaw.upstreamUpdatedAt),
+            }
+          : null,
+      };
+      if (srcEntry.status === 'green_noop_pending_identity' && !hasUpstream) {
+        srcEntry.status = 'red';
+        srcEntry.error_code = 'zero-without-upstream-identity';
+      } else if (srcEntry.status === 'green_noop_pending_identity') {
+        srcEntry.status = 'green_noop';
+      }
+      sources[row.source] = srcEntry;
+    }
+    tickResult = 'ok';
+  } else {
+    // Envelope without details[]: legitimate only as 422 no-active-profiles.
+    if (httpStatus === 422) {
+      sources['no-active-profiles'] = {
+        outcome: 'no-active-profiles',
+        success: false,
+        records_fetched: null,
+        records_accepted: 0,
+        duplicate_records: null,
+        error_code: 'no-active-profiles',
+        status: 'no-op',
+        scheduler: null,
+        upstream: null,
+      };
+      tickResult = 'noop';
+    } else {
+      schemaErrors = [`failure envelope without details[] under HTTP ${httpStatus ?? 'unknown'}: ${found.error}`];
+      tickResult = 'schema-error';
+    }
+  }
+
+  let startedAtMs = Number.NaN;
+  const rawStarted = found?.startedAt ?? null;
+  if (rawStarted != null) startedAtMs = Date.parse(rawStarted);
+  const startedAtIso = !Number.isNaN(startedAtMs)
+    ? new Date(startedAtMs).toISOString()
+    : new Date(stat.mtimeMs).toISOString();
+
   fs.writeFileSync(
     outPath,
     `${JSON.stringify(
       {
-        schema_version: 1,
+        schema_version: 2,
         run_id: runId,
+        workflow_name: workflowName,
+        repository: prov.repository ?? null,
+        run_number: intOrNull(prov.run_number),
+        run_attempt: intOrNull(prov.run_attempt),
+        scheduled_at_tick: prov.scheduled_at ?? null,
+        git_sha: prov.git_sha ?? null,
+        http_status: httpStatus,
+        response_body_sha256: prov.body_sha256 ?? null,
         run_started_at: startedAtIso,
-        sources: Object.fromEntries(
-          found.details.map((row) => [
-            row.source,
-            {
-              outcome: row.outcome,
-              success: row.success === true,
-              records_fetched: row.fetchedCount ?? null,
-              records_accepted: row.upsertedCount ?? row.diagnostics?.normalizedCount ?? 0,
-              duplicate_records: row.diagnostics?.duplicateCount ?? null,
-              latency_ms: null,
-              error_code: row.error ?? row.diagnostics?.zeroReason ?? null,
-              status: classifySourceRow(row),
-            },
-          ]),
-        ),
+        tick_result: tickResult,
+        sources,
+        ...(schemaErrors.length > 0 ? { schema_errors: schemaErrors } : {}),
         _meta: { derived_from_log_dir: runId, processed_at: new Date().toISOString() },
       },
       null,
@@ -169,14 +289,15 @@ for (const runId of runDirs) {
     'utf8',
   );
 }
+
 console.log(`OK collected ${processed} new run summaries into ${runsDir} (${runDirs.length} dirs scanned)`);
-if (processed === 0 && runDirs.length > 0) {
-  console.error(
-    'WARN: no run directories contained a source-refresh JSON payload — ' +
-      'check that downloaded logs are from the Source Refresh Clock workflow',
-  );
-}
+console.log(`OK distinct response-body hashes observed: ${seenBodyHashes.size}`);
 
 if (processed === 0 && runDirs.length === 0) {
-  fail('no run directories found under SOURCE_REFRESH_LOGS_DIR');
+  fail(`no run directories found under ${logsDir}`);
+}
+
+function intOrNull(value) {
+  const n = Number(value);
+  return Number.isInteger(n) ? n : null;
 }

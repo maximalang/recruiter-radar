@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "generated_from": {
     "repo_working_tree": true,
     "source_policy_path": "packages/db/source-policy.json",
@@ -49,5 +49,53 @@
     "rosstat-open-data",
     "transparent-business-fns"
   ],
-  "determinism_check": "pass: byte-identical across 2 consecutive runs"
+  "zero_contracts": {
+    "cbr-registry": {
+      "criticality": "optional",
+      "allow_zero_success": false,
+      "allowed_reasons": [],
+      "require_upstream_identity": true,
+      "note": "fail closed outside these reasons; arbitrary diagnostics.zeroReason values must turn RED"
+    },
+    "egrul-fns": {
+      "criticality": "required",
+      "allow_zero_success": false,
+      "allowed_reasons": [],
+      "require_upstream_identity": true,
+      "note": "fail closed outside these reasons; arbitrary diagnostics.zeroReason values must turn RED"
+    },
+    "fns-open-data": {
+      "criticality": "optional",
+      "allow_zero_success": false,
+      "allowed_reasons": [],
+      "require_upstream_identity": true,
+      "note": "fail closed outside these reasons; arbitrary diagnostics.zeroReason values must turn RED"
+    },
+    "rospatent-open-data": {
+      "criticality": "optional",
+      "allow_zero_success": false,
+      "allowed_reasons": [],
+      "require_upstream_identity": true,
+      "note": "fail closed outside these reasons; arbitrary diagnostics.zeroReason values must turn RED"
+    },
+    "rosstat-open-data": {
+      "criticality": "optional",
+      "allow_zero_success": false,
+      "allowed_reasons": [],
+      "require_upstream_identity": true,
+      "note": "fail closed outside these reasons; arbitrary diagnostics.zeroReason values must turn RED"
+    },
+    "transparent-business-fns": {
+      "criticality": "optional",
+      "allow_zero_success": false,
+      "allowed_reasons": [],
+      "require_upstream_identity": true,
+      "note": "fail closed outside these reasons; arbitrary diagnostics.zeroReason values must turn RED"
+    }
+  },
+  "hard_bounds": {
+    "MAX_DEGRADED_OPTIONAL_SOURCES_PER_DAY": 2,
+    "MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE": 2,
+    "arithmetic_note": "bound counts optional-only among the six 7-day sources; required failures never count toward it"
+  }
 }
