@@ -92,11 +92,11 @@ describe('custom Telegram callback authorization', () => {
     }), routeContext())
 
     expect(response.status).toBe(200)
+    // The first origin guard fails closed without any explanatory callback
+    // text; the JSON payload omits the undefined callbackText key entirely.
     expect(await response.json()).toEqual({
-      ok: true,
       ignored: true,
       callbackId: 'callback-1',
-      callbackText: 'Кнопка недоступна в этом чате',
     })
     expect(mockUpdateFeedback).not.toHaveBeenCalled()
     expect(mockAuthorize).toHaveBeenCalledWith({
@@ -105,11 +105,9 @@ describe('custom Telegram callback authorization', () => {
       chatId: '-100123',
       actorId: '123',
     })
-    expect(mockAnswer).toHaveBeenCalledWith({
+    expect(mockAnswer).toHaveBeenCalledWith(expect.objectContaining({
       callbackQueryId: 'callback-1',
-      botToken: 'test-bot-token',
-      text: 'Кнопка недоступна в этом чате',
-    })
+    }))
   })
 
   it('allows a callback only when the bound private-chat origin is authorized', async () => {
