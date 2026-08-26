@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "generated_from": {
+    "repo_working_tree": true,
+    "source_policy_path": "packages/db/source-policy.json",
+    "source_schedules_path": "apps/web/lib/sources/source-schedules.ts"
+  },
+  "policy_sha256": "c5a56995c6a84bf16e51903e736124d7e42177dfedf8fd96265a6c362bbe5030",
+  "schedules_sha256": "6b0e6fea2a5d7aaa81a03671492b7b2e746fcaf106164ded0f0ae55308b80cda",
+  "source_count": 27,
+  "required_optional_counts": {
+    "required": 11,
+    "optional": 16
+  },
+  "source_criticality": {
+    "hh": "required",
+    "career-pages": "required",
+    "greenhouse": "required",
+    "lever": "required",
+    "ashby": "required",
+    "recruitee": "required",
+    "workable": "required",
+    "smartrecruiters": "required",
+    "rabota-rossii": "required",
+    "egrul-fns": "required",
+    "transparent-business-fns": "optional",
+    "fedresurs": "optional",
+    "company-site": "optional",
+    "funding-business-signals": "optional",
+    "linkedin-company-pages": "optional",
+    "superjob": "required",
+    "habr-career": "optional",
+    "company-newsrooms": "optional",
+    "industry-media": "optional",
+    "github-company-org": "optional",
+    "youtube-company-channels": "optional",
+    "telegram-company-channels": "optional",
+    "fns-open-data": "optional",
+    "government-procurement": "optional",
+    "cbr-registry": "optional",
+    "rosstat-open-data": "optional",
+    "rospatent-open-data": "optional"
+  },
+  "seven_day_sources": [
+    "cbr-registry",
+    "egrul-fns",
+    "fns-open-data",
+    "rospatent-open-data",
+    "rosstat-open-data",
+    "transparent-business-fns"
+  ],
+  "determinism_check": "pass: byte-identical across 2 consecutive runs"
+}
