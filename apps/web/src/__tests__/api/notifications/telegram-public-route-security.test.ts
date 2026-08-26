@@ -99,12 +99,9 @@ describe('custom Telegram callback authorization', () => {
       callbackId: 'callback-1',
     })
     expect(mockUpdateFeedback).not.toHaveBeenCalled()
-    expect(mockAuthorize).toHaveBeenCalledWith({
-      accountId: 'account-1',
-      clientProfileId: '7',
-      chatId: '-100123',
-      actorId: '123',
-    })
+    // The private-self-origin gate fails closed before any per-profile
+    // authorization round-trip, so authorize must not be consulted.
+    expect(mockAuthorize).not.toHaveBeenCalled()
     expect(mockAnswer).toHaveBeenCalledWith(expect.objectContaining({
       callbackQueryId: 'callback-1',
     }))
