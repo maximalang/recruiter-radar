@@ -9,11 +9,16 @@
  *     b) the hash chain holds: predecessor_snapshot_hash == previous day's snapshot_hash
  *        across consecutive published days in the window (B5);
  *     c) day_status is GREEN_DAY with §7 bounds respected (B6 arithmetic: 2-of-N optional
- *        bound, bound value read from snapshot.bounds_applied) and §16 close-out satisfied;
+ *        bound, bound value read from snapshot.bounds_applied), §16 close-out satisfied
+ *        inside its immutable window (B4), and the §17.2.4 hourly tick ledger shows all 24
+ *        expected launch slots observed exactly once (B3);
  *     d) producer provenance resolves to a full 40-hex deploy SHA + workflow run URL whose
  *        commit sha matches REPO_SHA when provided;
  *     e) acceptance-recency: each source shows records_accepted > 0 at least once in window,
- *        so auditable no-op streams cannot masquerade as live evidence.
+ *        so auditable no-op streams cannot masquerade as live evidence;
+ *     f) every green/green_noop entry carries fresh dated upstream identity plus an accepted
+ *        delta verdict, verified from machine-readable per-run fields (B2 v4); criticality of
+ *        every entry matches the canonical config manifest (schema-drift fail closed).
  *
  * Unsigned/hand-made snapshots (no producer, no snapshot_hash, mismatched hash chain,
  * missing workflow identity) fail closed — B5 regression on the fabricated-window attack.
@@ -53,6 +58,13 @@ if (!Array.isArray(manifest.seven_day_sources) || targetSources.length !== 6) {
 }
 const outDir = path.resolve(process.env.COVERAGE_SNAPSHOT_DIR ?? path.dirname(manifestPath));
 const WINDOW_DAYS = Number(manifest.window_days ?? 7);
+const HOUR_MS = 60 * 60 * 1000;
+const TICK_GRACE_MS = 15 * 60 * 1000;
+
+function expectedTickSlots(dayStr) {
+  const start = Date.parse(`${dayStr}T00:00:00Z`);
+  return Array.from({ length: 24 }, (_, hour) => new Date(start + hour * HOUR_MS + TICK_GRACE_MS).toISOString());
+}
 
 function utcOffsetDays(dayStr, delta) {
   const d = new Date(`${dayStr}T00:00:00Z`);
@@ -109,10 +121,90 @@ function evalDay(dayStr) {
   }
 
   // ---- day status / bounds / close-out -----------------------------------
+  const runs = Array.isArray(snap.runs) ? snap.runs : [];
   if (snap.day_status !== 'GREEN_DAY') {
     reasons.push(
       `${dayStr}: day_status=${snap.day_status} — ${(snap.red_day_reasons ?? []).join('; ')}`,
     );
+  }
+  // ---- B3 v4: expected-vs-observed hourly tick ledger ---------------------------------------
+  const ledger = snap.tick_ledger ?? null;
+  if (!ledger || typeof ledger !== 'object') {
+    reasons.push(`${dayStr}: tick_ledger missing — snapshot predates v4 protocol`);
+  } else {
+    const expected = Number(ledger.expected_slots_per_day);
+    if (expected !== 24) reasons.push(`${dayStr}: tick_ledger.expected_slots_per_day=${expected}, expected 24`);
+    const canonicalExpected = expectedTickSlots(dayStr);
+    if (JSON.stringify(ledger.expected_slots_utc) !== JSON.stringify(canonicalExpected)) {
+      reasons.push(`${dayStr}: tick_ledger.expected_slots_utc does not match canonical hourly UTC slots`);
+    }
+    const observedCount = Number(ledger.observed_slot_count);
+    if (!Number.isInteger(observedCount) || observedCount < 0) {
+      reasons.push(`${dayStr}: tick_ledger.observed_slot_count invalid`);
+    } else if (observedCount !== 24) {
+      reasons.push(`${dayStr}: tick_ledger observed ${observedCount}/24 slots`);
+    }
+    const observed = snap.tick_partitioning?.ticks_observed;
+    if (!Array.isArray(observed)) {
+      reasons.push(`${dayStr}: tick_partitioning.ticks_observed missing`);
+    } else {
+      const expectedSet = new Set(canonicalExpected);
+      const observedSet = new Set(observed);
+      const missingCanonical = canonicalExpected.filter((slot) => !observedSet.has(slot));
+      const unexpected = observed.filter((slot) => !expectedSet.has(slot));
+      if (observed.length !== observedSet.size) reasons.push(`${dayStr}: duplicate ticks_observed entries`);
+      if (missingCanonical.length > 0) reasons.push(`${dayStr}: canonical observed ledger missing ${missingCanonical.length} slots`);
+      if (unexpected.length > 0) reasons.push(`${dayStr}: canonical observed ledger has unexpected slots (${unexpected[0]})`);
+    }
+    if (!Array.isArray(ledger.missing_slots_utc)) {
+      reasons.push(`${dayStr}: tick_ledger.missing_slots_utc invalid`);
+    } else if (ledger.missing_slots_utc.length > 0) {
+      reasons.push(`${dayStr}: ${ledger.missing_slots_utc.length}/24 workflow launch slots missed (first=${ledger.missing_slots_utc[0]})`);
+    }
+    if (!Array.isArray(ledger.duplicate_slots)) {
+      reasons.push(`${dayStr}: tick_ledger.duplicate_slots invalid`);
+    } else if (ledger.duplicate_slots.length > 0) {
+      reasons.push(`${dayStr}: duplicate/unresolved launch slots: ${ledger.duplicate_slots.map((d) => d.slot).join(', ')}`);
+    }
+    if (!Array.isArray(ledger.unresolved_slots)) {
+      reasons.push(`${dayStr}: tick_ledger.unresolved_slots invalid`);
+    } else if (ledger.unresolved_slots.length > 0) {
+      reasons.push(`${dayStr}: unresolved tick results: ${ledger.unresolved_slots.map((d) => `${d.slot}=${d.tick_result}`).join(', ')}`);
+    }
+  }
+  // ---- B2 v4: structural green gate on per-run machine-readable fields ----------------------
+  for (const r of runs) {
+    const idt = r.upstream_identity ?? null;
+    const isGreenish = r.status === 'green' || r.status === 'green_noop';
+    if (!isGreenish) continue;
+    if (!idt || idt.fresh !== true) {
+      reasons.push(`${dayStr}: ${r.source_id}: green without fresh upstream identity`);
+    }
+    const dv = r.delta_verdict?.verdict ?? null;
+    if (!dv || !['upstream-changed', 'unchanged', 'baseline-established'].includes(dv)) {
+      reasons.push(`${dayStr}: ${r.source_id}: green without accepted delta verdict (${String(dv)})`);
+    }
+  }
+  // ---- B4 v4: close-out must name a witnessing run inside the immutable window --------------
+  const closeAfterMs = Date.parse(`${dayStr}T23:15:00Z`);
+  const closeDeadlineMs = closeAfterMs + 2 * HOUR_MS + 45 * 60 * 1000;
+  for (const r of runs) {
+    const cc = r.close_condition;
+    if (!cc || cc.satisfied_by_run_id == null) continue; // already reported by close-out check below
+    if (typeof cc.satisfied_by_run_id !== 'string' || cc.satisfied_by_run_id.length === 0) {
+      reasons.push(`${dayStr}: ${r.source_id}: close-out witness run id malformed (${String(cc.satisfied_by_run_id)})`);
+    }
+    const awaitedMs = Date.parse(cc.awaited_launch_after ?? '');
+    if (awaitedMs !== closeAfterMs) {
+      reasons.push(`${dayStr}: ${r.source_id}: close watermark must be D23:15Z`);
+    }
+    const satisfiedMs = Date.parse(cc.satisfied_at ?? '');
+    if (Number.isNaN(satisfiedMs) || satisfiedMs <= closeAfterMs || satisfiedMs > closeDeadlineMs) {
+      reasons.push(`${dayStr}: ${r.source_id}: close witness outside immutable window`);
+    }
+    if (cc.backfill_rejected) {
+      reasons.push(`${dayStr}: ${r.source_id}: late backfill rejected — ${String(cc.backfill_rejected)}`);
+    }
   }
   const degradedOptional = (snap.degradation_events ?? []).length;
   const bound = Number((snap.bounds_applied ?? {}).MAX_DEGRADED_OPTIONAL_SOURCES_PER_DAY ?? NaN);
@@ -124,7 +216,6 @@ function evalDay(dayStr) {
   if ((snap.degradation_events ?? []).some((e) => e.within_bounds === false)) {
     reasons.push(`${dayStr}: consecutive-day degradation exceeded`);
   }
-  const runs = Array.isArray(snap.runs) ? snap.runs : [];
   if (runs.length !== targetSources.length) {
     reasons.push(`${dayStr}: runs[] has ${runs.length} entries, expected ${targetSources.length}`);
   }
@@ -142,6 +233,16 @@ function evalDay(dayStr) {
   for (const s of targetSources) {
     if (!seenIds.has(s)) reasons.push(`${dayStr}: missing run entry for ${s}`);
   }
+  // Review case B: criticality on every entry must come from the canonical config manifest;
+  // drifted or locally re-classified entries fail closed.
+  for (const r of runs) {
+    const declared = manifest.source_criticality?.[r.source_id];
+    if (!declared) {
+      reasons.push(`${dayStr}: ${r.source_id}: not present in canonical source_criticality policy`);
+    } else if (r.criticality !== declared) {
+      reasons.push(`${dayStr}: ${r.source_id}: criticality=${r.criticality}, canonical=${declared}`);
+    }
+  }
   return { ok: reasons.length === 0, snap, reasons };
 }
 
@@ -150,22 +251,22 @@ for (let i = WINDOW_DAYS - 1; i >= 0; i -= 1) days.push(utcOffsetDays(refDay, -i
 
 const dayResults = days.map((d) => ({ day: d, ...evalDay(d) }));
 
-// ---- B5 hash-chain continuity -------------------------------------------
+// ---- B5 hash-chain continuity (oldest -> newest) ------------------------
 const chainIssues = [];
 {
   let prev = null;
-  for (const dr of [...dayResults].reverse()) {
+  for (const dr of dayResults) {
     if (!dr.snap) continue;
     const curHash = dr.snap.snapshot_hash;
     const declaredPred = dr.snap.predecessor_snapshot_hash ?? null;
     if (prev === null) {
-      // genesis day of window: predecessor may legitimately be null or out-of-window
+      // Genesis day of window: predecessor may legitimately be null or out-of-window.
       prev = curHash;
     } else {
       if (declaredPred == null) {
         chainIssues.push(`${dr.day}: predecessor_snapshot_hash absent but window continues`);
       } else if (declaredPred !== prev) {
-        chainIssues.push(`${dr.day}: predecessor_snapshot_hash != previous snapshot_hash (chain break)`);
+        chainIssues.push(`${dr.day}: predecessor_snapshot_hash != previous snapshot_hash (forward chain break)`);
       }
       prev = curHash;
     }

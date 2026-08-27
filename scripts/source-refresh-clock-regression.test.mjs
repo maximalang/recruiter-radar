@@ -110,7 +110,7 @@ function greenRow(overrides = {}) {
     error_code: null,
     status: 'green',
     scheduler: { due: true },
-    upstream: { content_hash: `h${'x'.repeat(30)}`, version_id: 'v1', upstream_updated_at: '2026-08-20T10:00:00Z' },
+    upstream: { content_hash: 'c'.repeat(64), version_id: 'v1', upstream_updated_at: '2026-08-20T10:00:00Z' },
     ...overrides,
   };
 }
@@ -124,6 +124,26 @@ function dayRows(overridesBySource = {}, opts = {}) {
     rows[s] = overridesBySource[s] ?? greenRow(opts.green ?? {});
   }
   return rows;
+}
+
+/** Write one complete hourly day plus the bounded close-witness tick. */
+function writeHourlyRuns(runsDir, { day, overridesBySource = {}, green = {} }) {
+  for (let hour = 0; hour < 24; hour += 1) {
+    const runId = String(15000000000 + hour + 1);
+    const startedAt = `${day}T${String(hour).padStart(2, '0')}:45:00Z`;
+    const summary = makeRunSummary({ runId, startedAt, sources: dayRows(overridesBySource, { green }) });
+    fs.writeFileSync(path.join(runsDir, `${runId}.json`), JSON.stringify(summary));
+  }
+  const closeId = '16000000000';
+  const close = makeRunSummary({
+    runId: closeId,
+    startedAt: `${day}T23:59:59Z`,
+    sources: dayRows({}, { green }),
+  });
+  const nextDay = new Date(`${day}T00:00:00Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  close.run_started_at = `${nextDay.toISOString().slice(0, 10)}T02:00:00Z`;
+  fs.writeFileSync(path.join(runsDir, `${closeId}.json`), JSON.stringify(close));
 }
 
 // ================================================================================
@@ -411,14 +431,7 @@ test('S7: 2 degraded optional stay in bounds; 3 exceed MAX_DEGRADED_OPTIONAL_SOU
     }
     const runsDir = path.join(dir, 'runs');
     fs.mkdirSync(runsDir);
-    fs.writeFileSync(
-      path.join(runsDir, '15151515151.json'),
-      JSON.stringify(makeRunSummary({ runId: '15151515151', startedAt: '2026-08-20T06:00:00Z', sources: dayRows(overrides) })),
-    );
-    fs.writeFileSync(
-      path.join(runsDir, '16161616161.json'),
-      JSON.stringify(makeRunSummary({ runId: '16161616161', startedAt: '2026-08-21T02:00:00Z', sources: dayRows() })),
-    );
+    writeHourlyRuns(runsDir, { day: '2026-08-20', overridesBySource: overrides });
     const res = buildSnapshot({ day: '2026-08-20', runsDir: runsDir, outDir: dir })
     assert.equal(res.status, 0, res.stderr);
     const snap = readDayArtifact(dir, '2026-08-20');
@@ -461,4 +474,108 @@ test('S8: run summary containing only five of six target sources yields explicit
     snap.red_day_reasons.some((r) => r.includes(absent)),
     'missing sixth source must fail the day explicitly',
   );
+});
+
+// ================================================================================
+// Adversarial A-E — exact v4 blocker cases
+// ================================================================================
+test('A: past next_eligible_run_at is overdue, never a valid not_due attestation', () => {
+  const dir = tmpDir('adv-a-past-due');
+  const runsDir = path.join(dir, 'runs');
+  fs.mkdirSync(runsDir);
+  const run = makeRunSummary({
+    runId: '19191919191',
+    startedAt: '2026-08-20T05:00:00Z',
+    sources: dayRows({
+      'egrul-fns': greenRow({
+        outcome: 'deferred', status: 'deferred', success: false,
+        records_fetched: null, records_accepted: 0,
+        scheduler: { due: false, next_eligible_run_at: '2026-08-20T04:59:59Z' },
+      }),
+    }),
+  });
+  const close = makeRunSummary({ runId: '20202020202', startedAt: '2026-08-21T02:00:00Z', sources: dayRows() });
+  for (const s of [run, close]) fs.writeFileSync(path.join(runsDir, `${s.run_id}.json`), JSON.stringify(s));
+  assert.equal(buildSnapshot({ day: '2026-08-20', runsDir, outDir: dir }).status, 0);
+  const snap = readDayArtifact(dir, '2026-08-20');
+  assert.equal(snap.runs.find((r) => r.source_id === 'egrul-fns').status, 'overdue_deferred');
+  assert.equal(snap.day_status, 'RED_DAY');
+});
+
+test('B: ordinary green with stale upstream identity is downgraded to red', () => {
+  const dir = tmpDir('adv-b-stale-green');
+  const runsDir = path.join(dir, 'runs');
+  fs.mkdirSync(runsDir);
+  const stale = greenRow({ upstream: { content_hash: 'd'.repeat(64), version_id: 'old', upstream_updated_at: '2026-08-01T10:00:00Z' } });
+  const run = makeRunSummary({ runId: '21212121212', startedAt: '2026-08-20T05:00:00Z', sources: dayRows({ 'egrul-fns': stale }) });
+  const close = makeRunSummary({ runId: '22222222222', startedAt: '2026-08-21T02:00:00Z', sources: dayRows() });
+  for (const s of [run, close]) fs.writeFileSync(path.join(runsDir, `${s.run_id}.json`), JSON.stringify(s));
+  assert.equal(buildSnapshot({ day: '2026-08-20', runsDir, outDir: dir }).status, 0);
+  const snap = readDayArtifact(dir, '2026-08-20');
+  const egrul = snap.runs.find((r) => r.source_id === 'egrul-fns');
+  assert.equal(egrul.status, 'red');
+  assert.equal(egrul.upstream_identity.fresh, false);
+  assert.ok(snap.red_day_reasons.some((reason) => reason.includes('egrul-fns')));
+});
+
+test('C: late close run after immutable deadline cannot backfill the covered day', () => {
+  const dir = tmpDir('adv-c-late-backfill');
+  const runsDir = path.join(dir, 'runs');
+  fs.mkdirSync(runsDir);
+  writeHourlyRuns(runsDir, { day: '2026-08-20' });
+  const latePath = path.join(runsDir, '16000000000.json');
+  const late = JSON.parse(fs.readFileSync(latePath, 'utf8'));
+  late.run_started_at = '2026-08-21T03:00:00Z';
+  fs.writeFileSync(latePath, JSON.stringify(late));
+  assert.equal(buildSnapshot({ day: '2026-08-20', runsDir, outDir: dir }).status, 0);
+  const snap = readDayArtifact(dir, '2026-08-20');
+  assert.notEqual(snap.day_status, 'GREEN_DAY');
+  assert.ok(snap.runs.every((r) => r.close_condition.satisfied_by_run_id == null));
+  assert.ok(snap.runs.every((r) => r.close_condition.backfill_rejected));
+});
+
+test('D: checker catches a forward hash-chain break even when the edited snapshot is rehashed', () => {
+  const dir = tmpDir('adv-d-chain-direction');
+  const previousRuns = path.join(dir, 'previous-runs');
+  const currentRuns = path.join(dir, 'current-runs');
+  fs.mkdirSync(previousRuns);
+  fs.mkdirSync(currentRuns);
+  writeHourlyRuns(previousRuns, {
+    day: '2026-08-19',
+    green: { upstream: { content_hash: 'e'.repeat(64), version_id: 'v19', upstream_updated_at: '2026-08-19T10:00:00Z' } },
+  });
+  writeHourlyRuns(currentRuns, { day: '2026-08-20' });
+  assert.equal(buildSnapshot({ day: '2026-08-19', runsDir: previousRuns, outDir: dir }).status, 0);
+  assert.equal(buildSnapshot({ day: '2026-08-20', runsDir: currentRuns, outDir: dir }).status, 0);
+  const currentPath = path.join(dir, '2026-08-20.json');
+  const current = JSON.parse(fs.readFileSync(currentPath, 'utf8'));
+  current.predecessor_snapshot_hash = 'f'.repeat(64);
+  const unsigned = { ...current };
+  delete unsigned.snapshot_hash;
+  current.snapshot_hash = sha256Canonical(unsigned);
+  fs.writeFileSync(currentPath, JSON.stringify(current, null, 2));
+  const checked = runScript(CHECKER, {
+    CONFIG_MANIFEST: CONFIG,
+    COVERAGE_SNAPSHOT_DIR: dir,
+    COVERAGE_REF_DAY_UTC: '2026-08-20',
+    EXPECTED_REPO_SHA: FULL_SHA,
+  });
+  assert.notEqual(checked.status, 0);
+  assert.match(checked.stdout, /forward chain break/);
+});
+
+test('E: mixed deploy SHA in one collected day is rejected before snapshot publication', () => {
+  const dir = tmpDir('adv-e-mixed-sha');
+  const runsDir = path.join(dir, 'runs');
+  fs.mkdirSync(runsDir);
+  const mismatched = makeRunSummary({
+    runId: '23232323232',
+    startedAt: '2026-08-20T05:00:00Z',
+    sources: dayRows(),
+    overrides: { git_sha: '0'.repeat(40) },
+  });
+  fs.writeFileSync(path.join(runsDir, `${mismatched.run_id}.json`), JSON.stringify(mismatched));
+  const result = buildSnapshot({ day: '2026-08-20', runsDir, outDir: dir });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /provenance git_sha/);
 });

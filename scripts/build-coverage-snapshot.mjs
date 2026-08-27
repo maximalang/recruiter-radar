@@ -39,7 +39,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { sha256Canonical, stableStringify, utcOffsetDays } from './lib/coverage-integrity.mjs';
+import {
+  recomputeSnapshotHash,
+  sha256Canonical,
+  stableStringify,
+  utcOffsetDays,
+} from './lib/coverage-integrity.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -49,6 +54,7 @@ const configManifestPath = process.env.CONFIG_MANIFEST ?? '';
 const repoSha = process.env.REPO_SHA ?? '';
 const workflowRunUrl = process.env.WORKFLOW_RUN_URL ?? '';
 const windowId = process.env.COVERAGE_WINDOW_ID ?? '';
+const workflowRepo = workflowRunUrl.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/actions\/runs\//)?.[1] ?? null;
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
@@ -89,6 +95,12 @@ for (const file of runFiles) {
   }
   const problems = validateRunSummaryV2(parsed);
   if (problems.length > 0) fail(`run summary ${file}: ${problems.join('; ')}`);
+  if (parsed.run_id !== file.slice(0, -'.json'.length)) {
+    fail(`run summary ${file}: run_id does not match its filename (provenance binding)`);
+  }
+  if (workflowRepo && parsed.repository !== workflowRepo) {
+    fail(`run summary ${file}: repository ${parsed.repository} != workflow URL repository ${workflowRepo}`);
+  }
   collectedRuns.push(parsed);
 }
 collectedRuns.sort((a, b) => Date.parse(a.run_started_at) - Date.parse(b.run_started_at));
@@ -104,8 +116,10 @@ function validateRunSummaryV2(parsed) {
   if (!Number.isInteger(parsed?.run_attempt) || parsed.run_attempt <= 0) problems.push('run_attempt invalid');
   if (!/^([0-9a-f]{64})$/i.test(parsed?.response_body_sha256 ?? '')) problems.push('response_body_sha256 invalid');
   if (typeof parsed?.workflow_name !== 'string' || parsed.workflow_name.length === 0) problems.push('workflow_name missing');
-  if (Number.isNaN(Date.parse(parsed?.run_started_at ?? ''))) problems.push('run_started_at unparseable');
+  if (typeof parsed?.run_started_at !== 'string' || Number.isNaN(Date.parse(parsed?.run_started_at ?? ''))) problems.push('run_started_at unparseable');
   if (!parsed?.sources || typeof parsed.sources !== 'object' || Array.isArray(parsed.sources)) problems.push('sources missing');
+  if (!['ok', 'noop', 'schema-error', 'unknown'].includes(parsed?.tick_result)) problems.push('tick_result missing/invalid');
+  if (Array.isArray(parsed?.schema_errors) && parsed.schema_errors.length > 0) problems.push(`schema_errors present: ${parsed.schema_errors.join('; ')}`);
   return problems;
 }
 
@@ -149,26 +163,79 @@ if (dayTicks.length === 0) {
     `no clock ticks attributable to ${rawDay}. Snapshot refused: covered day requires at least one tick.`,
   );
 }
+// B5 hardening: every contributing run summary must originate from the SAME deploy the
+// snapshot claims as producer. A mixed-SHA day silently blends deploys into one evidence day.
+for (const r of collectedRuns) {
+  if ((r.git_sha ?? '').toLowerCase() !== repoSha.toLowerCase()) {
+    fail(`run ${r.run_id}: provenance git_sha ${r.git_sha} != REPO_SHA ${repoSha}`);
+  }
+}
 const laterRuns = collectedRuns.filter((r) => r._tickMs >= dayEndMs);
 const priorRuns = collectedRuns.filter((r) => r._tickMs < dayStartMs);
 
+// ---- B3 expected-vs-observed hourly tick ledger ------------------------------------------------
+// The Source Refresh Clock cron is hourly, so EVERY UTC hour of the covered day owes one
+// expected tick slot. Under the attribution formula above slots sit at hh:15 (launch-minus-
+// grace floored to the hour, plus grace), and every hourly launch (the :45 schedule with
+// drift/latency up to one hour) lands in its own hour's slot. Fewer observed slots than
+// expected = missed workflow launches; two runs folded onto one slot = duplicate/unresolved
+// launch. Both are DAY DEFECTS (protocol §17.2.4), never silent norms.
+const HOUR_MS = 60 * 60 * 1000;
+const EXPECTED_TICK_SLOTS_PER_DAY = 24;
+const expectedSlotMsList = [];
+for (let h = 0; h < EXPECTED_TICK_SLOTS_PER_DAY; h += 1) {
+  expectedSlotMsList.push(dayStartMs + h * HOUR_MS + TICK_GRACE_MS);
+}
+const observedSlots = new Map(); // slotMs -> run ids
+for (const r of dayTicks) {
+  observedSlots.set(r._tickMs, [...(observedSlots.get(r._tickMs) ?? []), r.run_id]);
+}
+const missingTickSlots = expectedSlotMsList
+  .filter((ms) => !observedSlots.has(ms))
+  .map((ms) => new Date(ms).toISOString());
+const duplicateTickSlots = [...observedSlots.entries()]
+  .filter(([, ids]) => ids.length > 1)
+  .map(([ms, ids]) => ({ slot: new Date(ms).toISOString(), run_ids: ids.sort() }));
+const unresolvedTickSlots = dayTicks
+  .filter((r) => r.tick_result !== 'ok')
+  .map((r) => ({ slot: r._tickIso, run_id: r.run_id, tick_result: r.tick_result }));
+
 // ---- B2 helpers -------------------------------------------------------------------------------
+// Freshness horizon for upstream identity (protocol §2.2/§17.3): identity observed more than
+// the 7-day window plus one grace day ago cannot witness a live stream, and rows whose
+// upstream_updated_at falls outside [horizon, day-end] are stale.
+const IDENTITY_FRESHNESS_WINDOW_DAYS = manifest.window_days ?? 7;
+const IDENTITY_GRACE_DAYS = 1;
+
 function hasFreshUpstreamIdentity(row) {
   const up = row.upstream;
   if (!up || typeof up !== 'object') return false;
   if (typeof up.content_hash !== 'string' || !/^[0-9a-f]{16,64}$/i.test(up.content_hash)) return false;
-  if (up.upstream_updated_at != null && Number.isNaN(Date.parse(up.upstream_updated_at))) return false;
-  return true;
+  if (up.upstream_updated_at == null) return false; // B2: undated identity is not freshness evidence
+  const updatedMs = Date.parse(up.upstream_updated_at);
+  if (Number.isNaN(updatedMs)) return false;
+  if (updatedMs > dayEndMs) return false; // future-dated identity is fabricated
+  const oldestFreshMs = dayStartMs - (IDENTITY_FRESHNESS_WINDOW_DAYS + IDENTITY_GRACE_DAYS) * DAY_MS;
+  return updatedMs >= oldestFreshMs;
+}
+
+function normalizeIdentity(identity) {
+  if (!identity || typeof identity !== 'object') return null;
+  return {
+    content_hash: identity.content_hash ?? identity.content_hash_sha256 ?? null,
+    version_id: identity.version_id ?? identity.versionId ?? null,
+    upstream_updated_at: identity.upstream_updated_at ?? identity.upstreamUpdatedAt ?? null,
+  };
 }
 
 /** Delta verdict vs previous day's published snapshot (§B2 fresh/delta contract). */
 function deltaVerdict(sourceId, effectiveRow) {
   const prevPath = path.join(outDir, `${utcOffsetDays(rawDay, -1)}.json`);
-  if (!fs.existsSync(prevPath)) return { verdict: 'first-day', previous_identity: null };
+  if (!fs.existsSync(prevPath)) return { verdict: 'baseline-established', previous_identity: null };
   const prevSnap = JSON.parse(fs.readFileSync(prevPath, 'utf8'));
   const prevEntry = (prevSnap.runs ?? []).find((r) => r.source_id === sourceId);
-  const prevIdentity = prevEntry?.upstream_identity ?? null;
-  const curIdentity = effectiveRow.upstream ?? null;
+  const prevIdentity = normalizeIdentity(prevEntry?.upstream_row ?? prevEntry?.upstream_identity);
+  const curIdentity = normalizeIdentity(effectiveRow.upstream);
   if (!curIdentity) return { verdict: 'no-current-identity', previous_identity: prevIdentity };
   if (!prevIdentity) return { verdict: 'baseline-established', previous_identity: null };
   const changed =
@@ -218,7 +285,19 @@ function evaluateSource(sourceId) {
       notes.push(
         `noop gate: identity=${identityOk ? 'ok' : 'missing'} contract=${contractAllows ? 'allowed' : 'not-declared'} delta=${delta.verdict}`,
       );
-      detail = notes[notes.length - 1];
+      detail = identityOk ? notes[notes.length - 1] : 'zero-without-upstream-identity';
+    } else if (effectiveRow.status === 'green') {
+      // B2 v4: the freshness/delta gate applies to ANY green evidence, not only no-ops.
+      // A green run without fresh dated upstream identity cannot witness a live stream.
+      const identityOk = hasFreshUpstreamIdentity(effectiveRow);
+      const delta = deltaVerdict(sourceId, effectiveRow);
+      const deltaOk = ['upstream-changed', 'unchanged', 'baseline-established'].includes(delta.verdict);
+      status = identityOk && deltaOk ? 'green' : 'red';
+      notes.push(
+        `green gate: identity=${identityOk ? 'fresh' : 'stale-or-missing'} delta=${delta.verdict}`,
+      );
+      detail = effectiveRow.error_code ?? null;
+      if (!identityOk) detail = detail ?? 'green-without-fresh-upstream-identity';
     } else {
       status = effectiveRow.status; // green | red | deferred | no-op
       detail = effectiveRow.error_code ?? null;
@@ -226,13 +305,22 @@ function evaluateSource(sourceId) {
   } else {
     // No actual outcome in day D. Only scheduler-attested not-due keeps this out of failure;
     // deferred-only days and absent rows require later close-out below.
-    const schedulerSaysNotDue = deferredRows.some(({ row }) => row.scheduler?.due === false);
-    if (schedulerSaysNotDue) {
+    // B1 v4: a deferral attests "not due" ONLY with a valid next_eligible_run_at strictly in
+    // the future of the deferring run. Past, missing or unparseable timestamps are overdue
+    // self-attestation (review case A), never an excuse.
+    const deferredWithAttestation = deferredRows.filter(({ row, run }) => {
+      if (row.scheduler?.due !== false) return false;
+      const rawNext = row.scheduler?.next_eligible_run_at;
+      if (rawNext == null) return false;
+      const nextMs = Date.parse(rawNext);
+      if (Number.isNaN(nextMs)) return false;
+      return nextMs > Date.parse(run.run_started_at);
+    });
+    const futureAttestation = deferredWithAttestation.at(-1);
+    if (futureAttestation) {
       status = 'not_due';
-      detail = `all ${deferredRows.length} rows deferred; scheduler attested next_eligible_run_at in future`;
-      if (deferredRows[deferredRows.length - 1].row.scheduler?.next_eligible_run_at != null) {
-        notes.push(`next_eligible_run_at=${deferredRows.at(-1).row.scheduler.next_eligible_run_at}`);
-      }
+      detail = `${deferredRows.length} row(s) deferred; scheduler attested due=false with future next_eligible_run_at`;
+      notes.push(`next_eligible_run_at=${futureAttestation.row.scheduler.next_eligible_run_at}`);
     } else if (deferredRows.length > 0) {
       status = 'overdue_deferred';
       detail = `${deferredRows.length} deferred row(s); scheduler did not attest future eligibility`;
@@ -250,36 +338,81 @@ function evaluateSource(sourceId) {
     records_fetched: effectiveRow?.records_fetched ?? null,
     records_accepted: effectiveRow?.records_accepted ?? null,
     duplicate_records: effectiveRow?.duplicate_records ?? null,
+    // B2 v4: machine-readable gate results, so the window checker (and reviewers) can verify
+    // greenness structurally instead of trusting the status string alone.
+    upstream_identity: effectiveRow
+      ? {
+          present: Boolean(effectiveRow.upstream && typeof effectiveRow.upstream === 'object'),
+          content_hash_sha256: hasFreshUpstreamIdentity(effectiveRow)
+            ? String(effectiveRow.upstream?.content_hash ?? '')
+            : null,
+          upstream_updated_at: effectiveRow.upstream?.upstream_updated_at ?? null,
+          fresh: hasFreshUpstreamIdentity(effectiveRow),
+        }
+      : { present: false, content_hash_sha256: null, upstream_updated_at: null, fresh: false },
+    delta_verdict:
+      effectiveRow && ['green', 'green_noop'].includes(status)
+        ? (() => {
+            const d = deltaVerdict(sourceId, effectiveRow);
+            return { verdict: d.verdict, ...(d.reason ? { reason: d.reason } : {}) };
+          })()
+        : null,
     error_code: effectiveRow?.error_code ?? null,
     observation_row_ids: [], // deprecated field kept for schema compat; identity now upstream_identity
-    upstream_identity: effectiveRow ? effectiveRow.upstream ?? null : null,
+    upstream_row: effectiveRow ? effectiveRow.upstream ?? null : null,
     close_condition: closeConditionFor(sourceId),
     detail,
     ...(notes.length > 0 ? { notes } : {}),
   };
 }
 
-/** §16 close-out: a later-tick run after the covered day with a real attempt for the slot. */
-function closeConditionFor(sourceId) {
-  const probeAfter = Date.parse(`${rawDay}T23:00:00Z`); // last tick of day D must be superseded
-  for (const lr of [...laterRuns].sort((a, b) => Date.parse(a.run_started_at) - Date.parse(b.run_started_at))) {
-    const row = lr.sources[sourceId];
-    if (!row) continue;
-    if (row.outcome === 'deferred') continue;
-    const startMs = Date.parse(lr.run_started_at);
-    if (startMs <= probeAfter) continue;
+/**
+ * §16 close-out (B4 v4): the day is witnessed by the FIRST expected subsequent tick slot —
+ * `D+1 00:15Z` — and only inside the bounded window `[D 23:15Z, D+1 02:00Z]`. A later run
+ * inside that window closes the day with its own provenance; NO run within the window leaves
+ * close-out open (day red/pending); a run arriving after the immutable closure deadline is
+ * NOT accepted as retroactive evidence (review case C) — it is its own late tick, and the
+ * day carries an explicit backfill_rejected marker instead of greenness.
+ */
+const CLOSE_PROBE_AFTER_MS = dayEndMs - HOUR_MS + TICK_GRACE_MS;
+// Immutable closure deadline: the first expected subsequent slot lives at D+1 00:15Z; the
+// witnessed launch must occur no later than two hours into D+1 (B4 v4, review case C).
+const CLOSE_WINDOW_END_MS = dayStartMs + DAY_MS + 2 * HOUR_MS;
+const closeConditionFor = (sourceId) => {
+  const eligible = [...laterRuns]
+    .sort((a, b) => Date.parse(a.run_started_at) - Date.parse(b.run_started_at))
+    .find((lr) => {
+      const startMs = Date.parse(lr.run_started_at);
+      return (
+        startMs > CLOSE_PROBE_AFTER_MS &&
+        startMs <= CLOSE_WINDOW_END_MS &&
+        (lr.tick_result ?? '') === 'ok'
+      );
+    });
+  const lateRun = [...laterRuns]
+    .filter((lr) => Date.parse(lr.run_started_at) > CLOSE_WINDOW_END_MS)
+    .sort((a, b) => Date.parse(a.run_started_at) - Date.parse(b.run_started_at))[0];
+  if (!eligible) {
     return {
-      satisfied_by_run_id: lr.run_id,
-      satisfied_at: lr.run_started_at,
-      awaited_launch_after: new Date(probeAfter).toISOString(),
+      satisfied_by_run_id: null,
+      satisfied_at: null,
+      awaited_launch_after: new Date(CLOSE_PROBE_AFTER_MS).toISOString(),
+      ...(lateRun || Date.now() > CLOSE_WINDOW_END_MS
+        ? {
+            backfill_rejected: lateRun
+              ? `run ${lateRun.run_id} started at ${lateRun.run_started_at} after closure deadline ${new Date(CLOSE_WINDOW_END_MS).toISOString()}`
+              : `closure deadline ${new Date(CLOSE_WINDOW_END_MS).toISOString()} passed without witnessing run`,
+          }
+        : {}),
     };
   }
   return {
-    satisfied_by_run_id: null,
-    satisfied_at: null,
-    awaited_launch_after: new Date(probeAfter).toISOString(),
+    satisfied_by_run_id: eligible.run_id,
+    satisfied_at: eligible.run_started_at,
+    awaited_launch_after: new Date(CLOSE_PROBE_AFTER_MS).toISOString(),
+    closed_by_tick_slot: eligible._tickIso,
   };
-}
+};
 
 function criticalityOf(sourceId) {
   const mapped = criticalityMap[sourceId];
@@ -291,8 +424,9 @@ const runs = targetSources.map((sourceId) => evaluateSource(sourceId));
 // ---- §7 hard bounds (arithmetic corrected per blocker B6) -------------------------------------
 const MAX_DEGRADED_OPTIONAL_SOURCES_PER_DAY = 2;
 const MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2;
-// Note: with N_OPTIONAL=4 among the six sources, max degraded 2 of 4 => at least 2 healthy
-// optional remain; bounds apply within the six-source window, 2-of-N documented in runbook §7.
+// Note: among the six 7-day sources there are N_OPTIONAL=5 optional and N_REQUIRED=1 required
+// (egrul-fns), per config.json required_optional_counts. Max degraded 2 of 5 => at least 3
+// healthy optional remain; bounds apply within the six-source window, 2-of-N in runbook §7.
 
 const OPTIONAL_IDS = targetSources.filter((s) => criticalityMap[s] === 'optional');
 const REQUIRED_IDS = targetSources.filter((s) => criticalityMap[s] === 'required');
@@ -352,6 +486,23 @@ for (const r of runs) {
   }
 }
 
+// ---- B3: expected-vs-observed tick ledger feeds day status (§17.2.4) ----------------------------
+if (missingTickSlots.length > 0) {
+  RED_DAY_REASONS.push(
+    `missing workflow launch slots (${missingTickSlots.length}/${EXPECTED_TICK_SLOTS_PER_DAY}): first=${missingTickSlots[0]}`,
+  );
+}
+if (duplicateTickSlots.length > 0) {
+  RED_DAY_REASONS.push(
+    `duplicate/unresolved tick slots: ${duplicateTickSlots.map((d) => `${d.slot}<=${d.run_ids.join('+')}`).join(', ')}`,
+  );
+}
+if (unresolvedTickSlots.length > 0) {
+  RED_DAY_REASONS.push(
+    `unresolved tick results: ${unresolvedTickSlots.map((d) => `${d.slot}=${d.tick_result}`).join(', ')}`,
+  );
+}
+
 const openCloseConditions = runs.filter((r) => r.close_condition.satisfied_by_run_id == null);
 let dayStatus;
 if (RED_DAY_REASONS.length > 0) dayStatus = 'RED_DAY';
@@ -366,7 +517,16 @@ function readPredecessorHash(dayStr) {
     if (fs.existsSync(p)) {
       try {
         const snap = JSON.parse(fs.readFileSync(p, 'utf8'));
-        return snap.snapshot_hash ?? sha256Canonical(snap);
+        // B5 v4: the predecessor reference is only trusted when it provably hashes to the
+        // predecessor's own content AND the predecessor day strictly precedes this day. A
+        // tampered or misdated file silently forges a chain link.
+        if (snap.evidence_day_utc !== cursor) return null;
+        if (recomputeSnapshotHash(snap) !== snap.snapshot_hash) {
+          fail(
+            `predecessor snapshot ${cursor}.json content does not match its own snapshot_hash — refusing to chain onto corrupted evidence`,
+          );
+        }
+        return snap.snapshot_hash;
       } catch {
         return null;
       }
@@ -395,6 +555,16 @@ const coreSnapshot = {
     grace_ms: TICK_GRACE_MS,
     ticks_observed: [...new Set(dayTicks.map((r) => r._tickIso))].sort(),
     adjacent_day_runs_excluded: [...new Set(laterRuns.concat(priorRuns).map((r) => r.run_id))].sort().slice(0, 20),
+  },
+  // B3 v4: explicit expected-vs-observed ledger. An hourly cron owes exactly 24 slots; the
+  // checker enforces this structurally instead of trusting prose claims of full-day coverage.
+  tick_ledger: {
+    expected_slots_per_day: EXPECTED_TICK_SLOTS_PER_DAY,
+    expected_slots_utc: expectedSlotMsList.map((ms) => new Date(ms).toISOString()),
+    observed_slot_count: observedSlots.size,
+    missing_slots_utc: missingTickSlots,
+    duplicate_slots: duplicateTickSlots,
+    unresolved_slots: unresolvedTickSlots,
   },
   runs,
   degradation_events,

@@ -79,9 +79,9 @@ last_successful_normalization_at, consecutive_failures, …) и смежные
 зафиксированы, чтобы отчёты были сопоставимы во времени):
 
 ```sql
--- L2 lineage v2: expected-source CTE + LEFT JOIN, чтобы ПОЛНОСТЬЮ отсутствующий
--- источник появлялся явной missing-строкой (а не исчезал из результата GROUP BY),
--- и чтобы предикат требовал свежий accepted/fresh-identity исход, а не любой success.
+-- L2 lineage v3 (B7): executable against migration
+-- 20260814030000_add_source_temporal_health.sql. `records_accepted` is the only
+-- normalization counter; outcome is constrained to success/blocked/rate_limited/failure.
 WITH expected(source_id) AS (
   VALUES ('egrul-fns'),
          ('transparent-business-fns'),
@@ -94,39 +94,61 @@ observed AS (
   SELECT
     source_id,
     COUNT(*) FILTER (
-      WHERE completed_at > NOW() - INTERVAL '7 days') AS attempts_7d,
+      WHERE completed_at > NOW() - INTERVAL '7 days' - INTERVAL '1 day') AS attempts_8d,
     COUNT(*) FILTER (
       WHERE outcome = 'success'
-        AND upserted_count > 0
-        AND completed_at > NOW() - INTERVAL '7 days') AS accepted_success_7d,
+        AND records_accepted > 0
+        AND completed_at > NOW() - INTERVAL '7 days' - INTERVAL '1 day') AS accepted_success_8d,
     COUNT(*) FILTER (
-      WHERE outcome = 'expected-zero'
-        AND completed_at > NOW() - INTERVAL '7 days'
-        AND content_hash = (previous observation's content_hash)) AS declared_zero_7d,
+      WHERE outcome = 'success'
+        AND records_fetched = 0
+        AND records_accepted = 0
+        AND completed_at > NOW() - INTERVAL '7 days' - INTERVAL '1 day') AS zero_success_8d,
+    COUNT(*) FILTER (
+      WHERE outcome = 'blocked'
+        AND completed_at > NOW() - INTERVAL '7 days' - INTERVAL '1 day') AS blocked_8d,
+    COUNT(*) FILTER (
+      WHERE outcome = 'rate_limited'
+        AND completed_at > NOW() - INTERVAL '7 days' - INTERVAL '1 day') AS rate_limited_8d,
     MAX(completed_at) FILTER (WHERE outcome = 'success') AS last_success,
-    SUM(duplicate_records) FILTER (
-      WHERE completed_at > NOW() - INTERVAL '7 days') AS dupes_7d
+    MAX(completed_at) FILTER (WHERE outcome = 'success' AND records_accepted > 0) AS last_accepted,
+    COALESCE(SUM(duplicate_records) FILTER (
+      WHERE completed_at > NOW() - INTERVAL '7 days' - INTERVAL '1 day'), 0) AS dupes_8d
   FROM source_run_observations
   GROUP BY source_id
+),
+health AS (
+  SELECT source_id, last_successful_normalization_at
+  FROM source_health_state
 )
 SELECT
   e.source_id,
-  COALESCE(o.attempts_7d, 0)          AS attempts_7d,
-  COALESCE(o.accepted_success_7d, 0)  AS accepted_success_7d,
+  COALESCE(o.attempts_8d, 0)       AS attempts_8d,
+  COALESCE(o.accepted_success_8d, 0) AS accepted_success_8d,
+  COALESCE(o.zero_success_8d, 0)   AS zero_success_8d,
+  COALESCE(o.blocked_8d, 0)        AS blocked_8d,
+  COALESCE(o.rate_limited_8d, 0)   AS rate_limited_8d,
   o.last_success,
-  COALESCE(o.dupes_7d, 0)             AS dupes_7d,
-  CASE WHEN o.source_id IS NULL THEN 'MISSING_SOURCE'
-       WHEN COALESCE(o.accepted_success_7d, 0) > 0 THEN 'LINEAGE_OK'
-       ELSE 'NO_ACCEPTED_EVIDENCE' END AS lineage_verdict
+  o.last_accepted,
+  h.last_successful_normalization_at,
+  COALESCE(o.dupes_8d, 0)          AS dupes_8d,
+  CASE
+    WHEN o.source_id IS NULL THEN 'MISSING_SOURCE'
+    WHEN COALESCE(o.accepted_success_8d, 0) > 0
+      AND o.last_accepted >= NOW() - INTERVAL '7 days' - INTERVAL '1 day'
+      THEN 'LINEAGE_OK'
+    ELSE 'NO_ACCEPTED_EVIDENCE'
+  END AS lineage_verdict
 FROM expected e
 LEFT JOIN observed o USING (source_id)
+LEFT JOIN health h USING (source_id)
 ORDER BY e.source_id;
--- pass-критерий: для КАЖДОГО из шести источников
---   lineage_verdict = LINEAGE_OK
---   OR (declared_zero_7d >= 1 AND upstream identity/delta подтверждены — см. §17.3),
--- плюс last_success >= NOW() - INTERVAL '7d+grace'.
--- MISSING_SOURCE строка обязана фейлить verdict: отсутствующая шестая строка — не «пусто»,
--- а провал комплектности окна.
+-- Pass criterion (fail closed): every expected row must have
+--   lineage_verdict = LINEAGE_OK,
+--   accepted_success_8d > 0, and last_accepted >= NOW() - 8 days.
+-- `zero_success_8d` is diagnostic only: this DB schema has no `expected-zero` outcome
+-- or upstream identity columns, so L2 cannot promote a zero stream to LINEAGE_OK.
+-- MISSING_SOURCE is a hard failure, not an empty result.
 ```
 
 **L3 — live-пруф (реальная среда).** Контролируемый прогон против production:
@@ -187,8 +209,8 @@ optional(16): cbr-registry, company-newsrooms, company-site, fedresurs, fns-open
 
 | Статус | Условие | Типичные исходы |
 | --- | --- | --- |
-| `green` | данные верифицированно дошли до пайплайна | `ingested`, `ingested-with-duplicates`; `idempotent-replay` при подтверждённой свежести; `expected-zero` — только если контракт источника явно декларирует «может быть законно пустым» и детекция это подтвердила |
-| `red` | верифицированный провал прогона | `failed`, `blocked`, `missing-summary`, `invalid-summary`, `unexpected-zero`, `normalization-zero`, `ingestion-zero`, `rate-limited` у required/unknown |
+| `green` | данные верифицированно дошли до пайплайна, причём B2-гейт свежести пройден: датируемая upstream identity (content_hash + `upstream_updated_at` в горизонте `[D−(7d+1d), D]`) и принятый delta verdict | `ingested`, `ingested-with-duplicates`; `idempotent-replay` при подтверждённой свежести; `expected-zero` — только если контракт источника явно декларирует «может быть законно пустым» и детекция это подтвердила. `success` без свежей dated identity или без delta verdict — НЕ green (B2 v4) |
+| `red` | верифицированный провал прогона | `failed`, `blocked`, `missing-summary`, `invalid-summary`, `unexpected-zero`, `normalization-zero`, `ingestion-zero`, `rate-limited` у required/unknown; `green-without-fresh-upstream-identity` (B2 v4) |
 | `unknown` | вердикт установить нельзя | отсутствующая строка наблюдения за плановый запуск, `deferred` за пределами оверлап-бюджета, `credential-gated`, malformed/несовместимый payload, ответ без ожидаемых полей |
 
 Обязательные атрибуты каждого прогона в evidence: `outcome`, `records_fetched`,
@@ -322,9 +344,13 @@ MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2
   `predecessor_snapshot_hash` + producer-поля (§17.4): хеш цепочка и identity деплоя
   дают более сильную гарантию, чем один агрегатный хеш конфигурации.
 
-Снапшоты генерируются кодом приложения (не руками): коллектор после суточного цикла
-читает `source_run_observations` за прошлый UTC-день, вычисляет статусы §5, применяет
-границы §7, пишет файл и (при подключённой БД) строку-дубль в append-only таблицу.
+Снапшоты генерируются отдельным инструментальным pipeline-кодом (не руками), но текущий
+workflow `source-refresh-clock.yml` сам захватывает и загружает только один run-artifact;
+он НЕ вызывает collector/builder/checker и НЕ публикует дневной snapshot. После накопления
+полного набора запусков операторский/следующий pipeline обязан вызвать collector, затем
+`build-coverage-snapshot.mjs`, затем `check-coverage-window.mjs`; без этого live window не
+считается закрытым. Коллектор читает скачанные CI-логи (не `source_run_observations` напрямую),
+builder вычисляет статусы §5 и границы §7, checker механически закрывает окно.
 
 ## 9. Правила 7-дневного окна
 
@@ -520,6 +546,11 @@ verdict: live | stale | blocked      # stale/blocked требует причин
    полностью: параметр `COVERAGE_ALLOW_PREVIOUS_DAY` удалён из контракта builder'а.
    Зелёность дня D определяется исключительно строками с tick-атрибуцией дня D и
    последующим закрытием §16.
+4. **B1 v4**: attest «не просрочен» действителен ТОЛЬКО при `next_eligible_run_at`,
+   который парсится как дата и строго позже `started_at` самого deferred-прогона
+   (контроль per-row, а не по произвольному последнему запуску дня). Прошедший,
+   self-attestation «должен был запуститься, но не запустился» = `overdue_deferred`
+   (review-сценарий A §18), никогда не an excuse.
 
 ### 17.2 Часовой tick ledger: expected-vs-observed (B3)
 
@@ -535,8 +566,11 @@ verdict: live | stale | blocked      # stale/blocked требует причин
    job завершается warning'ом и НЕ считается success evidence'ом; всё остальное
    (207 с required failure, 207 сверх бюджета §7, 5xx, timeout, malformed, missing
    details) — non-zero exit + RED evidence ряда.
-4. Нет delta между ожидаемыми 24 tick'ами суток и наблюдаемыми launch'ами = дефект дня,
-   а не молчаливая норма; missing tick неотличим от инцидента по построению ledger'а.
+4. Ledger обязан содержать ровно 24 ожидаемых UTC-слота (`expected_slots_per_day=24`) и
+   `observed_slot_count`; missing, duplicate или unresolved slot добавляет RED_DAY и
+   блокирует публикацию окна. «Нет delta между ожидаемыми 24 tick'ами и наблюдаемыми
+   launch'ами» — дефект дня, а не молчаливая норма; missing tick неотличим от инцидента
+   по построению ledger'а.
 
 ### 17.3 Zero-success подлежит identity/delta контракту (B2)
 
@@ -549,10 +583,15 @@ verdict: live | stale | blocked      # stale/blocked требует причин
    - доступен upstream identity (`content_hash`/versionId/upstreamUpdatedAt);
    - delta verdict против published snapshot вчера ∈ {upstream-changed, unchanged,
      baseline-established}.
-2. Произвольный `diagnostics.zeroReason` или пустая identity ⇒ `red` c
+2. **B2 v4 распространяет gate на обычный `green`**: любой green (включая
+   `ingested` и `ingested-with-duplicates`) обязан нести machine-readable
+   `upstream_identity.fresh=true` с непустым `content_hash_sha256`, валидным
+   `upstream_updated_at` и `delta_verdict.verdict` из того же allowlist. Green без
+   датированной свежей identity или delta verdict понижается в `red`.
+3. Произвольный `diagnostics.zeroReason` или пустая identity ⇒ `red` c
    `error_code=zero-reason-not-in-policy | zero-without-upstream-identity`. Регрессия на
    adversarial harness PR #240 («шести источникам произвольный expected-zero») покрывает это.
-3. L2-предикат fresh-identity см. SQL в §3 (`declared_zero_7d` требует сравнения content_hash
+4. L2-предикат fresh-identity см. SQL в §3 (`declared_zero_7d` требует сравнения content_hash
    соседних наблюдений); сверка полей БД — задача миграции identity-колонок, до её
    применения declared-zero не апгрейдится до LINEAGE_OK автоматически.
 
@@ -564,9 +603,13 @@ verdict: live | stale | blocked      # stale/blocked требует причин
 2. Late run обрабатывается как собственный tick своего часа (не ретроактивный исход чужого
    дня); закрывающие runs следующего дня участвуют только в close_condition дня D,
    но не в его day-level статусах.
-3. После истечения последних tick'ов дня день закрывается watermark'ом: снапшот
-   публикуется только когда у каждого слота есть subsequent non-deferred attempt позже
-   `D 23:00Z` (§16); иначе `<day>.pending.json` (PENDING_CLOSE), не учитываемый окном.
+3. После истечения последних tick'ов дня день закрывается watermark'ом: первый expected
+   subsequent tick slot — `D+1 00:15Z`; допустимое окно close-witness — `[D 23:15Z,
+   D+1 02:00Z]`. Каждый source обязан иметь non-deferred run с `tick_result=ok` внутри
+   этого окна; иначе `<day>.pending.json` (PENDING_CLOSE), не учитываемый окном.
+4. После `D+1 02:00Z` окно immutable: поздний run записывается как собственный поздний
+   tick, но не может ретроактивно закрыть D; снапшот получает `backfill_rejected`, а гейт
+   остаётся RED/NOT_READY (review-сценарий C §18).
 
 ### 17.5 Producer identity, хеш-цепочка и анти-tamper (B5)
 
@@ -578,6 +621,11 @@ verdict: live | stale | blocked      # stale/blocked требует причин
    окне, соответствие repo_sha деплою и sha конфигурации manifest'у. Любой разрыв =
    NOT_READY fail-closed; fabricated unsigned окно (регрессия attacker-модели PR #240)
    отвергается механически.
+   Проверка выполняется в направлении `oldest → newest`: для каждого следующего дня
+   `predecessor_snapshot_hash` обязан равняться hash предыдущего опубликованного дня;
+   reverse-order сверка запрещена. Builder также требует `run_id == filename stem`,
+   repository summary == repository из `workflow_run_url` и один `git_sha` на весь
+   собираемый день.
 3. Ручные правки published snapshot эквивалентны tamper: recompute ломается и гейт
    падает; легальный путь исправления — superseded-file механика §10.1.
 4. Артефакты workflow содержат тело upstream-ответа только в пределах минимальности:
