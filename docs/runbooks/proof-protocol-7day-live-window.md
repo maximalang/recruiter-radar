@@ -286,9 +286,18 @@ MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2
   "producer": {
     "repo_sha": "<ПОЛНЫЙ 40-hex git SHA запускающего деплоя>",
     "workflow_run_url": "https://github.com/<org>/<repo>/actions/runs/<run_id>",
+    "workflow_name": "Source Refresh Clock",
+    "repository": "<org>/<repo>",
     "policy_sha256": "<sha256(packages/db/source-policy.json)>",
-    "schedules_sha256": "<sha256(apps/web/lib/sources/source-schedules.ts)>"
+    "schedules_sha256": "<sha256(apps/web/lib/sources/source-schedules.ts)>",
+    "config_manifest_sha256": "<sha256 канонического config.json>"
   },
+  "trusted_provenance": {
+    "authority": "downloaded-github-actions-artifact",
+    "status": "verified",
+    "attestation_kind": "collector-log-artifact-digest"
+  },
+  "run_attestations": [{"run_id": "<id>", "run_attempt": 1, "artifact_digest": "<64hex>", "summary_sha256": "<64hex>"}],
   "window_days": 7,
   "runs": [
     {
@@ -301,7 +310,8 @@ MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2
       "duplicate_records": 2,
       "error_code": null,
       "upstream_identity": {"content_hash": "<16..64hex>", "version_id": null, "upstream_updated_at": null},
-      "close_condition": {"awaited_launch_after": "...", "satisfied_by_run_id": "...", "satisfied_at": "..."}
+      "source_observation": {"source_id": "egrul-fns", "run_id": "<id>", "artifact_digest": "<64hex>", "summary_sha256": "<64hex>"},
+      "close_condition": {"awaited_launch_after": "...", "satisfied_by_run_id": "...", "satisfied_at": "...", "witness_source_id": "egrul-fns", "witness_response_body_sha256": "<64hex>", "witness_artifact_digest": "<64hex>"}
     }
   ],
   "degradation_events": [
@@ -330,6 +340,20 @@ MAX_CONSECUTIVE_DEGRADED_DAYS_PER_SOURCE = 2
 - `runs[]` обязан содержать все шесть источников; отсутствие элемента — дефект сборки
   снапшота, а не просто «нет данных»: такой снапшот не публикуется, день считается
   покрытым только полноценным файлом.
+- `trusted_provenance` и `run_attestations` обязательны для READY. `artifact_digest` вычисляется
+  collector-ом по фактически скачанному GitHub Actions log-artifact (relative path + bytes +
+  SHA-256 содержимого), а `source_observation` обязан ссылаться на соответствующий run и его
+  `summary_sha256`. Самодекларированные `repository`/run URL/summary без этого digest не имеют
+  authority и fail-closed.
+- `close_condition` обязан быть source-bound: `witness_source_id` совпадает с `source_id`,
+  а witnessing summary содержит этот источник с non-deferred outcome, raw response digest и
+  artifact digest. Source-less closer не закрывает ни один источник.
+- Каждая deferral-attestation scoped к своему tick slot: `due=false` с будущим
+  `next_eligible_run_at` не маскирует последующий overdue/deferred slot того же источника.
+- В пределах 7-day window комбинация `(source_id, content_hash, version_id, upstream_updated_at)`
+  не может повторяться между днями. Повтор identity или identity старше одних суток — stale
+  liveness и делает окно `NOT_READY`; `unchanged` означает новую source-bound observation,
+  а не копирование старого payload.
 - `observation_row_ids` выведен из употребления: реальная связь с БД идёт через
   `upstream_identity` + `close_condition.satisfied_by_run_id` (§17.3); поле оставлено
   пустым массивом только для совместимости схемы v2 и не проверяется гейтом.
@@ -551,12 +575,15 @@ verdict: live | stale | blocked      # stale/blocked требует причин
    (контроль per-row, а не по произвольному последнему запуску дня). Прошедший,
    self-attestation «должен был запуститься, но не запустился» = `overdue_deferred`
    (review-сценарий A §18), никогда не an excuse.
+5. Attestation scoped к конкретному tick slot: ранний `due=false` не маскирует
+   более поздний overdue/deferred slot того же source; source-less close witness
+   не может закрыть такой слот.
 
 ### 17.2 Часовой tick ledger: expected-vs-observed (B3)
 
 1. Workflow `source-refresh-clock.yml` печатает строку `source-refresh-provenance:`
-   (`repository`, `run_id`, `run_number`, `attempt`, `scheduled_at`, `git_sha`,
-   `http_status`, `body_sha256`) и загружает артефакт `proof-evidence/` с телом ответа;
+   (`repository`, `run_id`, `run_number`, `attempt`, `event_name=schedule`, `scheduled_at`,
+   `git_sha`, `http_status`, `body_sha256`) и загружает артефакт `proof-evidence/` с телом ответа;
    collector `scripts/collect-refresh-logs.mjs` строит по каждому запуску summary
    `<run_id>.json` со `schema_version: 2`.
 2. Каждый сканированный запуск даёт файл: успех, 422 no-op, malformed/missing-payload —
@@ -626,9 +653,17 @@ verdict: live | stale | blocked      # stale/blocked требует причин
    reverse-order сверка запрещена. Builder также требует `run_id == filename stem`,
    repository summary == repository из `workflow_run_url` и один `git_sha` на весь
    собираемый день.
-3. Ручные правки published snapshot эквивалентны tamper: recompute ломается и гейт
+   Кроме того, READY требует `trusted_provenance.authority=
+   downloaded-github-actions-artifact`: collector вычисляет `artifact_digest` по exact
+   скачанному log-artifact, а `source_observation` и `run_attestations` связывают source
+   row с `run_id`/attempt, scheduled event, raw response hash и этим digest. Self-signed
+   summaries без durable artifact authority отвергаются.
+3. В пределах окна комбинация `(source_id, content_hash, version_id, upstream_updated_at)`
+   не повторяется между днями; повтор identity или identity старше суток — stale liveness,
+   а не допустимый `unchanged` delta.
+4. Ручные правки published snapshot эквивалентны tamper: recompute ломается и гейт
    падает; легальный путь исправления — superseded-file механика §10.1.
-4. Артефакты workflow содержат тело upstream-ответа только в пределах минимальности:
+5. Артефакты workflow содержат тело upstream-ответа только в пределах минимальности:
    ошибки/счётчики/source ids/критичность; тела provider payload'ов, персональные
    контакты, креды в evidence запрещены (§12.5).
 

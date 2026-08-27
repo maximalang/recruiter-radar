@@ -579,3 +579,76 @@ test('E: mixed deploy SHA in one collected day is rejected before snapshot publi
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /provenance git_sha/);
 });
+
+// F — a one-minute deferral attestation cannot cover later overdue slots, and a source-less
+// close witness cannot close the required source.
+test('F: transient deferral and source-less closer remain fail-closed', () => {
+  const dir = tmpDir('adv-f-transient-deferral');
+  const runsDir = path.join(dir, 'runs');
+  fs.mkdirSync(runsDir);
+  for (let hour = 0; hour < 24; hour += 1) {
+    const rows = dayRows();
+    rows['egrul-fns'] = greenRow({
+      outcome: 'deferred',
+      success: false,
+      records_fetched: null,
+      records_accepted: 0,
+      status: 'deferred',
+      scheduler:
+        hour === 0
+          ? { due: false, next_eligible_run_at: '2026-08-20T00:46:00Z' }
+          : { due: true },
+      upstream: null,
+    });
+    const summary = makeRunSummary({
+      runId: String(25000000000 + hour),
+      startedAt: `2026-08-20T${String(hour).padStart(2, '0')}:45:00Z`,
+      sources: rows,
+    });
+    fs.writeFileSync(path.join(runsDir, `${summary.run_id}.json`), JSON.stringify(summary));
+  }
+  const sourceLessCloser = makeRunSummary({
+    runId: '25000000024',
+    startedAt: '2026-08-21T00:45:00Z',
+    sources: {},
+  });
+  fs.writeFileSync(
+    path.join(runsDir, `${sourceLessCloser.run_id}.json`),
+    JSON.stringify(sourceLessCloser),
+  );
+
+  assert.equal(buildSnapshot({ day: '2026-08-20', runsDir, outDir: dir }).status, 0);
+  const snap = readDayArtifact(dir, '2026-08-20');
+  const egrul = snap.runs.find((entry) => entry.source_id === 'egrul-fns');
+  assert.equal(egrul.status, 'overdue_deferred');
+  assert.equal(egrul.close_condition.satisfied_by_run_id, null);
+  assert.equal(snap.day_status, 'RED_DAY');
+});
+
+// G — self-signed summaries with one reused upstream identity are not a live seven-day window.
+test('G: forged seven-day summaries are rejected by trust and identity-lineage gates', () => {
+  const dir = tmpDir('adv-g-forged-window');
+  const first = '2026-08-20';
+  const plusDay = (day, delta) => {
+    const date = new Date(`${day}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + delta);
+    return date.toISOString().slice(0, 10);
+  };
+  for (let offset = 0; offset < 7; offset += 1) {
+    const day = plusDay(first, offset);
+    const runsDir = path.join(dir, `runs-${day}`);
+    fs.mkdirSync(runsDir);
+    writeHourlyRuns(runsDir, { day, green: { upstream: { content_hash: 'c'.repeat(64), version_id: 'same-v1', upstream_updated_at: '2026-08-19T10:00:00Z' } } });
+    assert.equal(buildSnapshot({ day, runsDir, outDir: dir }).status, 0);
+  }
+  const checked = runScript(CHECKER, {
+    CONFIG_MANIFEST: CONFIG,
+    COVERAGE_SNAPSHOT_DIR: dir,
+    COVERAGE_REF_DAY_UTC: '2026-08-26',
+    EXPECTED_REPO_SHA: FULL_SHA,
+  });
+  assert.notEqual(checked.status, 0);
+  assert.match(checked.stdout, /VERDICT: NOT_READY/);
+  assert.match(checked.stdout, /trusted provenance/);
+  assert.match(checked.stdout, /upstream identity reused/);
+});

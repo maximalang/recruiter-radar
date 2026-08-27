@@ -28,6 +28,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { createHash } from 'node:crypto';
+import { sha256Canonical } from './lib/coverage-integrity.mjs';
 
 const logsDir = process.env.SOURCE_REFRESH_LOGS_DIR ?? '';
 const runsDir = process.env.REFRESH_RUNS_DIR ?? '';
@@ -125,6 +127,23 @@ function walkLogFiles(dir) {
   return out.sort();
 }
 
+/**
+ * Bind a collected summary to the exact downloaded GitHub artifact contents. The digest is
+ * computed from relative paths, byte lengths, and SHA-256s, so a hand-made summary cannot
+ * claim collector provenance without the durable log artifact itself (B5).
+ */
+function logArtifactDigest(runDir, txtFiles) {
+  const files = txtFiles.map((filePath) => {
+    const bytes = fs.readFileSync(filePath);
+    return {
+      path: path.relative(runDir, filePath).replaceAll(path.sep, '/'),
+      bytes: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    };
+  });
+  return sha256Canonical(files);
+}
+
 const seenBodyHashes = new Set();
 const runDirs = fs.readdirSync(logsDir).filter((d) => fs.statSync(path.join(logsDir, d)).isDirectory());
 let processed = 0;
@@ -133,6 +152,7 @@ for (const runId of runDirs) {
   const outPath = path.join(runsDir, `${runId}.json`);
   if (fs.existsSync(outPath)) continue; // idempotent re-run of collector
   const txtFiles = walkLogFiles(path.join(logsDir, runId));
+  const artifactDigest = logArtifactDigest(path.join(logsDir, runId), txtFiles);
   const provAccumulator = {};
   let found = null;
   let malformedMessage = null;
@@ -274,6 +294,7 @@ for (const runId of runDirs) {
         run_number: intOrNull(prov.run_number),
         run_attempt: intOrNull(prov.run_attempt),
         scheduled_at_tick: prov.scheduled_at ?? null,
+        event_name: prov.event_name ?? null,
         git_sha: prov.git_sha ?? null,
         http_status: httpStatus,
         response_body_sha256: prov.body_sha256 ?? null,
@@ -281,7 +302,11 @@ for (const runId of runDirs) {
         tick_result: tickResult,
         sources,
         ...(schemaErrors.length > 0 ? { schema_errors: schemaErrors } : {}),
-        _meta: { derived_from_log_dir: runId, processed_at: new Date().toISOString() },
+        _meta: {
+          derived_from_log_dir: runId,
+          log_artifact_digest: artifactDigest,
+          processed_at: new Date().toISOString(),
+        },
       },
       null,
       2,

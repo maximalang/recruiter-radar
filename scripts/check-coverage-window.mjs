@@ -34,7 +34,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { recomputeSnapshotHash } from './lib/coverage-integrity.mjs';
+import { recomputeSnapshotHash, sha256Canonical } from './lib/coverage-integrity.mjs';
 
 const manifestPath = process.env.CONFIG_MANIFEST ?? 'docs/evidence/source-refresh-coverage/config.json';
 const refDay = process.env.COVERAGE_REF_DAY_UTC ?? new Date().toISOString().slice(0, 10);
@@ -110,6 +110,78 @@ function evalDay(dayStr) {
     ) {
       reasons.push(`${dayStr}: snapshot schedules_sha256 differs from config manifest`);
     }
+    if (
+      typeof snap.producer.config_manifest_sha256 !== 'string' ||
+      snap.producer.config_manifest_sha256 !== sha256Canonical(manifest)
+    ) {
+      reasons.push(`${dayStr}: producer.config_manifest_sha256 does not bind this snapshot to the immutable config manifest`);
+    }
+    const urlRepo = snap.producer.workflow_run_url.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/actions\/runs\//)?.[1];
+    if (snap.producer.repository !== urlRepo) {
+      reasons.push(`${dayStr}: producer.repository does not match workflow_run_url repository`);
+    }
+    if (snap.producer.workflow_name !== 'Source Refresh Clock') {
+      reasons.push(`${dayStr}: producer.workflow_name is not Source Refresh Clock`);
+    }
+  }
+  const runs = Array.isArray(snap.runs) ? snap.runs : [];
+  // A summary can describe a GitHub run, but it cannot be its own authority. The collector's
+  // artifact digest is the durable boundary: without it a hand-made summary/window is never
+  // eligible for READY, even when its producer fields and self-hash look correct.
+  if (snap.trusted_provenance?.authority !== 'downloaded-github-actions-artifact') {
+    reasons.push(`${dayStr}: trusted provenance authority missing (self-declared summaries rejected)`);
+  }
+  if (snap.trusted_provenance?.status !== 'verified') {
+    reasons.push(`${dayStr}: trusted provenance is not verified by a collected artifact digest`);
+  }
+  if (snap.trusted_provenance?.attestation_kind !== 'collector-log-artifact-digest') {
+    reasons.push(`${dayStr}: unsupported trusted provenance attestation kind`);
+  }
+  const runAttestations = Array.isArray(snap.run_attestations) ? snap.run_attestations : [];
+  const attestationsById = new Map(runAttestations.map((a) => [a.run_id, a]));
+  if (runAttestations.length === 0) reasons.push(`${dayStr}: run_attestations missing`);
+  for (const r of runs) {
+    const isGreenish = r.status === 'green' || r.status === 'green_noop';
+    const obs = r.source_observation;
+    if (!isGreenish && !obs) continue;
+    if (!obs || obs.source_id !== r.source_id) {
+      reasons.push(`${dayStr}: ${r.source_id}: source-bound observation missing`);
+      continue;
+    }
+    if (!/^[0-9a-f]{64}$/i.test(obs.artifact_digest ?? '')) {
+      reasons.push(`${dayStr}: ${r.source_id}: source observation lacks durable artifact digest`);
+    }
+    if (!/^[0-9a-f]{64}$/i.test(obs.summary_sha256 ?? '')) {
+      reasons.push(`${dayStr}: ${r.source_id}: source observation lacks summary digest`);
+    }
+    if (obs.event_name !== 'schedule' || typeof obs.scheduled_at_tick !== 'string' || !obs.scheduled_at_tick) {
+      reasons.push(`${dayStr}: ${r.source_id}: observation is not bound to a scheduled GitHub event`);
+    }
+    if (obs.repository !== snap.producer?.repository || obs.workflow_name !== snap.producer?.workflow_name) {
+      reasons.push(`${dayStr}: ${r.source_id}: observation producer identity differs from snapshot producer`);
+    }
+    const attestation = attestationsById.get(obs.run_id);
+    if (!attestation) {
+      reasons.push(`${dayStr}: ${r.source_id}: observation run ${obs.run_id} has no attestation`);
+      continue;
+    }
+    for (const field of [
+      'run_number',
+      'run_attempt',
+      'repository',
+      'workflow_name',
+      'event_name',
+      'scheduled_at_tick',
+      'git_sha',
+      'run_started_at',
+      'response_body_sha256',
+      'artifact_digest',
+      'summary_sha256',
+    ]) {
+      if (obs[field] !== attestation[field]) {
+        reasons.push(`${dayStr}: ${r.source_id}: observation/attestation ${field} mismatch`);
+      }
+    }
   }
   if (typeof snap.snapshot_hash !== 'string' || !/^[0-9a-f]{64}$/.test(snap.snapshot_hash)) {
     reasons.push(`${dayStr}: snapshot_hash missing/not 64-hex`);
@@ -121,7 +193,6 @@ function evalDay(dayStr) {
   }
 
   // ---- day status / bounds / close-out -----------------------------------
-  const runs = Array.isArray(snap.runs) ? snap.runs : [];
   if (snap.day_status !== 'GREEN_DAY') {
     reasons.push(
       `${dayStr}: day_status=${snap.day_status} — ${(snap.red_day_reasons ?? []).join('; ')}`,
@@ -204,6 +275,15 @@ function evalDay(dayStr) {
     }
     if (cc.backfill_rejected) {
       reasons.push(`${dayStr}: ${r.source_id}: late backfill rejected — ${String(cc.backfill_rejected)}`);
+    }
+    if (cc.witness_source_id !== r.source_id) {
+      reasons.push(`${dayStr}: ${r.source_id}: close witness is not source-bound`);
+    }
+    if (!/^[0-9a-f]{64}$/i.test(cc.witness_response_body_sha256 ?? '')) {
+      reasons.push(`${dayStr}: ${r.source_id}: close witness lacks raw response digest`);
+    }
+    if (!/^[0-9a-f]{64}$/i.test(cc.witness_artifact_digest ?? '')) {
+      reasons.push(`${dayStr}: ${r.source_id}: close witness lacks artifact digest`);
     }
   }
   const degradedOptional = (snap.degradation_events ?? []).length;
@@ -291,8 +371,45 @@ for (const src of targetSources) {
   if (!latest) recencyGaps.push(`${src}: no records_accepted>0 anywhere in window`);
 }
 
+// A seven-day window needs seven independently observed upstream states. Replaying one dated
+// identity is not a valid "unchanged" delta: it proves only that the same old payload was copied
+// forward (B2/B5, forged-window case G).
+const lineageIssues = [];
+const identityOwners = new Map();
+for (const { day, snap } of dayResults.filter((result) => result.snap)) {
+  const dayStartMs = Date.parse(`${day}T00:00:00Z`);
+  for (const entry of snap.runs ?? []) {
+    if (!['green', 'green_noop'].includes(entry.status)) continue;
+    const idt = entry.upstream_identity ?? {};
+    const hasIdentity = [idt.content_hash, idt.version_id, idt.upstream_updated_at].some(
+      (value) => value != null && String(value).length > 0,
+    );
+    if (!hasIdentity) continue;
+    const identityKey = [
+      entry.source_id,
+      idt.content_hash ?? '',
+      idt.version_id ?? '',
+      idt.upstream_updated_at ?? '',
+    ].join('|');
+    const owner = identityOwners.get(identityKey);
+    if (owner) {
+      lineageIssues.push(
+        `${day}: ${entry.source_id}: upstream identity reused from ${owner} (not an independent daily observation)`,
+      );
+    } else {
+      identityOwners.set(identityKey, day);
+    }
+    const updatedMs = Date.parse(idt.upstream_updated_at ?? '');
+    if (!Number.isNaN(updatedMs) && updatedMs < dayStartMs - 24 * HOUR_MS) {
+      lineageIssues.push(
+        `${day}: ${entry.source_id}: upstream identity is stale (${idt.upstream_updated_at})`,
+      );
+    }
+  }
+}
+
 const daysOk = dayResults.every((d) => d.ok);
-const ready = daysOk && chainIssues.length === 0 && recencyGaps.length === 0;
+const ready = daysOk && chainIssues.length === 0 && recencyGaps.length === 0 && lineageIssues.length === 0;
 
 console.log('=== SOURCE REFRESH COVERAGE WINDOW GATE v2 (protocol §9.5) ===');
 console.log(`reference_day=${refDay} window=${days[0]}..${days[days.length - 1]} (${WINDOW_DAYS} days)`);
@@ -307,9 +424,14 @@ if (recencyGaps.length > 0) {
   console.log('acceptance-recency gaps:');
   recencyGaps.forEach((g) => console.log(`  - ${g}`));
 }
+if (lineageIssues.length > 0) {
+  console.log('observation-lineage issues:');
+  lineageIssues.forEach((g) => console.log(`  - ${g}`));
+}
 console.log(
   `VERDICT: ${ready ? 'READY' : 'NOT_READY'} ` +
     `(green_days=${dayResults.filter((d) => d.ok).length}/${WINDOW_DAYS}, ` +
-    `chain_issues=${chainIssues.length}, recency_gaps=${recencyGaps.length})`,
+    `chain_issues=${chainIssues.length}, recency_gaps=${recencyGaps.length}, ` +
+    `lineage_issues=${lineageIssues.length})`,
 );
 process.exit(ready ? 0 : 1);

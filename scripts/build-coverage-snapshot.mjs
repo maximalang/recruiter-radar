@@ -105,6 +105,33 @@ for (const file of runFiles) {
 }
 collectedRuns.sort((a, b) => Date.parse(a.run_started_at) - Date.parse(b.run_started_at));
 
+/**
+ * Hash the exact collected summary (excluding only builder-local tick attribution). This is
+ * carried into each source observation so a snapshot cannot silently swap a source row from a
+ * different summary after collection (B5).
+ */
+function runSummaryDigest(run) {
+  const { _tickMs, _tickIso, ...durable } = run;
+  return sha256Canonical(durable);
+}
+
+function runAttestation(run) {
+  return {
+    run_id: run.run_id,
+    run_number: run.run_number,
+    run_attempt: run.run_attempt,
+    repository: run.repository,
+    workflow_name: run.workflow_name,
+    event_name: run.event_name ?? null,
+    scheduled_at_tick: run.scheduled_at_tick ?? null,
+    git_sha: run.git_sha,
+    run_started_at: run.run_started_at,
+    response_body_sha256: run.response_body_sha256,
+    artifact_digest: run._meta?.log_artifact_digest ?? null,
+    summary_sha256: runSummaryDigest(run),
+  };
+}
+
 function validateRunSummaryV2(parsed) {
   const problems = [];
   if (!parsed || typeof parsed !== 'object') problems.push('not an object');
@@ -228,6 +255,27 @@ function normalizeIdentity(identity) {
   };
 }
 
+function sourceObservation(sourceId, run) {
+  if (!run) return null;
+  const attestation = runAttestation(run);
+  return {
+    source_id: sourceId,
+    run_id: attestation.run_id,
+    run_number: attestation.run_number,
+    run_attempt: attestation.run_attempt,
+    repository: attestation.repository,
+    workflow_name: attestation.workflow_name,
+    event_name: attestation.event_name,
+    scheduled_at_tick: attestation.scheduled_at_tick,
+    git_sha: attestation.git_sha,
+    run_started_at: attestation.run_started_at,
+    response_body_sha256: attestation.response_body_sha256,
+    artifact_digest: attestation.artifact_digest,
+    summary_sha256: attestation.summary_sha256,
+    tick_slot: run._tickIso,
+  };
+}
+
 /** Delta verdict vs previous day's published snapshot (§B2 fresh/delta contract). */
 function deltaVerdict(sourceId, effectiveRow) {
   const prevPath = path.join(outDir, `${utcOffsetDays(rawDay, -1)}.json`);
@@ -316,14 +364,20 @@ function evaluateSource(sourceId) {
       if (Number.isNaN(nextMs)) return false;
       return nextMs > Date.parse(run.run_started_at);
     });
+    // A future attestation is scoped to its own scheduled slot. It cannot excuse a later
+    // overdue/deferred slot for the same source (the v4 false-GREEN case F).
+    const invalidDeferredRows = deferredRows.filter(
+      ({ row, run }) => !deferredWithAttestation.some((candidate) => candidate.run.run_id === run.run_id),
+    );
     const futureAttestation = deferredWithAttestation.at(-1);
-    if (futureAttestation) {
+    if (deferredRows.length > 0 && invalidDeferredRows.length === 0 && futureAttestation) {
       status = 'not_due';
-      detail = `${deferredRows.length} row(s) deferred; scheduler attested due=false with future next_eligible_run_at`;
+      detail = `${deferredRows.length} row(s) deferred; every observed slot attested due=false with future next_eligible_run_at`;
       notes.push(`next_eligible_run_at=${futureAttestation.row.scheduler.next_eligible_run_at}`);
     } else if (deferredRows.length > 0) {
       status = 'overdue_deferred';
-      detail = `${deferredRows.length} deferred row(s); scheduler did not attest future eligibility`;
+      detail = `${deferredRows.length} deferred row(s); at least one observed slot lacked future eligibility attestation`;
+      if (futureAttestation) notes.push('early deferral attestation cannot mask a later overdue slot');
     } else {
       status = 'unknown-missing-launch';
       detail = `no rows for source during ${rawDay} (explicit missing launch)`;
@@ -360,6 +414,7 @@ function evaluateSource(sourceId) {
     error_code: effectiveRow?.error_code ?? null,
     observation_row_ids: [], // deprecated field kept for schema compat; identity now upstream_identity
     upstream_row: effectiveRow ? effectiveRow.upstream ?? null : null,
+    source_observation: sourceObservation(sourceId, effectiveRun),
     close_condition: closeConditionFor(sourceId),
     detail,
     ...(notes.length > 0 ? { notes } : {}),
@@ -386,7 +441,12 @@ const closeConditionFor = (sourceId) => {
       return (
         startMs > CLOSE_PROBE_AFTER_MS &&
         startMs <= CLOSE_WINDOW_END_MS &&
-        (lr.tick_result ?? '') === 'ok'
+        (lr.tick_result ?? '') === 'ok' &&
+        // §16 is source-bound: a source-less later run cannot close every slot. The
+        // witnessing summary must contain this source and a non-deferred outcome.
+        lr.sources?.[sourceId] &&
+        lr.sources[sourceId].outcome !== 'deferred' &&
+        lr.sources[sourceId].status !== 'deferred'
       );
     });
   const lateRun = [...laterRuns]
@@ -411,6 +471,9 @@ const closeConditionFor = (sourceId) => {
     satisfied_at: eligible.run_started_at,
     awaited_launch_after: new Date(CLOSE_PROBE_AFTER_MS).toISOString(),
     closed_by_tick_slot: eligible._tickIso,
+    witness_source_id: sourceId,
+    witness_response_body_sha256: eligible.response_body_sha256 ?? null,
+    witness_artifact_digest: eligible._meta?.log_artifact_digest ?? null,
   };
 };
 
@@ -546,9 +609,22 @@ const coreSnapshot = {
     kind: 'github-actions',
     repo_sha: repoSha,
     workflow_run_url: workflowRunUrl,
+    workflow_name: 'Source Refresh Clock',
+    repository: workflowRepo,
     policy_sha256: manifest.policy_sha256,
     schedules_sha256: manifest.schedules_sha256,
+    config_manifest_sha256: sha256Canonical(manifest),
   },
+  // The builder records, but never upgrades, collector provenance. The checker only accepts a
+  // published window when every source observation has a durable artifact digest.
+  trusted_provenance: {
+    authority: 'downloaded-github-actions-artifact',
+    status: collectedRuns.every((run) => /^[0-9a-f]{64}$/i.test(run._meta?.log_artifact_digest ?? ''))
+      ? 'verified'
+      : 'unverified',
+    attestation_kind: 'collector-log-artifact-digest',
+  },
+  run_attestations: collectedRuns.map(runAttestation),
   window_days: manifest.window_days ?? 7,
   tick_partitioning: {
     rule: 'floor-to-hour tick slot; run belongs solely to the tick day it was launched in',

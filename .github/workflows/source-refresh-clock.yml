@@ -49,6 +49,7 @@ jobs:
             -e RR_PROV_RUN_ID='${{ github.run_id }}' \
             -e RR_PROV_RUN_NUMBER='${{ github.run_number }}' \
             -e RR_PROV_RUN_ATTEMPT='${{ github.run_attempt }}' \
+            -e RR_PROV_EVENT_NAME='${{ github.event_name }}' \
             -e RR_PROV_SCHEDULED_AT_TICK='${{ github.event.schedule || 'manual' }}' \
             -e RR_PROV_GIT_SHA='${{ github.sha }}' \
             web node --input-type=module - <<'NODE'
@@ -60,11 +61,14 @@ jobs:
           const provRunId = process.env.RR_PROV_RUN_ID ?? ''
           const provRunNumber = process.env.RR_PROV_RUN_NUMBER ?? ''
           const provAttempt = process.env.RR_PROV_RUN_ATTEMPT ?? '1'
+          const provEventName = process.env.RR_PROV_EVENT_NAME ?? ''
           const provScheduledAt = process.env.RR_PROV_SCHEDULED_AT_TICK ?? ''
           const provGitSha = process.env.RR_PROV_GIT_SHA ?? ''
           if (!/^[0-9a-f]{40}$/.test(provGitSha)) throw new Error('provenance git_sha missing or not a full 40-hex SHA — fail closed')
           if (!/^\d+$/.test(provRunId) || !/^\d+$/.test(provRunNumber)) throw new Error('provenance run id/number missing — fail closed')
           if (!provRepository.includes('/')) throw new Error('provenance repository missing — fail closed')
+          if (provEventName !== 'schedule') throw new Error('source refresh proof requires a scheduled GitHub event — fail closed')
+          if (!provScheduledAt) throw new Error('scheduled event expression missing — fail closed')
           const key = process.env.CRON_API_KEY?.trim()
           if (!key) throw new Error('CRON_API_KEY is not configured in the web runtime.')
           const payload = '{}'
@@ -97,7 +101,7 @@ jobs:
           // B3: the exact upstream response body is durable provenance; emit it as one
           // JSON line plus a bounded summary. Never print CRON_API_KEY or provider payloads.
           const bodySha256 = createHash('sha256').update(response.rawBody).digest('hex')
-          console.log(`source-refresh-provenance: repository=${provRepository} run_id=${provRunId} run_number=${provRunNumber} attempt=${provAttempt} scheduled_at=${provScheduledAt} git_sha=${provGitSha} http_status=${response.status} body_sha256=${bodySha256}`)
+          console.log(`source-refresh-provenance: repository=${provRepository} run_id=${provRunId} run_number=${provRunNumber} attempt=${provAttempt} event_name=${provEventName} scheduled_at=${provScheduledAt} git_sha=${provGitSha} http_status=${response.status} body_sha256=${bodySha256}`)
           console.log(`source-refresh-provenance: body=${response.rawBody}`)
           let parsed = null
           try { parsed = JSON.parse(response.rawBody) } catch {}
