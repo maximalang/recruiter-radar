@@ -1,7 +1,7 @@
 # RF identity boundary hardening — isolated proof report
 
 - Task: `t_935b4dcc`
-- Implementation source commit under verification: `03b9f6f75b3a1a5ecd3f71310ccba989caff9fcf`
+- Implementation source: current worktree on `codex/rf-identity-boundary-hardening`, based on HEAD `dc8f8c45d561b09a23a050b86686bae886bf057e`.
 - Branch: `codex/rf-identity-boundary-hardening`
 - Evidence directory: `docs/source-review/artifacts/rf-identity-boundary-hardening-20260827/`
 - Scope: close the strong-identity write/read boundary blocker identified by independent review `t_a557a8e9`; preserve auditable disposable-Postgres evidence.
@@ -23,14 +23,23 @@ The historical report `rf-source-intelligence-prod-proof-20260826.md` is not reu
    - quarantines remaining legacy strong keys with their original key and structured metadata, without deleting rows;
    - keeps canonical collision winners deterministic and aborts if the quarantine batch exceeds 5,000 rows;
    - serializes reconciliation against `org_source_refs` writers.
-3. `packages/db/scripts/source-digest-evidence.sql` and `apps/web/lib/digest-evidence-query.ts`
+3. `packages/db/migrations/20260827100000_harden_rr_multitenant_domain_suffixes.sql`
+   - extends the canonical domain validator with an explicit fail-closed deny
+     policy for public-suffix and shared-hosting zones;
+   - quarantines existing failed strong keys (including residual rows skipped by
+     the earlier marker policy) without deleting rows and keeps the existing
+     write trigger active for future writes.
+4. `packages/db/scripts/source-digest-evidence.sql` and `apps/web/lib/digest-evidence-query.ts`
    - apply the same trusted-key gates defensively at the read/corroboration boundary;
    - prevent malformed or quarantined keys from merging organizations or increasing confidence.
-4. `apps/web/lib/health-readiness.ts`
-   - advances the expected latest migration to `20260826100100_quarantine_legacy_source_keys`.
-5. `packages/db/scripts/verify-source-identity-boundary-quarantine.mjs`
-   - covers malformed and checksum-invalid identity keys, platform/IP/domain tricks, mixed prefixes, canonical collisions, trusted shared-key merges, quarantine retention, and digest confidence boundaries.
-6. `packages/db/scripts/verify-career-pages-ingest.mjs`
+5. `apps/web/lib/health-readiness.ts`
+   - advances the expected latest migration to `20260827100000_harden_rr_multitenant_domain_suffixes`.
+6. `packages/db/scripts/verify-source-identity-boundary-quarantine.mjs`
+   - covers malformed and checksum-invalid identity keys, platform/IP/domain tricks,
+     public-suffix/shared-hosting domains, mixed prefixes, canonical collisions,
+     trusted shared-key merges, quarantine retention, write-trigger rejection, and
+     digest confidence boundaries.
+7. `packages/db/scripts/verify-career-pages-ingest.mjs`
    - reports the transaction-scoped disposable fixture cleanup accurately.
 
 ## Verification results
@@ -39,11 +48,12 @@ All commands below were run from the worktree root. Immutable stdout captures ar
 
 | Check | Result | Evidence |
 | --- | --- | --- |
+| Focused identity resolution contract | 2 tests passed, 0 failed, exit 0 | `organization-resolution-test.log` |
 | Focused RF runtime contract | 2 tests passed, 0 failed, exit 0 | `rf-source-runtime-final.log` |
 | Disposable source-subsystem battery | exit 0; identity lineage, quarantine, ranking, digest, corroboration, and ingest verifiers completed | `source-subsystem.log` |
-| Identity quarantine verifier | `quarantinedRows: 5`, `canonicalizedRows: 2`, invalid shared key did not merge, trusted shared key merged, platform bridge rejected, runtime guard active | `source-subsystem.log` |
-| First disposable migration run | 121 migrations applied, exit 0 | `migrations-first.log` |
-| Repeat disposable migration run | 0 applied, 121 skipped, exit 0 | `migrations-repeat.log` |
+| Identity quarantine verifier | exit 0; `quarantinedRows: 15`, `canonicalizedRows: 2`, invalid shared key did not merge, multitenant/public-suffix domains did not merge, marker spoof rows did not bypass quarantine, trusted shared key merged, platform bridge rejected, runtime guard active | `source-subsystem.log` |
+| First disposable migration run | 122 migrations applied, exit 0 | `migrations-first.log` |
+| Repeat disposable migration run | 0 applied, 122 skipped, exit 0 | `migrations-repeat.log` |
 | DB syntax validation | 305 `.mjs` files passed, exit 0 | `db-validate-final.log` |
 | Digest SQL/TypeScript mirror | mirror already in sync at 33,361 chars, exit 0 | `mirror-sync-final.log` |
 | TypeScript check | `npm run web:check`, exit 0 | `web-check-final.log` |

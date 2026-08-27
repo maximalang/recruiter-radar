@@ -1,11 +1,12 @@
-✔ identity ambiguity is exposed as a typed fail-closed rejection (4.0148ms)
-ℹ tests 1
+✔ rejects public-suffix and multitenant domains as strong identities (6.8804ms)
+✔ identity ambiguity is exposed as a typed fail-closed rejection (1.0186ms)
+ℹ tests 2
 ℹ suites 0
-ℹ pass 1
+ℹ pass 2
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 75.6377
+ℹ duration_ms 114.9763
 
 exit_code=0

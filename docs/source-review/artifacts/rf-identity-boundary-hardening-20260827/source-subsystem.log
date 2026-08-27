@@ -246,8 +246,10 @@ Applying migration: 20260826100000_add_rr_identity_validation_functions.sql
   ✓ 20260826100000_add_rr_identity_validation_functions.sql applied.
 Applying migration: 20260826100100_quarantine_legacy_source_keys.sql
   ✓ 20260826100100_quarantine_legacy_source_keys.sql applied.
+Applying migration: 20260827100000_harden_rr_multitenant_domain_suffixes.sql
+  ✓ 20260827100000_harden_rr_multitenant_domain_suffixes.sql applied.
 
-Migration summary: 121 applied, 0 skipped, 121 total.
+Migration summary: 122 applied, 0 skipped, 122 total.
 All new migrations applied successfully.
 {
   "ok": true,
@@ -262,13 +264,13 @@ All new migrations applied successfully.
     {
       "verifier": "verify-source-identity-boundary-quarantine.mjs",
       "output": [
-        "{",
         "  \"ok\": true,",
         "  \"smoke\": \"source-identity-boundary-quarantine\",",
         "  \"verified\": {",
-        "    \"quarantinedRows\": 5,",
+        "    \"quarantinedRows\": 15,",
         "    \"canonicalizedRows\": 2,",
         "    \"invalidSharedKeyDidNotMerge\": true,",
+        "    \"multitenantDomainDidNotMerge\": true,",
         "    \"trustedSharedKeyMerged\": true,",
         "    \"platformDomainBridgeRejected\": true,",
         "    \"runtimeGuardRemainsActive\": true",
@@ -294,12 +296,12 @@ All new migrations applied successfully.
         "  \"smoke\": \"digest-selection\",",
         "  \"verified\": {",
         "    \"tenantOwnerInvariant\": true,",
-        "    \"scopedBoostWinner\": \"Scoped Match digest-selection-1787781844276-c83bb7b6\",",
+        "    \"scopedBoostWinner\": \"Scoped Match digest-selection-1787817911858-cc6f9665\",",
         "    \"careerPagesSelection\": [",
-        "      \"Scoped Match digest-selection-1787781844276-c83bb7b6\"",
+        "      \"Scoped Match digest-selection-1787817911858-cc6f9665\"",
         "    ],",
         "    \"domainSelection\": [",
-        "      \"Unscoped Match digest-selection-1787781844276-c83bb7b6\"",
+        "      \"Unscoped Match digest-selection-1787817911858-cc6f9665\"",
         "    ]",
         "  }",
         "}"
