@@ -1,11 +1,7 @@
-
-> recruiter-radar@1.0.0 db:migrate
-> node packages/db/scripts/migrate.mjs
-
+=== repeat migration run ===
 Connected to database.
 schema_migrations table ready.
 
 Migration summary: 0 applied, 122 skipped, 122 total.
 Database is up to date — no pending migrations.
 
-exit_code=0

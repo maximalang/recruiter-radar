@@ -1,7 +1,3 @@
-
-> recruiter-radar@1.0.0 verify:source:subsystem-live-db
-> node packages/db/scripts/run-source-live-db-verifier.mjs source-subsystem
-
 Connected to database.
 schema_migrations table ready.
 Applying migration: 0001_init.sql
@@ -296,12 +292,12 @@ All new migrations applied successfully.
         "  \"smoke\": \"digest-selection\",",
         "  \"verified\": {",
         "    \"tenantOwnerInvariant\": true,",
-        "    \"scopedBoostWinner\": \"Scoped Match digest-selection-1787817911858-cc6f9665\",",
+        "    \"scopedBoostWinner\": \"Scoped Match digest-selection-1787818228207-e05fe48f\",",
         "    \"careerPagesSelection\": [",
-        "      \"Scoped Match digest-selection-1787817911858-cc6f9665\"",
+        "      \"Scoped Match digest-selection-1787818228207-e05fe48f\"",
         "    ],",
         "    \"domainSelection\": [",
-        "      \"Unscoped Match digest-selection-1787817911858-cc6f9665\"",
+        "      \"Unscoped Match digest-selection-1787818228207-e05fe48f\"",
         "    ]",
         "  }",
         "}"
@@ -343,5 +339,3 @@ All new migrations applied successfully.
     }
   ]
 }
-
-exit_code=0

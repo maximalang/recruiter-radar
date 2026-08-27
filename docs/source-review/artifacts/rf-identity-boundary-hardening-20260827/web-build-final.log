@@ -25,15 +25,15 @@ Generated 16 PWA icons and 5 rounded tab icons.
 ▲ Next.js 16.2.11 (Turbopack)
 
   Creating an optimized production build ...
-✓ Compiled successfully in 23.7s
+✓ Compiled successfully in 16.3s
   Running TypeScript ...
-  Finished TypeScript in 18.0s ...
+  Finished TypeScript in 10.3s ...
   Collecting page data using 17 workers ...
   Generating static pages using 17 workers (0/20) ...
   Generating static pages using 17 workers (5/20) 
   Generating static pages using 17 workers (10/20) 
   Generating static pages using 17 workers (15/20) 
-✓ Generating static pages using 17 workers (20/20) in 536ms
+✓ Generating static pages using 17 workers (20/20) in 378ms
   Finalizing page optimization ...
 
 Route (app)
@@ -147,5 +147,3 @@ Route (app)
 ○  (Static)   prerendered as static content
 ƒ  (Dynamic)  server-rendered on demand
 
-
-exit_code=0
