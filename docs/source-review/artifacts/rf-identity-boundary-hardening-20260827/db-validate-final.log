@@ -7,5 +7,3 @@
 > node scripts/validate-syntax.mjs
 
 OK: 305 .mjs files passed syntax check.
-
-exit_code=0

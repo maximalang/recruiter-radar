@@ -1,7 +1,7 @@
 # RF identity boundary hardening — isolated proof report
 
 - Task: `t_935b4dcc`
-- Implementation source: current worktree on `codex/rf-identity-boundary-hardening`, based on HEAD `dc8f8c45d561b09a23a050b86686bae886bf057e`.
+- Implementation source: current worktree on `codex/rf-identity-boundary-hardening`, exact implementation head `721dde81e199927dc95b34b8d067f1d830ba71e0` (descends from `dc8f8c45d561b09a23a050b86686bae886bf057e`).
 - Branch: `codex/rf-identity-boundary-hardening`
 - Evidence directory: `docs/source-review/artifacts/rf-identity-boundary-hardening-20260827/`
 - Scope: close the strong-identity write/read boundary blocker identified by independent review `t_a557a8e9`; preserve auditable disposable-Postgres evidence.

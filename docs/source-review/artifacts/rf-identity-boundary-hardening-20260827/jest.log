@@ -1,6 +1,6 @@
 
 > test
-> jest --runInBand
+> jest
 
 No tests found, exiting with code 1
 Run with `--passWithNoTests` to exit with code 0
@@ -16,6 +16,4 @@ npm error path C:\Users\max\Desktop\all\recruiter-radar\.worktrees\t_935b4dcc\ap
 npm error workspace @recruiter-radar/web
 npm error location C:\Users\max\Desktop\all\recruiter-radar\.worktrees\t_935b4dcc\apps\web
 npm error command failed
-npm error command C:\WINDOWS\system32\cmd.exe /d /s /c jest --runInBand
-
-exit_code=1
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c jest

@@ -1,7 +1,4 @@
-
-> recruiter-radar@1.0.0 db:migrate
-> node packages/db/scripts/migrate.mjs
-
+=== first migration run ===
 Connected to database.
 schema_migrations table ready.
 Applying migration: 0001_init.sql
@@ -251,5 +248,3 @@ Applying migration: 20260827100000_harden_rr_multitenant_domain_suffixes.sql
 
 Migration summary: 122 applied, 0 skipped, 122 total.
 All new migrations applied successfully.
-
-exit_code=0
