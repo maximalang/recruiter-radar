@@ -1,0 +1,151 @@
+
+> recruiter-radar@1.0.0 web:build
+> npm run build --workspace @recruiter-radar/web
+
+
+> prebuild
+> npm run icons:generate
+
+
+> icons:generate
+> node scripts/generate-app-icons.mjs
+
+Generated 16 PWA icons and 5 rounded tab icons.
+
+> build
+> next build
+
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\max\Desktop\all\recruiter-radar\package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * C:\Users\max\Desktop\all\recruiter-radar\.worktrees\t_935b4dcc\package-lock.json
+
+▲ Next.js 16.2.11 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 17.1s
+  Running TypeScript ...
+  Finished TypeScript in 10.0s ...
+  Collecting page data using 17 workers ...
+  Generating static pages using 17 workers (0/20) ...
+  Generating static pages using 17 workers (5/20) 
+  Generating static pages using 17 workers (10/20) 
+  Generating static pages using 17 workers (15/20) 
+✓ Generating static pages using 17 workers (20/20) in 335ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /.well-known/oauth-protected-resource
+├ ƒ /.well-known/oauth-protected-resource/api/internal/mcp
+├ ƒ /.well-known/oauth-protected-resource/api/internal/timeweb-mcp
+├ ƒ /admin
+├ ƒ /admin/payments
+├ ƒ /admin/users/[id]
+├ ƒ /api/admin/payment-refunds
+├ ƒ /api/auth/callback/superjob
+├ ƒ /api/auth/email-change/confirm
+├ ƒ /api/auth/email-change/prepare
+├ ƒ /api/auth/invite/accept
+├ ƒ /api/auth/invite/prepare
+├ ƒ /api/auth/login/verify
+├ ƒ /api/auth/passkeys/[id]
+├ ƒ /api/auth/passkeys/authentication/options
+├ ƒ /api/auth/passkeys/authentication/verify
+├ ƒ /api/auth/passkeys/registration/options
+├ ƒ /api/auth/passkeys/registration/verify
+├ ƒ /api/auth/session/refresh
+├ ƒ /api/billing/webhook
+├ ƒ /api/billing/webhook/robokassa
+├ ƒ /api/cron/daily-radar
+├ ƒ /api/cron/notification-delivery-retry
+├ ƒ /api/cron/opportunities/[job]
+├ ƒ /api/cron/opportunities/commercial-signal-enrichment
+├ ƒ /api/cron/opportunities/query-plan-yield
+├ ƒ /api/cron/source-refresh
+├ ƒ /api/dashboard/metrics
+├ ƒ /api/digest
+├ ƒ /api/digest/delivery
+├ ƒ /api/digest/feedback
+├ ƒ /api/health
+├ ƒ /api/health/payment-readiness
+├ ƒ /api/health/readiness
+├ ƒ /api/hh/digest
+├ ƒ /api/internal/mcp
+├ ƒ /api/internal/timeweb-mcp
+├ ƒ /api/landing-events
+├ ƒ /api/leads
+├ ƒ /api/leads/[id]
+├ ƒ /api/leads/[id]/export
+├ ƒ /api/leads/export
+├ ƒ /api/leads/generate
+├ ƒ /api/leads/score
+├ ƒ /api/notifications/telegram/[publicId]
+├ ƒ /api/notifications/vk/[publicId]
+├ ƒ /api/opportunities
+├ ƒ /api/opportunities/[id]
+├ ƒ /api/opportunities/[id]/action
+├ ƒ /api/opportunities/[id]/crm-deliveries
+├ ƒ /api/opportunities/[id]/outcomes
+├ ƒ /api/opportunities/[id]/workflow
+├ ƒ /api/opportunities/export
+├ ƒ /api/opportunities/integrations
+├ ƒ /api/opportunities/integrations/[integrationReference]/credentials/[credentialReference]
+├ ƒ /api/opportunities/integrations/[integrationReference]/credentials/rotate
+├ ƒ /api/opportunities/integrations/[integrationReference]/outcomes
+├ ƒ /api/opportunities/outcomes/analytics
+├ ƒ /api/opportunities/outcomes/calibration-export
+├ ƒ /api/opportunities/outcomes/external
+├ ƒ /api/opportunities/outcomes/summary
+├ ƒ /api/profile/preferences
+├ ƒ /api/profile/preview
+├ ƒ /api/push/subscribe
+├ ƒ /api/push/unsubscribe
+├ ƒ /api/review
+├ ƒ /api/sources/ingest
+├ ƒ /api/sources/status
+├ ƒ /api/telegram/connect-status
+├ ƒ /api/telegram/webhook
+├ ƒ /auth/change-email
+├ ƒ /auth/confirm
+├ ƒ /auth/invite
+├ ○ /auth/verify
+├ ƒ /checkout
+├ ƒ /checkout/order/[orderId]/cancel
+├ ƒ /checkout/order/[orderId]/success
+├ ƒ /dashboard
+├ ƒ /leads
+├ ƒ /leads/[id]
+├ ○ /legal
+├ ƒ /login
+├ ○ /offer
+├ ƒ /onboarding
+├ ƒ /onboarding/pilot/[orderId]
+├ ƒ /opportunities
+├ ƒ /opportunities/radar
+├ ○ /opportunities/sources
+├ ○ /payment-and-refund
+├ ○ /personal-data-consent
+├ ○ /privacy
+├ ƒ /profile
+├ ƒ /review
+├ ƒ /settings
+├ ƒ /settings/access
+├ ○ /settings/account
+├ ○ /settings/delivery
+├ ƒ /settings/diagnostics/sources
+├ ○ /settings/profile
+├ ƒ /settings/radar
+├ ƒ /settings/security
+├ ƒ /settings/team
+└ ○ /terms
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+exit_code=0

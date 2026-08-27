@@ -224,7 +224,7 @@ try {
       weakCompanyNameAliasPreserved: true,
       idempotent: true,
     },
-    cleanup: 'isolated-database-retained-for-audit',
+    cleanup: 'transaction-scoped-fixture-outer-wrapper-drops-disposable-database',
   }, null, 2));
 } catch (error) {
   throw error;

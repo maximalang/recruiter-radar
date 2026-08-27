@@ -1,5 +1,5 @@
 export const EXPECTED_LATEST_MIGRATION =
-  '20260826090000_add_notification_inbound_claim'
+  '20260826100100_quarantine_legacy_source_keys'
 
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/
 
