@@ -7,6 +7,9 @@
  *
  * Inputs (all required):
  *   REFRESH_RUNS_DIR   directory with collect-refresh-logs.mjs output (<run_id>.json files)
+ *   SOURCE_REFRESH_LOGS_DIR directory with downloaded artifacts/<run_id>/github-run-manifest.json + log bytes;
+ *                      required for verified authority (otherwise snapshot stays unverified)
+ *
  *   CONFIG_MANIFEST    docs/evidence/source-refresh-coverage/config.json from
  *                      generate-refresh-config-manifest.mjs (hashes, classification, targets,
  *                      zero_contracts)
@@ -39,6 +42,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { verifySummaryAgainstArtifact } from './lib/coverage-authority.mjs';
 import {
   recomputeSnapshotHash,
   sha256Canonical,
@@ -50,6 +54,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 const rawDay = process.env.COVERAGE_DAY_UTC ?? '';
 const runsDir = process.env.REFRESH_RUNS_DIR ?? '';
+const sourceLogsDir = process.env.SOURCE_REFRESH_LOGS_DIR ?? '';
 const configManifestPath = process.env.CONFIG_MANIFEST ?? '';
 const repoSha = process.env.REPO_SHA ?? '';
 const workflowRunUrl = process.env.WORKFLOW_RUN_URL ?? '';
@@ -86,6 +91,7 @@ if (fs.existsSync(outPath)) {
 const runFiles = fs.readdirSync(runsDir).filter((f) => f.endsWith('.json'));
 if (runFiles.length === 0) fail(`no run summaries found in ${runsDir}`);
 const collectedRuns = [];
+const authorityByRunId = new Map();
 for (const file of runFiles) {
   let parsed;
   try {
@@ -101,6 +107,8 @@ for (const file of runFiles) {
   if (workflowRepo && parsed.repository !== workflowRepo) {
     fail(`run summary ${file}: repository ${parsed.repository} != workflow URL repository ${workflowRepo}`);
   }
+  const authority = verifySummaryAgainstArtifact(parsed, sourceLogsDir);
+  authorityByRunId.set(parsed.run_id, authority);
   collectedRuns.push(parsed);
 }
 collectedRuns.sort((a, b) => Date.parse(a.run_started_at) - Date.parse(b.run_started_at));
@@ -116,6 +124,7 @@ function runSummaryDigest(run) {
 }
 
 function runAttestation(run) {
+  const authority = authorityByRunId.get(run.run_id);
   return {
     run_id: run.run_id,
     run_number: run.run_number,
@@ -128,6 +137,9 @@ function runAttestation(run) {
     run_started_at: run.run_started_at,
     response_body_sha256: run.response_body_sha256,
     artifact_digest: run._meta?.log_artifact_digest ?? null,
+    authority_manifest_sha256: authority?.authority?.manifest_sha256 ?? null,
+    authority_verified: authority?.verified === true,
+    ...(authority?.problems?.length > 0 ? { authority_errors: authority.problems } : {}),
     summary_sha256: runSummaryDigest(run),
   };
 }
@@ -599,6 +611,8 @@ function readPredecessorHash(dayStr) {
   return null; // genesis snapshot of the window
 }
 
+const allAuthorityVerified =
+  collectedRuns.length > 0 && collectedRuns.every((run) => authorityByRunId.get(run.run_id)?.verified === true);
 const coreSnapshot = {
   schema_version: 2,
   evidence_type: 'source-refresh-coverage',
@@ -615,13 +629,11 @@ const coreSnapshot = {
     schedules_sha256: manifest.schedules_sha256,
     config_manifest_sha256: sha256Canonical(manifest),
   },
-  // The builder records, but never upgrades, collector provenance. The checker only accepts a
-  // published window when every source observation has a durable artifact digest.
+  // A self-declared _meta digest is not authority. Only builder verification against the raw
+  // downloaded artifact and its GitHub manifest can produce a verified status.
   trusted_provenance: {
     authority: 'downloaded-github-actions-artifact',
-    status: collectedRuns.every((run) => /^[0-9a-f]{64}$/i.test(run._meta?.log_artifact_digest ?? ''))
-      ? 'verified'
-      : 'unverified',
+    status: allAuthorityVerified ? 'verified' : 'unverified',
     attestation_kind: 'collector-log-artifact-digest',
   },
   run_attestations: collectedRuns.map(runAttestation),

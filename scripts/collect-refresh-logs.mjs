@@ -28,8 +28,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { createHash } from 'node:crypto';
-import { sha256Canonical } from './lib/coverage-integrity.mjs';
+import {
+  computeArtifactDigest,
+  provenanceBindingProblems,
+  readAuthorityManifest,
+} from './lib/coverage-authority.mjs';
 
 const logsDir = process.env.SOURCE_REFRESH_LOGS_DIR ?? '';
 const runsDir = process.env.REFRESH_RUNS_DIR ?? '';
@@ -132,16 +135,8 @@ function walkLogFiles(dir) {
  * computed from relative paths, byte lengths, and SHA-256s, so a hand-made summary cannot
  * claim collector provenance without the durable log artifact itself (B5).
  */
-function logArtifactDigest(runDir, txtFiles) {
-  const files = txtFiles.map((filePath) => {
-    const bytes = fs.readFileSync(filePath);
-    return {
-      path: path.relative(runDir, filePath).replaceAll(path.sep, '/'),
-      bytes: bytes.length,
-      sha256: createHash('sha256').update(bytes).digest('hex'),
-    };
-  });
-  return sha256Canonical(files);
+function logArtifactDigest(runDir) {
+  return computeArtifactDigest(runDir);
 }
 
 const seenBodyHashes = new Set();
@@ -149,11 +144,13 @@ const runDirs = fs.readdirSync(logsDir).filter((d) => fs.statSync(path.join(logs
 let processed = 0;
 
 for (const runId of runDirs) {
+  const runPath = path.join(logsDir, runId);
   const outPath = path.join(runsDir, `${runId}.json`);
   if (fs.existsSync(outPath)) continue; // idempotent re-run of collector
-  const txtFiles = walkLogFiles(path.join(logsDir, runId));
-  const artifactDigest = logArtifactDigest(path.join(logsDir, runId), txtFiles);
+  const txtFiles = walkLogFiles(runPath);
+  const artifactDigest = logArtifactDigest(runPath);
   const provAccumulator = {};
+
   let found = null;
   let malformedMessage = null;
 
@@ -190,6 +187,17 @@ for (const runId of runDirs) {
   }
 
   const prov = provAccumulator;
+  let authorityManifest = null;
+  let authorityManifestSha256 = null;
+  let authorityErrors = [];
+  try {
+    const authority = readAuthorityManifest(runPath, runId);
+    authorityManifest = authority.manifest;
+    authorityManifestSha256 = authority.manifest_sha256;
+    authorityErrors = provenanceBindingProblems(prov, authorityManifest);
+  } catch (error) {
+    authorityErrors = [error.message];
+  }
   const httpStatus = intOrNull(prov.http_status);
   processed += 1;
   const stat = fs.statSync(path.join(logsDir, runId));
@@ -289,13 +297,13 @@ for (const runId of runDirs) {
       {
         schema_version: 2,
         run_id: runId,
-        workflow_name: workflowName,
-        repository: prov.repository ?? null,
-        run_number: intOrNull(prov.run_number),
-        run_attempt: intOrNull(prov.run_attempt),
-        scheduled_at_tick: prov.scheduled_at ?? null,
-        event_name: prov.event_name ?? null,
-        git_sha: prov.git_sha ?? null,
+        workflow_name: authorityManifest?.workflow_name ?? prov.workflow_name ?? workflowName,
+        repository: authorityManifest?.repository ?? prov.repository ?? null,
+        run_number: authorityManifest?.run_number ?? intOrNull(prov.run_number),
+        run_attempt: authorityManifest?.run_attempt ?? intOrNull(prov.attempt),
+        scheduled_at_tick: authorityManifest?.scheduled_at_tick ?? prov.scheduled_at ?? null,
+        event_name: authorityManifest?.event_name ?? prov.event_name ?? null,
+        git_sha: authorityManifest?.head_sha ?? prov.git_sha ?? null,
         http_status: httpStatus,
         response_body_sha256: prov.body_sha256 ?? null,
         run_started_at: startedAtIso,
@@ -305,6 +313,9 @@ for (const runId of runDirs) {
         _meta: {
           derived_from_log_dir: runId,
           log_artifact_digest: artifactDigest,
+          authority_manifest_sha256: authorityManifestSha256,
+          authority_verified: authorityManifest != null && authorityErrors.length === 0,
+          ...(authorityErrors.length > 0 ? { authority_errors: authorityErrors } : {}),
           processed_at: new Date().toISOString(),
         },
       },

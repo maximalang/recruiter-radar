@@ -101,7 +101,7 @@ jobs:
           // B3: the exact upstream response body is durable provenance; emit it as one
           // JSON line plus a bounded summary. Never print CRON_API_KEY or provider payloads.
           const bodySha256 = createHash('sha256').update(response.rawBody).digest('hex')
-          console.log(`source-refresh-provenance: repository=${provRepository} run_id=${provRunId} run_number=${provRunNumber} attempt=${provAttempt} event_name=${provEventName} scheduled_at=${provScheduledAt} git_sha=${provGitSha} http_status=${response.status} body_sha256=${bodySha256}`)
+          console.log(`source-refresh-provenance: workflow_name=Source_Refresh_Clock repository=${provRepository} run_id=${provRunId} run_number=${provRunNumber} attempt=${provAttempt} event_name=${provEventName} scheduled_at=${provScheduledAt} git_sha=${provGitSha} http_status=${response.status} body_sha256=${bodySha256}`)
           console.log(`source-refresh-provenance: body=${response.rawBody}`)
           let parsed = null
           try { parsed = JSON.parse(response.rawBody) } catch {}
@@ -157,6 +157,43 @@ jobs:
           throw new Error(`source-refresh returned HTTP ${response.status}`)
           NODE
           SSH_EOF
+
+      - name: Write authoritative GitHub run manifest
+        if: always()
+        env:
+          RR_MANIFEST_REPOSITORY: ${{ github.repository }}
+          RR_MANIFEST_RUN_ID: ${{ github.run_id }}
+          RR_MANIFEST_RUN_NUMBER: ${{ github.run_number }}
+          RR_MANIFEST_RUN_ATTEMPT: ${{ github.run_attempt }}
+          RR_MANIFEST_EVENT_NAME: ${{ github.event_name }}
+          RR_MANIFEST_SCHEDULED_AT_TICK: ${{ github.event.schedule || 'manual' }}
+          RR_MANIFEST_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs'
+          const required = [
+            'RR_MANIFEST_REPOSITORY', 'RR_MANIFEST_RUN_ID', 'RR_MANIFEST_RUN_NUMBER',
+            'RR_MANIFEST_RUN_ATTEMPT', 'RR_MANIFEST_EVENT_NAME', 'RR_MANIFEST_SCHEDULED_AT_TICK',
+            'RR_MANIFEST_HEAD_SHA',
+          ]
+          for (const key of required) {
+            if (!process.env[key]) throw new Error(`missing authoritative manifest field ${key}`)
+          }
+          const manifest = {
+            schema_version: 1,
+            workflow_name: 'Source Refresh Clock',
+            repository: process.env.RR_MANIFEST_REPOSITORY,
+            run_id: process.env.RR_MANIFEST_RUN_ID,
+            run_number: Number(process.env.RR_MANIFEST_RUN_NUMBER),
+            run_attempt: Number(process.env.RR_MANIFEST_RUN_ATTEMPT),
+            event_name: process.env.RR_MANIFEST_EVENT_NAME,
+            scheduled_at_tick: process.env.RR_MANIFEST_SCHEDULED_AT_TICK,
+            head_sha: process.env.RR_MANIFEST_HEAD_SHA,
+            artifact_name: `source-refresh-run-${process.env.RR_MANIFEST_RUN_ID}-attempt-${process.env.RR_MANIFEST_RUN_ATTEMPT}`,
+          }
+          fs.writeFileSync('proof-evidence/github-run-manifest.json', `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+          NODE
 
       - name: Classify tick outcome
         id: classify

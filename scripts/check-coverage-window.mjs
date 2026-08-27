@@ -28,17 +28,25 @@
  *   COVERAGE_SNAPSHOT_DIR directory with <day>.json snapshots (defaults to manifest's dir)
  *   COVERAGE_REF_DAY_UTC  reference day YYYY-MM-DD (defaults today UTC); window = 7 days ending here
  *   EXPECTED_REPO_SHA     optional full 40-hex deploy SHA that must match every snapshot's producer.repo_sha
+ *   SOURCE_REFRESH_LOGS_DIR downloaded artifacts/<run_id>/ with workflow-generated manifest + log bytes;
+ *                         required for READY (summary-declared provenance is never authority)
+ *
  *
  * Exit codes: 0 ready | 1 not ready.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import {
+  verifySummaryAgainstArtifact,
+  workflowRunUrlParts,
+} from './lib/coverage-authority.mjs';
 import { recomputeSnapshotHash, sha256Canonical } from './lib/coverage-integrity.mjs';
 
 const manifestPath = process.env.CONFIG_MANIFEST ?? 'docs/evidence/source-refresh-coverage/config.json';
 const refDay = process.env.COVERAGE_REF_DAY_UTC ?? new Date().toISOString().slice(0, 10);
 const expectedRepoSha = process.env.EXPECTED_REPO_SHA ?? '';
+const sourceLogsDir = process.env.SOURCE_REFRESH_LOGS_DIR ?? '';
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
@@ -183,6 +191,55 @@ function evalDay(dayStr) {
       }
     }
   }
+
+  // The summary's _meta and trusted_provenance are claims, not authority. Re-open every
+  // downloaded artifact and compare its manifest/bytes with the attestation before READY.
+  const producerUrl = workflowRunUrlParts(snap.producer?.workflow_run_url);
+  if (!sourceLogsDir) {
+    reasons.push(`${dayStr}: SOURCE_REFRESH_LOGS_DIR is required for authoritative artifact verification`);
+  } else {
+    if (!producerUrl) {
+      reasons.push(`${dayStr}: producer workflow URL cannot be resolved to a GitHub run identity`);
+    }
+    const authoritativeRunIds = new Set();
+    for (const attestation of runAttestations) {
+      const summary = {
+        run_id: attestation.run_id,
+        run_number: attestation.run_number,
+        run_attempt: attestation.run_attempt,
+        repository: attestation.repository,
+        workflow_name: attestation.workflow_name,
+        event_name: attestation.event_name,
+        scheduled_at_tick: attestation.scheduled_at_tick,
+        git_sha: attestation.git_sha,
+        _meta: {
+          log_artifact_digest: attestation.artifact_digest,
+          authority_manifest_sha256: attestation.authority_manifest_sha256,
+          authority_verified: attestation.authority_verified,
+        },
+      };
+      const authority = verifySummaryAgainstArtifact(summary, sourceLogsDir);
+      if (!authority.verified || attestation.authority_verified !== true) {
+        reasons.push(
+          `${dayStr}: run ${attestation.run_id}: authoritative artifact verification failed${
+            authority.problems.length > 0 ? ` (${authority.problems.join('; ')})` : ''
+          }`,
+        );
+      } else {
+        authoritativeRunIds.add(String(attestation.run_id));
+      }
+    }
+    if (producerUrl && !authoritativeRunIds.has(producerUrl.run_id)) {
+      reasons.push(`${dayStr}: producer workflow URL run_id is not present in authoritative attestations`);
+    }
+    if (producerUrl?.run_attempt != null) {
+      const matchingAttempt = runAttestations.some(
+        (attestation) => String(attestation.run_id) === producerUrl.run_id && attestation.run_attempt === producerUrl.run_attempt,
+      );
+      if (!matchingAttempt) reasons.push(`${dayStr}: producer workflow URL run_attempt is not authoritative`);
+    }
+  }
+
   if (typeof snap.snapshot_hash !== 'string' || !/^[0-9a-f]{64}$/.test(snap.snapshot_hash)) {
     reasons.push(`${dayStr}: snapshot_hash missing/not 64-hex`);
   } else {

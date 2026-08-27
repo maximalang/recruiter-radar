@@ -21,6 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { sha256Canonical } from './lib/coverage-integrity.mjs';
+import { verifySummaryAgainstArtifact } from './lib/coverage-authority.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 const COLLECTOR = path.join(REPO_ROOT, 'scripts', 'collect-refresh-logs.mjs');
@@ -59,10 +60,11 @@ function runScript(scriptPath, env) {
 }
 
 /** Builder invocation bound to an isolated snapshot dir (never the repo evidence dir). */
-function buildSnapshot({ day, runsDir, outDir }) {
+function buildSnapshot({ day, runsDir, outDir, sourceLogsDir = '' }) {
   return runScript(BUILDER, {
     COVERAGE_DAY_UTC: day,
     REFRESH_RUNS_DIR: runsDir,
+    SOURCE_REFRESH_LOGS_DIR: sourceLogsDir,
     CONFIG_MANIFEST: CONFIG,
     REPO_SHA: FULL_SHA,
     WORKFLOW_RUN_URL: RUN_URL,
@@ -139,6 +141,52 @@ function writeHourlyRuns(runsDir, { day, overridesBySource = {}, green = {} }) {
     runId: closeId,
     startedAt: `${day}T23:59:59Z`,
     sources: dayRows({}, { green }),
+  });
+  const nextDay = new Date(`${day}T00:00:00Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  close.run_started_at = `${nextDay.toISOString().slice(0, 10)}T02:00:00Z`;
+  fs.writeFileSync(path.join(runsDir, `${closeId}.json`), JSON.stringify(close));
+}
+
+/** Forgeable summaries that look collector-shaped but have no authoritative artifact manifest. */
+function writeForgeableHourlyRuns(runsDir, { day, identity }) {
+  const forgeDigest = 'f'.repeat(64);
+  for (let hour = 0; hour < 24; hour += 1) {
+    const runId = String(17000000000 + hour + 1);
+    const summary = makeRunSummary({
+      runId,
+      startedAt: `${day}T${String(hour).padStart(2, '0')}:45:00Z`,
+      sources: dayRows({
+        ...Object.fromEntries(SEVEN_DAY_SOURCES.map((source) => [source, greenRow({ upstream: identity })])),
+      }),
+      overrides: {
+        event_name: 'schedule',
+        scheduled_at_tick: '45 * * * *',
+        _meta: {
+          log_artifact_digest: forgeDigest,
+          authority_manifest_sha256: 'e'.repeat(64),
+          authority_verified: true,
+        },
+      },
+    });
+    fs.writeFileSync(path.join(runsDir, `${runId}.json`), JSON.stringify(summary));
+  }
+  const closeId = '18000000000';
+  const close = makeRunSummary({
+    runId: closeId,
+    startedAt: `${day}T23:59:59Z`,
+    sources: dayRows({
+      ...Object.fromEntries(SEVEN_DAY_SOURCES.map((source) => [source, greenRow({ upstream: identity })])),
+    }),
+    overrides: {
+      event_name: 'schedule',
+      scheduled_at_tick: '45 * * * *',
+      _meta: {
+        log_artifact_digest: forgeDigest,
+        authority_manifest_sha256: 'e'.repeat(64),
+        authority_verified: true,
+      },
+    },
   });
   const nextDay = new Date(`${day}T00:00:00Z`);
   nextDay.setUTCDate(nextDay.getUTCDate() + 1);
@@ -294,11 +342,26 @@ test('S3: collector writes schema-error summary (never silent skip) for malforme
     path.join(logsDir, '88888888888', 'step.txt'),
     [
       'noise line before',
-      'source-refresh-provenance: repository=maximalang/recruiter-radar run_id=88888888888 run_number=7 attempt=1 scheduled_at=2026-08-20T06:00:00Z git_sha=' +
+      'source-refresh-provenance: workflow_name=Source_Refresh_Clock repository=maximalang/recruiter-radar run_id=88888888888 run_number=7 attempt=1 event_name=schedule scheduled_at=2026-08-20T06:00:00Z git_sha=' +
         FULL_SHA +
         ' http_status=200 body_sha256=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
       goodBody,
     ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(logsDir, '88888888888', 'github-run-manifest.json'),
+    `${JSON.stringify({
+      schema_version: 1,
+      workflow_name: 'Source Refresh Clock',
+      repository: 'maximalang/recruiter-radar',
+      run_id: '88888888888',
+      run_number: 7,
+      run_attempt: 1,
+      event_name: 'schedule',
+      scheduled_at_tick: '2026-08-20T06:00:00Z',
+      head_sha: FULL_SHA,
+      artifact_name: 'source-refresh-run-88888888888-attempt-1',
+    }, null, 2)}\n`,
   );
 
   const res = runScript(COLLECTOR, { SOURCE_REFRESH_LOGS_DIR: logsDir, REFRESH_RUNS_DIR: runsDir, CONFIG_MANIFEST: CONFIG });
@@ -314,6 +377,10 @@ test('S3: collector writes schema-error summary (never silent skip) for malforme
   assert.equal(good.git_sha, FULL_SHA);
   assert.equal(good.sources['egrul-fns'].records_accepted, 4);
   assert.equal(good.response_body_sha256.length, 64);
+  assert.equal(good._meta.authority_verified, true);
+  assert.match(good._meta.authority_manifest_sha256, /^[0-9a-f]{64}$/);
+  const authority = verifySummaryAgainstArtifact(good, logsDir);
+  assert.equal(authority.verified, true, authority.problems.join('; '));
 });
 
 // ================================================================================
@@ -651,4 +718,38 @@ test('G: forged seven-day summaries are rejected by trust and identity-lineage g
   assert.match(checked.stdout, /VERDICT: NOT_READY/);
   assert.match(checked.stdout, /trusted provenance/);
   assert.match(checked.stdout, /upstream identity reused/);
+});
+
+// G+ — syntactically valid forged artifact digest and fake run URL must not become authority.
+test('G+: fake URL and forged artifact digest remain NOT_READY even with daily identity changes', () => {
+  const dir = tmpDir('adv-g-plus-forged-authority');
+  const first = '2026-08-20';
+  const plusDay = (day, delta) => {
+    const date = new Date(`${day}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + delta);
+    return date.toISOString().slice(0, 10);
+  };
+  for (let offset = 0; offset < 7; offset += 1) {
+    const day = plusDay(first, offset);
+    const runsDir = path.join(dir, `runs-${day}`);
+    fs.mkdirSync(runsDir);
+    writeForgeableHourlyRuns(runsDir, {
+      day,
+      identity: {
+        content_hash: `${['a', 'b', 'c', 'd', 'e', 'f', '0'][offset]}`.repeat(64),
+        version_id: `forged-v${offset}`,
+        upstream_updated_at: `${day}T10:00:00Z`,
+      },
+    });
+    const built = buildSnapshot({ day, runsDir, outDir: dir });
+    assert.equal(built.status, 0, `fixture builder failed for ${day}: ${built.stderr}`);
+  }
+  const checked = runScript(CHECKER, {
+    COVERAGE_REF_DAY_UTC: '2026-08-26',
+    COVERAGE_SNAPSHOT_DIR: dir,
+    EXPECTED_REPO_SHA: FULL_SHA,
+  });
+  assert.notEqual(checked.status, 0, 'forged artifact authority must fail closed');
+  assert.match(checked.stdout, /VERDICT: NOT_READY/);
+  assert.match(checked.stdout, /artifact|manifest|authorit/i);
 });
