@@ -163,7 +163,7 @@ BEGIN
     WHERE NOT (
         RIGHT(ref.source_key, LENGTH(' [legacy-key-quarantined:20260827100000]'))
           = ' [legacy-key-quarantined:20260827100000]'
-        AND ref.metadata->'quarantine'->>'migration'
+        AND COALESCE(ref.metadata->'quarantine'->>'migration', '')
           = '20260827100000_harden_rr_multitenant_domain_suffixes'
       )
       -- A marker in source_key is not trusted by itself: legacy rows from the
@@ -172,7 +172,7 @@ BEGIN
       AND NOT (
         RIGHT(ref.source_key, LENGTH(' [legacy-key-quarantined:20260826100100]'))
           = ' [legacy-key-quarantined:20260826100100]'
-        AND ref.metadata->'quarantine'->>'migration'
+        AND COALESCE(ref.metadata->'quarantine'->>'migration', '')
           = '20260826100100_quarantine_legacy_source_keys'
       )
       AND (

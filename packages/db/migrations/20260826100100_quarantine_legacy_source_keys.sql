@@ -50,7 +50,7 @@ WITH candidates AS (
     AND NOT (
       RIGHT(ref.source_key, LENGTH(' [legacy-key-quarantined:20260826100100]'))
         = ' [legacy-key-quarantined:20260826100100]'
-      AND ref.metadata->'quarantine'->>'migration'
+      AND COALESCE(ref.metadata->'quarantine'->>'migration', '')
         = '20260826100100_quarantine_legacy_source_keys'
     )
     AND rr_is_trusted_domain_key(ref.source_key) = false
@@ -100,7 +100,7 @@ BEGIN
     WHERE NOT (
         RIGHT(ref.source_key, LENGTH(' [legacy-key-quarantined:20260826100100]'))
           = ' [legacy-key-quarantined:20260826100100]'
-        AND ref.metadata->'quarantine'->>'migration'
+        AND COALESCE(ref.metadata->'quarantine'->>'migration', '')
           = '20260826100100_quarantine_legacy_source_keys'
       )
       AND (

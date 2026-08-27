@@ -1,5 +1,5 @@
-✔ marks a successful idempotent replay only when a normalized record passed identity resolution (1.1521ms)
-✔ preserves a source-owned expected-zero reason (0.1456ms)
+✔ marks a successful idempotent replay only when a normalized record passed identity resolution (0.925ms)
+✔ preserves a source-owned expected-zero reason (0.3071ms)
 ℹ tests 2
 ℹ suites 0
 ℹ pass 2
@@ -7,6 +7,6 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 174.2706
+ℹ duration_ms 220.3057
 
 exit_code=0

@@ -234,7 +234,7 @@ async function replayLegacyKeyPolicy(client) {
       WHERE ref.source_key LIKE 'domain:%'
         AND NOT (
           RIGHT(ref.source_key, LENGTH('${quarantineSuffix}')) = '${quarantineSuffix}'
-          AND ref.metadata->'quarantine'->>'migration' = '20260826100100_quarantine_legacy_source_keys'
+          AND COALESCE(ref.metadata->'quarantine'->>'migration', '') = '20260826100100_quarantine_legacy_source_keys'
         )
         AND rr_is_trusted_domain_key(ref.source_key) = false
         AND rr_is_trusted_domain_key('domain:' || rr_canonical_company_domain(substring(ref.source_key FROM 8))) = true
@@ -269,7 +269,7 @@ async function replayLegacyKeyPolicy(client) {
         )
     WHERE NOT (
         RIGHT(ref.source_key, LENGTH('${quarantineSuffix}')) = '${quarantineSuffix}'
-        AND ref.metadata->'quarantine'->>'migration' = '20260826100100_quarantine_legacy_source_keys'
+        AND COALESCE(ref.metadata->'quarantine'->>'migration', '') = '20260826100100_quarantine_legacy_source_keys'
       )
       AND (
         (left(lower(ref.source_key), 4) = 'inn:' AND NOT rr_is_trusted_inn_key(ref.source_key))
