@@ -47,7 +47,12 @@ WITH candidates AS (
     ) AS already_canonical
   FROM org_source_refs AS ref
   WHERE ref.source_key LIKE 'domain:%'
-    AND ref.source_key NOT LIKE '%[legacy-key-quarantined:%'
+    AND NOT (
+      RIGHT(ref.source_key, LENGTH(' [legacy-key-quarantined:20260826100100]'))
+        = ' [legacy-key-quarantined:20260826100100]'
+      AND ref.metadata->'quarantine'->>'migration'
+        = '20260826100100_quarantine_legacy_source_keys'
+    )
     AND rr_is_trusted_domain_key(ref.source_key) = false
     AND rr_is_trusted_domain_key('domain:' || rr_canonical_company_domain(substring(ref.source_key FROM 8))) = true
     -- Canonical-target collision guard: if a row with the exact canonical
@@ -92,7 +97,12 @@ BEGIN
             'at', NOW()
           )
         )
-    WHERE ref.source_key NOT LIKE '%[legacy-key-quarantined:%'
+    WHERE NOT (
+        RIGHT(ref.source_key, LENGTH(' [legacy-key-quarantined:20260826100100]'))
+          = ' [legacy-key-quarantined:20260826100100]'
+        AND ref.metadata->'quarantine'->>'migration'
+          = '20260826100100_quarantine_legacy_source_keys'
+      )
       AND (
         (left(lower(ref.source_key), 4) = 'inn:' AND NOT rr_is_trusted_inn_key(ref.source_key))
         OR (left(lower(ref.source_key), 5) = 'ogrn:' AND NOT rr_is_trusted_ogrn_key(ref.source_key))

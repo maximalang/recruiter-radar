@@ -1,5 +1,5 @@
 export const EXPECTED_LATEST_MIGRATION =
-  '20260826100100_quarantine_legacy_source_keys'
+  '20260827100000_harden_rr_multitenant_domain_suffixes'
 
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/
 
