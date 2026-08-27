@@ -1,5 +1,5 @@
 export const EXPECTED_LATEST_MIGRATION =
-  '20260817150000_timeweb_mcp_sessions_multi_session'
+  '20260826100100_quarantine_legacy_source_keys'
 
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/
 

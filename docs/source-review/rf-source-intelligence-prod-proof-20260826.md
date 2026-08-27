@@ -70,7 +70,7 @@ Isolation experiments performed:
 1. Windows junction without dot-segment (`C:\Users\max\Desktop\all\rr-jestlink` → worktree): still empty, because next/jest resolves the real path internally (testMatch globs contained `.worktrees/t_e5cead81/...`).
 2. Control: same command in the main checkout (`C:\Users\max\Desktop\all\recruiter-radar\apps\web`) finds **456** tests (exit 0).
 
-Conclusion: environment/known-Jest-dot-directory limitation, not a product defect. Both failing gates are CI-green on GitHub for the same commits (recent PR #227 merged with green checks).
+Conclusion: environment/known-Jest-dot-directory limitation, not a product defect. Exact-head GitHub evidence for `928af20d5152bcfbfdbd5c0d994f4b793783d0e0` is recorded in workflow run `33006919447`, job `98303111262`; it is not evidence that descendant commits belong to PR #227. The later identity-boundary implementation is verified separately in `rf-identity-boundary-hardening-proof-20260827.md`.
 
 Gates blocked locally by this issue (not run here):
 - `npm run test:query-planner-v2:db` (QP-v2 planner/repository/runtime-db jest stage + verifier; its disposable-DB migration phase itself succeeded — 119/119 — before failing at the jest collection step with QP_EXIT=1)
