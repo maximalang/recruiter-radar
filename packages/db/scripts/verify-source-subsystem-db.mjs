@@ -29,6 +29,7 @@ for (const verifier of verifiers) {
       ...process.env,
       SOURCE_ENV_FILE_DISABLED: 'true',
       SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK: 'isolated',
+      SOURCE_QUARANTINE_POLICY_TEST_ACK: 'isolated',
     },
     encoding: 'utf8',
     timeout: 180_000,

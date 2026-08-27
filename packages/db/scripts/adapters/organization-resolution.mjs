@@ -30,10 +30,40 @@ const PLATFORM_DOMAINS = new Set([
   'jobs.eu',
 ]);
 
+// Explicit fail-closed policy for public suffixes and shared hosting zones.
+// These hosts are not company-owned identity boundaries: a tenant below any of
+// them must never corroborate with another organization by domain alone.
 const PUBLIC_SUFFIX_DOMAINS = new Set([
-  'co.uk', 'org.uk', 'gov.uk', 'ac.uk',
-  'com.au', 'net.au', 'org.au',
-  'co.jp', 'co.kr', 'com.cn', 'com.br', 'com.tr',
+  'ac.uk', 'co.uk', 'gov.uk', 'org.uk',
+  'ac.jp', 'co.jp', 'go.jp', 'ne.jp', 'or.jp',
+  'ac.kr', 'co.kr', 'go.kr', 'ne.kr', 'or.kr',
+  'ac.nz', 'co.nz', 'govt.nz', 'net.nz', 'org.nz',
+  'ac.za', 'co.za', 'gov.za', 'net.za', 'org.za', 'web.za',
+  'com.ar', 'com.au', 'com.bd', 'com.br', 'com.cn', 'com.co',
+  'com.ec', 'com.hk', 'com.mx', 'com.my', 'com.pe', 'com.ph',
+  'com.pk', 'com.sg', 'com.tr', 'com.tw', 'com.vn',
+  'co.in', 'co.il', 'co.th', 'co.ug', 'co.ke', 'co.tz',
+  'firm.in', 'gen.in', 'ind.in', 'net.in', 'org.in',
+  'gov.au', 'net.au', 'org.au', 'edu.au',
+  'gov.cn', 'net.cn', 'org.cn', 'edu.cn',
+  'gov.sg', 'net.sg', 'org.sg', 'edu.sg',
+  'gov.my', 'net.my', 'org.my', 'edu.my',
+  'gov.pk', 'net.pk', 'org.pk', 'edu.pk',
+  'gov.ph', 'net.ph', 'org.ph', 'edu.ph',
+  'gov.tr', 'net.tr', 'org.tr', 'edu.tr',
+  'gov.vn', 'net.vn', 'org.vn', 'edu.vn',
+]);
+
+const MULTITENANT_DOMAIN_SUFFIXES = new Set([
+  'appspot.com', 'azurewebsites.net', 'blogspot.com', 'blogspot.co.uk',
+  'blogspot.de', 'blogspot.fr', 'blogspot.jp', 'blogspot.ru',
+  'cargo.site', 'cloudfront.net', 'com.sg', 'co.in', 'co.za',
+  'firebaseapp.com', 'fly.dev',
+  'github.io', 'gitlab.io', 'glitch.me', 'herokuapp.com', 'netlify.app',
+  'notion.site', 'notion.so', 'onrender.com', 'pages.dev', 'railway.app',
+  'readthedocs.io', 'repl.co', 's3.amazonaws.com', 'stackblitz.io',
+  'surge.sh', 'vercel.app', 'web.app', 'webflow.io', 'wixsite.com',
+  'workers.dev',
 ]);
 
 const CORPORATE_SUBDOMAIN_PREFIXES = new Set(['www', 'career', 'careers', 'job', 'jobs', 'hr', 'vacancy', 'vacancies']);
@@ -199,7 +229,8 @@ function canonicalCompanyDomain(value) {
   ))) return null;
 
   const domain = labels.join('.');
-  if (PUBLIC_SUFFIX_DOMAINS.has(domain)) return null;
+  if (PUBLIC_SUFFIX_DOMAINS.has(domain) || MULTITENANT_DOMAIN_SUFFIXES.has(domain)) return null;
+  if ([...MULTITENANT_DOMAIN_SUFFIXES].some((item) => domain.endsWith(`.${item}`))) return null;
   if (PLATFORM_DOMAINS.has(domain) || [...PLATFORM_DOMAINS].some((item) => domain.endsWith(`.${item}`))) return null;
   return domain;
 }

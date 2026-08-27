@@ -8,6 +8,7 @@
 //   - invalid strong keys are preserved only as auditable quarantine rows;
 //   - mixed-case prefixes cannot bypass quarantine;
 //   - safe domain variants are canonicalized without duplicate keys;
+//   - public-suffix and shared-hosting domains do not merge organizations;
 //   - quarantined keys do not corroborate otherwise unrelated organizations;
 //   - a checksum-valid shared key still merges genuine fragments.
 
@@ -53,9 +54,10 @@ try {
     ok: true,
     smoke: 'source-identity-boundary-quarantine',
     verified: {
-      quarantinedRows: 5,
+      quarantinedRows: 15,
       canonicalizedRows: 2,
       invalidSharedKeyDidNotMerge: true,
+      multitenantDomainDidNotMerge: true,
       trustedSharedKeyMerged: true,
       platformDomainBridgeRejected: true,
       runtimeGuardRemainsActive: true,
@@ -84,6 +86,8 @@ async function setupFixture(client) {
   orgs.capsOnly = await insertOrg(client, 'Caps Only Domain');
   orgs.platformCareer = await insertOrg(client, 'Platform Career Domain', 'careers.hh.ru');
   orgs.platformNested = await insertOrg(client, 'Platform Nested Domain', 'hh.jobs.hh.ru');
+  orgs.multitenantA = await insertOrg(client, 'Multitenant Domain A');
+  orgs.multitenantB = await insertOrg(client, 'Multitenant Domain B');
   orgs.trustedA = await insertOrg(client, 'Trusted Merge A');
   orgs.trustedB = await insertOrg(client, 'Trusted Merge B');
 
@@ -94,6 +98,8 @@ async function setupFixture(client) {
   try {
     await insertRef(client, orgs.badInnA, 'hh', 'inn:7701234567', 'bad-inn-a', 'Bad INN A');
     await insertRef(client, orgs.badInnB, 'superjob', 'inn:7701234567', 'bad-inn-b', 'Bad INN B');
+    await insertRef(client, orgs.badInnA, 'gdelt', 'inn:7701234567 [legacy-key-quarantined:attacker]', 'quarantine-marker-bypass', 'Bad INN A');
+    await insertRef(client, orgs.badInnA, 'gdelt', 'inn:7701234567 [legacy-key-quarantined:20260826100100]', 'quarantine-exact-marker-bypass', 'Bad INN A');
     await insertRef(client, orgs.caseOnly, 'career-pages', 'domain:WWW.CaseOnly.Example', 'case-only', 'Case Only Domain');
     await insertRef(client, orgs.collision, 'career-pages', 'domain:collision.example', 'collision-canonical', 'Canonical Collision Domain');
     await insertRef(client, orgs.collision, 'career-pages', 'domain:WWW.Collision.Example', 'collision-variant', 'Canonical Collision Domain');
@@ -105,6 +111,18 @@ async function setupFixture(client) {
     // a platform host, controls cross-source identity.
     await insertRef(client, orgs.platformCareer, 'hh', 'company-name:platform-career', 'platform-career', 'Platform Career Domain');
     await insertRef(client, orgs.platformNested, 'superjob', 'company-name:platform-nested', 'platform-nested', 'Platform Nested Domain');
+
+    // Shared-hosting and public-suffix variants are not company-owned identity
+    // boundaries. The same github.io key is deliberately used by two different
+    // orgs and source families to prove that quarantine prevents a merge.
+    await insertRef(client, orgs.multitenantA, 'hh', 'domain:foo.github.io', 'multitenant-github-a', 'Multitenant Domain A');
+    await insertRef(client, orgs.multitenantB, 'superjob', 'domain:foo.github.io', 'multitenant-github-b', 'Multitenant Domain B');
+    await insertRef(client, orgs.multitenantA, 'rabota-rossii', 'domain:bar.notion.site', 'multitenant-notion', 'Multitenant Domain A');
+    await insertRef(client, orgs.multitenantA, 'public-ats', 'domain:tenant.wixsite.com', 'multitenant-wix', 'Multitenant Domain A');
+    await insertRef(client, orgs.multitenantA, 'hosted-ats', 'domain:tenant.blogspot.com', 'multitenant-blogspot', 'Multitenant Domain A');
+    await insertRef(client, orgs.multitenantA, 'russian-ats', 'domain:foo.co.in', 'multitenant-co-in', 'Multitenant Domain A');
+    await insertRef(client, orgs.multitenantA, 'company-context', 'domain:foo.com.sg', 'multitenant-com-sg', 'Multitenant Domain A');
+    await insertRef(client, orgs.multitenantA, 'government-open-data', 'domain:foo.co.za', 'multitenant-co-za', 'Multitenant Domain A');
 
     // One valid strong key is shared by two different source/org fragments.
     await insertRef(client, orgs.trustedA, 'rabota-rossii', 'inn:7701234507', 'trusted-a', 'Trusted Merge A');
@@ -124,6 +142,8 @@ async function setupFixture(client) {
   signalIds.capsOnly = await insertSignal(client, orgs.capsOnly, 'rabota-rossii', 'caps-only', 'Caps Only role');
   signalIds.platformCareer = await insertSignal(client, orgs.platformCareer, 'hh', 'platform-career', 'Platform Career role');
   signalIds.platformNested = await insertSignal(client, orgs.platformNested, 'superjob', 'platform-nested', 'Platform Nested role');
+  signalIds.multitenantA = await insertSignal(client, orgs.multitenantA, 'hh', 'multitenant-github-a', 'Multitenant A role');
+  signalIds.multitenantB = await insertSignal(client, orgs.multitenantB, 'superjob', 'multitenant-github-b', 'Multitenant B role');
   signalIds.trustedA = await insertSignal(client, orgs.trustedA, 'rabota-rossii', 'trusted-a', 'Trusted A role');
   signalIds.trustedB = await insertSignal(client, orgs.trustedB, 'superjob', 'trusted-b', 'Trusted B role');
 
@@ -212,7 +232,10 @@ async function replayLegacyKeyPolicy(client) {
           = rr_canonical_company_domain(substring(ref.source_key FROM 8)) AS already_canonical
       FROM org_source_refs AS ref
       WHERE ref.source_key LIKE 'domain:%'
-        AND ref.source_key NOT LIKE '%[legacy-key-quarantined:%'
+        AND NOT (
+          RIGHT(ref.source_key, LENGTH('${quarantineSuffix}')) = '${quarantineSuffix}'
+          AND ref.metadata->'quarantine'->>'migration' = '20260826100100_quarantine_legacy_source_keys'
+        )
         AND rr_is_trusted_domain_key(ref.source_key) = false
         AND rr_is_trusted_domain_key('domain:' || rr_canonical_company_domain(substring(ref.source_key FROM 8))) = true
         AND NOT EXISTS (
@@ -244,7 +267,10 @@ async function replayLegacyKeyPolicy(client) {
             'at', NOW()
           )
         )
-    WHERE ref.source_key NOT LIKE '%[legacy-key-quarantined:%'
+    WHERE NOT (
+        RIGHT(ref.source_key, LENGTH('${quarantineSuffix}')) = '${quarantineSuffix}'
+        AND ref.metadata->'quarantine'->>'migration' = '20260826100100_quarantine_legacy_source_keys'
+      )
       AND (
         (left(lower(ref.source_key), 4) = 'inn:' AND NOT rr_is_trusted_inn_key(ref.source_key))
         OR (left(lower(ref.source_key), 5) = 'ogrn:' AND NOT rr_is_trusted_ogrn_key(ref.source_key))
@@ -270,6 +296,13 @@ async function verifySqlGateSemantics(client) {
       rr_is_trusted_domain_key('domain:WWW.Example.Test') AS noncanonical_domain,
       rr_is_trusted_domain_key('domain:255.255.255.255') AS ip_literal,
       rr_is_trusted_domain_key('domain:hh.ru') AS platform_domain,
+      rr_is_trusted_domain_key('domain:foo.github.io') AS github_pages,
+      rr_is_trusted_domain_key('domain:bar.notion.site') AS notion_site,
+      rr_is_trusted_domain_key('domain:tenant.wixsite.com') AS wixsite,
+      rr_is_trusted_domain_key('domain:tenant.blogspot.com') AS blogspot,
+      rr_is_trusted_domain_key('domain:foo.co.in') AS public_suffix_co_in,
+      rr_is_trusted_domain_key('domain:foo.com.sg') AS public_suffix_com_sg,
+      rr_is_trusted_domain_key('domain:foo.co.za') AS public_suffix_co_za,
       rr_is_trusted_domain_key(NULL) AS null_domain
   `);
   const [gate] = rows;
@@ -284,6 +317,13 @@ async function verifySqlGateSemantics(client) {
   assert.equal(gate.noncanonical_domain, false);
   assert.equal(gate.ip_literal, false);
   assert.equal(gate.platform_domain, false);
+  assert.equal(gate.github_pages, false);
+  assert.equal(gate.notion_site, false);
+  assert.equal(gate.wixsite, false);
+  assert.equal(gate.blogspot, false);
+  assert.equal(gate.public_suffix_co_in, false);
+  assert.equal(gate.public_suffix_com_sg, false);
+  assert.equal(gate.public_suffix_co_za, false);
   assert.equal(gate.null_domain, false);
 }
 
@@ -296,12 +336,26 @@ async function verifyReconciledKeys(client, fixture) {
   );
   const byExternalId = new Map(result.rows.map((row) => [row.external_id, row]));
   const quarantined = result.rows.filter((row) => row.source_key.endsWith(quarantineSuffix));
-  assert.equal(quarantined.length, 5, 'exactly five nonconforming fixture rows must be quarantined');
+  assert.equal(quarantined.length, 15, 'all nonconforming fixture rows must be quarantined');
   assert.equal(byExternalId.get('bad-inn-a').source_key.endsWith(quarantineSuffix), true);
   assert.equal(byExternalId.get('bad-inn-b').source_key.endsWith(quarantineSuffix), true);
   assert.equal(byExternalId.get('collision-variant').source_key.endsWith(quarantineSuffix), true);
   assert.equal(byExternalId.get('ip-literal').source_key.endsWith(quarantineSuffix), true);
   assert.equal(byExternalId.get('mixed-prefix').source_key.endsWith(quarantineSuffix), true);
+  assert.equal(byExternalId.get('quarantine-marker-bypass').source_key, `inn:7701234567 [legacy-key-quarantined:attacker]${quarantineSuffix}`);
+  assert.equal(byExternalId.get('quarantine-exact-marker-bypass').source_key, `inn:7701234567 [legacy-key-quarantined:20260826100100]${quarantineSuffix}`);
+  for (const externalId of [
+    'multitenant-github-a',
+    'multitenant-github-b',
+    'multitenant-notion',
+    'multitenant-wix',
+    'multitenant-blogspot',
+    'multitenant-co-in',
+    'multitenant-com-sg',
+    'multitenant-co-za',
+  ]) {
+    assert.equal(byExternalId.get(externalId).source_key.endsWith(quarantineSuffix), true);
+  }
 
   assert.equal(byExternalId.get('case-only').source_key, 'domain:caseonly.example');
   assert.equal(byExternalId.get('caps-only').source_key, 'domain:capssolo.example');
@@ -309,17 +363,23 @@ async function verifyReconciledKeys(client, fixture) {
   assert.equal(byExternalId.get('trusted-a').source_key, 'inn:7701234507');
   assert.equal(byExternalId.get('trusted-b').source_key, 'inn:7701234507');
 
-  // The guard must reject a new invalid strong key after reconciliation. This
+  // The guard must reject new invalid strong keys after reconciliation. This
   // assertion is deliberately inside the rollbacked transaction.
-  await client.query('SAVEPOINT identity_guard_test');
-  try {
-    await assert.rejects(
-      insertRef(client, fixture.orgs.badInnA, 'hh', 'INN:7701234567', 'guard-rejected', 'Bad INN A'),
-      /rr-org-source-refs-cannot-add-failed-gate-key/,
-    );
-  } finally {
-    await client.query('ROLLBACK TO SAVEPOINT identity_guard_test');
-    await client.query('RELEASE SAVEPOINT identity_guard_test');
+  for (const [source, sourceKey] of [
+    ['hh', 'INN:7701234567'],
+    ['superjob', 'domain:foo.github.io'],
+    ['rabota-rossii', 'domain:foo.co.in'],
+  ]) {
+    await client.query('SAVEPOINT identity_guard_test');
+    try {
+      await assert.rejects(
+        insertRef(client, fixture.orgs.badInnA, source, sourceKey, `guard-rejected-${source}`, 'Bad INN A'),
+        /rr-org-source-refs-cannot-add-failed-gate-key/,
+      );
+    } finally {
+      await client.query('ROLLBACK TO SAVEPOINT identity_guard_test');
+      await client.query('RELEASE SAVEPOINT identity_guard_test');
+    }
   }
 }
 
@@ -354,4 +414,14 @@ async function verifyDigestBoundary(client, fixture, rows) {
   assert.notEqual(platformNested.corroboration_key, 'domain:hh.jobs.hh.ru');
   assert.equal(platformCareer.corroboration_key, `org:${fixture.orgs.platformCareer}`);
   assert.equal(platformNested.corroboration_key, `org:${fixture.orgs.platformNested}`);
+
+  const multitenantA = rowForOrg(fixture.orgs.multitenantA);
+  const multitenantB = rowForOrg(fixture.orgs.multitenantB);
+  assert.ok(multitenantA && multitenantB, 'multitenant-domain fixtures remain independently visible');
+  assert.notEqual(multitenantA.corroboration_key, 'domain:foo.github.io');
+  assert.notEqual(multitenantB.corroboration_key, 'domain:foo.github.io');
+  assert.equal(multitenantA.corroboration_key, `org:${fixture.orgs.multitenantA}`);
+  assert.equal(multitenantB.corroboration_key, `org:${fixture.orgs.multitenantB}`);
+  assert.deepEqual(multitenantA.corroborated_org_ids.map(String), [String(fixture.orgs.multitenantA)]);
+  assert.deepEqual(multitenantB.corroborated_org_ids.map(String), [String(fixture.orgs.multitenantB)]);
 }

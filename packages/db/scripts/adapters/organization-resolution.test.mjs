@@ -3,9 +3,30 @@ import test from 'node:test';
 
 import {
   OrganizationIdentityConflictError,
+  classifyStrongIdentityKey,
   isOrganizationIdentityConflict,
   resolveOrganizationOwner,
 } from './organization-resolution.mjs';
+
+const MULTITENANT_DOMAIN_KEYS = [
+  'domain:foo.github.io',
+  'domain:bar.notion.site',
+  'domain:tenant.wixsite.com',
+  'domain:tenant.blogspot.com',
+  'domain:foo.co.in',
+  'domain:foo.com.sg',
+  'domain:foo.co.za',
+];
+
+test('rejects public-suffix and multitenant domains as strong identities', () => {
+  for (const key of MULTITENANT_DOMAIN_KEYS) {
+    assert.equal(classifyStrongIdentityKey(key), null, `must reject ${key}`);
+  }
+  assert.deepEqual(classifyStrongIdentityKey('domain:company.ru'), {
+    key: 'domain:company.ru',
+    type: 'domain',
+  });
+});
 
 test('identity ambiguity is exposed as a typed fail-closed rejection', async () => {
   const client = {
