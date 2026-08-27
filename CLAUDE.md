@@ -51,7 +51,7 @@ A company hiring an internal recruiter is NOT a hot signal by itself.
 
 Short, actionable, stateful. Each lead: company, score, confidence, why now, evidence summary, best angle, safe next action.
 
-Inline buttons: `Беру / Мимо / Позже / Уже написал / Ответили / Созвон / Клиент / Скрыть похожие`.
+Inline buttons: `Беру / Мимо / Позже / Уже написал / Ответили / Созвон / Клиент / Скрыть`.
 
 Callback handling: authenticated, idempotent, logged, replay-safe, connected to digest candidate state, reflected in future suppression/reweighting.
 
