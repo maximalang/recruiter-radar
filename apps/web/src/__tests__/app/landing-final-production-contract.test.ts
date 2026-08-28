@@ -16,10 +16,10 @@ describe("landing final production contract", () => {
     const heroCss = source("app/landing/detection-scene.module.css");
 
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
-    expect(hero).toContain("Компании, которым стоит написать сегодня.");
-    expect(hero).toContain('data-hero-layout="ambient-radar"');
+    expect(hero).toContain("Список компаний, где найм уже идёт");
+    expect(hero).toContain('data-hero-layout="morning-list"');
     expect(hero).toContain('data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
-    expect(hero).toContain("Посмотреть пример");
+    expect(hero).toContain("Открыть пример");
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain('data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}');
     expect(hero).toContain('data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}');
@@ -41,10 +41,10 @@ describe("landing final production contract", () => {
     expect(conversion).toContain('data-pricing-layout="pilot-decision"');
     expect(conversion).toContain('data-faq-layout="centered"');
     expect(conversion).toContain("Попробовать 7 дней —");
-    expect(conversion).toContain("Проверьте радар на своей нише за 7 дней");
-    expect(browserAudit).toContain("Проверьте радар на своей нише за 7 дней");
+    expect(conversion).toContain("Полноценная неделя работы");
+    expect(browserAudit).toContain("Полноценная неделя работы");
     expect(conversion).toContain("Запустить на 7 дней");
-    expect(conversion).toContain("Разовая оплата · без автопродления");
+    expect(conversion).toContain("Разовая оплата · доступ открывается сразу · без автопродления");
     expect(conversion).toContain("После пилота");
     expect(conversion).toContain("Коротко о главном");
 
@@ -105,5 +105,88 @@ describe("landing final production contract", () => {
     expect(faq).not.toContain("email digest");
     expect(faq).not.toContain("browser push");
     expect(faq).not.toContain("signed HTTPS webhook");
+  });
+
+  test("landing makes no delivery-cadence promises and demo dates stay fixed", () => {
+    // Regression guard for the critic blocker: while Source Refresh Clock has
+    // no live-proof, landing copy must not promise a daily/morning cadence and
+    // demo freshness must come from a fixed labeled scenario, not `new Date()`.
+    const cadenceFiles = [
+      source("app/landing/detection-scene.tsx"),
+      source("app/landing/conversion-panel.tsx"),
+      source("app/landing/workspace-scene.tsx"),
+      source("app/landing/hero-product-preview.tsx"),
+      source("app/home-page-content.tsx"),
+      source("app/api/telegram/webhook/route.ts"),
+      source("lib/email/digestEmail.ts"),
+      source("lib/pricingCatalog.ts"),
+    ];
+
+    for (const file of cadenceFiles) {
+      expect(file).not.toMatch(/каждое утро/i);
+      expect(file).not.toMatch(/каждый день/i);
+      expect(file).not.toMatch(/ежедневн/i);
+    }
+    expect(source("app/landing/detection-scene.tsx")).not.toMatch(/утренн/i);
+
+    // Relative-freshness phrasing is banned on the landing: demo facts must
+    // carry an absolute, labeled scenario date instead of "N days ago".
+    for (const file of [
+      source("app/landing/signal-timeline.tsx"),
+      source("app/landing/hero-product-preview.tsx"),
+      source("lib/landing-demo.ts"),
+    ]) {
+      expect(file).not.toMatch(/дней назад|дня назад|час назад|только что/i);
+      expect(file).not.toMatch(/(^|[^\S])вчера(?![а-я])/i);
+    }
+    const timeline = source("app/landing/signal-timeline.tsx");
+    expect(timeline).toContain("6 мая · демо-сценарий");
+    expect(timeline).toContain("10 мая · демо-сценарий");
+    expect(timeline).toContain("11 мая · демо-сценарий");
+    expect(timeline).toContain("STORY.company.freshness");
+
+    // Demo story freshness is an explicit fixed date, never "today".
+    const demoStory = source("lib/landing-demo.ts");
+    expect(demoStory).toContain("демо-сценарий");
+    expect(demoStory).toMatch(/12 мая/);
+    expect(demoStory).toContain('eventDate: "6 мая · демо-сценарий"');
+    expect(demoStory).toContain('eventDate: "10 мая · демо-сценарий"');
+    expect(demoStory).not.toMatch(/freshness:\s*"сегодня"/);
+
+    // Demo evidence facts carry an absolute date too; no relative windows.
+    expect(source("app/landing/landing-copy.ts")).not.toMatch(
+      /за последние (семь|7) дней/,
+    );
+
+    // No relative freshness for demo facts anywhere on the landing surface:
+    // every dated event is anchored to the fixed scenario (12 мая 2026).
+    const relativeFreshnessFiles = [
+      source("app/landing/signal-timeline.tsx"),
+      source("app/landing/workspace-scene.tsx"),
+      source("app/landing/evidence-scene.tsx"),
+      source("app/landing/hero-product-preview.tsx"),
+      source("app/landing/detection-scene.tsx"),
+      source("lib/landing-demo.ts"),
+      source("app/landing/landing-copy.ts"),
+    ];
+
+    for (const file of relativeFreshnessFiles) {
+      expect(file).not.toMatch(/дней назад/i);
+      expect(file).not.toMatch(/дня назад/i);
+      expect(file).not.toMatch(/\bвчера\b/i);
+      expect(file).not.toMatch(/час назад/i);
+      expect(file).not.toMatch(/только что/i);
+      expect(file).not.toMatch(/за последние \d+ (дн|нед)/i);
+    }
+
+    // Timeline and demo story agree with the fixed anchor dates.
+    expect(timeline).toContain("6 мая · демо-сценарий");
+    expect(timeline).toContain("10 мая · демо-сценарий");
+    expect(timeline).toContain("11 мая · демо-сценарий");
+    expect(timeline).toContain("STORY.company.freshness");
+    // Demo fallback items use hard-coded dates; no wall-clock generation.
+    const publicProduct = source("lib/publicProduct.ts");
+    expect(publicProduct).toContain('demoAnchorDate = "2026-05-12T09:00:00.000Z"');
+    expect(publicProduct).toMatch(/function buildPublicDemoDigestItems\(\)/);
   });
 });

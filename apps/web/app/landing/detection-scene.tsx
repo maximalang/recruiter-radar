@@ -5,7 +5,7 @@ import {
   LANDING_ANALYTICS_EVENT,
 } from "../../lib/landing-analytics-contract";
 import { ArrowGlyph } from "./brand-glyphs";
-import HeroSignalField from "./hero-signal-field";
+import HeroProductPreview from "./hero-product-preview";
 import sceneStyles from "./detection-scene.module.css";
 
 export default function DetectionScene(props: { previewHref: string; paymentConfigured: boolean }) {
@@ -16,29 +16,16 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
       aria-labelledby="detection-title"
       data-theme="inverse"
       data-header-tone="dark"
-      data-hero-layout="ambient-radar"
+      data-hero-layout="morning-list"
       data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}
     >
-      <div className={sceneStyles.fieldFigure} data-hero-visual data-mobile-hero-signal>
-        <HeroSignalField />
-      </div>
-
-      <div className={sceneStyles.kicker}>
-        <span className={sceneStyles.kickerRule} aria-hidden="true" />
-        <span>Радар клиентских возможностей</span>
-        <span className={sceneStyles.kickerMeta}>Сигнал → факт → повод</span>
-      </div>
-
       <div className={sceneStyles.copy} data-hero-copy>
-        <p className={sceneStyles.serviceLabel}>Поиск новых клиентов для рекрутинговых агентств</p>
+        <p className={sceneStyles.serviceLabel}>Публичные данные о найме · источник и дата по каждому факту</p>
         <h1 id="detection-title" className={sceneStyles.title} data-hero-title>
-          Компании, которым стоит написать сегодня.
+          Список компаний, где найм уже идёт
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Recruiter Radar отслеживает свежие изменения в найме и показывает, где появился реальный повод предложить подбор — с фактами и источниками по каждой компании.
-        </p>
-        <p className={sceneStyles.visuallyHidden}>
-          Схема показывает несколько подтверждающих сигналов найма, объединённых в одну клиентскую возможность.
+          Приоритетный список компаний с сигналами найма: почему компания в списке, какие факты это подтверждают и с чего начать контакт.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a
@@ -47,7 +34,7 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Посмотреть пример <ArrowGlyph />
+            Открыть пример <ArrowGlyph />
           </a>
           <span className={sceneStyles.actionHint}>Настройте нишу и географию · без регистрации</span>
         </div>
@@ -57,6 +44,10 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
             ? "7 дней · 990 ₽ · без автопродления · сообщения отправляете вы"
             : "7 дней · заявка без списания · сообщения отправляете вы"}
         </p>
+      </div>
+
+      <div className={sceneStyles.fieldFigure} data-hero-visual data-mobile-hero-signal>
+        <HeroProductPreview />
       </div>
     </section>
   );

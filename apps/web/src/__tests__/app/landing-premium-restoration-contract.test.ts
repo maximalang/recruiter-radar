@@ -89,13 +89,16 @@ describe("landing premium restoration contract", () => {
     expect(timelineCss).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
-  it("keeps the hero description paired with one static screen-reader account of the scheme", () => {
+  it("keeps the hero description self-sufficient for screen readers", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const heroCss = source("app/landing/detection-scene.module.css");
 
+    // The priority-list description names the product value directly and makes
+    // no delivery-cadence promise; no extra screen-reader account is needed.
     expect(hero).toContain(
-      "Схема показывает несколько подтверждающих сигналов найма, объединённых в одну клиентскую возможность.",
+      "Приоритетный список компаний с сигналами найма: почему компания в списке, какие факты это подтверждают и с чего начать контакт.",
     );
+    expect(hero).not.toContain("со свежими сигналами");
     expect(heroCss).toContain(".visuallyHidden");
   });
 

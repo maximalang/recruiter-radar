@@ -188,12 +188,142 @@
   position: absolute;
   z-index: 2;
   top: 50%;
-  right: clamp(-13rem, -9vw, -5rem);
-  width: min(58vw, 53rem);
-  aspect-ratio: 1;
+  right: clamp(0rem, 2vw, 3.5rem);
+  width: min(44vw, 42rem);
   overflow: visible;
-  opacity: .66;
-  transform: translateY(-47%);
+  opacity: 1;
+  transform: translateY(-50%);
+}
+
+/* Concept-2 product panel: dark browser-chrome window with a demo lead card.
+ * Static illustration — clearly labeled "Демо-данные", no freshness claims. */
+.productShot {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 24%, transparent);
+  border-radius: var(--radius-overlay);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--color-surface-elevated) 92%, transparent),
+      color-mix(in srgb, var(--color-surface-primary) 96%, transparent));
+  box-shadow: var(--shadow-overlay);
+  text-align: left;
+}
+.shotBar {
+  display: flex;
+  align-items: center;
+  gap: .42rem;
+  padding: .78rem 1.1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-primary) 12%, transparent);
+}
+.shotDot {
+  width: .62rem;
+  height: .62rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-text-primary) 20%, transparent);
+}
+.shotTitle {
+  margin-left: .5rem;
+  color: color-mix(in srgb, var(--color-text-primary) 66%, transparent);
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  letter-spacing: .04em;
+}
+.shotDemoTag {
+  margin-left: auto;
+  padding: .22rem .6rem;
+  border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 46%, transparent);
+  border-radius: var(--radius-pill);
+  color: var(--color-signal-on-dark);
+  font-family: var(--font-mono);
+  font-size: .58rem;
+  font-weight: 650;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.shotBody {
+  display: grid;
+  grid-template-columns: minmax(0, .78fr) minmax(0, 1.22fr);
+}
+.shotSide {
+  display: grid;
+  gap: .55rem;
+  align-content: start;
+  padding: 1.05rem 1.1rem;
+  border-right: 1px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+  color: color-mix(in srgb, var(--color-text-primary) 58%, transparent);
+  font-size: .74rem;
+  line-height: 1.45;
+}
+.shotSideActive {
+  padding: .38rem .55rem;
+  margin: -.38rem -.55rem;
+  border-left: 2px solid var(--color-signal);
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+  background: color-mix(in srgb, var(--color-signal) 9%, transparent);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+.shotSideNote {
+  font-family: var(--font-mono);
+  font-size: .58rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .75;
+}
+.shotContent {
+  padding: 1.15rem 1.3rem 1.3rem;
+}
+.shotTag {
+  margin: 0 0 .5rem;
+  color: var(--color-signal-hover);
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  font-weight: 650;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.shotCompany {
+  margin: 0 0 .85rem;
+  font-size: 1.02rem;
+  font-weight: 640;
+  letter-spacing: -.01em;
+}
+.shotTable {
+  display: grid;
+  gap: .55rem;
+  margin: 0;
+}
+.shotRow {
+  display: grid;
+  grid-template-columns: 7.2rem minmax(0, 1fr);
+  gap: .8rem;
+  padding: .5rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent);
+  font-size: .76rem;
+  line-height: 1.45;
+}
+.shotRow dt {
+  color: color-mix(in srgb, var(--color-text-primary) 56%, transparent);
+  font-weight: 620;
+}
+.shotRow dd { margin: 0; }
+.shotDemoNote {
+  margin-left: .45rem;
+  padding: .1rem .38rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-primary) 22%, transparent);
+  border-radius: var(--radius-pill);
+  color: color-mix(in srgb, var(--color-text-primary) 60%, transparent);
+  font-family: var(--font-mono);
+  font-size: .52rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.shotNext {
+  margin: .85rem 0 0;
+  color: color-mix(in srgb, var(--color-text-primary) 72%, transparent);
+  font-size: .76rem;
 }
 
 .loginLink {
@@ -229,7 +359,8 @@
 
 @media (max-width: 1279px) {
   .title { font-size: clamp(3.15rem, 5.8vw, 4.6rem); }
-  .fieldFigure { right: -13rem; width: min(72vw, 47rem); }
+  .fieldFigure { right: 1rem; width: min(46vw, 38rem); }
+  .shotRow { grid-template-columns: 6.2rem minmax(0, 1fr); }
 }
 
 @media (max-width: 959px) {
@@ -237,7 +368,20 @@
   .kicker { top: 5.8rem; left: var(--page-gutter); }
   .copy { width: min(100%, 42rem); margin-top: 2rem; }
   .title { max-width: 10.5ch; font-size: clamp(3.1rem, 8.5vw, 4.7rem); }
-  .fieldFigure { top: 45%; right: -15rem; width: min(88vw, 42rem); opacity: .36; pointer-events: none; }
+  /* Product panel becomes a full-width block under the copy — readable, not cropped. */
+  .section { grid-template-columns: minmax(0, 1fr); }
+  .fieldFigure {
+    position: relative;
+    top: auto;
+    right: auto;
+    transform: none;
+    width: min(100%, 34rem);
+    margin-top: .5rem;
+    opacity: 1;
+    pointer-events: none;
+  }
+  .shotSide { display: none; }
+  .shotBody { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 600px) {
@@ -246,18 +390,15 @@
   .kickerRule { width: 1.5rem; }
   .kickerMeta { margin-left: auto; }
   .copy { margin-top: 1.5rem; }
+  /* Compact demo evidence strip stays near the fold: H1 -> CTA -> panel. */
   .title { max-width: 9.8ch; font-size: clamp(3rem, 13vw, 4rem); }
   .description { max-width: 29rem; font-size: .93rem; line-height: 1.55; }
   .actions { align-items: flex-start; flex-direction: column; gap: .55rem; }
   .actionHint { max-width: 20rem; }
-  .fieldFigure { top: 7.2rem; right: -8.7rem; width: 21rem; opacity: .3; transform: none; }
-}
-
-@media (max-width: 480px) {
-  .section { min-height: auto; padding-inline: 1rem; }
-  .title { font-size: clamp(2.7rem, 12.4vw, 3.4rem); }
-  .description { font-size: .92rem; }
-  .fieldFigure { top: 6.8rem; right: -9.5rem; width: 18rem; opacity: .26; transform: none; }
+  .fieldFigure { width: 100%; }
+  .shotContent { padding: .95rem 1rem 1.05rem; }
+  .shotRow { grid-template-columns: minmax(0, 1fr); gap: .15rem; padding: .45rem 0; }
+  .shotCompany { font-size: .95rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

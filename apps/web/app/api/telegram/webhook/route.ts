@@ -126,7 +126,7 @@ export async function POST(request: Request) {
             [chatId, telegramUsername, `tg:${chatId}@telegram`, telegramUsername]
           );
           await sendTelegramTextMessage(
-            "Радар активирован. Ежедневный дайджест будет приходить сюда.\n\nЧтобы подключить профиль агентства, используйте ссылку из личного кабинета.",
+            "Радар активирован. Дайджесты будут приходить сюда.\n\nЧтобы подключить профиль агентства, используйте ссылку из личного кабинета.",
             { botToken, chatId }
           ).catch(() => {});
         } catch (error) {

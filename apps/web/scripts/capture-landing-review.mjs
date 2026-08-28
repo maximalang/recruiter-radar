@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -97,16 +98,37 @@ async function resetInteractionState(page) {
 
 async function preparePage(context, targetUrl = baseUrl) {
   const page = await context.newPage();
+  const consoleMessages = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") {
+      consoleMessages.push({ type: message.type(), text: message.text() });
+    }
+  });
+  page.on("pageerror", (error) => consoleMessages.push({ type: "pageerror", text: error.message }));
+  pageConsoleMessages.set(page, consoleMessages);
   await page.route("**/api/landing-events", (route) => route.fulfill({ status: 204 }));
   await page.route("https://mc.yandex.ru/metrika/tag.js", (route) => route.fulfill({
     status: 200,
     contentType: "application/javascript",
     body: "/* deterministic analytics loader stub for review capture */",
   }));
-  await page.goto(targetUrl, { waitUntil: "networkidle" });
+  await page.goto(targetUrl, { waitUntil: "load", timeout: 30_000 });
+  await page.waitForLoadState("load", { timeout: 30_000 });
+  // Bounded readiness instead of networkidle: keep-alive sessions and analytics
+  // stubs can hold the network busy forever. DOM landmarks plus hydration state
+  // are deterministic; a short settle window lets late layout settle without
+  // masking genuinely pending requests.
   await page.locator('[data-landing-experience="signal-lock"]').waitFor({ state: "attached" });
   await page.locator("#scene-detection").waitFor({ state: "visible" });
   await page.locator("#preview-results").waitFor({ state: "attached" });
+  await page.waitForFunction(
+    () => document.readyState === "complete"
+      && Array.from(document.querySelectorAll("script"))
+        .some((script) => script.src.includes("/_next/static/chunks/")),
+    undefined,
+    { timeout: 30_000 },
+  );
+  await page.waitForTimeout(160);
 
   const consent = page.getByRole("button", { name: "Разрешить", exact: true });
   if (await consent.isVisible()) {
@@ -296,15 +318,38 @@ const manifest = {
   hero320: null,
 };
 
+// Console/pageerror gate: captures must prove a clean render state. Any
+// browser error or warning fails the capture run WITH the manifest so the
+// artifacts can be inspected, but the run is never reported as ok.
+const consoleGate = [];
+const pageConsoleMessages = new Map();
+function recordConsoleMessages(label, page) {
+  for (const message of pageConsoleMessages.get(page) ?? []) {
+    consoleGate.push({ viewport: label, ...message });
+  }
+}
+function assertCleanConsole() {
+  assert.deepEqual(
+    consoleGate,
+    [],
+    `capture: browser console warnings/errors: ${JSON.stringify(consoleGate)}`,
+  );
+}
+
 try {
   for (const viewport of viewports) {
     const context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
       reducedMotion: "reduce",
     });
-    const page = await preparePage(context);
+    // Aggregate console/pageerror in `finally` of each viewport so late errors
+    // from hover/click/scroll/screenshot phases are captured too — including
+    // when a capture step itself throws.
+    let page;
+    try {
+      page = await preparePage(context);
 
-    manifest.heroLogin320 = await captureHeroLoginInteraction(page, viewport.name) ?? manifest.heroLogin320;
+      manifest.heroLogin320 = await captureHeroLoginInteraction(page, viewport.name) ?? manifest.heroLogin320;
 
     await resetInteractionState(page);
     const closedHeight = await documentHeight(page);
@@ -369,14 +414,23 @@ try {
         animations: "disabled",
       });
     }
-
-    await context.close();
+    } finally {
+      recordConsoleMessages(viewport.name, page);
+      await context.close();
+    }
   }
 } finally {
   await browser.close();
 }
 
-await writeFile(path.join(reviewDirectory, "manifest.json"), JSON.stringify(manifest, null, 2));
+// Fail-closed: browser errors captured during any viewport invalidate the
+// evidence. Write the manifest first so artifacts remain inspectable, then
+// throw instead of reporting ok.
+await writeFile(path.join(reviewDirectory, "manifest.json"), JSON.stringify({
+  ...manifest,
+  consoleMessages: consoleGate,
+}, null, 2));
+assertCleanConsole();
 await writeFile(
   path.join(reviewDirectory, "provenance.json"),
   JSON.stringify({

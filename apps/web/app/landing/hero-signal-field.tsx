@@ -149,7 +149,7 @@ export default function HeroSignalField() {
 
       {/* Two annotations maximum: one dominant, one whisper-quiet. */}
       <div className={styles.annotation}>
-        <small className={styles.annotationEyebrow}>Свежий сигнал</small>
+        <small className={styles.annotationEyebrow}>Подтверждённый сигнал</small>
         <strong className={styles.annotationCompany}>{STORY.company.name}</strong>
         <span className={styles.annotationLine}>{STORY.company.signal}</span>
         <small className={styles.annotationMeta}>{dominantMeta}</small>

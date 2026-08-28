@@ -97,7 +97,7 @@ describe("public preview resilience", () => {
     reportFallback.mockRestore();
   });
 
-  it("keeps static demo freshness relative to the request date", async () => {
+  it("serves the fixed demo scenario with an explicit fact date, not wall-clock freshness", async () => {
     jest.useFakeTimers().setSystemTime(new Date("2026-08-18T12:00:00.000Z"));
     const reportFallback = jest.spyOn(console, "info").mockImplementation(() => undefined);
     mockGetHhDigestItems.mockResolvedValueOnce([]);
@@ -105,7 +105,10 @@ describe("public preview resilience", () => {
     const state = await getPublicSampleDigestState(readPublicPreviewInput({}));
     const newestPublishedAt = new Date(state.items[0].latest_published_at).getTime();
 
-    expect(Date.now() - newestPublishedAt).toBeLessThan(24 * 60 * 60 * 1000);
+    // Demo data must NOT track the request date: it stays pinned to the
+    // labeled scenario (12 мая) so the landing never implies live freshness.
+    expect(state.isLive).toBe(false);
+    expect(newestPublishedAt).toBe(Date.parse("2026-05-12T09:00:00.000Z"));
 
     reportFallback.mockRestore();
     jest.useRealTimers();
