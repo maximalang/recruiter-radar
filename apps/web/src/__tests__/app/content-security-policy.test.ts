@@ -9,6 +9,7 @@ describe('Content Security Policy', () => {
     expect(policy).toContain("https://mc.yandex.com");
     expect(policy).toContain("wss://mc.yandex.ru");
     expect(policy).toContain("wss://mc.yandex.com");
+    expect(policy).toContain(`frame-src https://mc.yandex.ru https://mc.yandex.com`);
     expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).not.toContain(' ws:');
   });
