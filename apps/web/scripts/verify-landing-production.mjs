@@ -90,7 +90,7 @@ async function resolveAnalyticsConsent(page) {
     return;
   }
 
-  await dialog.getByRole("button", { name: "Разрешить", exact: true }).click();
+  await dialog.getByRole("button", { name: "Принять аналитику", exact: true }).click();
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "Настройки cookies" }).waitFor({ state: "visible" });
 }

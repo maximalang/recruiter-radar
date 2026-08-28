@@ -1,22 +1,45 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import {
-  PageFrame,
-  SectionIntro,
-  SummaryRow,
-  SurfaceCard,
-} from "../ui/page-primitives";
+import { LEGAL_DOCUMENTS } from "@/lib/legalDocuments";
+import { OPERATOR_REQUISITES } from "@/lib/operatorRequisites";
+import { PageFrame, SectionIntro, SummaryRow, SurfaceCard } from "../ui/page-primitives";
 import { LegalDocumentNav } from "../ui/legal-document-nav";
 import { SiteFooter } from "../ui/site-footer";
-import { OPERATOR_REQUISITES } from "../../lib/operatorRequisites";
 import s from "../ui/legal-document.module.css";
 
 export const metadata: Metadata = {
-  title: "Реквизиты продавца — Recruiter Radar",
-  description: "Публичные реквизиты самозанятого продавца и оператора Recruiter Radar.",
+  title: "Реквизиты продавца и правовые документы — Recruiter Radar",
+  description:
+    "Публичные реквизиты самозанятого продавца и оператора Recruiter Radar, действующие редакции оферты, политики, согласия и правил сервиса.",
   robots: { index: true, follow: true },
 };
+
+const DOCUMENT_GROUPS: ReadonlyArray<{
+  group: string;
+  documents: ReadonlyArray<{ href: string; label: string; revisionKey?: keyof typeof LEGAL_DOCUMENTS; note?: string }>;
+}> = [
+  {
+    group: "Условия",
+    documents: [
+      { href: "/terms", label: "Публичная оферта", revisionKey: "terms" },
+      { href: "/payment-and-refund", label: "Оплата и возврат", revisionKey: "paymentAndRefund" },
+      { href: "/acceptable-use", label: "Правила использования", revisionKey: "acceptableUse" },
+    ],
+  },
+  {
+    group: "Персональные данные",
+    documents: [
+      { href: "/privacy", label: "Политика обработки", revisionKey: "privacy" },
+      { href: "/personal-data-consent", label: "Согласие на обработку", revisionKey: "personalDataConsent" },
+      { href: "/data-policy", label: "Публичные источники и исправление данных", revisionKey: "dataPolicy" },
+    ],
+  },
+  {
+    group: "Cookies и аналитика",
+    documents: [{ href: "/cookies", label: "Cookies и аналитика", revisionKey: "cookies" }],
+  },
+] as const;
 
 export default function LegalPage() {
   const requisites = OPERATOR_REQUISITES;
@@ -60,7 +83,7 @@ export default function LegalPage() {
             />
             <SummaryRow
               label="Телефон"
-              value={<a href="tel:+79009666092" style={{ color: "inherit" }}>{requisites.phone}</a>}
+              value={<a href={`tel:${requisites.phone.replace(/[^+\d]/g, "")}`} style={{ color: "inherit" }}>{requisites.phone}</a>}
             />
             <SummaryRow
               label="Сайт"
@@ -74,19 +97,41 @@ export default function LegalPage() {
         </p>
 
         <div className={s.docBody}>
-          <LegalSection n="1" title="Оплата и чек">
-            <p>Оплата проводится через защищённую платёжную страницу Robokassa. Продавец применяет НПД и после получения расчёта формирует электронный чек через «Мой налог» или подключённый сервис «Робочеки СМЗ».</p>
-            <p>При покупке от ООО или ИП указывается ИНН покупателя для корректного оформления чека. Подробный порядок размещён на странице <Link href="/payment-and-refund" className={s.docLink}>«Оплата и возврат»</Link>.</p>
-          </LegalSection>
+          <section className={s.docClause}>
+            <h2 className={s.docClauseTitle}>Действующие документы</h2>
+            <div className={s.docClauseText}>
+              <p>Актуальные редакции правовых документов сервиса. Для каждого заказа фиксируются ревизии принятых документов на момент оформления.</p>
+              <div className={s.docTableWrap}>
+                <table className={s.docTable}>
+                  <thead><tr><th scope="col">Документ</th><th scope="col">Редакция от</th></tr></thead>
+                  <tbody>
+                    {DOCUMENT_GROUPS.flatMap((group) => group.documents).map((document) => (
+                      <tr key={document.href}>
+                        <td><Link href={document.href} className={s.docLink}>{document.label}</Link></td>
+                        <td>{document.revisionKey ? LEGAL_DOCUMENTS[document.revisionKey].displayDate : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
 
-          <LegalSection n="2" title="Поддержка и юридически значимые обращения">
-            <p>Вопросы по заказу, доступу, чеку, возврату и персональным данным направляются на <a href={`mailto:${requisites.email}`} className={s.docLink}>{requisites.email}</a>. В обращении следует указать e-mail аккаунта и номер заказа, если он уже создан.</p>
-            <p>Телефон поддержки: <a href="tel:+79009666092" className={s.docLink}>{requisites.phone}</a>. Письменный канал является основным для фиксации содержания и даты обращения.</p>
-          </LegalSection>
+          <section className={s.docClause}>
+            <h2 className={s.docClauseTitle}>1. Оплата и чек</h2>
+            <div className={s.docClauseText}>
+              <p>Оплата проводится через защищённую платёжную страницу Robokassa. Продавец применяет НПД и после получения расчёта формирует электронный чек через «Мой налог» или подключённый сервис «Робочеки СМЗ».</p>
+              <p>При покупке от ООО или ИП указывается ИНН покупателя для корректного оформления чека. Подробный порядок размещён на странице <Link href="/payment-and-refund" className={s.docLink}>«Оплата и возврат»</Link>.</p>
+            </div>
+          </section>
 
-          <LegalSection n="3" title="Связанные документы">
-            <p>Условия оказания услуги содержатся в <Link href="/terms" className={s.docLink}>публичной оферте</Link>, правила обработки данных — в <Link href="/privacy" className={s.docLink}>политике обработки персональных данных</Link>, отдельное согласие — на странице <Link href="/personal-data-consent" className={s.docLink}>«Согласие ПДн»</Link>.</p>
-          </LegalSection>
+          <section className={s.docClause}>
+            <h2 className={s.docClauseTitle}>2. Поддержка и юридически значимые обращения</h2>
+            <div className={s.docClauseText}>
+              <p>Вопросы по заказу, доступу, чеку, возврату и персональным данным направляются на <a href={`mailto:${requisites.email}`} className={s.docLink}>{requisites.email}</a>. В обращении следует указать e-mail аккаунта и номер заказа, если он уже создан.</p>
+              <p>Телефон поддержки: <a href={`tel:${requisites.phone.replace(/[^+\d]/g, "")}`} className={s.docLink}>{requisites.phone}</a>. Письменный канал является основным для фиксации содержания и даты обращения.</p>
+            </div>
+          </section>
         </div>
       </section>
       <SiteFooter />
@@ -100,14 +145,5 @@ function Summary({ label, value }: { label: string; value: string }) {
       <span className={s.docSummaryLabel}>{label}</span>
       <span className={s.docSummaryValue}>{value}</span>
     </div>
-  );
-}
-
-function LegalSection({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
-  return (
-    <section className={s.docClause}>
-      <h2 className={s.docClauseTitle}>{n}. {title}</h2>
-      <div className={s.docClauseText}>{children}</div>
-    </section>
   );
 }

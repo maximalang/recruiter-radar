@@ -13,6 +13,8 @@
     "test": "jest",
     "test:types": "tsc -p tsconfig.test.json --noEmit",
     "test:landing:e2e": "node scripts/run-landing-production-audit.mjs",
+    "test:cookie-consent": "node scripts/verify-cookie-consent.mjs",
+    "test:legal-pages": "node scripts/verify-legal-pages.mjs",
     "test:landing:review-captures": "node scripts/capture-landing-review.mjs",
     "test:landing:pre218-captures": "node scripts/capture-landing-pre218.mjs",
     "payments:robokassa:site-criteria": "node scripts/verify-robokassa-site-criteria.mjs",
