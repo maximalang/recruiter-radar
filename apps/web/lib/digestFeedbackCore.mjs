@@ -1,3 +1,15 @@
+/**
+ * @typedef {'accepted'|'badfit'|'dismissed'|'snooze'|'contacted'|'replied'|'meeting'|'won'} DigestFeedbackAction
+ * @typedef {Object} DigestFeedbackInput
+ * @property {string|number} clientProfileId
+ * @property {string|number|null} [orgId] Canonical decimal BIGSERIAL string or safe integer.
+ * @property {string|number|null} [digestCandidateId] Canonical decimal BIGSERIAL string or safe integer.
+ * @property {DigestFeedbackAction} action
+ * @property {string|null} [note]
+ * @property {number|null} [snoozeDays]
+ * @property {number|null} [suppressionDays]
+ */
+
 export const DIGEST_FEEDBACK_ACTIONS = [
   'accepted',
   'badfit',
@@ -5,6 +17,7 @@ export const DIGEST_FEEDBACK_ACTIONS = [
   'snooze',
   'contacted',
   'replied',
+  'meeting',
   'won',
 ];
 
@@ -13,10 +26,12 @@ const MAX_SUPPRESSION_DAYS = 365;
 const DEFAULT_SNOOZE_DAYS = 7;
 const MAX_SNOOZE_DAYS = 90;
 
+/** @param {unknown} value @returns {value is DigestFeedbackAction} */
 export function isDigestFeedbackAction(value) {
   return typeof value === 'string' && DIGEST_FEEDBACK_ACTIONS.includes(value);
 }
 
+/** @param {{ action: DigestFeedbackAction, paramOffset?: number, snoozeDays?: number|null, suppressionDays?: number|null }} input */
 export function buildDigestFeedbackActionPlan(input) {
   const offset = input.paramOffset ?? 0;
   switch (input.action) {
@@ -33,6 +48,15 @@ export function buildDigestFeedbackActionPlan(input) {
     case 'replied':
       return {
         feedbackStatus: 'replied',
+        cooldownSql: 'NULL',
+        suppressedSql: "'infinity'::timestamptz",
+        cooldownUpdateSql: 'NULL',
+        suppressedUpdateSql: "'infinity'::timestamptz",
+        extraParams: [],
+      };
+    case 'meeting':
+      return {
+        feedbackStatus: 'meeting',
         cooldownSql: 'NULL',
         suppressedSql: "'infinity'::timestamptz",
         cooldownUpdateSql: 'NULL',
@@ -78,6 +102,7 @@ export function buildDigestFeedbackActionPlan(input) {
   }
 }
 
+/** @param {DigestFeedbackInput} input @param {{ query: Function }} db */
 export async function updateDigestOrgStateFeedbackCore(input, db) {
   if (!db) {
     throw new Error('DATABASE_URL is not set.');
@@ -101,7 +126,7 @@ export async function updateDigestOrgStateFeedbackCore(input, db) {
   const candidateContext = digestCandidateId == null
     ? null
     : await getDigestCandidateContext({ clientProfileId, digestCandidateId }, db);
-  const orgId = explicitOrgId ?? (candidateContext ? Number(candidateContext.orgId) : null);
+  const orgId = explicitOrgId ?? (candidateContext ? String(candidateContext.orgId) : null);
 
   if (digestCandidateId != null && !candidateContext && explicitOrgId == null) {
     throw new Error('Digest candidate not found for this client profile.');
@@ -156,6 +181,18 @@ export async function updateDigestOrgStateFeedbackCore(input, db) {
       last_source_external_id = COALESCE(EXCLUDED.last_source_external_id, client_digest_org_state.last_source_external_id),
       last_source_display_name = COALESCE(EXCLUDED.last_source_display_name, client_digest_org_state.last_source_display_name),
       updated_at = NOW()
+    WHERE (
+      $3::BIGINT IS NULL
+      OR client_digest_org_state.last_digest_candidate_id IS NULL
+      OR client_digest_org_state.last_digest_candidate_id = $3::BIGINT
+    )
+    AND CASE client_digest_org_state.feedback_status::TEXT
+      WHEN 'won' THEN EXCLUDED.feedback_status = 'won'
+      WHEN 'meeting' THEN EXCLUDED.feedback_status IN ('meeting', 'won')
+      WHEN 'replied' THEN EXCLUDED.feedback_status IN ('replied', 'meeting', 'won')
+      WHEN 'contacted' THEN EXCLUDED.feedback_status IN ('contacted', 'replied', 'meeting', 'won')
+      ELSE TRUE
+    END
     RETURNING
       client_profile_id::TEXT AS "clientProfileId",
       org_id::TEXT AS "orgId",
@@ -178,7 +215,28 @@ export async function updateDigestOrgStateFeedbackCore(input, db) {
     ...actionConfig.extraParams,
   ]);
 
-  return result.rows[0];
+  if (result.rows[0]) return result.rows[0];
+
+  // A stale callback is an expected no-op, not a failed delivery. Return the
+  // current row after the CAS rejected an older candidate or a downgrade.
+  const current = await db.query(`
+    SELECT
+      client_profile_id::TEXT AS "clientProfileId",
+      org_id::TEXT AS "orgId",
+      feedback_status::TEXT AS "feedbackStatus",
+      feedback_at::TEXT AS "feedbackAt",
+      feedback_note AS "feedbackNote",
+      cooldown_until::TEXT AS "cooldownUntil",
+      suppressed_until::TEXT AS "suppressedUntil",
+      last_digest_candidate_id::TEXT AS "lastDigestCandidateId",
+      last_digest_run_id::TEXT AS "lastDigestRunId",
+      updated_at::TEXT AS "updatedAt"
+    FROM client_digest_org_state
+    WHERE client_profile_id = $1 AND org_id = $2
+    LIMIT 1
+  `, [clientProfileId, orgId]);
+  if (current.rows[0]) return current.rows[0];
+  throw new Error('Digest feedback transition was superseded before state creation.');
 }
 
 async function getDigestCandidateContext(input, db) {
@@ -216,11 +274,35 @@ function clampSnoozeDays(value) {
 }
 
 function normalizePositiveInteger(value, message) {
-  const normalizedValue = typeof value === 'number' ? value : Number(value);
+  const raw = typeof value === 'string' && value.trim() !== ''
+    ? value.trim()
+    : value;
+  const normalizedValue = typeof raw === 'number' ? raw : Number(raw);
   if (!Number.isInteger(normalizedValue) || normalizedValue <= 0) {
     throw new Error(message);
   }
-  return normalizedValue;
+  // PostgreSQL BIGSERIAL is signed int64; number precision degrades above
+  // Number.MAX_SAFE_INTEGER (2^53), so the decimal digit string is validated
+  // against the BIGSERIAL range directly. Beyond-range ids are rejected and
+  // in-range values are passed to Postgres as canonical digit strings so no
+  // caller can widen the write through lossy JS-number coercion.
+  if (typeof raw === 'number' && !Number.isSafeInteger(raw)) {
+    throw new Error(message);
+  }
+  const digits = typeof raw === 'number'
+    ? String(raw)
+    : String(raw).replace(/^\+/, '');
+  if (!/^[1-9][0-9]*$/.test(digits)) {
+    throw new Error(message);
+  }
+  const upperLimitExclusive = '9223372036854775808'; // 2^63
+  if (
+    digits.length > upperLimitExclusive.length ||
+    (digits.length === upperLimitExclusive.length && digits >= upperLimitExclusive)
+  ) {
+    throw new Error(message);
+  }
+  return digits;
 }
 
 function normalizeOptionalText(value) {

@@ -130,7 +130,7 @@ describe('accepted feedback statuses', () => {
   // Mirrors the production acceptance-rate funnel (dashboard-data.ts), which
   // counts contacted/replied/won as "accepted". 'accepted' was never in the
   // digest_feedback_status enum and is no longer referenced by production code.
-  const ACCEPTED_STATUSES = new Set(['contacted', 'replied', 'won'])
+  const ACCEPTED_STATUSES = new Set(['contacted', 'replied', 'meeting', 'won'])
 
   const isAccepted = (status: string | null): boolean => {
     return status !== null && ACCEPTED_STATUSES.has(status)

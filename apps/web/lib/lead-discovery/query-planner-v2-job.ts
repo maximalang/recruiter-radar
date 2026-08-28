@@ -220,7 +220,7 @@ async function loadProfiles(
          JOIN orgs org ON org.id = state.org_id
          WHERE state.client_profile_id = profile.id
            AND state.feedback_status IN (
-             'badfit', 'dismissed', 'contacted', 'replied', 'won'
+             'badfit', 'dismissed', 'contacted', 'replied', 'meeting', 'won'
            )
        ), '[]'::JSONB) AS "feedbackEvents",
        COALESCE((

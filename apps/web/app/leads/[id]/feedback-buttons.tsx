@@ -45,7 +45,7 @@ type FeedbackTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 type TriageGroup = 'action' | 'progress' | 'park';
 
 interface TriageButton {
-  status: 'contacted' | 'replied' | 'won' | 'snooze' | 'dismissed' | 'badfit';
+  status: 'contacted' | 'replied' | 'meeting' | 'won' | 'snooze' | 'dismissed' | 'badfit';
   label: string;
   icon: (p: SVGProps<SVGSVGElement>) => ReactElement;
   tone: FeedbackTone;
@@ -57,6 +57,7 @@ interface TriageButton {
 const BUTTONS: readonly TriageButton[] = [
   { status: 'contacted', label: 'В работу', icon: HandIcon, tone: 'info', group: 'action' },
   { status: 'replied', label: 'Ответили', icon: ChatIcon, tone: 'success', group: 'progress' },
+  { status: 'meeting', label: 'Созвон', icon: ChatIcon, tone: 'success', group: 'progress' },
   { status: 'won', label: 'Клиент', icon: HandshakeIcon, tone: 'success', group: 'progress' },
   { status: 'snooze', label: 'Отложить', icon: ClockIcon, tone: 'warning', group: 'park' },
   { status: 'dismissed', label: 'Мимо', icon: WaveIcon, tone: 'neutral', group: 'park' },
