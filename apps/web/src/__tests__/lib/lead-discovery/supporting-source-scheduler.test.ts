@@ -99,3 +99,47 @@ test('persists a cooldown and keeps a 429 from failing the daily stage', async (
   expect(writes[0]?.some((value) =>
     value === '2026-01-01T06:00:00.000Z')).toBe(true)
 })
+
+test('keeps a non-rate-limit failure failed when structured diagnostics say rateLimit:false', async () => {
+  const writes: Array<readonly unknown[] | undefined> = []
+  const db = {
+    query: jest.fn(async (sql: string, params?: readonly unknown[]) => {
+      if (sql.includes('FROM source_scheduler_state')) return { rows: [] }
+      writes.push(params)
+      return { rows: [], rowCount: 1 }
+    }),
+  }
+
+  const [result] = await runSupportingSourceScheduler({
+    sources: ['company-site'],
+    run: async (source) => ({
+      source,
+      success: false,
+      outcome: 'failed',
+      error: 'source company-site did not emit a summary result. HH diagnostic: {"status":null,"rateLimit":false,"networkFailure":true}',
+    }),
+    db,
+    now: new Date('2026-01-01T00:00:00.000Z'),
+  })
+
+  expect(result).toMatchObject({ success: false, outcome: 'failed' })
+  expect(writes[0]).toEqual(expect.arrayContaining([
+    'company-site', 'failed',
+  ]))
+  expect(writes[0]?.some((value) =>
+    value === '2026-01-01T00:15:00.000Z')).toBe(true)
+})
+
+test.each([
+  ['HTTP 429 rate limited'],
+  ['upstream response included Retry-After: 120'],
+  ['HH diagnostic: {"status":null,"rateLimit":true,"networkFailure":false}'],
+])('preserves explicit rate-limit evidence: %s', async (error) => {
+  const [result] = await runSupportingSourceScheduler({
+    sources: ['industry-media'],
+    run: async (source) => ({ source, success: false, outcome: 'failed', error }),
+    now: new Date('2026-01-01T00:00:00.000Z'),
+  })
+
+  expect(result).toMatchObject({ success: true, outcome: 'rate-limited' })
+})

@@ -8,6 +8,15 @@
  * @property {string|null} [note]
  * @property {number|null} [snoozeDays]
  * @property {number|null} [suppressionDays]
+ *
+ * `dismissed` ("Скрыть") additionally propagates an ER-scoped suppression: a
+ * client_org_suppressions row keyed by the canonical corroboration key, so
+ * every entity-resolution fragment of the same employer is hidden for this
+ * client profile for the same bounded window. The `db` handle must provide
+ * `query`, `getSuppressionScope(orgId)` and `recordSuppression(payload)`; the
+ * digestFeedback.ts boundary binds them to the shared pool, while callers
+ * inside a transaction (Telegram webhook) bind them to the transaction client
+ * so the suppression write commits or rolls back with the state mutation.
  */
 
 export const DIGEST_FEEDBACK_ACTIONS = [
@@ -215,10 +224,24 @@ export async function updateDigestOrgStateFeedbackCore(input, db) {
     ...actionConfig.extraParams,
   ]);
 
-  if (result.rows[0]) return result.rows[0];
+  if (result.rows[0]) {
+    const appliedState = result.rows[0];
+    if (actionConfig.feedbackStatus === 'dismissed') {
+      await applyClientOrgSuppression({
+        clientProfileId,
+        orgId,
+        suppressionDays: input.suppressionDays,
+        sourceDigestCandidateId: appliedState.lastDigestCandidateId ?? null,
+        sourceFeedbackAt: appliedState.feedbackAt,
+      }, db);
+    }
+    return appliedState;
+  }
 
   // A stale callback is an expected no-op, not a failed delivery. Return the
-  // current row after the CAS rejected an older candidate or a downgrade.
+  // current row after the CAS rejected an older candidate or a downgrade. The
+  // ER-suppression fan-out stays skipped on this path: the winning event owns
+  // the propagation, so a rejected replay must never re-arm or extend it.
   const current = await db.query(`
     SELECT
       client_profile_id::TEXT AS "clientProfileId",
@@ -237,6 +260,37 @@ export async function updateDigestOrgStateFeedbackCore(input, db) {
   `, [clientProfileId, orgId]);
   if (current.rows[0]) return current.rows[0];
   throw new Error('Digest feedback transition was superseded before state creation.');
+}
+
+/**
+ * ER-scoped suppression for `dismissed` ("Скрыть похожие"): persist a
+ * client_org_suppressions row for the canonical corroboration key so every
+ * entity-resolution fragment of the same employer is hidden for this client
+ * profile for the same bounded window.
+ *
+ * Required by design: callers execute this core on the same transaction handle
+ * as the state transition. A missing scope or failed write aborts the operation
+ * instead of acknowledging "Скрыть похожие" while allowing fragments to return.
+ */
+async function applyClientOrgSuppression(input, db) {
+  if (typeof db.getSuppressionScope !== 'function' || typeof db.recordSuppression !== 'function') {
+    throw new Error('Organization suppression store is unavailable.');
+  }
+
+  const scope = await db.getSuppressionScope(input.orgId);
+  if (!scope || !scope.suppressionKey || scope.suppressedOrgIds.length === 0) {
+    throw new Error('Organization suppression scope was not found.');
+  }
+
+  await db.recordSuppression({
+    clientProfileId: input.clientProfileId,
+    orgId: input.orgId,
+    suppressionKey: scope.suppressionKey,
+    suppressedOrgIds: scope.suppressedOrgIds,
+    suppressionDays: clampSuppressionDays(input.suppressionDays),
+    sourceDigestCandidateId: input.sourceDigestCandidateId,
+    sourceFeedbackAt: input.sourceFeedbackAt,
+  });
 }
 
 async function getDigestCandidateContext(input, db) {
@@ -262,6 +316,7 @@ function clampSuppressionDays(value) {
   if (normalized > MAX_SUPPRESSION_DAYS) return MAX_SUPPRESSION_DAYS;
   return normalized;
 }
+export { clampSuppressionDays };
 
 function clampSnoozeDays(value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
