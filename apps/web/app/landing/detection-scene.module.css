@@ -292,6 +292,7 @@
   gap: .35rem;
   min-height: 2.2rem;
   padding: .42rem .48rem;
+  border-left: 2px solid transparent;
   border-radius: var(--radius-control);
   font-size: .68rem;
 }
@@ -304,8 +305,8 @@
 }
 .shotNav b { font-weight: 520; }
 .shotNavActive {
+  border-left-color: var(--color-signal);
   background: color-mix(in srgb, var(--color-signal-on-dark) 10%, transparent);
-  box-shadow: inset 2px 0 var(--color-signal);
   color: var(--color-text-primary);
 }
 .shotNavActive i,
@@ -381,6 +382,7 @@
   gap: .38rem;
   min-height: 4rem;
   padding: .55rem .5rem;
+  border-left: 2px solid transparent;
   border-bottom: 1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent);
 }
 .shotLeadList li:last-child { border-bottom: 0; }
@@ -394,7 +396,7 @@
 .shotLeadList li div { display: grid; gap: .18rem; min-width: 0; }
 .shotLeadList li strong { overflow: hidden; color: var(--color-text-primary); font-size: .66rem; font-weight: 610; text-overflow: ellipsis; white-space: nowrap; }
 .shotLeadList li small { color: color-mix(in srgb, var(--color-text-primary) 48%, transparent); font-size: .53rem; line-height: 1.3; }
-.shotLeadActive { background: color-mix(in srgb, var(--color-signal) 8%, transparent); box-shadow: inset 2px 0 var(--color-signal); }
+.shotLeadActive { border-left-color: var(--color-signal); background: color-mix(in srgb, var(--color-signal) 8%, transparent); }
 .shotDetail {
   min-width: 0;
   padding: .75rem;
