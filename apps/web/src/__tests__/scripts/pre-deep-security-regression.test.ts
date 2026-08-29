@@ -107,6 +107,6 @@ describe('parameterized database writes', () => {
   test('typed feedback API delegates to the shared mutation core', () => {
     const source = read('lib/digestFeedback.ts')
     expect(source).toContain('updateDigestOrgStateFeedbackCore')
-    expect(source).toContain('getSharedPool')
+    expect(source).toContain('getPool')
   })
 })
