@@ -113,6 +113,19 @@ for (const file of runFiles) {
 }
 collectedRuns.sort((a, b) => Date.parse(a.run_started_at) - Date.parse(b.run_started_at));
 
+// A self-declared collector flag/digest is not evidence. Every candidate summary must
+// bind to the downloaded GitHub artifact before this builder can emit any snapshot.
+const unverifiedAuthorityRuns = collectedRuns
+  .map((run) => ({ run, authority: authorityByRunId.get(run.run_id) }))
+  .filter(({ authority }) => authority?.verified !== true);
+if (unverifiedAuthorityRuns.length > 0) {
+  const details = unverifiedAuthorityRuns
+    .slice(0, 3)
+    .map(({ run, authority }) => `${run.run_id}: ${(authority?.problems ?? ['authority verification missing']).join(', ')}`)
+    .join('; ');
+  fail(`authoritative artifact verification failed before snapshot publication (${details})`);
+}
+
 /**
  * Hash the exact collected summary (excluding only builder-local tick attribution). This is
  * carried into each source observation so a snapshot cannot silently swap a source row from a
@@ -595,15 +608,19 @@ function readPredecessorHash(dayStr) {
         // B5 v4: the predecessor reference is only trusted when it provably hashes to the
         // predecessor's own content AND the predecessor day strictly precedes this day. A
         // tampered or misdated file silently forges a chain link.
-        if (snap.evidence_day_utc !== cursor) return null;
+        if (snap.evidence_day_utc !== cursor) {
+          fail(
+            `predecessor snapshot ${cursor}.json declares evidence_day_utc=${snap.evidence_day_utc ?? 'missing'} — refusing to chain onto misdated evidence`,
+          );
+        }
         if (recomputeSnapshotHash(snap) !== snap.snapshot_hash) {
           fail(
             `predecessor snapshot ${cursor}.json content does not match its own snapshot_hash — refusing to chain onto corrupted evidence`,
           );
         }
         return snap.snapshot_hash;
-      } catch {
-        return null;
+      } catch (error) {
+        fail(`predecessor snapshot ${cursor}.json is unreadable or invalid: ${error.message}`);
       }
     }
     cursor = utcOffsetDays(cursor, -1);
