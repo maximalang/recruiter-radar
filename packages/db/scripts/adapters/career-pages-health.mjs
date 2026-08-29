@@ -1,3 +1,5 @@
+import { resolveSuccessfulIngestZeroReason } from './rf-source-runtime.mjs';
+
 const ADAPTER_FAMILIES = Object.freeze({
   'greenhouse-board': 'greenhouse',
   'lever-postings': 'lever',
@@ -255,6 +257,48 @@ export function resolveCareerPagesHealthFamily({ hostedAtsFamily, adapter, sourc
     ?? ADAPTER_FAMILIES[boundedText(adapter)]
     ?? (sourceId === 'career-pages' ? 'company-career' : boundedText(sourceId))
     ?? 'unknown';
+}
+
+/**
+ * Whole-run zero-reason for a career-pages ingest whose normalized record
+ * count is zero. The per-family health taxonomy already knows WHY every board
+ * returned zero jobs (throttled / accessBlocked / noVacanciesPresent /
+ * pageUnreachable / parserOrLayoutDrift …); aggregate it into the single
+ * zeroReason the ingest classifier consumes. Environmental causes are
+ * deliberately excluded — a run throttled or blocked away from every board is
+ * a failed refresh window, not an acceptable zero, and stays without a
+ * zeroReason so the ingest reports `unexpected-zero` (fail closed), mirroring
+ * how rate-limited API sources are treated.
+ */
+const ENVIRONMENTAL_ONLY_ZERO_REASONS = new Set(['throttled', 'accessBlocked', 'pageUnreachable']);
+
+export function resolveCareerPagesIngestZeroReason(input, stats) {
+  const direct = resolveSuccessfulIngestZeroReason(input, stats);
+  if (direct) return direct;
+
+  if (!Array.isArray(input?.targetResults)) return undefined;
+
+  const zeroReasons = buildCareerPagesHealth({
+    targetResults: input.targetResults,
+    recordsReceived: input.recordsReceived,
+    recordsAfterDedupe: input.recordsAfterDedupe,
+    duplicateRecords: input.duplicateRecords,
+    skippedRecords: input.skippedRecords,
+    ingestionStats: stats,
+  }).totals.zeroReasons;
+
+  const entries = Object.entries(zeroReasons)
+    .filter(([, count]) => Number(count) > 0);
+  if (entries.length === 0) return undefined;
+
+  if (entries.every(([reason]) => ENVIRONMENTAL_ONLY_ZERO_REASONS.has(reason))) {
+    return undefined;
+  }
+
+  return entries
+    .sort((left, right) => Number(right[1]) - Number(left[1]))
+    .map(([reason]) => reason)
+    .join('+');
 }
 
 function isStaticMethod(method) {
