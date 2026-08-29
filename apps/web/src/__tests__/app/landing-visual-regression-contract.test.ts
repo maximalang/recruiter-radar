@@ -16,12 +16,13 @@ describe("landing visual regression contract", () => {
 
     expect(hero).toContain('data-theme="inverse"');
     expect(hero).toContain('data-header-tone="dark"');
-    expect(hero).toContain('data-hero-layout="morning-list"');
+    expect(hero).toContain('data-hero-layout="product-workspace"');
     expect(hero).not.toContain('data-header-tone="light"');
 
     expect(timeline).toContain('data-header-tone="light"');
     expect(timeline).toContain('id="scene-signal-timeline"');
-    expect(timeline).toContain("ПОВОД СОБРАН");
+    expect(timeline).toContain('data-product-workflow="profile-to-contact"');
+    expect(timeline).toContain("Решение остаётся за вами");
   });
 
   it("keeps the live product preview on the canonical scene stylesheet", () => {

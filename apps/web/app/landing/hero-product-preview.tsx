@@ -1,61 +1,118 @@
-import { ArrowGlyph } from "./brand-glyphs";
 import sceneStyles from "./detection-scene.module.css";
 
+const NAV_ITEMS = [
+  { label: "Сегодня", meta: "10", active: true },
+  { label: "Компании", meta: "", active: false },
+  { label: "Ситуации", meta: "2", active: false },
+  { label: "Радар", meta: "", active: false },
+  { label: "Настройки", meta: "", active: false },
+] as const;
+
+const LEADS = [
+  { rank: "01", company: "Промет", reason: "14 инженерных вакансий", confidence: "A", active: true },
+  { rank: "02", company: "Северные системы", reason: "Открыт новый регион", confidence: "B", active: false },
+  { rank: "03", company: "Техноформ", reason: "Редкие роли в найме", confidence: "B", active: false },
+] as const;
+
 /**
- * Static, clearly-labeled illustrative panel for the hero (concept 2):
- * "dark + product screen". Deliberately NOT real-time data — every claim is
- * demo-marked, no freshness/production proof. Server component: zero JS cost.
+ * Static, clearly-labeled workspace illustration for the hero (concept 2).
+ * Deliberately NOT real-time data: the fixed demo date is visible in the
+ * browser rail and the accessible name. Server component: zero JS cost.
  */
 export default function HeroProductPreview() {
   return (
-    <div
+    <figure
       className={sceneStyles.productShot}
       data-hero-product-preview="demo"
+      data-hero-workspace="today"
       role="img"
-      aria-label="Пример карточки компании из радара: повод для контакта, подтверждающие факты с датой и официальный путь контакта. Демо-данные."
+      aria-label="Демо рабочего кабинета Recruiter Radar от 12 мая: разделы Сегодня, Компании, Ситуации, Радар и Настройки; список компаний; выбранная карточка с причиной, источником, официальным контактом и ручными действиями."
     >
       <div className={sceneStyles.shotBar} aria-hidden="true">
         <span className={sceneStyles.shotDot} />
         <span className={sceneStyles.shotDot} />
         <span className={sceneStyles.shotDot} />
         <span className={sceneStyles.shotTitle}>Recruiter Radar</span>
-        <span className={sceneStyles.shotDemoTag}>Демо-данные</span>
+        <span className={sceneStyles.shotDemoTag}>Демо · 12 мая</span>
       </div>
-      <div className={sceneStyles.shotBody}>
-        <div className={sceneStyles.shotSide} aria-hidden="true">
-          <span className={sceneStyles.shotSideActive}>Список возможностей</span>
-          <span>Инженерный подбор · Москва</span>
-          <span>10 компаний с поводами</span>
-          <span className={sceneStyles.shotSideNote}>Демо-данные</span>
-        </div>
-        <div className={sceneStyles.shotContent}>
-          <p className={sceneStyles.shotTag}>Повод для обращения · демо-данные</p>
-          <p className={sceneStyles.shotCompany}>Производственная компания «Промет»</p>
-          <dl className={sceneStyles.shotTable}>
-            <div className={sceneStyles.shotRow}>
-              <dt>Факт</dt>
-              <dd>Открыли 14 инженерных вакансий за 6 дней · факт от 12 мая, демо</dd>
+      <div className={sceneStyles.shotBody} aria-hidden="true">
+        <aside className={sceneStyles.shotSide}>
+          <div className={sceneStyles.shotSideBrand}>
+            <span>RR</span>
+            <strong>Рабочий кабинет</strong>
+          </div>
+          <div className={sceneStyles.shotNav}>
+            {NAV_ITEMS.map((item, index) => (
+              <span
+                key={item.label}
+                className={item.active ? sceneStyles.shotNavActive : undefined}
+                data-hero-nav-item={item.label.toLowerCase()}
+              >
+                <i>{String(index + 1).padStart(2, "0")}</i>
+                <b>{item.label}</b>
+                {item.meta ? <em>{item.meta}</em> : null}
+              </span>
+            ))}
+          </div>
+          <div className={sceneStyles.shotProfile}>
+            <span>Профиль</span>
+            <strong>Инженерный подбор</strong>
+            <small>Москва и область</small>
+          </div>
+        </aside>
+
+        <div className={sceneStyles.shotWorkspace}>
+          <header className={sceneStyles.shotWorkspaceHeader}>
+            <div>
+              <span>Сегодня</span>
+              <strong>Компании, которым стоит написать</strong>
             </div>
-            <div className={sceneStyles.shotRow}>
-              <dt>Подтверждение</dt>
-              <dd>Расширение производства упомянуто на карьерной странице</dd>
-            </div>
-            <div className={sceneStyles.shotRow}>
-              <dt>Уверенность</dt>
-              <dd>
-                Высокая<span className={sceneStyles.shotDemoNote}>демо-данные</span>
-              </dd>
-            </div>
-            <div className={sceneStyles.shotRow}>
-              <dt>Контакт</dt>
-              <dd>Официальная страница вакансий компании</dd>
-            </div>
-          </dl>
-          <p className={sceneStyles.shotNext}>
-            Готовое основание для первого письма руководителю найма
-          </p>
+            <small>Профиль активен</small>
+          </header>
+
+          <div className={sceneStyles.shotSummary}>
+            <span><strong>10</strong> в списке</span>
+            <span><strong>3</strong> новых сигнала</span>
+            <span><strong>2</strong> на проверке</span>
+          </div>
+
+          <div className={sceneStyles.shotWorkspaceGrid}>
+            <ol className={sceneStyles.shotLeadList}>
+              {LEADS.map((lead) => (
+                <li key={lead.rank} className={lead.active ? sceneStyles.shotLeadActive : undefined}>
+                  <span>{lead.rank}</span>
+                  <div><strong>{lead.company}</strong><small>{lead.reason}</small></div>
+                  <b>{lead.confidence}</b>
+                </li>
+              ))}
+            </ol>
+
+            <article className={sceneStyles.shotDetail}>
+              <div className={sceneStyles.shotDetailHeader}>
+                <div><span>Выбрано из списка</span><strong>Промет</strong></div>
+                <b>A · высокая</b>
+              </div>
+              <div className={sceneStyles.shotWhy}>
+                <span>Почему сейчас</span>
+                <p>Открыты 14 инженерных вакансий; расширение производства подтверждено карьерной страницей.</p>
+              </div>
+              <dl className={sceneStyles.shotEvidence}>
+                <div><dt>Источник и дата</dt><dd>Карьерная страница · 12 мая</dd></div>
+                <div><dt>Официальный контакт</dt><dd>Раздел вакансий компании</dd></div>
+              </dl>
+              <div className={sceneStyles.shotNext}>
+                <span>Следующий ход</span>
+                <strong>Предложить точечный подбор по инженерным ролям</strong>
+              </div>
+              <div className={sceneStyles.shotActions}>
+                <span className={sceneStyles.shotActionPrimary}>В работу</span>
+                <span>Отложить</span>
+                <span>Не подходит</span>
+              </div>
+            </article>
+          </div>
         </div>
       </div>
-    </div>
+    </figure>
   );
 }

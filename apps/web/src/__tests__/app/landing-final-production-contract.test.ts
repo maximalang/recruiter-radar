@@ -16,18 +16,18 @@ describe("landing final production contract", () => {
     const heroCss = source("app/landing/detection-scene.module.css");
 
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
-    expect(hero).toContain("Список компаний, где найм уже идёт");
-    expect(hero).toContain('data-hero-layout="morning-list"');
+    expect(hero).toContain("Компании, которым стоит написать сегодня");
+    expect(hero).toContain('data-hero-layout="product-workspace"');
     expect(hero).toContain('data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
-    expect(hero).toContain("Открыть пример");
+    expect(hero).toContain("Посмотреть пример для своей ниши");
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain('data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}');
     expect(hero).toContain('data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}');
-    expect(hero).toContain("Настройте нишу и географию · без регистрации");
+    expect(hero).toContain("Специализация и география · без регистрации");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");
-    expect(heroCss).toMatch(/\.title\s*\{[\s\S]*?font-size:\s*clamp\(3\.55rem,\s*5\.4vw,\s*5\.45rem\)/);
+    expect(heroCss).toMatch(/\.title\s*\{[\s\S]*?font-size:\s*clamp\(3\.4rem,\s*4\.7vw,\s*5rem\)/);
   });
 
   test("uses one Pilot decision, centered FAQ, and compact closing CTA", () => {
@@ -142,7 +142,7 @@ describe("landing final production contract", () => {
     const timeline = source("app/landing/signal-timeline.tsx");
     expect(timeline).toContain("6 мая · демо-сценарий");
     expect(timeline).toContain("10 мая · демо-сценарий");
-    expect(timeline).toContain("11 мая · демо-сценарий");
+    expect(timeline).toContain('data-product-workflow="profile-to-contact"');
     expect(timeline).toContain("STORY.company.freshness");
 
     // Demo story freshness is an explicit fixed date, never "today".
@@ -182,7 +182,7 @@ describe("landing final production contract", () => {
     // Timeline and demo story agree with the fixed anchor dates.
     expect(timeline).toContain("6 мая · демо-сценарий");
     expect(timeline).toContain("10 мая · демо-сценарий");
-    expect(timeline).toContain("11 мая · демо-сценарий");
+    expect(timeline).toContain("Решение остаётся за вами");
     expect(timeline).toContain("STORY.company.freshness");
     // Demo fallback items use hard-coded dates; no wall-clock generation.
     const publicProduct = source("lib/publicProduct.ts");

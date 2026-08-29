@@ -75,15 +75,15 @@ describe("landing premium restoration contract", () => {
     }
   });
 
-  it("keeps informational timeline rows out of the keyboard order while preserving list semantics", () => {
+  it("keeps informational workflow rows out of the keyboard order while preserving list semantics", () => {
     const timeline = source("app/landing/signal-timeline.tsx");
     const timelineCss = source("app/landing/signal-timeline.module.css");
 
     expect(timeline).not.toContain("tabIndex");
     expect(timeline).toContain("<ol className={styles.events}>");
-    expect(timeline).toContain("<time>{event.date}</time>");
-    expect(timeline).toContain('data-timeline-event');
-    expect(timeline).toContain("ПОВОД СОБРАН");
+    expect(timeline).toContain("WORKFLOW_STEPS.map");
+    expect(timeline).toContain('data-workflow-step');
+    expect(timeline).toContain("Решение остаётся за вами");
     // No fake button affordances on rows.
     expect(timelineCss).not.toMatch(/\.event\s*\{[^}]*cursor:\s*pointer/);
     expect(timelineCss).toContain("@media (prefers-reduced-motion: reduce)");
@@ -96,7 +96,7 @@ describe("landing premium restoration contract", () => {
     // The priority-list description names the product value directly and makes
     // no delivery-cadence promise; no extra screen-reader account is needed.
     expect(hero).toContain(
-      "Приоритетный список компаний с сигналами найма: почему компания в списке, какие факты это подтверждают и с чего начать контакт.",
+      "Радар собирает публичные сигналы найма в рабочий список: показывает, что изменилось, чем это подтверждено и с какого безопасного шага начать контакт.",
     );
     expect(hero).not.toContain("со свежими сигналами");
     expect(heroCss).toContain(".visuallyHidden");

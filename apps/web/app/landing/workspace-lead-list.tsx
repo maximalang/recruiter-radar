@@ -23,7 +23,7 @@ export default function WorkspaceLeadList({ children }: { children: ReactNode })
   }, []);
 
   const rows = Children.toArray(children);
-  const defaultVisible = mobileEnhanced ? 3 : 4;
+  const defaultVisible = mobileEnhanced ? 2 : 4;
   const visibleRows = showAll ? rows : rows.slice(0, defaultVisible);
   const remaining = Math.max(0, rows.length - defaultVisible);
 
