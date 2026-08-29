@@ -45,6 +45,8 @@ export type DigestOrgStateRow = {
 
 export const DEFAULT_BADFIT_SUPPRESSION_DAYS: number
 
+export function clampSuppressionDays(value?: number | null): number
+
 export function isDigestFeedbackAction(value: unknown): value is DigestFeedbackAction
 
 export function buildDigestFeedbackActionPlan(input: {
