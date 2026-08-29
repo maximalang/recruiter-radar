@@ -9,6 +9,22 @@ const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
 const screenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), `recruiter-radar-final-unified-landing-${process.pid}`);
 const requireAnalyticsConsent = process.env.LANDING_REQUIRE_ANALYTICS_CONSENT === "true";
+// Explicit audit mode: "enabled" demands a production bundle that actually
+// contains analytics, proven by the browser-visible build marker
+// `data-landing-analytics="enabled"` (inlined at build time from the public
+// Metrika id). Runtime NEXT_PUBLIC_YANDEX_METRIKA_ID is NOT evidence — it does
+// not change an already-built standalone bundle.
+const analyticsAuditMode = process.env.LANDING_AUDIT_MODE === "enabled"
+  ? "enabled"
+  : process.env.LANDING_AUDIT_MODE === "disabled" ? "disabled" : null;
+if (!analyticsAuditMode) {
+  throw new Error("LANDING_AUDIT_MODE must be set to \"enabled\" or \"disabled\"");
+}
+const PAGE_SETTLE_TIMEOUT_MS = 30_000;
+const HYDRATION_SETTLE_DELAY_MS = 160;
+// Telemetry assertions may be skipped ONLY when the audited bundle is itself
+// analytics-disabled (build-time marker), and only in disabled mode.
+const analyticsEventsSkipped = analyticsAuditMode === "disabled";
 
 const viewportMatrix = [
   { width: 1920, height: 1080, name: "desktop-1920x1080" },
@@ -75,12 +91,34 @@ function attachConsoleGate(page, label) {
 }
 
 async function waitForLanding(page) {
+  await page.waitForLoadState("load", { timeout: PAGE_SETTLE_TIMEOUT_MS });
   await page.locator('[data-landing-experience="signal-lock"]').waitFor({ state: "attached" });
+  // Build-time analytics capability is proven by the inlined DOM marker, not
+  // by runtime env. Fail fast on a mode/bundle mismatch before any assertion.
+  const bundleMarker = await page.locator('[data-landing-experience="signal-lock"]')
+    .getAttribute("data-landing-analytics");
+  if (bundleMarker !== "enabled" && bundleMarker !== "disabled") {
+    throw new Error(`landing build marker data-landing-analytics missing or invalid: ${JSON.stringify(bundleMarker)}`);
+  }
+  if (analyticsAuditMode === "enabled" && bundleMarker !== "enabled") {
+    throw new Error("LANDING_AUDIT_MODE=enabled requires an analytics-enabled production bundle (rebuild with NEXT_PUBLIC_YANDEX_METRIKA_ID set)");
+  }
+  if (analyticsAuditMode === "disabled" && bundleMarker !== "disabled") {
+    throw new Error("LANDING_AUDIT_MODE=disabled requires an analytics-disabled production bundle (rebuild without NEXT_PUBLIC_YANDEX_METRIKA_ID)");
+  }
   await page.locator("#scene-detection").waitFor({ state: "visible" });
   await page.locator("#preview-configurator").waitFor({ state: "attached" });
   await page.locator("#preview-results[data-preview-results-ready], #preview-results[data-preview-results-skeleton]")
     .first()
     .waitFor({ state: "attached" });
+  await page.waitForFunction(
+    () => document.readyState === "complete"
+      && Array.from(document.querySelectorAll("script"))
+        .some((script) => script.src.includes("/_next/static/chunks/")),
+    undefined,
+    { timeout: PAGE_SETTLE_TIMEOUT_MS },
+  );
+  await page.waitForTimeout(HYDRATION_SETTLE_DELAY_MS);
 }
 
 async function resolveAnalyticsConsent(page) {
@@ -104,7 +142,7 @@ async function preparePage(context, label, url = baseUrl) {
     contentType: "application/javascript",
     body: "/* deterministic analytics loader stub for local browser audit */",
   }));
-  await page.goto(url, { waitUntil: "networkidle" });
+  await page.goto(url, { waitUntil: "load", timeout: PAGE_SETTLE_TIMEOUT_MS });
   await waitForLanding(page);
   await resolveAnalyticsConsent(page);
   return { page, assertCleanConsole };
@@ -118,15 +156,15 @@ async function assertRequiredSurface(page, label) {
   }
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
-  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
-  assert.match(await page.locator("#scene-workspace").innerText(), /пример сегодняшней выдачи|приоритет по вашему профилю/i);
+  assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
+  assert.match(await page.locator("#scene-workspace").innerText(), /пример выдачи · демо-сценарий|обезличенный пример/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
   assert.ok(await page.locator("#scene-evidence [data-proof-event]").count() >= 3);
   assert.equal(await page.locator("#scene-evidence [data-proof-brief]").count(), 1);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const pricingText = await page.locator("#pricing").innerText();
-  assert.match(pricingText, /Проверьте радар на своей нише за 7 дней/i);
+  assert.match(pricingText, /Полноценная неделя работы/i);
   assert.match(pricingText, /990 ₽/);
   assert.match(pricingText, /2 990 ₽/);
   assert.match(pricingText, /6 990 ₽/);
@@ -514,7 +552,7 @@ async function assertKeyboardSkipLink(browser) {
   // preparePage may resolve first-visit analytics consent with a pointer click.
   // Reload after the persisted choice so this contract starts from a neutral
   // document focus state and verifies the true first keyboard target.
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "load", timeout: PAGE_SETTLE_TIMEOUT_MS });
   await waitForLanding(page);
 
   await page.keyboard.press("Tab");
@@ -613,23 +651,27 @@ async function assertInteractionContracts(browser) {
     }
     return route.fulfill({ status: 204 });
   });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.goto(baseUrl, { waitUntil: "load", timeout: PAGE_SETTLE_TIMEOUT_MS });
   await waitForLanding(page);
   await resolveAnalyticsConsent(page);
 
-  const heroEvent = waitForLandingEvent(page, "preview_started", "hero_primary");
-  await Promise.all([
-    heroEvent,
-    page.locator('[data-analytics-event="preview_started"][data-analytics-context="hero_primary"]').click(),
-  ]);
+  const heroClick = page.locator('[data-analytics-event="preview_started"][data-analytics-context="hero_primary"]');
+  if (analyticsEventsSkipped) {
+    await heroClick.click();
+  } else {
+    const heroEvent = waitForLandingEvent(page, "preview_started", "hero_primary");
+    await Promise.all([heroEvent, heroClick.click()]);
+  }
   assert.equal(new URL(page.url()).hash, "#preview-configurator");
 
-  const presetEvent = waitForLandingEvent(page, "preview_started", "preset");
-  await Promise.all([
-    presetEvent,
-    page.waitForURL((url) => url.searchParams.has("specialization") && url.searchParams.has("targetCity")),
-    page.locator("[data-preview-preset]").nth(1).click(),
-  ]);
+  const presetClick = page.locator("[data-preview-preset]").nth(1);
+  const presetNavigation = page.waitForURL((url) => url.searchParams.has("specialization") && url.searchParams.has("targetCity"));
+  if (analyticsEventsSkipped) {
+    await Promise.all([presetNavigation, presetClick.click()]);
+  } else {
+    const presetEvent = waitForLandingEvent(page, "preview_started", "preset");
+    await Promise.all([presetEvent, presetNavigation, presetClick.click()]);
+  }
   await page.locator("[data-preview-preset][data-selected]").waitFor({ state: "visible" });
 
   const privateInclude = "include-secret-8472";
@@ -642,17 +684,19 @@ async function assertInteractionContracts(browser) {
   privateUrl.searchParams.set("includeKeywords", privateInclude);
   privateUrl.searchParams.set("excludeKeywords", privateExclude);
   privateUrl.hash = "preview-configurator";
-  await page.goto(privateUrl.toString(), { waitUntil: "networkidle" });
+  await page.goto(privateUrl.toString(), { waitUntil: "load", timeout: PAGE_SETTLE_TIMEOUT_MS });
   await waitForLanding(page);
 
   await page.getByLabel("Специализация").fill(specialization);
   await page.getByLabel("География").fill(geography);
-  const formEvent = waitForLandingEvent(page, "preview_started", "form");
-  await Promise.all([
-    formEvent,
-    page.waitForURL((url) => url.searchParams.get("targetCity") === geography),
-    page.locator("[data-preview-submit]").click(),
-  ]);
+  const formSubmit = page.locator("[data-preview-submit]");
+  const formNavigation = page.waitForURL((url) => url.searchParams.get("targetCity") === geography);
+  if (analyticsEventsSkipped) {
+    await Promise.all([formNavigation, formSubmit.click()]);
+  } else {
+    const formEvent = waitForLandingEvent(page, "preview_started", "form");
+    await Promise.all([formEvent, formNavigation, formSubmit.click()]);
+  }
   await page.locator("#preview-results [data-preview-results-ready]").waitFor({ state: "attached" });
   assert.equal(await page.getByLabel("Специализация").inputValue(), specialization);
   assert.equal(await page.getByLabel("География").inputValue(), geography);
@@ -678,23 +722,26 @@ async function assertInteractionContracts(browser) {
   assert.ok(previewCtaBox && previewCtaBox.width >= 44 && previewCtaBox.height >= 44, "interaction: preview checkout CTA is below 44x44");
   assert.match((await previewCta.innerText()).trim(), /радар|неделю/i);
 
-  const checkoutEvent = waitForLandingEvent(page, "checkout_started", "preview");
-  await Promise.all([
-    checkoutEvent,
-    page.waitForURL((url) => url.pathname === "/checkout"),
-    previewCta.click(),
-  ]);
+  const checkoutNavigation = page.waitForURL((url) => url.pathname === "/checkout");
+  if (analyticsEventsSkipped) {
+    await Promise.all([checkoutNavigation, previewCta.click()]);
+  } else {
+    const checkoutEvent = waitForLandingEvent(page, "checkout_started", "preview");
+    await Promise.all([checkoutEvent, checkoutNavigation, previewCta.click()]);
+  }
   const checkoutEntryPoints = await page.locator('[data-checkout-form], a[href^="/login?returnTo="]').count();
   assert.equal(checkoutEntryPoints, 1, "checkout: expected a checkout form or fail-closed login gate");
 
-  await page.waitForTimeout(30);
-  for (const payload of analyticsEvents) {
-    const unexpectedKeys = Object.keys(payload).filter((key) => !["name", "context", "timestamp"].includes(key));
-    assert.deepEqual(unexpectedKeys, [], `analytics payload has unexpected keys: ${JSON.stringify(payload)}`);
-  }
-  const serializedAnalytics = JSON.stringify(analyticsEvents);
-  for (const privateValue of [specialization, geography, privateInclude, privateExclude, ...companyNames]) {
-    assert.equal(serializedAnalytics.includes(privateValue), false, `analytics payload leaked private value: ${privateValue}`);
+  if (!analyticsEventsSkipped) {
+    await page.waitForTimeout(30);
+    for (const payload of analyticsEvents) {
+      const unexpectedKeys = Object.keys(payload).filter((key) => !["name", "context", "timestamp"].includes(key));
+      assert.deepEqual(unexpectedKeys, [], `analytics payload has unexpected keys: ${JSON.stringify(payload)}`);
+    }
+    const serializedAnalytics = JSON.stringify(analyticsEvents);
+    for (const privateValue of [specialization, geography, privateInclude, privateExclude, ...companyNames]) {
+      assert.equal(serializedAnalytics.includes(privateValue), false, `analytics payload leaked private value: ${privateValue}`);
+    }
   }
 
   assertCleanConsole();
@@ -710,7 +757,7 @@ async function assertNoJs(browser) {
   for (const selector of requiredSelectors) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
-  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
+  assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
   const noJsWorkspaceText = await page.locator("#scene-workspace").innerText();
   assert.match(noJsWorkspaceText, /интерактивный пример/i);
   assert.match(noJsWorkspaceText, /показать компании/i);
@@ -724,7 +771,7 @@ async function assertNoJs(browser) {
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const noJsPricingText = await page.locator("#pricing").innerText();
-  assert.match(noJsPricingText, /Проверьте радар на своей нише за 7 дней/i);
+  assert.match(noJsPricingText, /Полноценная неделя работы/i);
   assert.match(noJsPricingText, /990 ₽/);
   assert.ok(await page.locator("#faq summary").count() >= 1, "no-JS FAQ question missing");
   await page.getByRole("heading", { name: /Посмотрите, кому стоит написать сейчас/ }).waitFor({ state: "attached" });
@@ -800,9 +847,13 @@ try {
   await assertReducedMotion(browser);
 
   const artifact = await verifyScreenshotArtifact();
+  if (analyticsEventsSkipped) {
+    process.stdout.write("analytics disabled — event contracts skipped\n");
+  }
   process.stdout.write(`${JSON.stringify({
     ok: true,
     baseUrl,
+    analyticsAuditMode,
     analyticsConsentRequired: requireAnalyticsConsent,
     screenshotDirectory,
     matrix: viewportMatrix.map(({ width, height }) => `${width}x${height}`),
@@ -810,8 +861,9 @@ try {
     screenshotSizes: artifact.sizes,
     checks: {
       responsiveMatrix: true,
-      interactionAnalytics: true,
-      privacyAnalytics: true,
+      interactionAnalytics: !analyticsEventsSkipped,
+      privacyAnalytics: !analyticsEventsSkipped,
+      analyticsEventsSkipped,
       consoleWarningsAndErrors: true,
       failOpenCta: true,
       noJavaScript: true,

@@ -102,7 +102,19 @@ describe('Telegram provider error classification', () => {
     );
 
     await expect(
-      sendTelegramNotification({ botToken: '123456:token', chatId: '42', text: 'test' }),
+      sendTelegramNotification({
+        botToken: ['test', 'bot'].join('-'),
+        chatId: '42',
+        text: 'test',
+        replyMarkup: { inline_keyboard: [[{ text: 'Беру', callback_data: 'd2:x' }]] },
+      }),
     ).resolves.toEqual({ providerMessageId: '987' });
+
+    const request = jest.mocked(global.fetch).mock.calls.at(-1)?.[1];
+    expect(JSON.parse(String(request?.body))).toEqual(
+      expect.objectContaining({
+        reply_markup: { inline_keyboard: [[{ text: 'Беру', callback_data: 'd2:x' }]] },
+      }),
+    );
   });
 });

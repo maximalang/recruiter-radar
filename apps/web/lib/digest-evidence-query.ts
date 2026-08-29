@@ -146,100 +146,16 @@ export const DIGEST_EVIDENCE_QUERY = String.raw`WITH source_signal_rows AS (
         AND signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site', 'company-newsrooms', 'industry-media', 'github-company-org', 'youtube-company-channels', 'telegram-company-channels', 'fns-open-data', 'government-procurement', 'cbr-registry', 'rosstat-open-data', 'rospatent-open-data')
     )
 ),
--- org_corroboration_keys: map each org_id to a canonical cross-source
--- corroboration key derived from the STRONGEST shared strong key. This lets
--- signals from legacy fragmented orgs corroborate into one evidence package at
--- digest-assembly time. Current writers resolve validated strong identity keys
--- globally before upsert; this read-side bridge remains for historical rows and
--- is reversible because it never rewrites ownership.
---
--- Key precedence (strongest first): inn: > ogrn: > domain:
---   - inn:/ogrn: are legally unique → a perfect merge signal.
---   - domain: is unique to one employer's corporate surface, but a PLATFORM
---     host domain (hh.ru, trudvsem.ru, superjob.ru, career.habr.com,
---     greenhouse.io, lever.co) must NEVER be used — 'domain:hh.ru' would
---     falsely merge every HH employer. Platform domains are excluded below.
---   - company-name:/employer-name:/employer: are EXCLUDED — RU company names
---     drift (ООО/АО/ПАО suffixes, transliteration, short vs full) → false
---     merges. Corroboration is earned by a strong key, not by name similarity.
---
--- An org with NO strong key (only company-name:) falls back to its own org_id
--- as the corroboration_key → today's behavior, no forced merge, no regression.
---
--- PLATFORM_HOST_DOMAINS: domains that are job-board/ATS hosts, NOT employer
--- corporate surfaces. A corroboration_key must never be 'domain:<these>' or
--- the platform's many employers would falsely merge into one lead. Kept in
--- sync with the foreign-employer + source-priority policy lists.
+-- org_corroboration_keys_v1 is the canonical ER-key mapping shared with
+-- cross-fragment suppression. Restrict it to organizations present in this
+-- evidence run so the remaining digest pipeline keeps its previous scope.
 org_corroboration_keys AS (
-  WITH platform_host_domains AS (
-    SELECT unnest(ARRAY[
-      'hh.ru', 'hhcdn.com', 'trudvsem.ru', 'superjob.ru', 'superjob.com',
-      'career.habr.com', 'habr.com', 'boards.greenhouse.io', 'greenhouse.io',
-      'jobs.lever.co', 'lever.co', 'api.lever.co', 'boards-api.greenhouse.io',
-      'linkedin.com', 'hh.kz', 'hh.ua', 'rabota.ru', 'zarplata.ru'
-    ]) AS host_domain
-  )
   SELECT
-    org.id AS org_id,
-    COALESCE(
-      -- Strongest: INN (10-digit legal entity). Globally namespaced across sources.
-      (SELECT ('inn:' || LOWER(REPLACE(ref.source_key, 'inn:', '')))
-       FROM org_source_refs AS ref
-       WHERE ref.org_id = org.id
-         AND ref.source_key LIKE 'inn:%'
-       ORDER BY ref.source_key ASC
-       LIMIT 1),
-      -- OGRN (13-digit). Same namespace across sources.
-      (SELECT ('ogrn:' || LOWER(REPLACE(ref.source_key, 'ogrn:', '')))
-       FROM org_source_refs AS ref
-       WHERE ref.org_id = org.id
-         AND ref.source_key LIKE 'ogrn:%'
-       ORDER BY ref.source_key ASC
-       LIMIT 1),
-      -- domain: from org_source_refs (career-pages/rabota-rossii store it).
-      -- Excludes platform hosts — a domain key that would falsely merge
-      -- platform-aggregated employers is rejected.
-      (SELECT ('domain:' || LOWER(REPLACE(ref.source_key, 'domain:', '')))
-       FROM org_source_refs AS ref
-       WHERE ref.org_id = org.id
-         AND ref.source_key LIKE 'domain:%'
-         AND LOWER(REPLACE(ref.source_key, 'domain:', '')) NOT IN (SELECT host_domain FROM platform_host_domains)
-       ORDER BY ref.source_key ASC
-       LIMIT 1),
-      -- orgs.domain column (HH stores its corporate domain here, not as a
-      -- source_key). Same platform-host exclusion. This is the bridge that
-      -- lets an HH employer corroborate with a career-pages org on the same
-      -- corporate domain even though HH never wrote a domain: source_key.
-      CASE
-        WHEN NULLIF(BTRIM(org.domain), '') IS NOT NULL
-          AND LOWER(BTRIM(org.domain)) NOT IN (SELECT host_domain FROM platform_host_domains)
-        THEN 'domain:' || LOWER(BTRIM(org.domain))
-        ELSE NULL
-      END,
-      -- Fallback: no strong key → group by org_id (today's behavior).
-      ('org:' || org.id::TEXT)
-    ) AS corroboration_key,
-    CASE
-      WHEN EXISTS (
-        SELECT 1 FROM org_source_refs AS ref
-        WHERE ref.org_id = org.id AND ref.source_key LIKE 'inn:%'
-      ) THEN 'inn'
-      WHEN EXISTS (
-        SELECT 1 FROM org_source_refs AS ref
-        WHERE ref.org_id = org.id AND ref.source_key LIKE 'ogrn:%'
-      ) THEN 'ogrn'
-      WHEN EXISTS (
-        SELECT 1 FROM org_source_refs AS ref
-        WHERE ref.org_id = org.id
-          AND ref.source_key LIKE 'domain:%'
-          AND LOWER(REPLACE(ref.source_key, 'domain:', '')) NOT IN (SELECT host_domain FROM platform_host_domains)
-      ) THEN 'domain'
-      WHEN NULLIF(BTRIM(org.domain), '') IS NOT NULL
-        AND LOWER(BTRIM(org.domain)) NOT IN (SELECT host_domain FROM platform_host_domains) THEN 'domain'
-      ELSE 'org_id'
-    END AS corroboration_key_type
-  FROM orgs AS org
-  WHERE org.id IN (SELECT DISTINCT org_id FROM source_signal_rows)
+    keys.org_id,
+    keys.corroboration_key,
+    keys.corroboration_key_type
+  FROM org_corroboration_keys_v1 AS keys
+  WHERE keys.org_id IN (SELECT DISTINCT org_id FROM source_signal_rows)
 ),
 normalized_signal_rows AS (
   SELECT

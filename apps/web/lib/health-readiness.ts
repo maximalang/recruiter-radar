@@ -1,5 +1,5 @@
 export const EXPECTED_LATEST_MIGRATION =
-  '20260817150000_timeweb_mcp_sessions_multi_session'
+  '20260828100000_add_client_org_suppressions'
 
 const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/
 

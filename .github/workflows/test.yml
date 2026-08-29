@@ -328,6 +328,8 @@ jobs:
           exit 1
       - name: Landing production audit
         run: npm run test:landing:e2e
+        env:
+          LANDING_AUDIT_MODE: 'enabled'
       - name: Responsive surface audit
         run: npm run test:responsive-surfaces
       - name: Landing review captures (PR evidence artifact)

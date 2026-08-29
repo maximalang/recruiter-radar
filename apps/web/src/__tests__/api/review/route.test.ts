@@ -16,8 +16,8 @@ jest.mock('@/lib/db', () => ({
 jest.mock('@/lib/digestFeedback', () => ({
   updateDigestOrgStateFeedback: jest.fn(),
   // statics referenced by the module path
-  DIGEST_FEEDBACK_ACTIONS: ['accepted', 'badfit', 'dismissed', 'snooze', 'contacted', 'replied', 'won'],
-  isDigestFeedbackAction: jest.fn((v: unknown) => typeof v === 'string' && ['accepted', 'badfit', 'dismissed', 'snooze', 'contacted', 'replied', 'won'].includes(v as string)),
+  DIGEST_FEEDBACK_ACTIONS: ['accepted', 'badfit', 'dismissed', 'snooze', 'contacted', 'replied', 'meeting', 'won'],
+  isDigestFeedbackAction: jest.fn((v: unknown) => typeof v === 'string' && ['accepted', 'badfit', 'dismissed', 'snooze', 'contacted', 'replied', 'meeting', 'won'].includes(v as string)),
   DEFAULT_BADFIT_SUPPRESSION_DAYS: 30,
   buildDigestFeedbackActionPlan: jest.fn(),
 }));

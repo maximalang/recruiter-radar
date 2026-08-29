@@ -30,6 +30,7 @@ export default function LandingPage(props: {
     <div
       className={`${styles.landingPage} ${frameStyles.frame} ${visualStyles.visualSystem} ${motionStyles.motionRoot}`}
       data-landing-experience="signal-lock"
+      data-landing-analytics={isYandexMetrikaConfigured() ? "enabled" : "disabled"}
     >
       <LandingMotion />
       <LandingHashNavigation />

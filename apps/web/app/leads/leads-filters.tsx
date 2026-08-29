@@ -20,6 +20,7 @@ const FEEDBACK_OPTIONS = [
   { value: 'none', label: 'Без обратной связи' },
   { value: 'contacted', label: 'В работе' },
   { value: 'replied', label: 'Ответили' },
+  { value: 'meeting', label: 'Созвон' },
   { value: 'won', label: 'Клиент' },
   { value: 'snooze', label: 'Отложено' },
   { value: 'dismissed', label: 'Мимо' },

@@ -104,7 +104,7 @@ export const GATE_LABELS: Record<string, string> = { A: "Подтвержден�
 export const GATE_DESC: Record<string, string> = { A: "2+ независимых источника, чистое совпадение сущности", B: "1 сильный источник + обогащение", C: "Только платформенная агрегация, требует ревью", D: "Контекст без прямого доказательства найма" };
 
 export const FEEDBACK_LABELS: Record<string, { label: string; icon: (p: SVGProps<SVGSVGElement>) => ReactElement }> = {
-  contacted: { label: "В работе", icon: HandIcon }, replied: { label: "Ответили", icon: ChatIcon }, won: { label: "Клиент", icon: HandshakeIcon }, snooze: { label: "Отложено", icon: ClockIcon }, dismissed: { label: "Мимо", icon: WaveIcon }, badfit: { label: "Не наш профиль", icon: XIcon }, accepted: { label: "Беру", icon: CheckIcon }, later: { label: "Позже", icon: ClockIcon }, call: { label: "Созвон", icon: ChatIcon }, client: { label: "Клиент", icon: HandshakeIcon },
+  contacted: { label: "В работе", icon: HandIcon }, replied: { label: "Ответили", icon: ChatIcon }, meeting: { label: "Созвон", icon: ChatIcon }, won: { label: "Клиент", icon: HandshakeIcon }, snooze: { label: "Отложено", icon: ClockIcon }, dismissed: { label: "Мимо", icon: WaveIcon }, badfit: { label: "Не наш профиль", icon: XIcon }, accepted: { label: "Беру", icon: CheckIcon }, later: { label: "Позже", icon: ClockIcon }, call: { label: "Созвон", icon: ChatIcon }, client: { label: "Клиент", icon: HandshakeIcon },
 };
 
 const FEEDBACK_SHORT_LABELS: Record<string, string> = Object.fromEntries(Object.entries(FEEDBACK_LABELS).map(([k, v]) => [k, v.label]));

@@ -540,9 +540,8 @@ Per-lead block: `1. <b>Ромашка</b> · Москва` → `Готов к к
 - **Overflow:** `droppedLeads` → footer link «Открыть все лиды →» покрывает —
   ok. Не менять MAX_BATCH_MESSAGES=2 (контракт по памяти `telegram_digest_model`).
 - **Callback buttons:** (отдельная поверхность — `telegramDigestFeedback.ts`)
-  inline buttons `Беру/Мимо/Позже/Уже написал/Ответили/Созвон/Клиент/Скрыть
-  похожие`. Проверить, что labels когерентны с in-app `FEEDBACK_LABELS` и
-  DB-enum. Согласно памяти `project_feedback_enum_drift`, Telegram layer maps
+  inline buttons `Беру/Мимо/Позже/Уже написал/Ответили/Созвон/Клиент/Скрыть`.
+  Проверить, что labels когерентны с in-app `FEEDBACK_LABELS` и DB-enum.
   `accepted→contacted` — оставить mapping, не трогать enum. Только если
   label-дрифт виден — поправить copy.
 

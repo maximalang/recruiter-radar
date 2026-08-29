@@ -51,11 +51,16 @@ export type PublicPreviewItem = HhDigestItem & {
   relevanceSignals: PreviewRelevanceSignals
 }
 
-function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] {
-  const previousDay = new Date(referenceDate.getTime() - 24 * 60 * 60 * 1000)
-  const twoDaysAgo = new Date(referenceDate.getTime() - 2 * 24 * 60 * 60 * 1000)
-  const threeDaysAgo = new Date(referenceDate.getTime() - 3 * 24 * 60 * 60 * 1000)
-  const fourDaysAgo = new Date(referenceDate.getTime() - 4 * 24 * 60 * 60 * 1000)
+/**
+ * Fixed, clearly-labeled demo scenario. Dates are hard-coded so the landing
+ * never implies fresh data: every demo card shows an explicit fact date.
+ */
+function buildPublicDemoDigestItems(): HhDigestItem[] {
+  const demoAnchorDate = "2026-05-12T09:00:00.000Z";
+  const previousDay = "2026-05-11T09:00:00.000Z";
+  const twoDaysAgo = "2026-05-10T09:00:00.000Z";
+  const threeDaysAgo = "2026-05-09T09:00:00.000Z";
+  const fourDaysAgo = "2026-05-08T09:00:00.000Z";
 
   return [
     {
@@ -65,7 +70,7 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
       employer_name: DEFAULT_LANDING_DEMO_STORY.company.name,
       vacancies_count: DEFAULT_LANDING_DEMO_STORY.company.vacanciesCount,
       distinct_vacancy_names_count: DEFAULT_LANDING_DEMO_STORY.company.distinctVacancyNamesCount,
-      latest_published_at: referenceDate.toISOString(),
+      latest_published_at: demoAnchorDate,
       total_score: 348,
       reasons: [...DEFAULT_LANDING_DEMO_STORY.company.reasons],
       opener: DEFAULT_LANDING_DEMO_STORY.company.opener,
@@ -82,7 +87,7 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
       employer_name: "Сервисная B2B-компания",
       vacancies_count: 9,
       distinct_vacancy_names_count: 5,
-      latest_published_at: previousDay.toISOString(),
+      latest_published_at: previousDay,
       total_score: 312,
       reasons: [
         "Команда найма расширяет коммерческий блок",
@@ -102,7 +107,7 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
       employer_name: "Продуктовая IT-компания",
       vacancies_count: 11,
       distinct_vacancy_names_count: 7,
-      latest_published_at: twoDaysAgo.toISOString(),
+      latest_published_at: twoDaysAgo,
       total_score: 328,
       reasons: [
         "IT-подбор: за неделю открыты роли в backend и инфраструктуре",
@@ -122,7 +127,7 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
       employer_name: "Региональная розничная сеть",
       vacancies_count: 18,
       distinct_vacancy_names_count: 8,
-      latest_published_at: threeDaysAgo.toISOString(),
+      latest_published_at: threeDaysAgo,
       total_score: 296,
       reasons: [
         "Массовый подбор: сеть открывает новые точки",
@@ -142,7 +147,7 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
       employer_name: "Фармацевтическая компания",
       vacancies_count: 7,
       distinct_vacancy_names_count: 5,
-      latest_published_at: fourDaysAgo.toISOString(),
+      latest_published_at: fourDaysAgo,
       total_score: 284,
       reasons: [
         "Фармацевтический подбор: усиливается контроль качества",

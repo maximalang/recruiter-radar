@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
   if (!isDigestFeedbackAction(payload.action)) {
     return NextResponse.json(
-      { error: "action must be one of accepted, badfit, dismissed, snooze, contacted, replied, won." },
+      { error: "action must be one of accepted, badfit, dismissed, snooze, contacted, replied, meeting, won." },
       { status: 400 }
     );
   }
