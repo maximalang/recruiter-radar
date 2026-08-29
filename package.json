@@ -35,6 +35,7 @@
     "test:auth-v2:passkeys:e2e": "node packages/db/scripts/run-auth-v2-passkey-e2e.mjs",
     "test:production:acceptance": "node scripts/run-production-acceptance.mjs",
     "test:daily-radar:db": "node packages/db/scripts/run-daily-radar-db-tests.mjs",
+    "test:source-refresh-evidence:db": "node packages/db/scripts/verify-source-refresh-evidence-capture.mjs",
     "reconcile:payment-telemetry": "node packages/db/scripts/reconcile-payment-success-telemetry.mjs",
     "test:payment-telemetry:db": "node packages/db/scripts/verify-payment-success-telemetry.mjs",
     "test:opportunity-engine:db": "node packages/db/scripts/run-opportunity-engine-db-tests.mjs",

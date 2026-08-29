@@ -1,0 +1,138 @@
+name: Source Refresh Clock — Daily Evidence Capture
+
+# Daily durable capture of Source Refresh Clock evidence (protocol v2 §9/§16).
+#
+# Canonical pipeline for each UTC day:
+#   1. gh run list + gh run download: every clock tick artifact of the day,
+#      one directory per run, NAMED by run_id (collector/builder convention);
+#   2. collector: derive <run_id>.json summaries bound to the downloaded artifacts;
+#   3. builder: derive the day snapshot (<day>.json | <day>.pending.json), fail-closed;
+#   4. capture runner: persist snapshot + per-run archive index + derived alerts into
+#      Postgres (hash re-computation, tamper/chain verification, missing-day sweep).
+#
+# Every step exits non-zero on failure: a red or missing capture day is an incident.
+
+on:
+  schedule:
+    # 00:35 UTC daily — after the last hourly tick (HH:45) of the day has landed.
+    - cron: '35 0 * * *'
+  workflow_dispatch:
+    inputs:
+      coverage_day_utc:
+        description: 'UTC day to capture (YYYY-MM-DD). Empty = yesterday (schedule semantics).'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: source-refresh-evidence-capture
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout scripts (collector, builder, evidence store)
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Resolve capture day (UTC of run start)
+        id: day
+        run: |
+          set -euo pipefail
+          DAY="${{ github.event.inputs.coverage_day_utc || '' }}"
+          if [ -z "${DAY}" ]; then
+            DAY="$(date -u -d 'yesterday' +%F)"
+          fi
+          echo "day=${DAY}" >> "$GITHUB_OUTPUT"
+          echo "Capturing evidence for UTC day ${DAY}"
+
+      - name: Download clock tick artifacts of the capture day
+        id: runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAY: ${{ steps.day.outputs.day }}
+        run: |
+          set -euo pipefail
+          mkdir -p proof-runs refresh-runs coverage-snapshots
+          gh run list \
+            --workflow source-refresh-clock.yml \
+            --created "${DAY}" \
+            --limit 100 \
+            --json databaseId,createdAt \
+            --jq 'sort_by(.createdAt) | .[].databaseId' > run-ids.txt
+          count=0
+          failed=0
+          while read -r runId; do
+            [ -n "${runId}" ] || continue
+            count=$((count + 1))
+            echo "Downloading artifact for run ${runId}"
+            # Directory name MUST equal the run_id (collector/builder convention).
+            if ! gh run download "${runId}" \
+                 --name "source-refresh-run-${runId}-attempt-1" \
+                 --dir "proof-runs/${runId}"; then
+              echo "::error::artifact missing for clock run ${runId} — fail closed"
+              failed=$((failed + 1))
+            fi
+          done < run-ids.txt
+          echo "collected=${count}" >> "$GITHUB_OUTPUT"
+          if [ "${count}" -eq 0 ]; then
+            echo "::error::no Source Refresh Clock runs found for ${DAY} — missing-run incident"
+            exit 1
+          fi
+          if [ "${failed}" -gt 0 ]; then
+            echo "::error::${failed} clock artifact(s) could not be downloaded — fail closed"
+            exit 1
+          fi
+
+      - name: Collect run summaries (bound to downloaded artifacts)
+        env:
+          REFRESH_RUNS_DIR: refresh-runs
+          SOURCE_REFRESH_LOGS_DIR: proof-runs
+          CONFIG_MANIFEST: docs/evidence/source-refresh-coverage/config.json
+        run: |
+          set -euo pipefail
+          node scripts/collect-refresh-logs.mjs
+
+      - name: Build coverage snapshot for the day (fail closed)
+        env:
+          COVERAGE_DAY_UTC: ${{ steps.day.outputs.day }}
+          REFRESH_RUNS_DIR: refresh-runs
+          SOURCE_REFRESH_LOGS_DIR: proof-runs
+          CONFIG_MANIFEST: docs/evidence/source-refresh-coverage/config.json
+          REPO_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COVERAGE_SNAPSHOT_DIR: coverage-snapshots
+        run: |
+          set -euo pipefail
+          node scripts/build-coverage-snapshot.mjs
+
+      - name: Persist evidence + alerts into Postgres (fail closed)
+        env:
+          COVERAGE_DAY_UTC: ${{ steps.day.outputs.day }}
+          REFRESH_RUNS_DIR: refresh-runs
+          COVERAGE_SNAPSHOT_DIR: coverage-snapshots
+          SOURCE_REFRESH_LOGS_DIR: proof-runs
+          REPO_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DATABASE_URL: ${{ secrets.RR_EVIDENCE_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          node scripts/capture-source-refresh-evidence.mjs
+
+      - name: Retain raw evidence bundle for audit
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: source-refresh-evidence-${{ steps.day.outputs.day }}
+          path: |
+            refresh-runs/
+            proof-runs/
+            coverage-snapshots/
+          retention-days: 90
+          if-no-files-found: error
