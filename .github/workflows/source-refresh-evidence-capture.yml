@@ -91,6 +91,7 @@ jobs:
           fi
 
       - name: Collect run summaries (bound to downloaded artifacts)
+        id: collect
         env:
           REFRESH_RUNS_DIR: refresh-runs
           SOURCE_REFRESH_LOGS_DIR: proof-runs
@@ -100,6 +101,7 @@ jobs:
           node scripts/collect-refresh-logs.mjs
 
       - name: Build coverage snapshot for the day (fail closed)
+        id: build
         env:
           COVERAGE_DAY_UTC: ${{ steps.day.outputs.day }}
           REFRESH_RUNS_DIR: refresh-runs
@@ -113,6 +115,7 @@ jobs:
           node scripts/build-coverage-snapshot.mjs
 
       - name: Persist evidence + alerts into Postgres (fail closed)
+        id: persist
         env:
           COVERAGE_DAY_UTC: ${{ steps.day.outputs.day }}
           REFRESH_RUNS_DIR: refresh-runs
@@ -123,6 +126,22 @@ jobs:
           DATABASE_URL: ${{ secrets.RR_EVIDENCE_DATABASE_URL }}
         run: |
           set -euo pipefail
+          node scripts/capture-source-refresh-evidence.mjs
+
+      - name: Persist durable missing-snapshot alert when collection/build stopped
+        if: ${{ failure() && steps.persist.outcome == 'skipped' }}
+        env:
+          COVERAGE_DAY_UTC: ${{ steps.day.outputs.day }}
+          REFRESH_RUNS_DIR: refresh-runs
+          COVERAGE_SNAPSHOT_DIR: coverage-snapshots
+          SOURCE_REFRESH_LOGS_DIR: proof-runs
+          REPO_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DATABASE_URL: ${{ secrets.RR_EVIDENCE_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          # No snapshot can be trusted after an earlier collect/build failure. The capture
+          # runner records the affected UTC day as missing before preserving the job failure.
           node scripts/capture-source-refresh-evidence.mjs
 
       - name: Retain raw evidence bundle for audit

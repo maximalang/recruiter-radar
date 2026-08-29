@@ -108,12 +108,11 @@ const pendingPath = path.join(SNAPSHOT_DIR, PENDING_FILE);
 const usingPending = !fs.existsSync(snapPath) && fs.existsSync(pendingPath);
 const resolvedSnapPath = usingPending ? pendingPath : snapPath;
 if (!fs.existsSync(resolvedSnapPath)) {
-  const yesterday = utcOffsetDays(DAY, -1);
-  console.error(`snapshot artifact missing for ${DAY} — recording missing-snapshot evidence for ${yesterday}`);
+  console.error(`snapshot artifact missing for ${DAY} — recording missing-snapshot evidence for ${DAY}`);
   const alertClient = new pg.Client({ connectionString: DATABASE_URL, connectionTimeoutMillis: 10000 });
   try {
     await alertClient.connect();
-    await persistAlerts(alertClient, [deriveMissingSnapshotAlert(yesterday, { nowMs: Date.now() })]);
+    await persistAlerts(alertClient, [deriveMissingSnapshotAlert(DAY, { nowMs: Date.now() })]);
   } catch (error) {
     failWith(4, `could not persist missing-snapshot alert: ${error.message}`);
   } finally {

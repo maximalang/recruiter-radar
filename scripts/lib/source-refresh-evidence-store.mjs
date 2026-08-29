@@ -167,7 +167,17 @@ export function snapshotRowFromSnapshot(snapshot, meta = {}) {
   // immutable published snapshot; <day>.pending.json is a PENDING_CLOSE draft that a
   // later capture may supersede.
   const snapshotFile = meta.snapshot_file ?? `${day}.json`;
-  const published = snapshotFile.endsWith('.pending.json') === false && snapshotFile !== `${day}.pending.json`;
+  const published = snapshotFile === `${day}.json`;
+  const pending = snapshotFile === `${day}.pending.json`;
+  if (!published && !pending) {
+    fail(`snapshot_file must be exactly ${day}.json or ${day}.pending.json`);
+  }
+  if (published && snapshot.day_status === 'PENDING_CLOSE') {
+    fail('PENDING_CLOSE snapshots must use the unpublished .pending.json file');
+  }
+  if (pending && snapshot.day_status !== 'PENDING_CLOSE') {
+    fail('only PENDING_CLOSE snapshots may use the unpublished .pending.json file');
+  }
   return [
     day,
     2,
@@ -215,43 +225,57 @@ ON CONFLICT (evidence_day_utc) DO UPDATE SET
   degradation_events = EXCLUDED.degradation_events,
   provenance_status = EXCLUDED.provenance_status,
   provenance_problems = EXCLUDED.provenance_problems,
-  snapshot_published = TRUE,
+  snapshot_published = EXCLUDED.snapshot_published,
   snapshot_file = EXCLUDED.snapshot_file,
   snapshot = EXCLUDED.snapshot,
   captured_at = NOW(),
   captured_by_run_url = EXCLUDED.captured_by_run_url
 WHERE source_refresh_evidence_snapshots.snapshot_published = FALSE
-RETURNING (xmax = 0) AS inserted, evidence_day_utc, snapshot_hash;
+  AND EXCLUDED.snapshot_published = TRUE
+RETURNING (xmax = 0) AS inserted, evidence_day_utc, snapshot_hash, snapshot_published;
 `;
 
 /**
  * Idempotently persist one snapshot object. Returns
  * { status: 'inserted' | 'unchanged' | 'upgraded', day, snapshot_hash }.
- * A PENDING_CLOSE draft (published=FALSE) is interim evidence: a later capture of the
- * same day closes it and legitimately carries a different snapshot_hash — the draft row
- * is superseded (upgraded) by the published version. A PUBLISHED day is immutable:
- * re-capture with the same hash is a no-op; with a different hash it fails closed.
+ * A PENDING_CLOSE draft (published=FALSE) is interim evidence: only the later published
+ * capture for the same day may replace it. A pending replay is a no-op, and every other
+ * divergent hash fails closed. A PUBLISHED day is immutable.
  */
 export async function persistSnapshot(client, snapshot, meta = {}) {
   const row = snapshotRowFromSnapshot(snapshot, meta);
   const { rows } = await client.query(UPSERT_SNAPSHOT_SQL, row);
-  if (rows.length === 0) {
-    // No RETURNING row => the conflicting day row was already PUBLISHED (immutable).
-    const existing = await client.query(
-      `SELECT snapshot_hash FROM source_refresh_evidence_snapshots
-       WHERE evidence_day_utc = $1 AND snapshot_published = TRUE`,
-      [row[0]],
-    );
-    if (existing.rows.length === 0) {
-      fail(`day ${row[0]} upsert skipped but no published row found (inconsistent store)`);
-    }
-    if (existing.rows[0].snapshot_hash !== row[4]) {
-      fail(`append-only violation: day ${row[0]} already published with different snapshot_hash (tampered or stale capture)`);
-    }
-    return { status: 'unchanged', day: row[0], snapshot_hash: row[4] };
+  if (rows.length > 0) {
+    const result = rows[0];
+    return {
+      status: result.inserted === true ? 'inserted' : 'upgraded',
+      day: result.evidence_day_utc,
+      snapshot_hash: result.snapshot_hash,
+      published: result.snapshot_published === true,
+    };
   }
-  const r = rows[0];
-  return { status: r.inserted === true ? 'inserted' : 'upgraded', day: r.evidence_day_utc, snapshot_hash: r.snapshot_hash };
+
+  // No RETURNING row means either a published day, a pending replay, or a rejected
+  // divergent draft. Read the locked conflict winner before deciding which; this also
+  // makes a concurrent capture deterministic without trusting a caller-side pre-read.
+  const existing = await client.query(
+    `SELECT snapshot_hash, snapshot_published FROM source_refresh_evidence_snapshots
+     WHERE evidence_day_utc = $1`,
+    [row[0]],
+  );
+  if (existing.rows.length !== 1) {
+    fail(`day ${row[0]} upsert skipped but no single existing row found (inconsistent store)`);
+  }
+  const stored = existing.rows[0];
+  if (stored.snapshot_hash !== row[4]) {
+    fail(`append-only violation: day ${row[0]} already has a different snapshot_hash (tampered or stale capture)`);
+  }
+  return {
+    status: 'unchanged',
+    day: row[0],
+    snapshot_hash: row[4],
+    published: stored.snapshot_published === true,
+  };
 }
 
 const UPSERT_ARCHIVE_SQL = `
@@ -265,8 +289,9 @@ RETURNING run_id;
 `;
 
 /**
- * Idempotently persist the raw-artifact index for one run. Re-encounter of the same
- * run_id with a different digest/manifest hash fails closed BEFORE any write.
+ * Idempotently persist the raw-artifact index for one run. The unique insert is first,
+ * so a concurrent writer cannot turn a digest conflict into a silent no-op. If another
+ * writer won, compare its immutable identity before calling the record unchanged.
  */
 export async function persistLogArchiveIndex(client, entry) {
   for (const field of ['run_id', 'repository', 'workflow_name', 'event_name', 'scheduled_at_tick', 'artifact_name', 'storage_key']) {
@@ -280,20 +305,6 @@ export async function persistLogArchiveIndex(client, entry) {
   if (!Number.isInteger(entry?.run_attempt) || entry.run_attempt <= 0) fail('run_attempt invalid');
   if (!Number.isInteger(entry?.log_bytes) || entry.log_bytes < 0) fail('log_bytes invalid');
 
-  const existing = await client.query(
-    `SELECT authority_manifest_sha256, log_artifact_digest, summary_sha256
-     FROM source_refresh_evidence_log_archive WHERE run_id = $1`,
-    [entry.run_id],
-  );
-  if (existing.rows.length > 0) {
-    const prev = existing.rows[0];
-    const diverged =
-      prev.authority_manifest_sha256 !== entry.authority_manifest_sha256 ||
-      prev.log_artifact_digest !== entry.log_artifact_digest ||
-      prev.summary_sha256 !== entry.summary_sha256;
-    if (diverged) fail(`run ${entry.run_id} already archived with different digests (fail closed)`);
-    return { status: 'unchanged', run_id: entry.run_id };
-  }
   const { rows } = await client.query(UPSERT_ARCHIVE_SQL, [
     entry.run_id,
     entry.run_number,
@@ -311,7 +322,23 @@ export async function persistLogArchiveIndex(client, entry) {
     entry.summary_sha256,
     entry.archived_by_run_url ?? null,
   ]);
-  return { status: rows.length > 0 ? 'inserted' : 'unchanged', run_id: entry.run_id };
+  if (rows.length > 0) return { status: 'inserted', run_id: entry.run_id };
+
+  const existing = await client.query(
+    `SELECT authority_manifest_sha256, log_artifact_digest, summary_sha256
+     FROM source_refresh_evidence_log_archive WHERE run_id = $1`,
+    [entry.run_id],
+  );
+  if (existing.rows.length !== 1) {
+    fail(`run ${entry.run_id} conflict had no single existing archive row (inconsistent store)`);
+  }
+  const prev = existing.rows[0];
+  const diverged =
+    prev.authority_manifest_sha256 !== entry.authority_manifest_sha256 ||
+    prev.log_artifact_digest !== entry.log_artifact_digest ||
+    prev.summary_sha256 !== entry.summary_sha256;
+  if (diverged) fail(`run ${entry.run_id} already archived with different digests (fail closed)`);
+  return { status: 'unchanged', run_id: entry.run_id };
 }
 
 const UPSERT_ALERT_SQL = `
@@ -329,6 +356,18 @@ ON CONFLICT (alert_type, evidence_day_utc, dedupe_key) DO UPDATE SET
          AND source_refresh_evidence_alerts.resolved_at > NOW() - interval '4 hours'
     THEN 'resolved'
     ELSE 'open'
+  END,
+  resolved_at = CASE
+    WHEN source_refresh_evidence_alerts.status = 'resolved'
+         AND source_refresh_evidence_alerts.resolved_at > NOW() - interval '4 hours'
+    THEN source_refresh_evidence_alerts.resolved_at
+    ELSE NULL
+  END,
+  resolution_reason = CASE
+    WHEN source_refresh_evidence_alerts.status = 'resolved'
+         AND source_refresh_evidence_alerts.resolved_at > NOW() - interval '4 hours'
+    THEN source_refresh_evidence_alerts.resolution_reason
+    ELSE NULL
   END
 RETURNING (xmax = 0) AS inserted, alert_uid;
 `;
@@ -434,9 +473,9 @@ export async function resolveAlert(client, alertUidValue, reason) {
   if (typeof reason !== 'string' || reason.trim().length === 0) fail('resolution reason required');
   const { rowCount } = await client.query(
     `UPDATE source_refresh_evidence_alerts
-     SET status = 'resolved', resolved_at = NOW(), updated_at = NOW()
+     SET status = 'resolved', resolved_at = NOW(), resolution_reason = $2, updated_at = NOW()
      WHERE alert_uid = $1 AND status = 'open'`,
-    [alertUidValue],
+    [alertUidValue, reason.trim()],
   );
   return { resolved: rowCount === 1, alert_uid: alertUidValue };
 }

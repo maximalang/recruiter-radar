@@ -52,6 +52,10 @@ CREATE TABLE source_refresh_evidence_snapshots (
     CHECK (JSONB_TYPEOF(provenance_problems) = 'array'),
   snapshot_published BOOLEAN NOT NULL,
   snapshot_file TEXT NOT NULL CHECK (BTRIM(snapshot_file) <> ''),
+  CONSTRAINT source_refresh_evidence_snapshot_publication_check CHECK (
+    (snapshot_published = TRUE AND day_status IN ('GREEN_DAY', 'RED_DAY'))
+    OR (snapshot_published = FALSE AND day_status = 'PENDING_CLOSE')
+  ),
   snapshot JSONB NOT NULL,
   captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   captured_by_run_url TEXT
@@ -103,7 +107,12 @@ CREATE TABLE source_refresh_evidence_alerts (
   first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   resolved_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  resolution_reason TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT source_refresh_evidence_alerts_resolution_check CHECK (
+    (status = 'open' AND resolved_at IS NULL AND resolution_reason IS NULL)
+    OR (status = 'resolved' AND resolved_at IS NOT NULL AND BTRIM(resolution_reason) <> '')
+  )
 );
 
 CREATE INDEX source_refresh_evidence_alerts_day_idx
@@ -116,5 +125,41 @@ CREATE UNIQUE INDEX source_refresh_evidence_alerts_dedupe_uidx
 
 COMMENT ON TABLE source_refresh_evidence_alerts IS
   'Derived Source Refresh Clock alerts (red/missing/late snapshot, tick-ledger, tamper, chain); idempotent by (alert_type, evidence_day_utc, dedupe_key).';
+
+-- Evidence objects may be inserted once. The only legal mutation is the explicit
+-- PENDING_CLOSE draft -> published (GREEN_DAY/RED_DAY) transition for the same day.
+-- Archive indexes are strictly insert-only; their idempotency lives in the unique key.
+CREATE FUNCTION source_refresh_evidence_snapshot_append_only()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'source_refresh_evidence_snapshots is append-only';
+  END IF;
+  IF OLD.snapshot_published = TRUE
+     OR NEW.snapshot_published IS DISTINCT FROM TRUE THEN
+    RAISE EXCEPTION 'published snapshot is immutable; only pending->published is allowed';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER source_refresh_evidence_snapshot_append_only_trg
+BEFORE UPDATE OR DELETE ON source_refresh_evidence_snapshots
+FOR EACH ROW EXECUTE FUNCTION source_refresh_evidence_snapshot_append_only();
+
+CREATE FUNCTION source_refresh_evidence_log_archive_append_only()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'source_refresh_evidence_log_archive is append-only';
+END;
+$$;
+
+CREATE TRIGGER source_refresh_evidence_log_archive_append_only_trg
+BEFORE UPDATE OR DELETE ON source_refresh_evidence_log_archive
+FOR EACH ROW EXECUTE FUNCTION source_refresh_evidence_log_archive_append_only();
 
 COMMIT;

@@ -236,9 +236,36 @@ test('U8: pending draft is superseded by a later published day (upgrade)', async
   const close = daySnapshot();
   assert.notEqual(draft.snapshot_hash, close.snapshot_hash, 'draft and close hashes must differ');
   const client = fakeClient();
-  client.__queue({ rows: [{ inserted: false, evidence_day_utc: DAY, snapshot_hash: close.snapshot_hash }] });
+  client.__queue({ rows: [{ inserted: false, evidence_day_utc: DAY, snapshot_hash: close.snapshot_hash, snapshot_published: true }] });
   const result = await persistSnapshot(client, close, { snapshot_file: `${DAY}.json` });
   assert.equal(result.status, 'upgraded');
+});
+
+test('U8b: pending replay is unchanged and divergent pending evidence fails closed', async () => {
+  const draft = daySnapshot({ day_status: 'PENDING_CLOSE', close_condition_satisfied_by_all_sources: false });
+  const divergentDraft = daySnapshot({
+    day_status: 'PENDING_CLOSE',
+    close_condition_satisfied_by_all_sources: false,
+    produced_at: '2026-08-28T23:45:00.000Z',
+  });
+  const replayClient = fakeClient();
+  replayClient.__queue({ rows: [] });
+  replayClient.__queue({ rows: [{ snapshot_hash: draft.snapshot_hash, snapshot_published: false }] });
+  const replay = await persistSnapshot(replayClient, draft, { snapshot_file: `${DAY}.pending.json` });
+  assert.equal(replay.status, 'unchanged');
+  assert.match(
+    replayClient.__queries[0].text,
+    /snapshot_published = EXCLUDED\.snapshot_published/,
+    'a pending replay must never be promoted by the upsert clause',
+  );
+
+  const divergentClient = fakeClient();
+  divergentClient.__queue({ rows: [] });
+  divergentClient.__queue({ rows: [{ snapshot_hash: draft.snapshot_hash, snapshot_published: false }] });
+  await assert.rejects(
+    () => persistSnapshot(divergentClient, divergentDraft, { snapshot_file: `${DAY}.pending.json` }),
+    /append-only violation/,
+  );
 });
 
 // ---- U9 archive index ----------------------------------------------------------
@@ -260,27 +287,34 @@ const ARCHIVE = {
   archived_by_run_url: RUN_URL,
 };
 
-test('U9: archive index inserts, then unchanged; diverged digest fails closed', async () => {
+test('U9: archive index uses an atomic conflict-aware write and rejects a divergent concurrent record', async () => {
   const client = fakeClient();
-  client.__queue({ rows: [] }); // existence check: absent
-  client.__queue({ rows: [{ run_id: ARCHIVE.run_id }] }); // insert RETURNING
+  client.__queue({ rows: [{ run_id: ARCHIVE.run_id, inserted: true }] });
   const first = await persistLogArchiveIndex(client, ARCHIVE);
   assert.equal(first.status, 'inserted');
+  assert.match(client.__queries[0].text, /^INSERT INTO source_refresh_evidence_log_archive/);
+  assert.match(client.__queries[0].text, /ON CONFLICT \(run_id\) DO NOTHING/);
 
-  client.__queue({ rows: [{ ...ARCHIVE }] }); // existence check: present, same digests
+  client.__queue({ rows: [] });
+  client.__queue({ rows: [{ ...ARCHIVE }] });
   const second = await persistLogArchiveIndex(client, ARCHIVE);
   assert.equal(second.status, 'unchanged');
 
-  client.__queue({ rows: [{ ...ARCHIVE, log_artifact_digest: 'x'.repeat(64) }] });
-  await assert.rejects(() => persistLogArchiveIndex(client, ARCHIVE), /different digests/);
+  const divergentClient = fakeClient();
+  divergentClient.__queue({ rows: [] }); // conflict did not satisfy digest equality
+  divergentClient.__queue({ rows: [{ ...ARCHIVE, log_artifact_digest: 'e'.repeat(64) }] });
+  await assert.rejects(() => persistLogArchiveIndex(divergentClient, ARCHIVE), /different digests/);
 });
 
 // ---- U10 alert resolution ------------------------------------------------------
-test('U10: resolveAlert closes an open alert and requires a reason', async () => {
+test('U10: resolveAlert closes an open alert with an auditable reason', async () => {
   const client = fakeClient();
   client.__queue({ rows: [], rowCount: 1 });
-  const ok = await resolveAlert(client, 'red_day:2026-08-28:some-reason', 'fixed same day');
+  const reason = 'fixed same day';
+  const ok = await resolveAlert(client, 'red_day:2026-08-28:some-reason', reason);
   assert.equal(ok.resolved, true);
+  assert.equal(client.__queries[0].params[1], reason);
+  assert.match(client.__queries[0].text, /resolution_reason = \$2/);
   await assert.rejects(() => resolveAlert(client, 'x', '   '), /reason required/);
 
   client.__queue({ rows: [], rowCount: 0 });
