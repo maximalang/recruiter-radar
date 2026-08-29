@@ -36,10 +36,10 @@ describe("landing restoration narrative", () => {
   it("keeps the restored ambient hero payment-aware and connected to the preview", () => {
     const hero = source("app/landing/detection-scene.tsx");
 
-    expect(hero).toContain('data-hero-layout="morning-list"');
+    expect(hero).toContain('data-hero-layout="product-workspace"');
     expect(hero).toContain('data-theme="inverse"');
     expect(hero).toContain("data-payment-offer=");
-    expect(hero).toContain("Открыть пример");
+    expect(hero).toContain("Посмотреть пример для своей ниши");
     expect(hero).toContain("data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("без автопродления · сообщения отправляете вы");
@@ -91,8 +91,8 @@ describe("landing restoration narrative", () => {
 
     // Editorial intro stays bound to the live configurator.
     expect(workspace).toContain("Интерактивный пример");
-    expect(workspace).toContain("Проверьте на своей нише");
-    expect(workspace).toContain("Так выглядит ваша рабочая выдача.");
+    expect(workspace).toContain("Настройте практику");
+    expect(workspace).toContain("Проверьте, какие компании попадут в ваш рабочий список.");
     expect(workspace).toContain("Обезличенный пример.");
 
     // Current runtime behavior preserved: personalization, ranked leads,
@@ -102,7 +102,7 @@ describe("landing restoration narrative", () => {
     expect(lead).toContain("limit: 2");
     expect(lead).toContain("Уверенность");
     expect(lead).toContain("Следующий ход");
-    expect(leadList).toContain("const defaultVisible = mobileEnhanced ? 3 : 4");
+    expect(leadList).toContain("const defaultVisible = mobileEnhanced ? 2 : 4");
     expect(leadList).toContain("Показать ещё");
     expect(workspaceCss).not.toContain("-webkit-line-clamp");
   });

@@ -35,14 +35,14 @@ describe("landing visual and login reliability polish", () => {
       const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
       const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-      expect(hero).toContain('data-hero-layout="morning-list"');
+      expect(hero).toContain('data-hero-layout="product-workspace"');
       expect(hero).toContain("HeroProductPreview");
-      expect(hero).toContain("Открыть пример");
+      expect(hero).toContain("Посмотреть пример для своей ниши");
       expect(hero).not.toContain("HeroRadar");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);
     // Concept-2 product panel: neutral demo labeling, no freshness claims.
-    expect(productPreview).toContain("Демо-данные");
+    expect(productPreview).toContain("Демо · 12 мая");
     expect(productPreview).not.toMatch(/обновляются|live|Live/i);
     expect(heroScene).toContain("var(--color-text-primary)");
     expect(heroScene).toContain("var(--color-signal)");

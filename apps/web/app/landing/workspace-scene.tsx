@@ -80,11 +80,11 @@ function WorkspaceIntro() {
   return (
     <header className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
       <div>
-        <p className={styles.sceneLabel}>Интерактивный пример · Проверьте на своей нише</p>
-        <h2 id="workspace-title" className={styles.sceneHeading}>Так выглядит ваша рабочая выдача.</h2>
+        <p className={styles.sceneLabel}>Интерактивный пример · Настройте практику</p>
+        <h2 id="workspace-title" className={styles.sceneHeading}>Проверьте, какие компании попадут в ваш рабочий список.</h2>
       </div>
       <p className={styles.sceneLead}>
-        По каждой компании: повод для контакта, подтверждающие факты, оценка уверенности и следующий шаг. Задайте нишу и географию — список перестроится под ваш профиль.
+        Задайте специализацию и географию. В первой карточке раскроются повод для контакта, подтверждающие факты, уверенность и следующий ход.
       </p>
     </header>
   );

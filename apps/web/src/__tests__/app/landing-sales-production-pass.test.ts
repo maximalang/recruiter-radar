@@ -41,7 +41,7 @@ describe("landing sales production pass", () => {
     const list = source("app/landing/workspace-lead-list.tsx");
     expect(workspace).toContain("const visibleItems = previewState.items.slice(0, 5)");
     expect(workspace).toContain("defaultOpen={index === 0}");
-    expect(list).toContain("const defaultVisible = mobileEnhanced ? 3 : 4");
+    expect(list).toContain("const defaultVisible = mobileEnhanced ? 2 : 4");
     expect(list).toContain("Показать ещё");
   });
 

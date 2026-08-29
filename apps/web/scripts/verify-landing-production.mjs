@@ -156,7 +156,7 @@ async function assertRequiredSurface(page, label) {
   }
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
-  assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
+  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня/);
   assert.match(await page.locator("#scene-workspace").innerText(), /пример выдачи · демо-сценарий|обезличенный пример/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
@@ -363,7 +363,7 @@ async function assertLeadRows(page, label, viewport) {
   assert.equal(await secondary.locator("[data-selected-lead-detail]").count(), 0, `${label}: secondary recommendation must remain a scan row`);
 
   if (viewport.width <= 480) {
-    assert.equal(count, 3, `${label}: mobile should initially show one full and two compact recommendations`);
+    assert.equal(count, 2, `${label}: mobile should initially show one full and one compact recommendation`);
     assert.equal(await disclosure.getAttribute("aria-expanded"), "false");
     const visibleCompactSignals = await leads.locator(':scope:not([data-primary-lead]) [data-lead-why-now]').evaluateAll((elements) => (
       elements.filter((element) => getComputedStyle(element).display !== "none").length
@@ -757,7 +757,7 @@ async function assertNoJs(browser) {
   for (const selector of requiredSelectors) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
-  assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
+  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня/);
   const noJsWorkspaceText = await page.locator("#scene-workspace").innerText();
   assert.match(noJsWorkspaceText, /интерактивный пример/i);
   assert.match(noJsWorkspaceText, /показать компании/i);

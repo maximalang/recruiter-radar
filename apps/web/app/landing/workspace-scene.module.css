@@ -305,10 +305,16 @@
   .leadRow { grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: .45rem; }
   .leadSecondary .leadSignal { display: none; }
   .leadSignal { font-size: .73rem; }
-  .leadBody { margin: 0 .45rem .7rem 1.95rem; padding: .8rem; }
+  .leadBody { gap: .62rem; margin: 0 .25rem .6rem 1.65rem; padding: .62rem .55rem .62rem .7rem; }
+  .primaryReason p { font-size: .75rem; line-height: 1.42; }
   .evidenceBlock ul { grid-template-columns: 1fr; }
+  .evidenceBlock li { padding: .48rem .52rem; font-size: .69rem; }
   .outcomeGrid { grid-template-columns: 1fr; }
+  .outcomeMeta:nth-child(2) { display: none; }
+  .outcomeMeta,
+  .nextMove { padding: .52rem .58rem; }
   .nextMove { grid-column: auto; grid-template-columns: 1fr; gap: .28rem; }
+  .nextMove p { font-size: .75rem; }
   .productFooter { align-items: flex-start; flex-direction: column; gap: .2rem; padding: .65rem .8rem; }
 }
 
