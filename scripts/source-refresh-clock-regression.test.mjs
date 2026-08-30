@@ -20,8 +20,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { sha256Canonical } from './lib/coverage-integrity.mjs';
-import { verifySummaryAgainstArtifact } from './lib/coverage-authority.mjs';
+import { computeArtifactDigest, verifySummaryAgainstArtifact } from './lib/coverage-authority.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 const COLLECTOR = path.join(REPO_ROOT, 'scripts', 'collect-refresh-logs.mjs');
@@ -59,12 +60,65 @@ function runScript(scriptPath, env) {
   }
 }
 
+/** Create artifact-manifest bindings for builder fixtures that represent real collected runs. */
+function writeVerifiedAuthorityFixtures(runsDir, logsDir = path.join(runsDir, '.verified-artifacts')) {
+  fs.mkdirSync(logsDir, { recursive: true });
+  for (const file of fs.readdirSync(runsDir).filter((entry) => entry.endsWith('.json')).sort()) {
+    const summaryPath = path.join(runsDir, file);
+    const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+    const runId = String(summary.run_id);
+    summary.event_name = 'schedule';
+    summary.scheduled_at_tick ??= summary.run_started_at;
+
+    const runDir = path.join(logsDir, runId);
+    fs.mkdirSync(runDir, { recursive: true });
+    fs.writeFileSync(path.join(runDir, 'fixture.log'), `verified fixture for ${runId}\n`);
+    const manifest = {
+      schema_version: 1,
+      workflow_name: 'Source Refresh Clock',
+      repository: summary.repository,
+      run_id: runId,
+      run_number: summary.run_number,
+      run_attempt: summary.run_attempt,
+      event_name: summary.event_name,
+      scheduled_at_tick: summary.scheduled_at_tick,
+      head_sha: summary.git_sha,
+      artifact_name: `source-refresh-run-${runId}-attempt-${summary.run_attempt}`,
+    };
+    const manifestBytes = Buffer.from(JSON.stringify(manifest));
+    fs.writeFileSync(path.join(runDir, 'github-run-manifest.json'), manifestBytes);
+    summary._meta = {
+      ...summary._meta,
+      authority_verified: true,
+      log_artifact_digest: computeArtifactDigest(runDir),
+      authority_manifest_sha256: createHash('sha256').update(manifestBytes).digest('hex'),
+    };
+    fs.writeFileSync(summaryPath, JSON.stringify(summary));
+  }
+  return logsDir;
+}
+
+/** Avoid run-id collisions when several fixture days share one authority root. */
+function rewriteFixtureRunIds(runsDir, dayOffset) {
+  const files = fs.readdirSync(runsDir).filter((entry) => entry.endsWith('.json')).sort();
+  for (const [index, file] of files.entries()) {
+    const oldPath = path.join(runsDir, file);
+    const summary = JSON.parse(fs.readFileSync(oldPath, 'utf8'));
+    const runId = String(19000000000 + dayOffset * 100 + index);
+    summary.run_id = runId;
+    const newPath = path.join(runsDir, `${runId}.json`);
+    fs.writeFileSync(newPath, JSON.stringify(summary));
+    fs.unlinkSync(oldPath);
+  }
+}
+
 /** Builder invocation bound to an isolated snapshot dir (never the repo evidence dir). */
-function buildSnapshot({ day, runsDir, outDir, sourceLogsDir = '' }) {
+function buildSnapshot({ day, runsDir, outDir, sourceLogsDir }) {
+  const verifiedLogsDir = sourceLogsDir === undefined ? writeVerifiedAuthorityFixtures(runsDir) : sourceLogsDir;
   return runScript(BUILDER, {
     COVERAGE_DAY_UTC: day,
     REFRESH_RUNS_DIR: runsDir,
-    SOURCE_REFRESH_LOGS_DIR: sourceLogsDir,
+    SOURCE_REFRESH_LOGS_DIR: verifiedLogsDir,
     CONFIG_MANIFEST: CONFIG,
     REPO_SHA: FULL_SHA,
     WORKFLOW_RUN_URL: RUN_URL,
@@ -692,9 +746,10 @@ test('F: transient deferral and source-less closer remain fail-closed', () => {
   assert.equal(snap.day_status, 'RED_DAY');
 });
 
-// G — self-signed summaries with one reused upstream identity are not a live seven-day window.
-test('G: forged seven-day summaries are rejected by trust and identity-lineage gates', () => {
+// G — even artifact-verified summaries with one reused upstream identity are not a live seven-day window.
+test('G: reused upstream identity is rejected despite verified artifact authority', () => {
   const dir = tmpDir('adv-g-forged-window');
+  const sourceLogsDir = path.join(dir, 'verified-logs');
   const first = '2026-08-20';
   const plusDay = (day, delta) => {
     const date = new Date(`${day}T00:00:00Z`);
@@ -706,50 +761,55 @@ test('G: forged seven-day summaries are rejected by trust and identity-lineage g
     const runsDir = path.join(dir, `runs-${day}`);
     fs.mkdirSync(runsDir);
     writeHourlyRuns(runsDir, { day, green: { upstream: { content_hash: 'c'.repeat(64), version_id: 'same-v1', upstream_updated_at: '2026-08-19T10:00:00Z' } } });
-    assert.equal(buildSnapshot({ day, runsDir, outDir: dir }).status, 0);
+    rewriteFixtureRunIds(runsDir, offset);
+    writeVerifiedAuthorityFixtures(runsDir, sourceLogsDir);
+    assert.equal(buildSnapshot({ day, runsDir, outDir: dir, sourceLogsDir }).status, 0);
   }
   const checked = runScript(CHECKER, {
     CONFIG_MANIFEST: CONFIG,
     COVERAGE_SNAPSHOT_DIR: dir,
     COVERAGE_REF_DAY_UTC: '2026-08-26',
     EXPECTED_REPO_SHA: FULL_SHA,
+    SOURCE_REFRESH_LOGS_DIR: sourceLogsDir,
   });
   assert.notEqual(checked.status, 0);
   assert.match(checked.stdout, /VERDICT: NOT_READY/);
-  assert.match(checked.stdout, /trusted provenance/);
   assert.match(checked.stdout, /upstream identity reused/);
 });
 
-// G+ — syntactically valid forged artifact digest and fake run URL must not become authority.
-test('G+: fake URL and forged artifact digest remain NOT_READY even with daily identity changes', () => {
+// G+ — syntactically valid forged artifact digest and fake run URL must fail before publication.
+test('G+: fake URL and forged artifact digest are rejected before a snapshot exists', () => {
   const dir = tmpDir('adv-g-plus-forged-authority');
-  const first = '2026-08-20';
-  const plusDay = (day, delta) => {
-    const date = new Date(`${day}T00:00:00Z`);
-    date.setUTCDate(date.getUTCDate() + delta);
-    return date.toISOString().slice(0, 10);
-  };
-  for (let offset = 0; offset < 7; offset += 1) {
-    const day = plusDay(first, offset);
-    const runsDir = path.join(dir, `runs-${day}`);
-    fs.mkdirSync(runsDir);
-    writeForgeableHourlyRuns(runsDir, {
-      day,
-      identity: {
-        content_hash: `${['a', 'b', 'c', 'd', 'e', 'f', '0'][offset]}`.repeat(64),
-        version_id: `forged-v${offset}`,
-        upstream_updated_at: `${day}T10:00:00Z`,
-      },
-    });
-    const built = buildSnapshot({ day, runsDir, outDir: dir });
-    assert.equal(built.status, 0, `fixture builder failed for ${day}: ${built.stderr}`);
-  }
-  const checked = runScript(CHECKER, {
-    COVERAGE_REF_DAY_UTC: '2026-08-26',
-    COVERAGE_SNAPSHOT_DIR: dir,
-    EXPECTED_REPO_SHA: FULL_SHA,
+  const day = '2026-08-20';
+  const runsDir = path.join(dir, `runs-${day}`);
+  fs.mkdirSync(runsDir);
+  writeForgeableHourlyRuns(runsDir, {
+    day,
+    identity: {
+      content_hash: 'a'.repeat(64),
+      version_id: 'forged-v1',
+      upstream_updated_at: `${day}T10:00:00Z`,
+    },
   });
-  assert.notEqual(checked.status, 0, 'forged artifact authority must fail closed');
-  assert.match(checked.stdout, /VERDICT: NOT_READY/);
-  assert.match(checked.stdout, /artifact|manifest|authorit/i);
+  const built = buildSnapshot({ day, runsDir, outDir: dir, sourceLogsDir: '' });
+  assert.notEqual(built.status, 0, 'unverified source artifacts must fail before publication');
+  assert.match(built.stderr, /SOURCE_REFRESH_LOGS_DIR|authority/i);
+  assert.equal(fs.existsSync(path.join(dir, `${day}.json`)), false);
+  assert.equal(fs.existsSync(path.join(dir, `${day}.pending.json`)), false);
+});
+
+// H — a malformed predecessor must never be treated as a fresh chain genesis.
+test('H: malformed predecessor aborts before writing the candidate day', () => {
+  const dir = tmpDir('adv-h-broken-predecessor');
+  const day = '2026-08-20';
+  fs.writeFileSync(path.join(dir, '2026-08-19.json'), '{"not":"a valid coverage snapshot"}\n');
+  const runsDir = path.join(dir, 'runs');
+  fs.mkdirSync(runsDir);
+  writeHourlyRuns(runsDir, { day });
+
+  const built = buildSnapshot({ day, runsDir, outDir: dir });
+  assert.notEqual(built.status, 0, 'broken predecessor chain must fail before publication');
+  assert.match(built.stderr, /predecessor snapshot/i);
+  assert.equal(fs.existsSync(path.join(dir, `${day}.json`)), false);
+  assert.equal(fs.existsSync(path.join(dir, `${day}.pending.json`)), false);
 });
