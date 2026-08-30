@@ -286,6 +286,7 @@ describe("final unified evidence-first landing contract", () => {
     const evidence = renderToStaticMarkup(<EvidenceScene />);
     const delivery = renderToStaticMarkup(<DeliveryScene />);
 
+    expect(hero).toContain("Радар новых клиентов для агентств");
     expect(hero).toContain("Список компаний, где найм уже идёт");
     expect(hero).toContain("Открыть пример");
     expect(hero).toContain(">Войти</a>");
