@@ -1,9 +1,9 @@
 .section {
-  --delivery-paper: #f4f0e7;
-  --delivery-ink: #17201b;
-  --delivery-muted: #657068;
-  --delivery-line: #c9c4b8;
-  --delivery-accent: #245b51;
+  --delivery-paper: var(--landing-paper);
+  --delivery-ink: var(--landing-ink);
+  --delivery-muted: var(--landing-muted);
+  --delivery-line: var(--landing-line);
+  --delivery-accent: var(--landing-accent);
   background: var(--color-canvas);
   color: var(--color-text-primary);
   padding: clamp(3rem, 4.5vw, 4.5rem) var(--scene-pad);
@@ -128,7 +128,7 @@
 .messageFacts dt { color: var(--delivery-muted); font-family: var(--font-mono); font-size: .56rem; text-transform: uppercase; }
 .messageFacts dd { margin: 0; font-size: .72rem; line-height: 1.45; }
 .messageConfidence { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; margin-top: .75rem; padding: .6rem .7rem; border-left: 2px solid var(--delivery-accent); background: color-mix(in srgb, var(--delivery-accent) 8%, transparent); }
-.messageConfidence span { color: var(--delivery-muted); font-size: .62rem; }
+.messageConfidence span { color: var(--delivery-accent); font-size: .62rem; }
 .messageConfidence strong { color: var(--delivery-accent); font-size: .72rem; }
 .messageActions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; margin-top: .8rem; }
 .messageActions span { display: grid; min-height: 2.35rem; place-items: center; padding: .35rem; border: 1px solid var(--delivery-line); border-radius: var(--radius-control); color: var(--delivery-muted); font-size: .62rem; font-weight: 620; text-align: center; }

@@ -65,13 +65,15 @@ describe("landing product story v2", () => {
   it("uses the approved dark split-screen composition at desktop widths", () => {
     const visualCss = source("app/landing/landing-visual-system.module.css");
     const heroCss = source("app/landing/detection-scene.module.css");
+    const landing = source("app/landing/landing-page.tsx");
 
     expect(visualCss).toMatch(/--content-max:\s*76\.25rem/);
     expect(visualCss).toMatch(/--page-gutter:\s*clamp\(1rem,\s*2\.35vw,\s*2rem\)/);
-    expect(visualCss).toMatch(/--color-canvas:\s*#0d120f/);
-    expect(visualCss).toMatch(/--color-surface-primary:\s*#141b16/);
-    expect(visualCss).toMatch(/--color-text-primary:\s*#f2efe8/);
-    expect(visualCss).toMatch(/--color-signal:\s*#39b48e/);
+    expect(landing).toContain('data-theme="inverse"');
+    expect(visualCss).toMatch(/--landing-canvas:\s*var\(--color-canvas\)/);
+    expect(visualCss).toMatch(/--landing-paper:\s*var\(--color-text-primary\)/);
+    expect(visualCss).toMatch(/--landing-ink:\s*var\(--color-text-inverse\)/);
+    expect(visualCss).toMatch(/--landing-accent:\s*color-mix\(/);
     expect(heroCss).toMatch(
       /\.section\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*\.92fr\)\s+minmax\(0,\s*1\.08fr\)/,
     );
@@ -195,9 +197,9 @@ describe("landing product story v2", () => {
   it("frames the configurator as one paper product with an evidence-first selected lead", () => {
     const workspaceCss = source("app/landing/workspace-scene.module.css");
 
-    expect(workspaceCss).toMatch(/--workspace-paper:\s*#f4f0e7/);
-    expect(workspaceCss).toMatch(/--workspace-ink:\s*#17201b/);
-    expect(workspaceCss).toMatch(/--workspace-accent:\s*#245b51/);
+    expect(workspaceCss).toMatch(/--workspace-paper:\s*var\(--landing-paper\)/);
+    expect(workspaceCss).toMatch(/--workspace-ink:\s*var\(--landing-ink\)/);
+    expect(workspaceCss).toMatch(/--workspace-accent:\s*var\(--landing-accent\)/);
     expect(workspaceCss).not.toMatch(/gradient\(/);
     expect(workspaceCss).toMatch(
       /\.workspaceForm\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\) auto auto/,
@@ -247,9 +249,9 @@ describe("landing product story v2", () => {
     expect(evidenceText).toContain("Уверенность");
     expect(evidenceText).toContain("Следующий ход");
 
-    expect(evidenceCss).toMatch(/--evidence-paper:\s*#f4f0e7/);
-    expect(evidenceCss).toMatch(/--evidence-ink:\s*#17201b/);
-    expect(evidenceCss).toMatch(/--evidence-accent:\s*#245b51/);
+    expect(evidenceCss).toMatch(/--evidence-paper:\s*var\(--landing-paper\)/);
+    expect(evidenceCss).toMatch(/--evidence-ink:\s*var\(--landing-ink\)/);
+    expect(evidenceCss).toMatch(/--evidence-accent:\s*var\(--landing-accent\)/);
     expect(evidenceCss).not.toMatch(/gradient\(|box-shadow:/);
     expect(evidenceCss).toMatch(
       /\.timeline li\s*\{[^}]*grid-template-columns:\s*minmax\(8rem, \.6fr\)\s+minmax\(7rem, \.45fr\)\s+minmax\(0, 1\.55fr\)/,
