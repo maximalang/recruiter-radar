@@ -228,7 +228,7 @@ async function auditHeader(browser, viewport) {
   const heroBackground = "#scene-detection";
 
   await page.evaluate(() => window.scrollTo(0, 0));
-  await assertHeaderTone(page, `${viewport.name} Hero top`, "dark");
+  await assertHeaderTone(page, `${viewport.name} Hero top`, "light");
   await page.waitForFunction(() => !document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
   assert.equal(await header.getAttribute("data-scrolled"), null, `${viewport.name}: header must stay transparent at page top`);
 
@@ -267,7 +267,7 @@ async function auditHeader(browser, viewport) {
   await scrollSectionUnderHeader(page, "#pricing");
   await assertHeaderTone(page, `${viewport.name} light Pricing`, "light");
   await page.evaluate(() => window.scrollTo(0, 0));
-  await assertHeaderTone(page, `${viewport.name} Hero restored`, "dark");
+  await assertHeaderTone(page, `${viewport.name} Hero restored`, "light");
 
   assertCleanConsole();
   await context.close();

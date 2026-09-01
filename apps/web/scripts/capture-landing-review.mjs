@@ -88,7 +88,7 @@ async function resetInteractionState(page) {
   });
   await page.waitForFunction(() => (
     window.scrollY === 0
-    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark"
+    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light"
   ));
   await movePointerToNeutral(page);
   await page.evaluate(() => {

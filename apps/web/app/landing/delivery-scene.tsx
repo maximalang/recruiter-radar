@@ -44,17 +44,19 @@ function TelegramPreview() {
   return (
     <div
       className={sceneStyles.telegramPreview}
-      data-telegram-preview="demo"
-      role="img"
-      aria-label="Демо уведомления Recruiter Radar в Telegram от 12 мая: компания, причина приоритета, источник, уверенность и восемь ручных действий обратной связи."
+      data-telegram-preview="static-demo"
+      aria-labelledby="telegram-demo-label"
     >
-      <div className={sceneStyles.telegramTopbar} aria-hidden="true">
-        <span className={sceneStyles.telegramBack}>‹</span>
-        <span className={sceneStyles.telegramAvatar}>RR</span>
-        <div><strong>Recruiter Radar</strong><small>демо-уведомление</small></div>
-        <span className={sceneStyles.telegramMenu}>•••</span>
+      <div className={sceneStyles.telegramTopbar}>
+        <span className={sceneStyles.telegramBack} aria-hidden="true">‹</span>
+        <span className={sceneStyles.telegramAvatar} aria-hidden="true">RR</span>
+        <div>
+          <strong>Recruiter Radar</strong>
+          <small id="telegram-demo-label">Статический демо-экран · данные на 12 мая</small>
+        </div>
+        <span className={sceneStyles.telegramMenu} aria-hidden="true">•••</span>
       </div>
-      <div className={sceneStyles.telegramCanvas} aria-hidden="true">
+      <div className={sceneStyles.telegramCanvas}>
         <article className={sceneStyles.telegramMessage}>
           <div className={sceneStyles.messageMeta}>
             <span>Новый приоритетный сигнал</span>
@@ -67,7 +69,7 @@ function TelegramPreview() {
             <div><dt>Источник и дата</dt><dd>Карьерная страница компании · 12 мая</dd></div>
           </dl>
           <div className={sceneStyles.messageConfidence}><span>Уверенность</span><strong>A · высокая</strong></div>
-          <div className={sceneStyles.messageActions} data-telegram-feedback-actions="production">
+          <div className={sceneStyles.messageActions} data-telegram-feedback-actions="production" aria-label="Доступные ручные отметки">
             {TELEGRAM_FEEDBACK_ACTIONS.map((action, index) => (
               <span
                 key={action.key}
@@ -101,15 +103,15 @@ export default function DeliveryScene() {
         <div className={sceneStyles.intro}>
           <p>Как приходят результаты</p>
           <h2 id="delivery-title">Радар находит повод. Пишете вы.</h2>
-          <p className={sceneStyles.introSub}>Полная карточка остаётся в веб-кабинете. Короткий сигнал можно получить в Telegram, быстро отметить решение и вернуться к фактам перед контактом.</p>
+          <p className={sceneStyles.introSub}>Полная карточка остаётся в веб-кабинете. Короткий сигнал можно получить в Telegram, отметить решение и вернуться к фактам перед контактом.</p>
         </div>
 
-        <div className={sceneStyles.capabilityBand} aria-label="Поддерживаемые способы доставки">
+        <div className={sceneStyles.capabilityBand} aria-label="Демонстрация доставки сигнала">
           <TelegramPreview />
           <div className={sceneStyles.deliverySystem}>
             <div className={sceneStyles.routeIntro}>
               <span>Один сигнал — два уровня деталей</span>
-              <strong>Уведомление помогает решить, какую карточку открыть первой.</strong>
+              <strong>Telegram помогает выбрать карточку. Веб-кабинет хранит весь контекст.</strong>
             </div>
             <article className={sceneStyles.cabinet} data-channel="cabinet" data-delivery-core="workspace">
               <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel="cabinet" /></span>

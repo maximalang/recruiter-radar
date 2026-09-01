@@ -38,10 +38,11 @@ export default function EvidenceScene() {
                 <span className={styles.sourceCell}>
                   {String(index + 1).padStart(2, "0")} · {event.source}
                 </span>
-                <strong className={styles.factCell}>{event.fact}</strong>
-                <span className={styles.statusCell}>
-                  {event.eventDate} · {event.confidence}
+                <span className={styles.dateCell}>
+                  <time>{event.eventDate}</time>
+                  <small>{event.confidence}</small>
                 </span>
+                <strong className={styles.factCell}>{event.fact}</strong>
               </li>
             ))}
           </ol>

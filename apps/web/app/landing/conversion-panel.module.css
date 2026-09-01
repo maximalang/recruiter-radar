@@ -42,7 +42,7 @@
 }
 
 .finalEyebrow {
-  color: var(--color-signal-on-dark);
+  color: var(--color-accent-on-light);
 }
 
 .pricingIntro > span { grid-area: label; padding-top: .45rem; }
@@ -64,7 +64,7 @@
   border-radius: var(--radius-overlay);
   background: var(--color-text-primary);
   color: var(--color-text-inverse);
-  box-shadow: var(--shadow-overlay);
+  border: 1px solid var(--color-separator);
 }
 
 .pilotTopline {
@@ -75,7 +75,7 @@
 }
 
 .pilotMeta { display: grid; gap: .3rem; }
-.pilotEyebrow { color: var(--color-signal-on-dark); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+.pilotEyebrow { color: var(--color-accent-on-light); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
 .pilotTopline strong { font-size: 1rem; font-weight: 600; }
 .pilotPrice { font-size: clamp(3rem, 5vw, 4.7rem); font-weight: 520; letter-spacing: -.07em; line-height: .9; }
 
