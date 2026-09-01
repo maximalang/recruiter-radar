@@ -1,9 +1,9 @@
 .section {
-  --evidence-paper: #f4f0e7;
-  --evidence-ink: #17201b;
-  --evidence-muted: #56615a;
-  --evidence-accent: #245b51;
-  --evidence-line: rgba(23, 32, 27, .18);
+  --evidence-paper: var(--landing-paper);
+  --evidence-ink: var(--landing-ink);
+  --evidence-muted: var(--landing-muted);
+  --evidence-accent: var(--landing-accent);
+  --evidence-line: var(--landing-line);
   box-sizing: border-box;
   background: var(--evidence-paper);
   color: var(--evidence-ink);

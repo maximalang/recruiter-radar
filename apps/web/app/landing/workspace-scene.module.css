@@ -17,19 +17,19 @@
 .intro > p { max-width: 34rem; justify-self: end; font-size: .92rem; line-height: 1.55; }
 
 .productFrame {
-  --workspace-paper: #f4f0e7;
-  --workspace-paper-raised: #fffdf8;
-  --workspace-ink: #17201b;
-  --workspace-muted: #667068;
-  --workspace-line: #d8d3c8;
-  --workspace-accent: #245b51;
+  --workspace-paper: var(--landing-paper);
+  --workspace-paper-raised: var(--landing-paper-raised);
+  --workspace-ink: var(--landing-ink);
+  --workspace-muted: var(--landing-muted);
+  --workspace-line: var(--landing-line);
+  --workspace-accent: var(--landing-accent);
 
   overflow: hidden;
   padding: clamp(.5rem, 1.2vw, .85rem);
-  border: 1px solid #29332d;
+  border: 1px solid var(--landing-line-strong);
   border-radius: var(--radius-surface);
-  background: #0d120f;
-  box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 22%);
+  background: var(--landing-canvas);
+  box-shadow: var(--shadow-overlay);
   color: var(--workspace-ink);
 }
 
@@ -48,7 +48,7 @@
   justify-content: space-between;
   gap: 1rem;
   padding: .7rem 1rem;
-  border-radius: calc(var(--radius-surface) - .35rem) calc(var(--radius-surface) - .35rem) 0 0;
+  border-radius: var(--radius-surface) var(--radius-surface) 0 0;
   border-bottom: 1px solid var(--workspace-line);
 }
 .previewHeader span {
@@ -99,7 +99,7 @@
   align-items: center;
   padding: .25rem .6rem;
   border: 1px solid var(--workspace-line);
-  border-radius: .3rem;
+  border-radius: var(--radius-detail);
   background: transparent;
   color: var(--workspace-ink);
   font-size: .68rem;
@@ -128,8 +128,8 @@
   min-width: 0;
   min-height: 44px;
   padding: .62rem .7rem;
-  border: 1px solid #aaa79f;
-  border-radius: .3rem;
+  border: 1px solid var(--landing-line-strong);
+  border-radius: var(--radius-detail);
   background: var(--workspace-paper-raised);
   color: var(--workspace-ink);
   font: inherit;
@@ -138,7 +138,7 @@
 .workspaceForm button,
 .workspaceForm > a {
   min-height: 44px;
-  border-radius: .3rem;
+  border-radius: var(--radius-detail);
   font-size: .72rem;
   font-weight: 750;
 }
@@ -146,7 +146,7 @@
   border: 1px solid var(--workspace-accent);
   padding: .65rem .9rem;
   background: var(--workspace-accent);
-  color: #fffdf8;
+  color: var(--landing-paper);
   cursor: pointer;
   font: inherit;
   white-space: nowrap;
@@ -227,7 +227,7 @@
   justify-content: center;
   margin-top: .45rem;
   border: 1px solid var(--workspace-line);
-  border-radius: .3rem;
+  border-radius: var(--radius-detail);
   background: transparent;
   color: var(--workspace-ink);
   cursor: pointer;
@@ -344,7 +344,7 @@
   gap: 1rem;
   padding: .7rem 1rem;
   border-top: 1px solid var(--workspace-line);
-  border-radius: 0 0 calc(var(--radius-surface) - .35rem) calc(var(--radius-surface) - .35rem);
+  border-radius: 0 0 var(--radius-surface) var(--radius-surface);
 }
 .productFooter a {
   display: inline-flex;
@@ -378,7 +378,7 @@
     border-color: var(--workspace-accent);
     color: var(--workspace-accent);
   }
-  .workspaceForm button:hover { background: #193f38; }
+  .workspaceForm button:hover { background: color-mix(in srgb, var(--workspace-accent) 82%, var(--workspace-ink)); }
 }
 
 @media (max-width: 900px) {

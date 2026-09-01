@@ -61,6 +61,8 @@ describe("landing visual and login reliability polish", () => {
     expect(hero).not.toContain('data-header-tone="dark"');
     expect(header).toContain('useState<HeaderTone>("dark")');
     expect(header).toContain('const logoTone = scrolled || menuOpen ? "light" : tone;');
+    expect(header).toContain("if (!panel?.contains(active))");
+    expect(header).toContain("(event.shiftKey ? last : first).focus();");
     expect(accessibilityAudit).toContain("Header BrandLogo");
     expect(accessibilityAudit).toContain("Header nav");
     expect(accessibilityAudit).toContain("Header login");

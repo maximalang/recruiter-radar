@@ -131,7 +131,10 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
       const first = items[0];
       const last = items[items.length - 1];
       const active = document.activeElement;
-      if (event.shiftKey && active === first) {
+      if (!panel?.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && active === last) {

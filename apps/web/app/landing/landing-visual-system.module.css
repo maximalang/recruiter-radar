@@ -3,24 +3,18 @@
   --content-max: 76.25rem;
   --scene-pad: var(--page-gutter);
   --content: var(--content-max);
-  /* Concept tokens: bounded 1220px canvas, dark editorial green family. */
-  --color-canvas: #0d120f;
-  --color-surface-primary: #141b16;
-  --color-surface-secondary: #18211b;
-  --color-surface-elevated: #1d2721;
-  --color-text-primary: #f2efe8;
-  --color-text-secondary: #c8cec1;
-  --color-text-muted: #96a093;
-  --color-text-inverse: #0d120f;
-  --color-surface-light: #f2efe8;
-  --color-accent-on-light: #245b51;
-  --color-signal: #39b48e;
-  --color-signal-hover: #5ecfa9;
-  --color-signal-on-dark: #5ecfa9;
-  --color-copper: #b08d5f;
-  --color-separator: #2a342c;
-  --color-focus: #5ecfa9;
-  --color-focus-on-light: #245b51;
+  /* Landing aliases map the canonical inverse theme onto light product objects. */
+  --landing-canvas: var(--color-canvas);
+  --landing-paper: var(--color-text-primary);
+  --landing-paper-raised: color-mix(in srgb, var(--landing-paper) 94%, var(--color-surface-elevated));
+  --landing-ink: var(--color-text-inverse);
+  --landing-muted: color-mix(in srgb, var(--landing-ink) 64%, var(--landing-paper));
+  --landing-line: color-mix(in srgb, var(--landing-ink) 18%, var(--landing-paper));
+  --landing-line-strong: color-mix(in srgb, var(--landing-ink) 36%, var(--landing-paper));
+  --landing-accent: color-mix(in srgb, var(--landing-ink) 78%, var(--color-signal));
+  --color-surface-light: var(--landing-paper);
+  --color-accent-on-light: var(--landing-accent);
+  --color-focus-on-light: var(--landing-accent);
   background: var(--color-canvas);
   color: var(--color-text-primary);
 }

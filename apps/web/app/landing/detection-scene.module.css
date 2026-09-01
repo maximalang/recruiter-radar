@@ -27,7 +27,7 @@
   font-size: .61rem;
   letter-spacing: .08em;
   text-transform: uppercase;
-  animation: heroKickerReveal var(--motion-duration-scan) var(--motion-ease-standard) both;
+  animation: none;
 }
 
 .kickerRule { display: inline-block; width: 2.3rem; height: 1px; background: var(--color-signal); }
@@ -45,7 +45,7 @@
 .actions,
 .loginLink,
 .microcopy {
-  animation: heroItemReveal var(--motion-duration-scan) var(--motion-ease-standard) both;
+  animation: none;
 }
 
 .serviceLabel {
@@ -161,7 +161,7 @@
   border: 1px solid var(--color-separator);
   border-radius: var(--radius-overlay);
   background: var(--color-surface-elevated);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, .28);
+  box-shadow: var(--shadow-overlay);
   text-align: left;
 }
 .shotBar {
@@ -252,7 +252,7 @@
 }
 .shotNav i,
 .shotNav em {
-  color: color-mix(in srgb, var(--color-text-primary) 44%, transparent);
+  color: color-mix(in srgb, var(--color-text-primary) 68%, transparent);
   font-family: var(--font-mono);
   font-size: .52rem;
   font-style: normal;
@@ -274,7 +274,7 @@
 }
 .shotProfile span,
 .shotProfile small {
-  color: color-mix(in srgb, var(--color-text-primary) 48%, transparent);
+  color: color-mix(in srgb, var(--color-text-primary) 68%, transparent);
   font-size: .55rem;
 }
 .shotProfile strong { color: var(--color-text-primary); font-size: .68rem; font-weight: 600; }
@@ -316,7 +316,7 @@
   padding: .48rem .55rem;
   border: 1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent);
   border-radius: var(--radius-control);
-  color: color-mix(in srgb, var(--color-text-primary) 56%, transparent);
+  color: color-mix(in srgb, var(--color-text-primary) 68%, transparent);
   font-size: .55rem;
 }
 .shotSummary strong { color: var(--color-text-primary); font-size: .85rem; font-weight: 650; }
@@ -342,14 +342,14 @@
 .shotLeadList li:last-child { border-bottom: 0; }
 .shotLeadList li > span,
 .shotLeadList li > b {
-  color: color-mix(in srgb, var(--color-text-primary) 46%, transparent);
+  color: color-mix(in srgb, var(--color-text-primary) 68%, transparent);
   font-family: var(--font-mono);
   font-size: .52rem;
 }
 .shotLeadList li > b { justify-self: end; color: var(--color-signal-on-dark); }
 .shotLeadList li div { display: grid; gap: .18rem; min-width: 0; }
 .shotLeadList li strong { overflow: hidden; color: var(--color-text-primary); font-size: .66rem; font-weight: 610; text-overflow: ellipsis; white-space: nowrap; }
-.shotLeadList li small { color: color-mix(in srgb, var(--color-text-primary) 48%, transparent); font-size: .53rem; line-height: 1.3; }
+.shotLeadList li small { color: color-mix(in srgb, var(--color-text-primary) 68%, transparent); font-size: .53rem; line-height: 1.3; }
 .shotLeadActive { border-left-color: var(--color-signal); background: color-mix(in srgb, var(--color-signal) 8%, transparent); }
 .shotDetail {
   min-width: 0;
@@ -363,7 +363,7 @@
 .shotWhy > span,
 .shotConfidence > span,
 .shotNext > span {
-  color: color-mix(in srgb, var(--color-text-primary) 48%, transparent);
+  color: color-mix(in srgb, var(--color-text-primary) 68%, transparent);
   font-family: var(--font-mono);
   font-size: .5rem;
   letter-spacing: .04em;
@@ -374,7 +374,7 @@
 .shotWhy p { margin: .28rem 0 0; font-size: .62rem; line-height: 1.42; }
 .shotEvidence { display: grid; gap: .42rem; margin: .6rem 0 0; }
 .shotEvidence div { display: grid; grid-template-columns: 6.1rem minmax(0, 1fr); gap: .4rem; padding-top: .42rem; border-top: 1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
-.shotEvidence dt { color: color-mix(in srgb, var(--color-text-primary) 48%, transparent); font-size: .52rem; }
+.shotEvidence dt { color: color-mix(in srgb, var(--color-text-primary) 68%, transparent); font-size: .52rem; }
 .shotEvidence dd { margin: 0; font-size: .57rem; line-height: 1.35; }
 .shotConfidence {
   display: flex;
@@ -418,9 +418,6 @@
   animation-delay: calc(var(--motion-duration-control) * 2.5);
 }
 .loginLink:focus-visible { outline: 2px solid var(--color-signal-on-dark); outline-offset: 2px; }
-
-@keyframes heroKickerReveal { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
-@keyframes heroItemReveal { from { opacity: 0; transform: translate3d(0, 9px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
 
 @media (hover: hover) and (pointer: fine) {
   .primaryButton:hover,
