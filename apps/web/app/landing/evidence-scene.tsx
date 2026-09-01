@@ -23,11 +23,11 @@ export default function EvidenceScene() {
       <div className={styles.layout}>
         <header className={styles.intro}>
           <div>
-            <p className={styles.introLabel}>Why now · {DEMO_COMPANY.name}</p>
-            <h2>Факт усиливает факт — пока сигнал не становится решением.</h2>
+            <p className={styles.introLabel}>Почему эта компания сейчас · {DEMO_COMPANY.name}</p>
+            <h2>Сначала факты — потом решение.</h2>
           </div>
           <p>
-            Мы показываем подтверждения к рекомендации, а не прячем решение за непрозрачной оценкой.
+            По каждому пункту видно, что произошло, какой источник это опубликовал и когда сигнал зафиксирован. Уверенность помогает отсортировать очередь, а не заменяет ваше решение.
           </p>
         </header>
 

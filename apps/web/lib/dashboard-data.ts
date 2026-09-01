@@ -106,7 +106,7 @@ export async function getDashboardQualityMetrics(): Promise<QualityMetrics> {
         )
         SELECT
           COUNT(*) FILTER (WHERE feedback_status IS NOT NULL) AS delivered,
-          COUNT(*) FILTER (WHERE feedback_status IN ('contacted', 'replied', 'won')) AS accepted
+          COUNT(*) FILTER (WHERE feedback_status IN ('contacted', 'replied', 'meeting', 'won')) AS accepted
         FROM recent
       `),
       pool.query<{ delivered: string; accepted: string }>(`
@@ -125,7 +125,7 @@ export async function getDashboardQualityMetrics(): Promise<QualityMetrics> {
         )
         SELECT
           COUNT(*) FILTER (WHERE feedback_status IS NOT NULL) AS delivered,
-          COUNT(*) FILTER (WHERE feedback_status IN ('contacted', 'replied', 'won')) AS accepted
+          COUNT(*) FILTER (WHERE feedback_status IN ('contacted', 'replied', 'meeting', 'won')) AS accepted
         FROM recent
       `),
     ]);
@@ -361,6 +361,7 @@ const FEEDBACK_LABELS: Record<string, string> = {
   // DB-legal (digest_feedback_status enum) — current in-app vocabulary
   contacted: 'В работе',
   replied: 'Ответили',
+  meeting: 'Созвон',
   won: 'Клиент',
   snooze: 'Отложено',
   dismissed: 'Мимо',

@@ -27,7 +27,7 @@ function makeMockPool() {
   } as never);
 }
 
-const VALID_STATUSES = ['contacted', 'replied', 'won', 'badfit', 'snooze', 'dismissed'] as const;
+const VALID_STATUSES = ['contacted', 'replied', 'meeting', 'won', 'badfit', 'snooze', 'dismissed'] as const;
 
 describe('updateLeadFeedback', () => {
   beforeEach(() => {

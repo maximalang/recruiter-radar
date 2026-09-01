@@ -11,28 +11,28 @@ const STORY = DEFAULT_LANDING_DEMO_STORY;
 
 const TIMELINE_EVENTS = [
   {
-    date: "6 дней назад",
+    date: "6 мая · демо-сценарий",
     fact: `Открыты ${STORY.company.vacanciesCount} инженерных ролей`,
     source: "карьерная страница",
     state: "новый сигнал",
   },
   {
-    date: "2 дня назад",
+    date: "10 мая · демо-сценарий",
     fact: "Появилась новая редкая инженерная роль",
     source: "публичные вакансии",
-    state: "усиление",
+    state: "интерес растёт",
   },
   {
-    date: "вчера",
+    date: "11 мая · демо-сценарий",
     fact: "Найм остаётся активным — публикации обновлены",
     source: "повторная публикация",
-    state: "повтор",
+    state: "подтверждение",
   },
   {
     date: STORY.company.freshness,
     fact: "Изменения подтверждены повторной проверкой",
     source: `${STORY.evidence.length} подтверждающих факта`,
-    state: "подтверждено",
+    state: "приоритет повышен",
   },
 ] as const;
 
@@ -53,7 +53,7 @@ export default function SignalTimeline() {
             Один сигнал — шум. <em>Несколько подряд — повод.</em>
           </h2>
           <p className={shared.sceneLead}>
-            Радар смотрит на динамику: что открылось, что повторилось и что подтвердилось при следующей проверке.
+            Так одна компания поднимается в вашем списке: что открылось, что повторилось и что подтвердилось при следующей проверке.
           </p>
         </div>
 
@@ -80,7 +80,7 @@ export default function SignalTimeline() {
           <div className={styles.lock} data-opportunity-lock="true">
             <span>ПОВОД СОБРАН</span>
             <strong>Можно писать не наугад.</strong>
-            <small>все ключевые факты — в одной карточке</small>
+            <small>компания поднимается в приоритете — с фактами в одной карточке</small>
           </div>
         </div>
       </div>

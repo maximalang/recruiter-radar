@@ -5,6 +5,7 @@ export const DIGEST_FEEDBACK_ACTIONS: readonly [
   'snooze',
   'contacted',
   'replied',
+  'meeting',
   'won',
 ]
 

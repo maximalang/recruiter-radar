@@ -51,7 +51,7 @@ describe("landing sales production pass", () => {
     expect(panel).toContain('data-pricing-layout="pilot-decision"');
     expect(panel).not.toContain("data-recommended={plan.isPrimary");
     expect(panel).toContain("Без автопродления");
-    expect(panel).toContain("Проверяемые факты");
+    expect(panel).toContain("Факты и источники по каждой компании");
     expect(panel).toContain("Сообщения отправляете вы");
   });
 

@@ -412,7 +412,7 @@ async function loadActiveFeedbackPatterns(): Promise<FeedbackPatternEvent[]> {
       LOWER(TRIM(orgs.industry)) AS industry
     FROM client_digest_org_state AS state
     JOIN orgs ON orgs.id = state.org_id
-    WHERE state.feedback_status IN ('badfit', 'dismissed', 'contacted', 'replied', 'won')
+    WHERE state.feedback_status IN ('badfit', 'dismissed', 'contacted', 'replied', 'meeting', 'won')
   `)
   const events: FeedbackPatternEvent[] = []
   for (const r of rows) {

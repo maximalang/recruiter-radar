@@ -18,6 +18,8 @@ export type HhDigestItem = {
   candidate_source_keys: string[]
   location_names: string[]
   confidence_gate?: 'A' | 'B' | 'C' | 'D'
+  /** Durable identity used by native Telegram feedback callbacks. */
+  digest_candidate_id?: string
 }
 
 export async function getHhDigestItems(input?: {
