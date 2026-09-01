@@ -11,6 +11,7 @@ import {
   LANDING_ANALYTICS_CONTEXT,
   LANDING_ANALYTICS_EVENT,
 } from "../../lib/landing-analytics-contract";
+import { pluralCompanies } from "../../lib/format/plural";
 import LandingPreviewInteractions from "../landing-preview-interactions";
 import PreviewGeneratedEvent from "../preview-generated-event";
 import styles from "./landing.module.css";
@@ -215,7 +216,7 @@ function WorkspaceResultsContent(
             </small>
           ) : null}
         </div>
-        <span data-live={previewState.isLive || undefined}>{previewState.items.length} компаний</span>
+        <span data-live={previewState.isLive || undefined}>{previewState.items.length} {pluralCompanies(previewState.items.length)}</span>
       </div>
 
       {props.previewState.isPersonalized && appliedProfile.length > 0 ? (

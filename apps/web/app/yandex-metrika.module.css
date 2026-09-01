@@ -68,7 +68,7 @@
 .primaryButton {
   border: 1px solid var(--color-signal);
   background: var(--color-signal);
-  color: var(--color-signal);
+  color: var(--color-text-inverse);
 }
 
 .secondaryButton {
