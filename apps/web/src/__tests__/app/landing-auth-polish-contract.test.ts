@@ -50,15 +50,15 @@ describe("landing visual and login reliability polish", () => {
     expect(visual).not.toContain("data-hero-instrument");
   });
 
-  test("binds the transparent fixed header to the dark Hero surface from first paint", () => {
+  test("binds the transparent fixed header to a readable Hero tone from first paint", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const header = source("app/landing/landing-header.tsx");
     const accessibilityAudit = source("scripts/verify-landing-accessibility.mjs");
     const reviewCapture = source("scripts/capture-landing-review.mjs");
 
     expect(hero).toContain('data-theme="inverse"');
-    expect(hero).toContain('data-header-tone="dark"');
-    expect(hero).not.toContain('data-header-tone="light"');
+    expect(hero).toContain('data-header-tone="light"');
+    expect(hero).not.toContain('data-header-tone="dark"');
     expect(header).toContain('useState<HeaderTone>("dark")');
     expect(header).toContain('const logoTone = scrolled || menuOpen ? "light" : tone;');
     expect(accessibilityAudit).toContain("Header BrandLogo");
@@ -67,9 +67,12 @@ describe("landing visual and login reliability polish", () => {
     expect(accessibilityAudit).toContain("Header preview CTA");
     expect(accessibilityAudit).toContain("Header menu glyph");
     expect(accessibilityAudit).toContain("Header menu focus");
+    expect(accessibilityAudit).toContain('Hero top`, "light"');
+    expect(accessibilityAudit).toContain('Hero restored`, "light"');
     expect(accessibilityAudit).toContain('hash: "scene-evidence", tone: "dark"');
     expect(accessibilityAudit).toContain('hash: "pricing", tone: "light"');
     expect(accessibilityAudit).toContain('hash: "faq", tone: "light"');
+    expect(reviewCapture).toContain('getAttribute("data-tone") === "light"');
     expect(reviewCapture).toContain("hero-header-top.png");
     expect(reviewCapture).toContain("header-preview.png");
     expect(reviewCapture).toContain("header-proof-dark.png");

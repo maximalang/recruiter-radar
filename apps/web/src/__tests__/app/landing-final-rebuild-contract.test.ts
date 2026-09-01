@@ -133,7 +133,7 @@ describe("landing restoration narrative", () => {
     expect(delivery).not.toMatch(/сообщения отправляются автоматически|автоматическая рассылка/i);
   });
 
-  it("makes the pilot the only dominant offer and closes on the dark radar echo", () => {
+  it("makes the pilot the only dominant offer and closes on manual outreach proof", () => {
     const conversion = source("app/landing/conversion-panel.tsx");
     const conversionCss = source("app/landing/conversion-panel.module.css");
 
@@ -143,9 +143,10 @@ describe("landing restoration narrative", () => {
     expect(conversion).not.toContain("data-recommended={plan.isPrimary");
     expect(conversion).not.toContain("TargetIcon");
 
-    // Final scene echoes the dark ambient hero identity through the
-    // abstract radar echo field instead of becoming a second hero.
-    expect(conversion).toContain('data-final-radar="echo"');
+    // Final scene resolves the journey with explicit human control instead of
+    // repeating the retired abstract radar echo treatment.
+    expect(conversion).not.toContain('data-final-radar="echo"');
+    expect(conversion).toContain('data-final-proof="manual-outreach"');
     expect(conversion).toContain("Сообщения отправляете вы");
     expect(conversionCss).toContain("min-height: 21rem");
     expect(conversionCss).not.toContain("min-height: 26rem");

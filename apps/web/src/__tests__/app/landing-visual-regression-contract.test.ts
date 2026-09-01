@@ -10,14 +10,14 @@ function source(path: string) {
 }
 
 describe("landing visual regression contract", () => {
-  it("keeps the ambient radar hero and transparent header on readable tone contracts", () => {
+  it("keeps the inverse hero and transparent header on readable tone contracts", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const timeline = source("app/landing/signal-timeline.tsx");
 
     expect(hero).toContain('data-theme="inverse"');
-    expect(hero).toContain('data-header-tone="dark"');
+    expect(hero).toContain('data-header-tone="light"');
     expect(hero).toContain('data-hero-layout="product-workspace"');
-    expect(hero).not.toContain('data-header-tone="light"');
+    expect(hero).not.toContain('data-header-tone="dark"');
 
     expect(timeline).toContain('data-header-tone="light"');
     expect(timeline).toContain('id="scene-signal-timeline"');

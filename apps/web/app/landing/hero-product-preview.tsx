@@ -67,7 +67,7 @@ export default function HeroProductPreview() {
               <span>Сегодня</span>
               <strong>Компании, которым стоит написать</strong>
             </div>
-            <small>Профиль активен</small>
+            <small>Демо-профиль · 12 мая</small>
           </header>
 
           <div className={sceneStyles.shotSummary}>
@@ -87,20 +87,23 @@ export default function HeroProductPreview() {
               ))}
             </ol>
 
-            <article className={sceneStyles.shotDetail}>
+            <article className={sceneStyles.shotDetail} data-hero-company-detail="selected">
               <div className={sceneStyles.shotDetailHeader}>
                 <div><span>Выбрано из списка</span><strong>Промет</strong></div>
-                <b>A · высокая</b>
               </div>
-              <div className={sceneStyles.shotWhy}>
+              <div className={sceneStyles.shotWhy} data-hero-why-now="true">
                 <span>Почему сейчас</span>
                 <p>Открыты 14 инженерных вакансий; расширение производства подтверждено карьерной страницей.</p>
               </div>
-              <dl className={sceneStyles.shotEvidence}>
+              <dl className={sceneStyles.shotEvidence} data-hero-evidence="fixed-date">
                 <div><dt>Источник и дата</dt><dd>Карьерная страница · 12 мая</dd></div>
                 <div><dt>Официальный контакт</dt><dd>Раздел вакансий компании</dd></div>
               </dl>
-              <div className={sceneStyles.shotNext}>
+              <div className={sceneStyles.shotConfidence} data-hero-confidence="A">
+                <span>Уверенность</span>
+                <strong>A · высокая</strong>
+              </div>
+              <div className={sceneStyles.shotNext} data-hero-next-step="manual">
                 <span>Следующий ход</span>
                 <strong>Предложить точечный подбор по инженерным ролям</strong>
               </div>

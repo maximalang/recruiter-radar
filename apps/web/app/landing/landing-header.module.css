@@ -5,7 +5,8 @@
   min-height: 72px;
   border-bottom: 1px solid transparent;
   background: transparent;
-  color: var(--color-canvas);
+  color: var(--color-text-inverse);
+  --header-focus: var(--color-focus-on-light);
   transition:
     color var(--motion-duration-control) var(--motion-ease-standard),
     background-color var(--motion-duration-control) var(--motion-ease-standard),
@@ -14,15 +15,22 @@
 }
 
 .header[data-tone="light"]:not([data-scrolled]):not([data-menu-open]) {
+  --header-focus: var(--color-focus);
   color: var(--color-text-primary);
+}
+
+.header[data-tone="dark"]:not([data-scrolled]):not([data-menu-open]) {
+  --header-focus: var(--color-focus-on-light);
+  color: var(--color-text-inverse);
 }
 
 /* Scrolled: quiet surface — slightly translucent, no heavy shadow. */
 .header[data-scrolled],
 .header[data-menu-open] {
   border-bottom-color: color-mix(in srgb, var(--color-separator) 82%, transparent);
-  background: color-mix(in srgb, var(--color-canvas) 88%, transparent);
+  background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
   color: var(--color-text-primary);
+  --header-focus: var(--color-focus);
   backdrop-filter: blur(10px);
 }
 
@@ -147,7 +155,7 @@
 .cta:focus-visible,
 .menuButton:focus-visible,
 .mobileActions a:focus-visible {
-  outline: 2px solid var(--color-focus);
+  outline: 2px solid var(--header-focus);
   outline-offset: 3px;
 }
 

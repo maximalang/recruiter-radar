@@ -1,4 +1,9 @@
 .section {
+  --delivery-paper: #f4f0e7;
+  --delivery-ink: #17201b;
+  --delivery-muted: #657068;
+  --delivery-line: #c9c4b8;
+  --delivery-accent: #245b51;
   background: var(--color-canvas);
   color: var(--color-text-primary);
   padding: clamp(3rem, 4.5vw, 4.5rem) var(--scene-pad);
@@ -55,12 +60,10 @@
   width: min(100%, 27rem);
   justify-self: center;
   overflow: hidden;
-  padding: .45rem;
-  border: 1px solid color-mix(in srgb, var(--color-text-primary) 18%, transparent);
+  border: 1px solid var(--delivery-line);
   border-radius: var(--radius-overlay);
-  background: var(--color-text-primary);
-  box-shadow: var(--shadow-float);
-  color: var(--color-text-inverse);
+  background: var(--delivery-paper);
+  color: var(--delivery-ink);
 }
 
 .telegramTopbar {
@@ -74,7 +77,7 @@
 
 .telegramBack,
 .telegramMenu {
-  color: color-mix(in srgb, var(--color-text-inverse) 58%, transparent);
+  color: var(--delivery-muted);
   font-size: 1rem;
 }
 
@@ -84,8 +87,8 @@
   height: 2.2rem;
   place-items: center;
   border-radius: 50%;
-  background: var(--color-signal);
-  color: var(--color-text-inverse);
+  background: var(--delivery-accent);
+  color: var(--delivery-paper);
   font-family: var(--font-mono);
   font-size: .62rem;
   font-weight: 750;
@@ -93,23 +96,19 @@
 
 .telegramTopbar div { display: grid; min-width: 0; gap: .08rem; }
 .telegramTopbar strong { overflow: hidden; font-size: .84rem; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
-.telegramTopbar small { color: color-mix(in srgb, var(--color-text-inverse) 58%, transparent); font-size: .6rem; }
+.telegramTopbar small { color: var(--delivery-muted); font-size: .6rem; }
 
 .telegramCanvas {
   padding: 1.35rem .9rem 1.6rem;
-  border-radius: var(--radius-overlay);
-  background:
-    linear-gradient(color-mix(in srgb, var(--color-signal) 4%, var(--color-canvas)), color-mix(in srgb, var(--color-signal) 8%, var(--color-surface-secondary))),
-    var(--color-canvas);
+  border-top: 1px solid var(--delivery-line);
+  background: var(--delivery-paper);
 }
 
 .telegramMessage {
   padding: 1.05rem;
-  border: 1px solid var(--color-separator-subtle);
-  border-radius: var(--radius-overlay);
-  background: var(--color-surface-primary);
-  box-shadow: var(--shadow-card);
-  color: var(--color-text-primary);
+  border-left: 2px solid var(--delivery-accent);
+  background: transparent;
+  color: var(--delivery-ink);
 }
 
 .messageMeta {
@@ -118,23 +117,23 @@
   justify-content: space-between;
   gap: .75rem;
   padding-bottom: .7rem;
-  border-bottom: 1px solid var(--color-separator-subtle);
+  border-bottom: 1px solid var(--delivery-line);
 }
-.messageMeta span { color: var(--color-signal-hover); font-size: .62rem; font-weight: 700; letter-spacing: .055em; text-transform: uppercase; }
-.messageMeta small { color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: .54rem; white-space: nowrap; }
+.messageMeta span { color: var(--delivery-accent); font-size: .62rem; font-weight: 700; letter-spacing: .055em; text-transform: uppercase; }
+.messageMeta small { color: var(--delivery-muted); font-family: var(--font-mono); font-size: .54rem; white-space: nowrap; }
 .telegramMessage h3 { margin: .8rem 0 .16rem; font-size: 1.25rem; font-weight: 650; letter-spacing: -.035em; }
-.messageLocation { margin: 0; color: var(--color-text-secondary); font-size: .72rem; }
+.messageLocation { margin: 0; color: var(--delivery-muted); font-size: .72rem; }
 .messageFacts { display: grid; gap: .65rem; margin: .9rem 0 0; }
-.messageFacts div { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: .7rem; padding-top: .65rem; border-top: 1px solid var(--color-separator-subtle); }
-.messageFacts dt { color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: .56rem; text-transform: uppercase; }
+.messageFacts div { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: .7rem; padding-top: .65rem; border-top: 1px solid var(--delivery-line); }
+.messageFacts dt { color: var(--delivery-muted); font-family: var(--font-mono); font-size: .56rem; text-transform: uppercase; }
 .messageFacts dd { margin: 0; font-size: .72rem; line-height: 1.45; }
-.messageConfidence { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; margin-top: .75rem; padding: .6rem .7rem; border-left: 2px solid var(--color-signal); background: var(--color-signal-soft); }
-.messageConfidence span { color: var(--color-text-secondary); font-size: .62rem; }
-.messageConfidence strong { color: var(--color-signal-hover); font-size: .72rem; }
+.messageConfidence { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; margin-top: .75rem; padding: .6rem .7rem; border-left: 2px solid var(--delivery-accent); background: color-mix(in srgb, var(--delivery-accent) 8%, transparent); }
+.messageConfidence span { color: var(--delivery-muted); font-size: .62rem; }
+.messageConfidence strong { color: var(--delivery-accent); font-size: .72rem; }
 .messageActions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; margin-top: .8rem; }
-.messageActions span { display: grid; min-height: 2.35rem; place-items: center; padding: .35rem; border: 1px solid var(--color-separator); border-radius: var(--radius-control); color: var(--color-text-secondary); font-size: .62rem; font-weight: 620; text-align: center; }
-.messageActions .messageActionPrimary { border-color: color-mix(in srgb, var(--color-signal-hover) 48%, transparent); background: var(--color-signal-hover); color: var(--color-text-inverse); }
-.messageBoundary { margin: .65rem 0 0; color: var(--color-text-tertiary); font-size: .56rem; text-align: center; }
+.messageActions span { display: grid; min-height: 2.35rem; place-items: center; padding: .35rem; border: 1px solid var(--delivery-line); border-radius: var(--radius-control); color: var(--delivery-muted); font-size: .62rem; font-weight: 620; text-align: center; }
+.messageActions .messageActionPrimary { border-color: var(--delivery-accent); background: var(--delivery-accent); color: var(--delivery-paper); }
+.messageBoundary { margin: .65rem 0 0; color: var(--delivery-muted); font-size: .56rem; text-align: center; }
 
 .deliverySystem {
   display: grid;
@@ -156,9 +155,9 @@
   grid-template-columns: auto 1fr;
   gap: 1rem;
   align-items: start;
-  padding: 1.2rem;
-  border-radius: var(--radius-surface);
-  background: var(--color-surface-secondary);
+  padding: 1.2rem 0;
+  border-block: 1px solid var(--color-separator);
+  background: transparent;
 }
 
 .channelIcon {
@@ -166,9 +165,7 @@
   width: 2.4rem;
   height: 2.4rem;
   place-items: center;
-  border-radius: 50%;
-  background: var(--color-signal-soft);
-  color: var(--color-signal-hover);
+  color: var(--color-signal);
 }
 
 .channelIcon svg { width: 1.2rem; height: 1.2rem; }
@@ -204,9 +201,9 @@
   grid-template-columns: auto 1fr;
   gap: .8rem;
   align-items: start;
-  padding: 1rem;
-  border-radius: var(--radius-surface);
-  background: var(--color-surface-primary);
+  padding: 1rem 0;
+  border-top: 1px solid var(--color-separator);
+  background: transparent;
 }
 
 .channelRoute strong { font-size: .98rem; }
@@ -259,12 +256,10 @@
   z-index: auto;
   display: grid;
   width: 100%;
-  gap: .55rem;
+  gap: 0;
   margin-top: .4rem;
-  padding: .65rem;
-  border-radius: var(--radius-overlay);
-  background: var(--color-surface-primary);
-  box-shadow: var(--shadow-float);
+  padding: 0;
+  background: transparent;
 }
 
 @media (max-width: 980px) {
@@ -280,7 +275,6 @@
   .capabilityBand { margin-top: 1.75rem; }
   .boundaryRow { align-items: flex-start; flex-direction: column; }
   .manualBoundary { align-items: flex-start; flex-direction: column; gap: .25rem; }
-  .extraRoutes { box-shadow: none; }
 }
 
 @media (max-width: 520px) {

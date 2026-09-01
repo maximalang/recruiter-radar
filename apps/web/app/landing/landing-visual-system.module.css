@@ -1,8 +1,26 @@
 .visualSystem {
-  --page-gutter: clamp(1rem, 3.2vw, 4rem);
-  --content-max: 84rem;
+  --page-gutter: clamp(1rem, 2.35vw, 2rem);
+  --content-max: 76.25rem;
   --scene-pad: var(--page-gutter);
   --content: var(--content-max);
+  /* Concept tokens: bounded 1220px canvas, dark editorial green family. */
+  --color-canvas: #0d120f;
+  --color-surface-primary: #141b16;
+  --color-surface-secondary: #18211b;
+  --color-surface-elevated: #1d2721;
+  --color-text-primary: #f2efe8;
+  --color-text-secondary: #c8cec1;
+  --color-text-muted: #96a093;
+  --color-text-inverse: #0d120f;
+  --color-surface-light: #f2efe8;
+  --color-accent-on-light: #245b51;
+  --color-signal: #39b48e;
+  --color-signal-hover: #5ecfa9;
+  --color-signal-on-dark: #5ecfa9;
+  --color-copper: #b08d5f;
+  --color-separator: #2a342c;
+  --color-focus: #5ecfa9;
+  --color-focus-on-light: #245b51;
   background: var(--color-canvas);
   color: var(--color-text-primary);
 }

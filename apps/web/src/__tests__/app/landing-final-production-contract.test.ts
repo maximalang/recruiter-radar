@@ -27,7 +27,7 @@ describe("landing final production contract", () => {
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");
-    expect(heroCss).toMatch(/\.title\s*\{[\s\S]*?font-size:\s*clamp\(3\.4rem,\s*4\.7vw,\s*5rem\)/);
+    expect(heroCss).toMatch(/\.title\s*\{[^}]*font-size:\s*clamp\(2\.75rem,\s*4\.3vw,\s*3\.375rem\);[^}]*font-weight:\s*600;[^}]*line-height:\s*1\.05;/);
   });
 
   test("uses one Pilot decision, centered FAQ, and compact closing CTA", () => {

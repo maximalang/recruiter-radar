@@ -34,6 +34,7 @@ export default function ConversionPanel(props: {
         data-header-tone="light"
         data-pricing-surface="true"
         data-pricing-layout="pilot-decision"
+        data-pricing-path="pilot-first"
         data-motion-reveal="section"
       >
         <div className={panelStyles.pricingIntro} data-pricing-intro>
@@ -109,7 +110,7 @@ export default function ConversionPanel(props: {
         <div className={panelStyles.faqHeading} data-faq-heading>
           <span>FAQ · Коротко о главном</span>
           <h2>Что важно знать перед запуском.</h2>
-          <p>Как появляются компании, откуда берутся данные и что происходит после оплаты.</p>
+          <p>Как появляются компании, откуда берутся данные и как устроен запуск.</p>
           <small data-faq-trust>Пример можно настроить без регистрации.</small>
         </div>
         <div className={panelStyles.faqList} data-faq-list>
@@ -128,20 +129,8 @@ export default function ConversionPanel(props: {
         data-header-tone="dark"
         data-motion-reveal="section"
       >
-        <div className={panelStyles.finalCopy}>
-          <svg className={panelStyles.finalField} viewBox="0 0 520 320" aria-hidden="true" focusable="false" data-final-radar="echo">
-            <defs>
-              <radialGradient id="final-echo-halo" cx="50%" cy="50%" r="50%">
-                <stop className={panelStyles.finalHaloCore} offset="0" />
-                <stop offset="1" stopColor="var(--color-signal)" stopOpacity="0" />
-              </radialGradient>
-            </defs>
-            <path className={panelStyles.finalArc} d="M 60 318 A 258 258 0 0 1 518 296" />
-            <circle className={panelStyles.finalOrbit} cx="330" cy="196" r="118" pathLength={100} strokeDasharray="14 86" />
-            <circle className={panelStyles.finalSignal} cx="330" cy="196" r="3.4" />
-            <circle cx="352" cy="176" r="1.7" /><circle cx="309" cy="212" r="1.5" />
-            <circle className={panelStyles.finalEchoCopper} cx="368" cy="214" r="2.1" />
-          </svg>
+        <div className={panelStyles.finalCopy} data-final-proof="manual-outreach">
+
           <span className={panelStyles.finalEyebrow}>7 дней / своя ниша</span>
           <h2>Посмотрите, кому стоит написать сейчас.</h2>
           <p>Вы увидите компании своей ниши с активным наймом: что изменилось, чем подтверждено и с чего начать разговор.</p>
