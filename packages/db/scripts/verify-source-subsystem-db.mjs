@@ -14,6 +14,7 @@ assert.ok(process.env.DATABASE_URL?.trim(), 'DATABASE_URL is required.');
 
 const verifiers = [
   'verify-source-identity-lineage.mjs',
+  'verify-source-identity-boundary-quarantine.mjs',
   'verify-mixed-ranking-smoke.mjs',
   'verify-digest-selection-smoke.mjs',
   'verify-rf-context-corroboration-smoke.mjs',
@@ -28,6 +29,7 @@ for (const verifier of verifiers) {
       ...process.env,
       SOURCE_ENV_FILE_DISABLED: 'true',
       SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK: 'isolated',
+      SOURCE_QUARANTINE_POLICY_TEST_ACK: 'isolated',
     },
     encoding: 'utf8',
     timeout: 180_000,

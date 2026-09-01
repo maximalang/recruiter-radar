@@ -29,6 +29,7 @@ const testEnvironment = {
   SOURCE_LIVE_VERIFY: '1',
   SOURCE_LIVE_DB_TEST_ACK: 'isolated',
   SOURCE_IDENTITY_LINEAGE_DB_TEST_ACK: 'isolated',
+  SOURCE_QUARANTINE_POLICY_TEST_ACK: 'isolated',
   SOURCE_ENV_FILE_DISABLED: 'true',
 };
 const admin = new Client({ connectionString: databaseUrl });

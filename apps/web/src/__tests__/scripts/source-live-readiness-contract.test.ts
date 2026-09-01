@@ -349,6 +349,7 @@ describe('source live readiness contract', () => {
 
     const runner = readFileSync(sourceLiveDbRunnerPath, 'utf8')
     expect(runner).toContain("SOURCE_LIVE_DB_TEST_ACK !== 'isolated'")
+    expect(runner).toContain("SOURCE_QUARANTINE_POLICY_TEST_ACK: 'isolated'")
     expect(runner).toContain('CREATE DATABASE')
     expect(runner).toContain('DROP DATABASE IF EXISTS')
     expect(runner).toContain('WITH (FORCE)')
