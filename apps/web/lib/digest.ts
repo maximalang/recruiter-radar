@@ -124,7 +124,7 @@ export async function getDigestItemsForClientProfile(input: {
         OR (
           COALESCE(state.suppressed_until, '-infinity'::timestamptz) <= NOW()
           AND COALESCE(state.cooldown_until, '-infinity'::timestamptz) <= NOW()
-          AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'won')
+          AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'meeting', 'won')
         )
       )
       AND (
@@ -285,7 +285,7 @@ export async function runDigestForClientProfile(input: {
           OR (
             COALESCE(state.suppressed_until, '-infinity'::timestamptz) <= NOW()
             AND COALESCE(state.cooldown_until, '-infinity'::timestamptz) <= NOW()
-            AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'won')
+            AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'meeting', 'won')
           )
         )
         AND (
@@ -303,6 +303,7 @@ export async function runDigestForClientProfile(input: {
       .filter((item) => matchesClientProfile(item, clientProfile))
       .sort((left, right) => compareDigestItemsForClient(left, right, clientProfile))
       .slice(0, requestedLimit);
+    let resultItems: DigestItemInput[] = items;
 
     // Batch INSERT candidates — single query with multi-row VALUES list
     if (items.length > 0) {
@@ -393,6 +394,14 @@ export async function runDigestForClientProfile(input: {
           source_display_name
       `, candidateParams)
 
+      const candidateIdByOrgId = new Map(
+        insertedCandidates.rows.map((candidate) => [candidate.org_id, candidate.id]),
+      )
+      resultItems = items.map((item) => ({
+        ...item,
+        digest_candidate_id: candidateIdByOrgId.get(item.org_id),
+      }))
+
       // Batch INSERT org state for all successfully inserted candidates
       if (!input.skipStateWrite && insertedCandidates.rows.length > 0) {
         // Build O(1) lookup map by org_id — avoids O(n²) items.find() in the loop
@@ -482,7 +491,7 @@ export async function runDigestForClientProfile(input: {
     return {
       run: completedRunResult.rows[0],
       clientProfile,
-      items
+      items: resultItems
     };
   } catch (error) {
     await client.query("ROLLBACK");
@@ -497,7 +506,10 @@ export async function runDigestForClientProfile(input: {
  * are only present after INSERT. Used as the return type of mapDigestEvidenceRow
  * and as the input type for internal helpers that don't need those fields.
  */
-export type DigestItemInput = Omit<DigestItem, 'id' | 'digest_run_id' | 'created_at'>
+export type DigestItemInput = Omit<DigestItem, 'id' | 'digest_run_id' | 'created_at'> & {
+  /** DB-generated candidate id returned after a run insert. */
+  digest_candidate_id?: string
+}
 
 function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
   const reasons: [string, string] = [

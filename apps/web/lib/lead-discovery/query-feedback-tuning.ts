@@ -38,7 +38,7 @@ import { INDUSTRY_KEYWORDS, VALID_INDUSTRIES } from '@/lib/clientProfiles'
 /** Feedback actions that count as NEGATIVE for query tuning. */
 export const NEGATIVE_FEEDBACK_ACTIONS = Object.freeze(['badfit', 'dismissed'] as const)
 /** Feedback actions that count as POSITIVE for query tuning. */
-export const POSITIVE_FEEDBACK_ACTIONS = Object.freeze(['contacted', 'replied', 'won'] as const)
+export const POSITIVE_FEEDBACK_ACTIONS = Object.freeze(['contacted', 'replied', 'meeting', 'won'] as const)
 
 export type NegativeFeedbackAction = (typeof NEGATIVE_FEEDBACK_ACTIONS)[number]
 export type PositiveFeedbackAction = (typeof POSITIVE_FEEDBACK_ACTIONS)[number]

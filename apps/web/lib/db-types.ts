@@ -45,6 +45,7 @@ export enum DigestFeedbackStatus {
   NONE = 'none',
   CONTACTED = 'contacted',
   REPLIED = 'replied',
+  MEETING = 'meeting',
   WON = 'won',
   BADFIT = 'badfit',
   SNOOZE = 'snooze',

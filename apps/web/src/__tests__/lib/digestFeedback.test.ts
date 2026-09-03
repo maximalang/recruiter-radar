@@ -1,11 +1,12 @@
 import {
   DEFAULT_BADFIT_SUPPRESSION_DAYS,
   buildDigestFeedbackActionPlan,
+  updateDigestOrgStateFeedback,
 } from '@/lib/digestFeedback'
 
 describe('buildDigestFeedbackActionPlan', () => {
-  it('makes accepted/contacted/replied/won permanently suppressed', () => {
-    for (const action of ['accepted', 'contacted', 'replied', 'won'] as const) {
+  it('makes accepted/contacted/replied/meeting/won permanently suppressed', () => {
+    for (const action of ['accepted', 'contacted', 'replied', 'meeting', 'won'] as const) {
       const plan = buildDigestFeedbackActionPlan({ action })
       expect(plan.suppressedSql).toBe("'infinity'::timestamptz")
       expect(plan.extraParams).toEqual([])
@@ -68,5 +69,81 @@ describe('buildDigestFeedbackActionPlan', () => {
     })
     // GREATEST(...) is the marker that a re-feedback never shrinks the window.
     expect(plan.suppressedUpdateSql).toMatch(/GREATEST/)
+  })
+
+  it('preserves the BIGSERIAL maximum at the mutation boundary', async () => {
+    const maxBigSerial = '9223372036854775807'
+    const state = {
+      clientProfileId: maxBigSerial,
+      orgId: maxBigSerial,
+      feedbackStatus: 'contacted',
+      feedbackAt: null,
+      feedbackNote: null,
+      cooldownUntil: null,
+      suppressedUntil: 'infinity',
+      lastDigestCandidateId: maxBigSerial,
+      lastDigestRunId: null,
+      updatedAt: '2026-08-27T00:00:00.000Z',
+    }
+    const db = {
+      query: jest.fn().mockResolvedValueOnce({ rows: [state], rowCount: 1 }),
+    }
+
+    await updateDigestOrgStateFeedback({
+      clientProfileId: maxBigSerial,
+      orgId: maxBigSerial,
+      action: 'accepted',
+    }, db)
+
+    expect(db.query).toHaveBeenCalledWith(expect.any(String), [
+      maxBigSerial,
+      maxBigSerial,
+      null,
+      'contacted',
+      null,
+      null,
+      null,
+    ])
+  })
+
+  it('preserves a maximum BIGSERIAL candidate id and derives its org safely', async () => {
+    const maxBigSerial = '9223372036854775807'
+    const state = {
+      clientProfileId: maxBigSerial,
+      orgId: maxBigSerial,
+      feedbackStatus: 'contacted',
+      feedbackAt: null,
+      feedbackNote: null,
+      cooldownUntil: null,
+      suppressedUntil: 'infinity',
+      lastDigestCandidateId: maxBigSerial,
+      lastDigestRunId: null,
+      updatedAt: '2026-08-27T00:00:00.000Z',
+    }
+    const db = {
+      query: jest.fn()
+        .mockResolvedValueOnce({
+          rows: [{ orgId: maxBigSerial, sourceExternalId: 'hh-max', sourceDisplayName: 'Max org' }],
+          rowCount: 1,
+        })
+        .mockResolvedValueOnce({ rows: [state], rowCount: 1 }),
+    }
+
+    await updateDigestOrgStateFeedback({
+      clientProfileId: maxBigSerial,
+      digestCandidateId: maxBigSerial,
+      action: 'accepted',
+    }, db)
+
+    expect(db.query.mock.calls[0][1]).toEqual([maxBigSerial, maxBigSerial])
+    expect(db.query.mock.calls[1][1]).toEqual([
+      maxBigSerial,
+      maxBigSerial,
+      maxBigSerial,
+      'contacted',
+      null,
+      'hh-max',
+      'Max org',
+    ])
   })
 })

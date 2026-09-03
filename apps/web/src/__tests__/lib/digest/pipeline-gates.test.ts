@@ -104,7 +104,7 @@ function isSuppressed(state: SuppressionState | null): boolean {
   const now = new Date()
   const suppressed = state.suppressed_until && state.suppressed_until > now
   const inCooldown = state.cooldown_until && state.cooldown_until > now
-  const isPermanentBlock = ['contacted', 'replied', 'won'].includes(state.feedback_status ?? '')
+  const isPermanentBlock = ['contacted', 'replied', 'meeting', 'won'].includes(state.feedback_status ?? '')
   return !!(suppressed || inCooldown || isPermanentBlock)
 }
 
@@ -260,8 +260,8 @@ describe('digest pipeline — suppression', () => {
     expect(isSuppressed(state)).toBe(true)
   })
 
-  it('org with contacted/won/replied is permanently blocked', () => {
-    for (const status of ['contacted', 'replied', 'won'] as const) {
+  it('org with contacted/meeting/won/replied is permanently blocked', () => {
+    for (const status of ['contacted', 'replied', 'meeting', 'won'] as const) {
       const state: SuppressionState = {
         suppressed_until: null,
         cooldown_until: null,

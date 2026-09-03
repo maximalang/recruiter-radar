@@ -28,24 +28,22 @@ describe("landing visual and login reliability polish", () => {
   });
 
   test("restores the ambient radar hero on canonical inverse-theme tokens", () => {
-    const hero = source("app/landing/detection-scene.tsx");
-    const heroScene = source("app/landing/detection-scene.module.css");
-    const signalField = source("app/landing/hero-signal-field.tsx");
-    const signalFieldCss = source("app/landing/hero-signal-field.module.css");
-    const visual = source("app/landing/landing-visual-system.module.css");
-    const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
-    const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
+      const hero = source("app/landing/detection-scene.tsx");
+      const heroScene = source("app/landing/detection-scene.module.css");
+      const productPreview = source("app/landing/hero-product-preview.tsx");
+      const visual = source("app/landing/landing-visual-system.module.css");
+      const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
+      const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(hero).toContain('data-hero-layout="ambient-radar"');
-    expect(hero).toContain("HeroSignalField");
-    expect(hero).toContain("Радар клиентских возможностей");
-    expect(hero).not.toContain("HeroRadar");
+      expect(hero).toContain('data-hero-layout="morning-list"');
+      expect(hero).toContain("HeroProductPreview");
+      expect(hero).toContain("Открыть пример");
+      expect(hero).not.toContain("HeroRadar");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);
-    expect(signalFieldCss).toContain("var(--color-signal-on-dark)");
-    expect(signalFieldCss).toContain("var(--color-copper)");
-    expect(signalFieldCss).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-    expect(signalFieldCss).not.toMatch(/\brgba?\(/);
+    // Concept-2 product panel: neutral demo labeling, no freshness claims.
+    expect(productPreview).toContain("Демо-данные");
+    expect(productPreview).not.toMatch(/обновляются|live|Live/i);
     expect(heroScene).toContain("var(--color-text-primary)");
     expect(heroScene).toContain("var(--color-signal)");
     expect(heroScene).not.toContain("#c8f36a");

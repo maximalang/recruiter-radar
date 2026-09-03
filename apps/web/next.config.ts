@@ -27,7 +27,7 @@ export function buildContentSecurityPolicy(environment: string | undefined): str
     ? `connect-src 'self' ws: https://telegram.org ${metrikaHttpOrigins} ${metrikaSocketOrigins}`
     : `connect-src 'self' https://telegram.org ${metrikaHttpOrigins} ${metrikaSocketOrigins}`;
 
-  return `default-src 'self'; ${scriptPolicy}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; ${connectPolicy}; frame-ancestors 'none'`;
+  return `default-src 'self'; ${scriptPolicy}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; ${connectPolicy}; frame-src ${metrikaHttpOrigins}; frame-ancestors 'none'`;
 }
 
 const nextConfig: NextConfig = {

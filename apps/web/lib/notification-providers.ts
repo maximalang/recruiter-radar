@@ -1,4 +1,6 @@
 import { createHmac } from "node:crypto";
+
+import type { TelegramReplyMarkup } from "./telegramDigestFeedback";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
@@ -124,6 +126,7 @@ export async function sendTelegramNotification(input: {
   chatId: string;
   text: string;
   parseMode?: "HTML" | "MarkdownV2";
+  replyMarkup?: TelegramReplyMarkup;
 }): Promise<{ providerMessageId: string }> {
   const result = await callTelegramApi<{ message_id: number | string }>(
     input.botToken,
@@ -132,6 +135,7 @@ export async function sendTelegramNotification(input: {
       chat_id: input.chatId,
       text: input.text,
       ...(input.parseMode ? { parse_mode: input.parseMode } : {}),
+      ...(input.replyMarkup ? { reply_markup: input.replyMarkup } : {}),
       disable_web_page_preview: true,
     },
   );
