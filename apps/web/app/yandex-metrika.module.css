@@ -18,7 +18,7 @@
   gap: 12px 16px;
   border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 24%, transparent);
   border-radius: var(--radius-surface);
-  background: color-mix(in srgb, var(--color-text-primary) 97%, #04100c);
+  background: color-mix(in srgb, var(--color-text-primary) 94%, var(--color-signal) 6%);
   box-shadow: var(--shadow-overlay);
   color: var(--color-text-inverse);
   backdrop-filter: blur(10px);

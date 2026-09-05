@@ -4,7 +4,7 @@
   color: var(--color-text-primary);
   /* Stage 1/2 palette: one deepened dark-green identity for the touched
    * dark surfaces (pilot offer, closing CTA). */
-  --conversion-deep: color-mix(in srgb, var(--color-text-primary) 84%, #06130e);
+  --conversion-deep: color-mix(in srgb, var(--color-text-primary) 84%, var(--color-signal) 16%);
 }
 
 .anchor { scroll-margin-top: calc(72px + 24px); }
