@@ -209,14 +209,14 @@
 .finalHaloCore { stop-color: var(--color-signal); stop-opacity: .1; }
 
 .finalCopy h2 { max-width: 15ch; margin: .65rem 0 0; font-size: clamp(2.35rem, 3.3vw, 3.15rem); font-weight: 560; letter-spacing: -.055em; line-height: 1; position: relative; }
-.finalCopy p { max-width: 36rem; margin: .75rem 0 0; color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent); font-size: .94rem; line-height: 1.5; }
+.finalCopy p { max-width: 36rem; margin: .75rem 0 0; color: color-mix(in srgb, var(--color-text-inverse) 66%, transparent); font-size: .94rem; line-height: 1.5; }
 
 .finalDecision { display: grid; gap: .75rem; align-content: center; }
 .finalTrust { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none; }
-.finalTrust li { display: flex; align-items: center; gap: .55rem; color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent); font-size: .8rem; }
+.finalTrust li { display: flex; align-items: center; gap: .55rem; color: color-mix(in srgb, var(--color-text-inverse) 66%, transparent); font-size: .8rem; }
 .finalTrust li::before { width: .35rem; height: .35rem; border-radius: 50%; background: var(--color-signal); content: ""; }
 .finalCta { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .88rem; font-weight: 700; text-decoration: none; }
-.finalSecondaryLink { display: inline-flex; min-height: 44px; align-items: center; color: color-mix(in srgb, var(--color-text-inverse) 58%, transparent); font-size: .8rem; text-decoration: none; }
+.finalSecondaryLink { display: inline-flex; min-height: 44px; align-items: center; color: color-mix(in srgb, var(--color-text-inverse) 70%, transparent); font-size: .8rem; text-decoration: none; }
 
 @keyframes faqReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .faqList details[open] p { animation: faqReveal var(--motion-duration-navigation) var(--motion-ease-enter) both; }
