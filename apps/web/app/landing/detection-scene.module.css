@@ -165,6 +165,10 @@
   text-align: left;
 }
 .shotBar {
+  /* macOS-style traffic lights, deepened into the brand palette (stage 1/2). */
+  --shot-dot-close: #c04a3c;
+  --shot-dot-minimize: #cf9a2b;
+  --shot-dot-zoom: #4a8f63;
   display: flex;
   align-items: center;
   gap: .42rem;
@@ -175,14 +179,30 @@
   width: .62rem;
   height: .62rem;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--color-text-primary) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-text-primary) 22%, transparent);
+}
+.shotDot[data-shot-dot="red"] {
+  background: var(--shot-dot-close);
+  border-color: color-mix(in srgb, var(--shot-dot-close) 58%, var(--color-text-primary));
+}
+.shotDot[data-shot-dot="yellow"] {
+  background: var(--shot-dot-minimize);
+  border-color: color-mix(in srgb, var(--shot-dot-minimize) 58%, var(--color-text-primary));
+}
+.shotDot[data-shot-dot="green"] {
+  background: var(--shot-dot-zoom);
+  border-color: color-mix(in srgb, var(--shot-dot-zoom) 58%, var(--color-text-primary));
 }
 .shotTitle {
+  min-width: 0;
   margin-left: .5rem;
+  overflow: hidden;
   color: color-mix(in srgb, var(--color-text-primary) 66%, transparent);
   font-family: var(--font-mono);
   font-size: .68rem;
   letter-spacing: .04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .shotDemoTag {
   margin-left: auto;
@@ -206,7 +226,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  padding: 1rem .8rem .85rem;
+  padding: 1.05rem .85rem .9rem;
   border-right: 1px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent);
   color: color-mix(in srgb, var(--color-text-primary) 58%, transparent);
 }
@@ -279,7 +299,7 @@
 }
 .shotProfile strong { color: var(--color-text-primary); font-size: .68rem; font-weight: 600; }
 
-.shotWorkspace { min-width: 0; padding: 1rem; }
+.shotWorkspace { min-width: 0; padding: 1.1rem 1.15rem; }
 .shotWorkspaceHeader {
   display: flex;
   align-items: flex-start;
@@ -500,8 +520,6 @@
 
 @media (max-width: 430px) {
   .shotBar { padding-inline: .75rem; }
-  .shotDot { display: none; }
-  .shotTitle { margin-left: 0; }
   .shotNav > span:nth-child(5) { display: none; }
   .shotLeadList li:nth-child(3) { display: none; }
   .shotLeadList { grid-template-columns: repeat(2, minmax(0, 1fr)); }

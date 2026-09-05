@@ -2,6 +2,9 @@
   display: block;
   background: var(--color-canvas);
   color: var(--color-text-primary);
+  /* Stage 1/2 palette: one deepened dark-green identity for the touched
+   * dark surfaces (pilot offer, closing CTA). */
+  --conversion-deep: color-mix(in srgb, var(--color-text-primary) 84%, #06130e);
 }
 
 .anchor { scroll-margin-top: calc(72px + 24px); }
@@ -52,19 +55,19 @@
 .pricingDecision {
   display: grid;
   grid-template-columns: minmax(24rem, 1.15fr) minmax(18rem, .85fr);
-  gap: clamp(1.5rem, 4vw, 4rem);
+  gap: clamp(2rem, 4.5vw, 4.5rem);
   max-width: 72rem;
   margin: 2rem 0 0 auto;
 }
 
 .pilotOffer {
   display: grid;
-  gap: 1.1rem;
-  padding: clamp(1.4rem, 2.5vw, 2rem);
+  gap: 1.35rem;
+  padding: clamp(1.5rem, 2.5vw, 2.1rem);
   border-radius: var(--radius-overlay);
-  background: var(--color-text-primary);
+  background: var(--conversion-deep);
   color: var(--color-text-inverse);
-  border: 1px solid var(--color-separator);
+  border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 30%, var(--color-separator));
 }
 
 .pilotTopline {
@@ -75,9 +78,9 @@
 }
 
 .pilotMeta { display: grid; gap: .3rem; }
-.pilotEyebrow { color: var(--color-accent-on-light); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+.pilotEyebrow { color: var(--color-accent-on-light); font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .pilotTopline strong { font-size: 1rem; font-weight: 600; }
-.pilotPrice { font-size: clamp(3rem, 5vw, 4.7rem); font-weight: 520; letter-spacing: -.07em; line-height: .9; }
+.pilotPrice { font-size: clamp(3.3rem, 5.4vw, 5.05rem); font-weight: 540; letter-spacing: -.065em; line-height: .92; font-variant-numeric: tabular-nums; }
 
 .pilotOffer ul { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }
 .pilotOffer li { display: flex; align-items: flex-start; gap: .55rem; color: color-mix(in srgb, var(--color-text-inverse) 78%, transparent); font-size: .9rem; line-height: 1.45; }
@@ -89,7 +92,7 @@
   align-items: center;
   justify-content: space-between;
   gap: .7rem;
-  padding: .8rem 1rem;
+  padding: .95rem 1.15rem;
   border-radius: var(--radius-control);
   background: var(--color-signal);
   color: var(--color-text-inverse);
@@ -131,7 +134,7 @@
 .secondaryOffers article > div { display: grid; gap: .2rem; }
 .secondaryOffers article > div span { font-size: .95rem; font-weight: 650; }
 .secondaryOffers article > div small { color: var(--color-text-tertiary); font-size: .72rem; }
-.secondaryOffers article > strong { font-size: 1.15rem; font-weight: 620; }
+.secondaryOffers article > strong { font-size: 1.25rem; font-weight: 640; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .secondaryOffers article > a { display: inline-flex; min-height: 44px; align-items: center; gap: .35rem; color: var(--color-signal-hover); font-size: .8rem; font-weight: 650; text-decoration: none; }
 
 .faq {
@@ -167,7 +170,7 @@
   gap: clamp(2rem, 5vw, 4rem);
   min-height: 21rem;
   padding-block: clamp(2.75rem, 3.5vw, 3.5rem);
-  background: var(--color-text-primary);
+  background: var(--conversion-deep);
   color: var(--color-text-inverse);
 }
 
@@ -237,8 +240,8 @@
   .pricing { padding-block: 3rem; }
   .pricingIntro h2 { font-size: clamp(2rem, 9vw, 2.5rem); }
   .pricingIntro p { font-size: .92rem; }
-  .pilotOffer { padding: 1.1rem; }
-  .pilotPrice { font-size: 3.3rem; }
+  .pilotOffer { padding: 1.15rem; }
+  .pilotPrice { font-size: 3.55rem; }
   .secondaryOffers article { grid-template-columns: 1fr auto; gap: .35rem .75rem; }
   .secondaryOffers article > a { grid-column: 1 / -1; }
   .faq { padding-block: 3rem; }

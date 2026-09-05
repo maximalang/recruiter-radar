@@ -135,9 +135,17 @@ describe("landing product story v2", () => {
     expect(heroCss).toMatch(
       /@media \(max-width: 700px\)[\s\S]*?\.shotBody\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/,
     );
+    // Stage 1/2 (owner scope guard): the three macOS traffic lights stay
+    // visible and colored at every width, including 390px mobile.
+    expect(heroCss).not.toMatch(/\.shotDot[^{]*\{[^}]*display:\s*none/);
     expect(heroCss).toMatch(
-      /@media \(max-width: 430px\)[\s\S]*?\.shotDot\s*\{\s*display:\s*none;/,
+      /\.shotDot\[data-shot-dot="red"\]\s*\{[^}]*background:\s*var\(--shot-dot-close\)/,
     );
+    expect(preview.match(/data-shot-dot="(red|yellow|green)"/g)).toEqual([
+      'data-shot-dot="red"',
+      'data-shot-dot="yellow"',
+      'data-shot-dot="green"',
+    ]);
   });
 
   it("explains the full profile-to-contact workflow before the interactive example", () => {
