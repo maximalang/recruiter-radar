@@ -672,7 +672,7 @@ async function assertInteractionContracts(browser) {
   assert.equal(await page.locator("#preview-configurator form").count(), 0, "static story must not render a form");
   assert.equal(await page.locator("[data-preview-preset]").count(), 0, "static story must not render preset controls");
   assert.equal(await page.locator("#preview-configurator input").count(), 0, "static story must not render inputs");
-  assert.equal(await page.locator('[data-analytics-event="preview_started"][data-analytics-context="header"]').count(), 1, "header preview CTA must stay analytics-connected");
+  assert.equal(await page.locator('[data-analytics-event="preview_started"][data-analytics-context="header"]').count(), 2, "desktop + mobile-menu header preview CTAs must stay analytics-connected");
 
   const firstRender = await page.locator("#preview-configurator").innerText();
 
