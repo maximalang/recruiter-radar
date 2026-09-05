@@ -186,7 +186,7 @@ export function buildPublicPreviewHref(input: PublicPreviewHrefInput): string {
   appendPublicPreviewParams(params, input)
   const query = params.toString()
 
-  return query === "" ? "/#preview" : `/?${query}#preview`
+  return query === "" ? "/#preview-configurator" : `/?${query}#preview-configurator`
 }
 
 export function readPublicPreviewInput(searchParams: Record<string, string | string[] | undefined>): PublicPreviewInput {
@@ -235,6 +235,14 @@ function buildPublicDemoDigestState(input: PublicPreviewInput): PublicSampleDige
     hasExactMatches,
     items: ranked.map((entry) => toPublicPreviewItem(entry.item, entry.relevance.signals)),
   }
+}
+
+/**
+ * Deterministic static demo for the landing product story (polish v2 stage 2).
+ * Fixed anchor dates, no live fetch: the same honest scenario on every visit.
+ */
+export function getStaticDemoDigestItems(): PublicPreviewItem[] {
+  return buildPublicDemoDigestItems().map((item) => toPublicPreviewItem(item, defaultRelevanceSignals()))
 }
 
 export async function getPublicSampleDigestState(input: PublicPreviewInput): Promise<PublicSampleDigestState> {

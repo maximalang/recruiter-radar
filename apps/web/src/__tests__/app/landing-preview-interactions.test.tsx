@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 
 import LandingPreviewInteractions from "@/app/landing-preview-interactions";
 
@@ -15,94 +15,12 @@ describe("LandingPreviewInteractions", () => {
 
     const { unmount } = render(<LandingPreviewInteractions />);
 
-    expect(listener).not.toHaveBeenCalledWith(expect.objectContaining({
-      detail: expect.objectContaining({ name: "preview_generated" }),
-    }));
+    expect(listener).not.toHaveBeenCalled();
     unmount();
     window.removeEventListener("landing:analytics", listener);
   });
 
-  it("mounts with the real preview and blocks duplicate form submissions", () => {
-    render(
-      <div data-preview-section-content>
-        <form data-preview-form aria-busy="false">
-          <button type="submit" data-preview-submit>
-            <span data-preview-submit-label>Посмотреть компании</span>
-            <span data-preview-submit-status hidden>Радар анализирует сигналы…</span>
-          </button>
-        </form>
-        <div data-preview-results />
-        <LandingPreviewInteractions />
-      </div>,
-    );
-
-    const form = screen.getByRole("button", { name: "Посмотреть компании" }).closest("form");
-    const submit = screen.getByRole("button", { name: "Посмотреть компании" });
-
-    expect(form).toHaveAttribute("aria-busy", "false");
-    fireEvent.submit(form!);
-
-    expect(form).toHaveAttribute("aria-busy", "true");
-    expect(submit).toBeDisabled();
-    expect(screen.getByText("Радар анализирует сигналы…")).not.toHaveAttribute("hidden");
-
-    const duplicate = new Event("submit", { bubbles: true, cancelable: true });
-    form?.dispatchEvent(duplicate);
-    expect(duplicate.defaultPrevented).toBe(true);
-  });
-
-  it("restores the form after a persisted pageshow navigation", () => {
-    render(
-      <div data-preview-section-content>
-        <form data-preview-form aria-busy="true">
-          <button type="submit" data-preview-submit disabled>
-            <span data-preview-submit-label hidden>Посмотреть компании</span>
-            <span data-preview-submit-status>Радар анализирует сигналы…</span>
-          </button>
-        </form>
-        <LandingPreviewInteractions />
-      </div>,
-    );
-
-    window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
-
-    expect(screen.getByRole("button", { name: "Посмотреть компании" })).not.toBeDisabled();
-    expect(screen.getByRole("button", { name: "Посмотреть компании" }).closest("form"))
-      .toHaveAttribute("aria-busy", "false");
-  });
-
-  it("handles a preview form replaced by a server-component navigation", () => {
-    const { container } = render(
-      <div data-preview-section-content>
-        <form data-preview-form aria-busy="false">
-          <button type="submit" data-preview-submit>
-            <span data-preview-submit-label>Submit preview</span>
-            <span data-preview-submit-status hidden>Loading preview</span>
-          </button>
-        </form>
-        <LandingPreviewInteractions />
-      </div>,
-    );
-
-    const initialForm = container.querySelector<HTMLFormElement>("[data-preview-form]");
-    const replacementForm = document.createElement("form");
-    replacementForm.setAttribute("data-preview-form", "");
-    replacementForm.setAttribute("aria-busy", "false");
-    replacementForm.innerHTML = `
-      <button type="submit" data-preview-submit>
-        <span data-preview-submit-label>Submit replacement</span>
-        <span data-preview-submit-status hidden>Loading replacement</span>
-      </button>
-    `;
-    initialForm?.replaceWith(replacementForm);
-
-    fireEvent.submit(replacementForm);
-
-    expect(replacementForm).toHaveAttribute("aria-busy", "true");
-    expect(replacementForm.querySelector("[data-preview-submit]")).toBeDisabled();
-  });
-
-  it("restores a deep-link anchor after streamed preview results become ready", async () => {
+  it("restores a deep-link anchor after the static preview results become ready", async () => {
     window.history.replaceState({}, "", "/#scene-evidence");
     const scrollIntoView = jest.fn();
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
@@ -149,5 +67,31 @@ describe("LandingPreviewInteractions", () => {
     }
     window.requestAnimationFrame = originalRequestAnimationFrame;
     window.cancelAnimationFrame = originalCancelAnimationFrame;
+  });
+
+  it("does not restore anchors at or above the preview results", () => {
+    window.history.replaceState({}, "", "/#scene-workspace");
+    const scrollIntoView = jest.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    const { unmount } = render(
+      <div>
+        <div data-preview-results><div data-preview-results-ready /></div>
+        <section id="scene-workspace">Static story</section>
+        <LandingPreviewInteractions />
+      </div>,
+    );
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    unmount();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: originalScrollIntoView,
+    });
   });
 });

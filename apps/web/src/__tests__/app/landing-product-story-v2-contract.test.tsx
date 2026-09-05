@@ -37,7 +37,7 @@ describe("landing product story v2", () => {
     const heroCss = source("app/landing/detection-scene.module.css");
 
     expect(heroText).toContain("Компании, которым стоит написать сегодня");
-    expect(heroText).toContain("Посмотреть пример для своей ниши");
+    expect(heroText).toContain("Посмотреть пример продукта");
     expect(heroText).toContain("рабочий список");
     expect(preview).toContain('data-hero-workspace="today"');
     expect(previewText).toContain("Сегодня");
@@ -202,19 +202,13 @@ describe("landing product story v2", () => {
     );
   });
 
-  it("frames the configurator as one paper product with an evidence-first selected lead", () => {
+  it("frames the static story as one paper product with an evidence-first selected lead", () => {
     const workspaceCss = source("app/landing/workspace-scene.module.css");
 
     expect(workspaceCss).toMatch(/--workspace-paper:\s*var\(--landing-paper\)/);
     expect(workspaceCss).toMatch(/--workspace-ink:\s*var\(--landing-ink\)/);
     expect(workspaceCss).toMatch(/--workspace-accent:\s*var\(--landing-accent\)/);
     expect(workspaceCss).not.toMatch(/gradient\(/);
-    expect(workspaceCss).toMatch(
-      /\.workspaceForm\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\) auto auto/,
-    );
-    expect(workspaceCss).toMatch(
-      /\.workspaceForm button\s*\{[^}]*background:\s*var\(--workspace-accent\)/,
-    );
     expect(workspaceCss).toMatch(
       /\.leadPrimary\s*\{[^}]*border-left:\s*3px solid var\(--workspace-accent\)/,
     );
@@ -224,18 +218,17 @@ describe("landing product story v2", () => {
     expect(workspaceCss).toMatch(
       /\.nextMove\s*\{[^}]*border-top:\s*2px solid var\(--workspace-accent\)/,
     );
+    expect(workspaceCss).toMatch(/\.sourceBadges\s*\{/);
     expect(workspaceCss).toMatch(
-      /@media \(max-width: 900px\)[\s\S]*?\.workspaceForm\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
+      /\.sourceBadges em\[data-source-badge="hh"\]\s*\{[^}]*border-color:\s*color-mix/,
     );
+    expect(workspaceCss).toMatch(/\.storyPath\s*\{/);
     expect(workspaceCss).toMatch(
-      /@media \(max-width: 520px\)[\s\S]*?\.workspaceForm\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/,
+      /\.storyStep\[data-story-tone="signal"\]\s*\{[^}]*border-top-color:\s*var\(--color-signal\)/,
     );
     expect(workspaceCss).toMatch(/@media \(max-width: 400px\)/);
     expect(workspaceCss).toMatch(
-      /\.workspaceForm input\s*\{[^}]*min-height:\s*44px/,
-    );
-    expect(workspaceCss).toMatch(
-      /\.presetStrip a:focus-visible,[\s\S]*?outline:\s*3px solid var\(--workspace-accent\)/,
+      /\.leadRow:focus-visible,[\s\S]*?outline:\s*3px solid var\(--workspace-accent\)/,
     );
     expect(workspaceCss).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*?transition:\s*none\s*!important/,
@@ -283,9 +276,6 @@ describe("landing product story v2", () => {
     const landingFeedbackActions = feedbackActionsFromSource(
       source("app/landing/delivery-scene.tsx"),
     );
-    const productionFeedbackActions = feedbackActionsFromSource(
-      source("lib/telegramDigestFeedback.ts"),
-    );
 
     expect(delivery).toContain('data-telegram-preview="static-demo"');
     expect(deliveryText).toContain("Новый приоритетный сигнал");
@@ -293,10 +283,10 @@ describe("landing product story v2", () => {
     expect(deliveryText).toContain("Почему сейчас");
     expect(deliveryText).toContain("Источник и дата");
     expect(delivery).toContain('data-telegram-feedback-actions="production"');
-    expect(delivery.match(/data-feedback-action=/g)).toHaveLength(8);
-    expect(landingFeedbackActions).toHaveLength(8);
-    expect(landingFeedbackActions).toEqual(productionFeedbackActions);
-    for (const label of ["Беру", "Мимо", "Позже", "Уже написал", "Ответили", "Созвон", "Клиент", "Скрыть"]) {
+    expect(delivery.match(/data-feedback-action=/g)).toHaveLength(4);
+    expect(landingFeedbackActions).toHaveLength(4);
+    expect(landingFeedbackActions.map(([key]) => key)).toEqual(["accepted", "badfit", "snooze", "dismissed"]);
+    for (const label of ["Беру", "Мимо", "Позже", "Скрыть"]) {
       expect(deliveryText).toContain(label);
     }
     expect(deliveryText).toContain("Веб-кабинет");
@@ -314,7 +304,7 @@ describe("landing product story v2", () => {
     const detectionCss = source("app/landing/detection-scene.module.css");
     const deliveryCss = source("app/landing/delivery-scene.module.css");
 
-    expect(workspace).toContain("Проверьте, какие компании попадут в ваш рабочий список");
+    expect(workspace).toContain("Пример выдачи · демо-сценарий");
     expect(leadList).toContain("mobileEnhanced ? 2 : 4");
     expect(workspaceCss).toMatch(/\.outcomeMeta:nth-child\(2\)\s*\{\s*display:\s*none;/);
     expect(workspaceCss).toContain(".evidenceBlock li");

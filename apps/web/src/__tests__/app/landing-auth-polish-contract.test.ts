@@ -37,7 +37,7 @@ describe("landing visual and login reliability polish", () => {
 
       expect(hero).toContain('data-hero-layout="product-workspace"');
       expect(hero).toContain("HeroProductPreview");
-      expect(hero).toContain("Посмотреть пример для своей ниши");
+      expect(hero).toContain("Посмотреть пример продукта");
       expect(hero).not.toContain("HeroRadar");
     expect(existsSync(retiredRadar)).toBe(false);
     expect(existsSync(retiredRadarStyles)).toBe(false);

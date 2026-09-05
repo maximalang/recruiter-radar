@@ -18,8 +18,6 @@ export const LANDING_ANALYTICS_CONTEXT = {
   heroSecondary: "hero_secondary",
   landing: "landing",
   header: "header",
-  preset: "preset",
-  form: "form",
   preview: "preview",
   pricingPilot: "pricing_pilot",
   closing: "closing",
