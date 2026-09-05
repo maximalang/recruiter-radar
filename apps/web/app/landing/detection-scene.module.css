@@ -165,10 +165,11 @@
   text-align: left;
 }
 .shotBar {
-  /* macOS-style traffic lights, deepened into the brand palette (stage 1/2). */
-  --shot-dot-close: #c04a3c;
-  --shot-dot-minimize: #cf9a2b;
-  --shot-dot-zoom: #4a8f63;
+  /* macOS-style traffic lights derived from canonical brand tokens
+   * (semantic visual contract: no raw color literals). */
+  --shot-dot-close: color-mix(in srgb, var(--color-signal) 48%, var(--color-text-primary));
+  --shot-dot-minimize: color-mix(in srgb, var(--color-accent-on-light, var(--color-signal)) 62%, var(--color-text-primary));
+  --shot-dot-zoom: color-mix(in srgb, var(--color-signal) 78%, var(--color-text-primary));
   display: flex;
   align-items: center;
   gap: .42rem;
