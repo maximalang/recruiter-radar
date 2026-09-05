@@ -25,7 +25,7 @@ describe("landing visual regression contract", () => {
     expect(timeline).toContain("Решение остаётся за вами");
   });
 
-  it("keeps the live product preview on the canonical scene stylesheet", () => {
+  it("keeps the static product story on the canonical scene stylesheet", () => {
     const workspace = source("app/landing/workspace-scene.tsx");
 
     expect(workspace).toContain('className={sceneStyles.productFrame}');

@@ -19,11 +19,11 @@ describe("landing final production contract", () => {
     expect(hero).toContain("Компании, которым стоит написать сегодня");
     expect(hero).toContain('data-hero-layout="product-workspace"');
     expect(hero).toContain('data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
-    expect(hero).toContain("Посмотреть пример для своей ниши");
+    expect(hero).toContain("Посмотреть пример продукта");
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain('data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}');
     expect(hero).toContain('data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}');
-    expect(hero).toContain("Специализация и география · без регистрации");
+    expect(hero).toContain("Демо-сценарий от 12 мая · без регистрации");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");

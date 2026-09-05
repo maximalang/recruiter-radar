@@ -38,17 +38,13 @@ export default function LandingPage(props: {
       <LandingHeader previewHref="#preview-configurator" />
       <noscript>
         <div className={styles.noScriptNotice} data-noscript-disclosure role="note">
-          Интерактивная настройка примера требует JavaScript. Основная информация о продукте, тарифах и условиях остаётся доступна без него.
+          Расширение списка компаний в примере требует JavaScript. Продуктовый рассказ, тарифы и условия остаются доступны без него.
         </div>
       </noscript>
       <main id="main-content">
         <DetectionScene previewHref="#preview-configurator" paymentConfigured={props.paymentConfigured} />
         <SignalTimeline />
-        <WorkspaceScene
-          previewInput={props.previewInput}
-          hasPreview={props.hasPreview}
-          checkoutHref={props.checkoutHref}
-        />
+        <WorkspaceScene checkoutHref={props.checkoutHref} />
         <EvidenceScene />
         <DeliveryScene />
         <ConversionPanel

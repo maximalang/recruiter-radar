@@ -39,7 +39,7 @@ describe("landing restoration narrative", () => {
     expect(hero).toContain('data-hero-layout="product-workspace"');
     expect(hero).toContain('data-theme="inverse"');
     expect(hero).toContain("data-payment-offer=");
-    expect(hero).toContain("Посмотреть пример для своей ниши");
+    expect(hero).toContain("Посмотреть пример продукта");
     expect(hero).toContain("data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("без автопродления · сообщения отправляете вы");
@@ -81,23 +81,22 @@ describe("landing restoration narrative", () => {
     const leadList = source("app/landing/workspace-lead-list.tsx");
     const workspaceCss = source("app/landing/workspace-scene.module.css");
 
-    // One product frame with a visible identity rail — not a generic
-    // SaaS form/table grid.
-    expect(workspace).toContain('data-product-preview="live-radar"');
+    // Static story: the workspace is one fixed, honestly-labeled demo product
+    // object with visible identity rail — no SaaS form/table grid.
+    expect(workspace).toContain('data-product-preview="static-story"');
     expect(workspace).toContain('data-preview-editorial="true"');
     expect(workspace).toContain("data-preview-rail");
     expect(workspace).toContain("<span>Recruiter Radar</span>");
     expect(workspace).toContain("ПРИМЕР");
 
-    // Editorial intro stays bound to the live configurator.
-    expect(workspace).toContain("Интерактивный пример");
-    expect(workspace).toContain("Настройте практику");
-    expect(workspace).toContain("Проверьте, какие компании попадут в ваш рабочий список.");
+    // Editorial intro is bound to the static story anchors.
+    expect(workspace).toContain("Пример выдачи · демо-сценарий");
+    expect(workspace).toContain("Так радар ведёт компанию от сигнала до вашего решения.");
+    expect(workspace).toContain("Один обезличенный сценарий от 12 мая");
     expect(workspace).toContain("Обезличенный пример.");
 
-    // Current runtime behavior preserved: personalization, ranked leads,
+    // Current runtime behavior preserved: evidence-backed ranked leads,
     // progressive disclosure, unclamped prose.
-    expect(workspace).toContain("props.previewState.isPersonalized && appliedProfile.length > 0");
     expect(workspace).toContain("<WorkspaceLeadList");
     expect(lead).toContain("limit: 2");
     expect(lead).toContain("Уверенность");

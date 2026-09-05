@@ -34,9 +34,9 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Посмотреть пример для своей ниши <ArrowGlyph />
+            Посмотреть пример продукта <ArrowGlyph />
           </a>
-          <span className={sceneStyles.actionHint}>Специализация и география · без регистрации</span>
+          <span className={sceneStyles.actionHint}>Демо-сценарий от 12 мая · без регистрации</span>
         </div>
         <Link href="/login?returnTo=%2Fdashboard" className={sceneStyles.loginLink}>Войти</Link>
         <p className={sceneStyles.microcopy} data-hero-trust-line>

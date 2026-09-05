@@ -24,10 +24,6 @@ const TELEGRAM_FEEDBACK_ACTIONS = [
   { key: "accepted", label: "Беру" },
   { key: "badfit", label: "Мимо" },
   { key: "snooze", label: "Позже" },
-  { key: "contacted", label: "Уже написал" },
-  { key: "replied", label: "Ответили" },
-  { key: "meeting", label: "Созвон" },
-  { key: "won", label: "Клиент" },
   { key: "dismissed", label: "Скрыть" },
 ] as const;
 
