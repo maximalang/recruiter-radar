@@ -47,7 +47,7 @@ describe("public preview resilience", () => {
     const url = new URL(href, "https://radar.example");
 
     expect(url.pathname).toBe("/");
-    expect(url.hash).toBe("#preview");
+    expect(url.hash).toBe("#preview-configurator");
     expect(url.searchParams.get("specialization")).toBe("инженерный подбор");
     expect(url.searchParams.get("targetCity")).toBe("Москва");
     expect(url.searchParams.get("includeKeywords")).toBe("инженер");

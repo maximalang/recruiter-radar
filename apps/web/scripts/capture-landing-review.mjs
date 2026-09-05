@@ -27,7 +27,7 @@ const viewports = [
 const focusedSurfaces = [
   { name: "hero", selector: "#scene-detection" },
   { name: "timeline", selector: "#scene-signal-timeline" },
-  { name: "preview", selector: '#scene-workspace [data-product-preview="live-radar"]' },
+  { name: "preview", selector: '#scene-workspace [data-product-preview="static-story"]' },
   { name: "proof", selector: "#scene-evidence" },
   { name: "delivery", selector: "#scene-delivery" },
   { name: "pricing", selector: "#pricing" },
@@ -88,7 +88,7 @@ async function resetInteractionState(page) {
   });
   await page.waitForFunction(() => (
     window.scrollY === 0
-    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark"
+    && document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light"
   ));
   await movePointerToNeutral(page);
   await page.evaluate(() => {

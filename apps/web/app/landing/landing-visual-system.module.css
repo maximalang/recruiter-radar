@@ -1,8 +1,20 @@
 .visualSystem {
-  --page-gutter: clamp(1rem, 3.2vw, 4rem);
-  --content-max: 84rem;
+  --page-gutter: clamp(1rem, 2.35vw, 2rem);
+  --content-max: 76.25rem;
   --scene-pad: var(--page-gutter);
   --content: var(--content-max);
+  /* Landing aliases map the canonical inverse theme onto light product objects. */
+  --landing-canvas: var(--color-canvas);
+  --landing-paper: var(--color-text-primary);
+  --landing-paper-raised: color-mix(in srgb, var(--landing-paper) 94%, var(--color-surface-elevated));
+  --landing-ink: var(--color-text-inverse);
+  --landing-muted: color-mix(in srgb, var(--landing-ink) 64%, var(--landing-paper));
+  --landing-line: color-mix(in srgb, var(--landing-ink) 18%, var(--landing-paper));
+  --landing-line-strong: color-mix(in srgb, var(--landing-ink) 36%, var(--landing-paper));
+  --landing-accent: color-mix(in srgb, var(--landing-ink) 78%, var(--color-signal));
+  --color-surface-light: var(--landing-paper);
+  --color-accent-on-light: var(--landing-accent);
+  --color-focus-on-light: var(--landing-accent);
   background: var(--color-canvas);
   color: var(--color-text-primary);
 }

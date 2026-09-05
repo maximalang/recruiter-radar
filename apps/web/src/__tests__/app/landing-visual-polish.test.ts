@@ -19,11 +19,11 @@ describe("polished unified landing visual contract", () => {
     const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
     const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(heroScene).toContain('data-hero-layout="morning-list"');
+    expect(heroScene).toContain('data-hero-layout="product-workspace"');
     expect(heroScene).toContain('data-theme="inverse"');
     expect(heroScene).toContain('data-hero-visual');
     expect(heroScene).toContain("HeroProductPreview");
-    expect(heroScene).toContain("Открыть пример");
+    expect(heroScene).toContain("Посмотреть пример продукта");
     expect(heroScene).not.toContain("HeroRadar");
     expect(heroScene).not.toContain("HeroInstrument");
     expect(existsSync(retiredRadar)).toBe(false);
@@ -111,14 +111,18 @@ describe("polished unified landing visual contract", () => {
     expect(footerControl).toContain("window.dispatchEvent");
   });
 
-  it("uses one stable preview anchor without duplicating it in the suspense fallback", () => {
+  it("uses one stable preview anchor without duplicating it in the skeleton export", () => {
+    // Stable anchors: the compact anchor belt keeps one stable preview anchor
+    // without duplicating it in the page-level skeleton export.
     const workspace = source("app/landing/workspace-scene.tsx");
     const skeletonStart = workspace.indexOf("export function WorkspaceResultsSkeleton");
     const skeletonSource = workspace.slice(skeletonStart);
 
     expect(workspace).toContain('id="preview-results"');
-    expect(workspace).toContain("<Suspense fallback={<WorkspaceResultsSkeleton />}>");
-    expect(workspace).toContain("embedded");
+    expect(workspace).toContain('id="preview-configurator"');
+    expect(workspace).toContain("data-preview-results-ready");
+    expect(workspace).not.toContain("<Suspense");
+    expect(workspace).toContain("LandingPreviewInteractions");
     expect(skeletonSource).not.toContain('id="preview-results"');
     expect(skeletonSource).toContain("data-preview-results-skeleton");
   });

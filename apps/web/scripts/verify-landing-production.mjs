@@ -108,7 +108,7 @@ async function waitForLanding(page) {
   }
   await page.locator("#scene-detection").waitFor({ state: "visible" });
   await page.locator("#preview-configurator").waitFor({ state: "attached" });
-  await page.locator("#preview-results[data-preview-results-ready], #preview-results[data-preview-results-skeleton]")
+  await page.locator("#preview-results[data-preview-results-ready]")
     .first()
     .waitFor({ state: "attached" });
   await page.waitForFunction(
@@ -156,7 +156,7 @@ async function assertRequiredSurface(page, label) {
   }
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
-  assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
+  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня/);
   assert.match(await page.locator("#scene-workspace").innerText(), /пример выдачи · демо-сценарий|обезличенный пример/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
@@ -363,7 +363,7 @@ async function assertLeadRows(page, label, viewport) {
   assert.equal(await secondary.locator("[data-selected-lead-detail]").count(), 0, `${label}: secondary recommendation must remain a scan row`);
 
   if (viewport.width <= 480) {
-    assert.equal(count, 3, `${label}: mobile should initially show one full and two compact recommendations`);
+    assert.equal(count, 2, `${label}: mobile should initially show one full and one compact recommendation`);
     assert.equal(await disclosure.getAttribute("aria-expanded"), "false");
     const visibleCompactSignals = await leads.locator(':scope:not([data-primary-lead]) [data-lead-why-now]').evaluateAll((elements) => (
       elements.filter((element) => getComputedStyle(element).display !== "none").length
@@ -375,18 +375,18 @@ async function assertLeadRows(page, label, viewport) {
   }
 }
 
-async function assertMobilePresetComposition(page, viewport) {
+async function assertMobileStoryComposition(page, viewport) {
   if (viewport.width > 480) return;
-  const strip = page.locator('[aria-label="Готовые профили радара"]');
-  const stripBox = await strip.boundingBox();
-  assert.ok(stripBox, `${viewport.name}: missing preset group`);
-  const clipped = await strip.locator("[data-preview-preset]").evaluateAll((elements, bounds) => elements.flatMap((element) => {
+  const path = page.locator('[data-story-path="signals-dossier-cabinet"]');
+  const pathBox = await path.boundingBox();
+  assert.ok(pathBox, `${viewport.name}: missing story path`);
+  const clipped = await path.locator("[data-story-step]").evaluateAll((elements, bounds) => elements.flatMap((element) => {
     const rect = element.getBoundingClientRect();
     return rect.left < bounds.left - 1 || rect.right > bounds.right + 1
       ? [{ text: element.textContent?.trim(), left: rect.left, right: rect.right }]
       : [];
-  }), stripBox);
-  assert.deepEqual(clipped, [], `${viewport.name}: preset controls must wrap without half-clipped options`);
+  }), pathBox);
+  assert.deepEqual(clipped, [], `${viewport.name}: story steps must stack without half-clipped options`);
 }
 
 async function measurePageHeight(page, viewport) {
@@ -450,7 +450,7 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertHeaderLayout(page, viewport);
   await assertHeroGeometry(page, viewport.name);
   await assertLeadRows(page, viewport.name, viewport);
-  await assertMobilePresetComposition(page, viewport);
+  await assertMobileStoryComposition(page, viewport);
   await revealAllMotionSections(page, viewport.name);
 
   await assertNoHorizontalOverflow(page, viewport.name);
@@ -664,44 +664,31 @@ async function assertInteractionContracts(browser) {
   }
   assert.equal(new URL(page.url()).hash, "#preview-configurator");
 
-  const presetClick = page.locator("[data-preview-preset]").nth(1);
-  const presetNavigation = page.waitForURL((url) => url.searchParams.has("specialization") && url.searchParams.has("targetCity"));
-  if (analyticsEventsSkipped) {
-    await Promise.all([presetNavigation, presetClick.click()]);
-  } else {
-    const presetEvent = waitForLandingEvent(page, "preview_started", "preset");
-    await Promise.all([presetEvent, presetNavigation, presetClick.click()]);
-  }
-  await page.locator("[data-preview-preset][data-selected]").waitFor({ state: "visible" });
+  // Static product story: the same honest demo renders on every visit. The
+  // former preset/form personalization flows are gone; the privacy contract
+  // now anti-asserts that no user input exists to leak and that repeated
+  // deep-link visits render identical content.
+  await page.locator("#preview-configurator [data-preview-results-ready]").waitFor({ state: "attached" });
+  assert.equal(await page.locator("#preview-configurator form").count(), 0, "static story must not render a form");
+  assert.equal(await page.locator("[data-preview-preset]").count(), 0, "static story must not render preset controls");
+  assert.equal(await page.locator("#preview-configurator input").count(), 0, "static story must not render inputs");
+  assert.equal(await page.locator('[data-analytics-event="preview_started"][data-analytics-context="header"]').count(), 2, "desktop + mobile-menu header preview CTAs must stay analytics-connected");
 
-  const privateInclude = "include-secret-8472";
-  const privateExclude = "exclude-secret-8472";
-  const specialization = "Конфиденциальный инженерный подбор 8472";
-  const geography = "Москва секрет 8472";
+  const firstRender = await page.locator("#preview-configurator").innerText();
+
   const privateUrl = new URL(baseUrl);
-  privateUrl.searchParams.set("specialization", "инженерный подбор");
-  privateUrl.searchParams.set("targetCity", "Москва");
-  privateUrl.searchParams.set("includeKeywords", privateInclude);
-  privateUrl.searchParams.set("excludeKeywords", privateExclude);
+  privateUrl.searchParams.set("specialization", "Конфиденциальный инженерный подбор 8472");
+  privateUrl.searchParams.set("targetCity", "Москва секрет 8472");
+  privateUrl.searchParams.set("includeKeywords", "include-secret-8472");
+  privateUrl.searchParams.set("excludeKeywords", "exclude-secret-8472");
   privateUrl.hash = "preview-configurator";
   await page.goto(privateUrl.toString(), { waitUntil: "load", timeout: PAGE_SETTLE_TIMEOUT_MS });
   await waitForLanding(page);
 
-  await page.getByLabel("Специализация").fill(specialization);
-  await page.getByLabel("География").fill(geography);
-  const formSubmit = page.locator("[data-preview-submit]");
-  const formNavigation = page.waitForURL((url) => url.searchParams.get("targetCity") === geography);
-  if (analyticsEventsSkipped) {
-    await Promise.all([formNavigation, formSubmit.click()]);
-  } else {
-    const formEvent = waitForLandingEvent(page, "preview_started", "form");
-    await Promise.all([formEvent, formNavigation, formSubmit.click()]);
-  }
-  await page.locator("#preview-results [data-preview-results-ready]").waitFor({ state: "attached" });
-  assert.equal(await page.getByLabel("Специализация").inputValue(), specialization);
-  assert.equal(await page.getByLabel("География").inputValue(), geography);
-  assert.equal(new URL(page.url()).searchParams.get("includeKeywords"), privateInclude);
-  assert.equal(new URL(page.url()).searchParams.get("excludeKeywords"), privateExclude);
+  await page.locator("#preview-configurator [data-preview-results-ready]").waitFor({ state: "attached" });
+  assert.equal(await page.locator("#preview-configurator form").count(), 0, "personalized deep link must not reveal a form");
+  const secondRender = await page.locator("#preview-configurator").innerText();
+  assert.equal(secondRender, firstRender, "static story must ignore personalization params and render the same demo");
 
   const leads = page.locator("article[data-lead-row]");
   const leadCount = await leads.count();
@@ -737,9 +724,11 @@ async function assertInteractionContracts(browser) {
     for (const payload of analyticsEvents) {
       const unexpectedKeys = Object.keys(payload).filter((key) => !["name", "context", "timestamp"].includes(key));
       assert.deepEqual(unexpectedKeys, [], `analytics payload has unexpected keys: ${JSON.stringify(payload)}`);
+      assert.notEqual(payload.context, "form", "retired form context must not be emitted");
+      assert.notEqual(payload.context, "preset", "retired preset context must not be emitted");
     }
     const serializedAnalytics = JSON.stringify(analyticsEvents);
-    for (const privateValue of [specialization, geography, privateInclude, privateExclude, ...companyNames]) {
+    for (const privateValue of ["Конфиденциальный инженерный подбор 8472", "Москва секрет 8472", "include-secret-8472", "exclude-secret-8472", ...companyNames]) {
       assert.equal(serializedAnalytics.includes(privateValue), false, `analytics payload leaked private value: ${privateValue}`);
     }
   }
@@ -757,17 +746,15 @@ async function assertNoJs(browser) {
   for (const selector of requiredSelectors) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
-  assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
+  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня/);
   const noJsWorkspaceText = await page.locator("#scene-workspace").innerText();
-  assert.match(noJsWorkspaceText, /интерактивный пример/i);
-  assert.match(noJsWorkspaceText, /показать компании/i);
-  assert.equal(await page.locator("#preview-configurator form").count(), 1, "no-JS configurator missing");
-  await page.getByLabel("Специализация").waitFor({ state: "attached" });
-  await page.getByLabel("География").waitFor({ state: "attached" });
-  await page.locator("#preview-configurator button[type='submit']").waitFor({ state: "attached" });
-  const skeleton = page.locator("#preview-results[data-preview-results-skeleton]").first();
-  await skeleton.waitFor({ state: "attached" });
-  assert.equal(await skeleton.evaluate((element) => element.closest("#preview-results") === element), true, "no-JS skeleton escaped results boundary");
+  assert.match(noJsWorkspaceText, /пример выдачи · демо-сценарий/i);
+  assert.match(noJsWorkspaceText, /Сигналы/i);
+  assert.equal(await page.locator("#preview-configurator form").count(), 0, "no-JS static story must not render a form");
+  assert.equal(await page.locator("[data-noscript-disclosure]").count(), 1, "no-JS disclosure missing");
+  const results = page.locator("#preview-results[data-preview-results-ready]").first();
+  await results.waitFor({ state: "attached" });
+  assert.equal(await results.evaluate((element) => element.getAttribute("id")), "preview-results", "no-JS results boundary missing");
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const noJsPricingText = await page.locator("#pricing").innerText();

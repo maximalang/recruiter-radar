@@ -10,21 +10,22 @@ function source(path: string) {
 }
 
 describe("landing visual regression contract", () => {
-  it("keeps the ambient radar hero and transparent header on readable tone contracts", () => {
+  it("keeps the inverse hero and transparent header on readable tone contracts", () => {
     const hero = source("app/landing/detection-scene.tsx");
     const timeline = source("app/landing/signal-timeline.tsx");
 
     expect(hero).toContain('data-theme="inverse"');
-    expect(hero).toContain('data-header-tone="dark"');
-    expect(hero).toContain('data-hero-layout="morning-list"');
-    expect(hero).not.toContain('data-header-tone="light"');
+    expect(hero).toContain('data-header-tone="light"');
+    expect(hero).toContain('data-hero-layout="product-workspace"');
+    expect(hero).not.toContain('data-header-tone="dark"');
 
     expect(timeline).toContain('data-header-tone="light"');
     expect(timeline).toContain('id="scene-signal-timeline"');
-    expect(timeline).toContain("ПОВОД СОБРАН");
+    expect(timeline).toContain('data-product-workflow="profile-to-contact"');
+    expect(timeline).toContain("Решение остаётся за вами");
   });
 
-  it("keeps the live product preview on the canonical scene stylesheet", () => {
+  it("keeps the static product story on the canonical scene stylesheet", () => {
     const workspace = source("app/landing/workspace-scene.tsx");
 
     expect(workspace).toContain('className={sceneStyles.productFrame}');

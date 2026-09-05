@@ -3,36 +3,25 @@
   overflow: hidden;
   padding-block: clamp(4.5rem, 7vw, 7rem);
   background-color: var(--color-canvas);
-  background-image:
-    radial-gradient(circle at 85% 5%, color-mix(in srgb, var(--color-signal) 8%, transparent), transparent 28%),
-    linear-gradient(180deg, var(--color-surface-primary) 0%, var(--color-canvas) 58%, var(--color-surface-elevated) 100%);
-}
-
-.section::before {
-  position: absolute;
-  top: -22rem;
-  right: -17rem;
-  width: 42rem;
-  height: 42rem;
-  border: 1px solid color-mix(in srgb, var(--color-signal) 8%, transparent);
-  border-radius: 50%;
-  content: "";
-  pointer-events: none;
 }
 
 .layout {
   position: relative;
-  z-index: 1;
   display: grid;
   grid-template-columns: minmax(18rem, .72fr) minmax(34rem, 1.28fr);
-  gap: clamp(2.5rem, 7vw, 7rem);
+  gap: clamp(2.5rem, 6vw, 5rem);
   align-items: center;
   width: min(var(--content), 100%);
   margin: auto;
 }
 
 .intro { max-width: 31rem; }
-.intro h2 { max-width: 11ch; font-size: clamp(2.6rem, 4vw, 4.1rem); line-height: .98; text-wrap: balance; }
+.intro h2 {
+  max-width: 14ch;
+  font-size: clamp(2.5rem, 3.6vw, 3rem);
+  line-height: 1.04;
+  text-wrap: balance;
+}
 .intro h2 em { display: inline; color: var(--color-signal-hover); font-size: 1em; }
 
 .timeline { position: relative; min-width: 0; }
@@ -50,10 +39,7 @@
   bottom: 0;
   left: 0;
   width: 1px;
-  background-image: linear-gradient(to bottom,
-    color-mix(in srgb, var(--color-copper) 24%, transparent),
-    color-mix(in srgb, var(--color-signal) 62%, transparent) 70%,
-    color-mix(in srgb, var(--color-signal) 16%, transparent));
+  background-color: color-mix(in srgb, var(--color-signal) 56%, var(--color-separator-subtle));
   content: "";
   transform: scaleY(0);
   transform-origin: top;
@@ -64,9 +50,7 @@
   bottom: 0;
   left: 0;
   height: 1px;
-  background-image: linear-gradient(90deg,
-    color-mix(in srgb, var(--color-signal) 60%, transparent),
-    color-mix(in srgb, var(--color-signal) 8%, transparent));
+  background-color: color-mix(in srgb, var(--color-signal) 42%, var(--color-separator-subtle));
   transform: scaleX(0);
   transform-origin: left;
 }
@@ -79,37 +63,22 @@
   grid-template-columns: 5.8rem 2.3rem minmax(0, 1fr) auto;
   gap: .75rem;
   align-items: center;
-  min-height: 5rem;
+  min-height: 5.25rem;
+  padding-block: .5rem;
   border-bottom: 1px solid var(--color-separator-subtle);
   opacity: 0;
   transform: translate3d(0, 4px, 0);
-  transition:
-    opacity var(--motion-duration-control) var(--motion-ease-standard),
-    background-color var(--motion-duration-control) var(--motion-ease-standard);
+  transition: opacity var(--motion-duration-control) var(--motion-ease-standard);
 }
-.event::before {
-  position: absolute;
-  top: .65rem;
-  bottom: .65rem;
-  left: 0;
-  width: 2px;
-  background: var(--color-signal);
-  content: "";
-  opacity: 0;
-  transform: scaleY(.25);
-  transition:
-    opacity var(--motion-duration-control) var(--motion-ease-standard),
-    transform var(--motion-duration-context) var(--motion-ease-standard);
-}
-.event time {
+.stepLabel {
   color: var(--color-text-tertiary);
   font-family: var(--font-mono);
-  font-size: .55rem;
+  font-size: .6875rem;
+  letter-spacing: .035em;
   text-align: right;
   text-transform: uppercase;
 }
 .node { position: relative; z-index: 2; display: grid; width: 1.9rem; height: 1.9rem; place-items: center; }
-/* Mask disc keeps the trajectory line visually detached from the dot. */
 .node::before {
   position: absolute;
   width: 1rem;
@@ -118,98 +87,60 @@
   background: var(--color-canvas);
   content: "";
 }
-/* State ring replaces the legacy glow: border-only, animated by transform. */
-.node::after {
-  position: absolute;
-  width: 1.35rem;
-  height: 1.35rem;
-  border: 1px solid transparent;
-  border-radius: 50%;
-  content: "";
-  opacity: 0;
-  transform: scale(.7);
-  transition:
-    opacity var(--motion-duration-control) var(--motion-ease-standard),
-    border-color var(--motion-duration-control) var(--motion-ease-standard),
-    transform var(--motion-duration-context) var(--motion-ease-standard);
-}
 .node i {
   position: relative;
   z-index: 1;
-  width: .42rem;
-  height: .42rem;
+  width: .5rem;
+  height: .5rem;
+  border: 1px solid color-mix(in srgb, var(--color-signal) 65%, var(--color-canvas));
   border-radius: 50%;
-  background: var(--color-copper);
-  transition: background-color var(--motion-duration-control) var(--motion-ease-standard);
+  background: var(--color-signal);
 }
-.event:nth-child(n+3) .node i { background: var(--color-signal); }
-.eventCopy { display: grid; gap: .24rem; min-width: 0; }
-.eventCopy strong { font-size: clamp(.92rem, 1.15vw, 1.04rem); font-weight: 600; line-height: 1.3; }
+.eventCopy { display: grid; gap: .35rem; min-width: 0; }
+.eventCopy strong { font-size: clamp(1rem, 1.15vw, 1.125rem); font-weight: 600; line-height: 1.3; }
 .eventCopy small {
   color: var(--color-text-tertiary);
   font-family: var(--font-mono);
-  font-size: .52rem;
-  letter-spacing: .04em;
+  font-size: .6875rem;
+  letter-spacing: .035em;
+  line-height: 1.45;
   text-transform: uppercase;
 }
 .eventState {
   justify-self: end;
   color: var(--color-signal-hover);
   font-family: var(--font-mono);
-  font-size: .49rem;
-  letter-spacing: .055em;
+  font-size: .6875rem;
+  letter-spacing: .045em;
   text-transform: uppercase;
 }
-.event:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
-
-@media (hover: hover) and (pointer: fine) {
-  .event:hover { background-image: linear-gradient(90deg, color-mix(in srgb, var(--color-signal) 5%, transparent), transparent 72%); }
-  .event:hover::before { opacity: 1; transform: scaleY(1); }
-  .event:hover .node i { background: var(--color-signal-hover); }
-  .event:hover .node::after {
-    opacity: 1;
-    border-color: color-mix(in srgb, var(--color-signal) 30%, transparent);
-    transform: scale(1);
-  }
-  .events:has(.event:hover) .event:not(:hover) { opacity: .62 !important; }
-}
-
-.event:focus-visible::before { opacity: 1; transform: scaleY(1); }
-.event:focus-visible .node i { background: var(--color-signal-hover); }
-.event:focus-visible .node::after {
-  opacity: 1;
-  border-color: color-mix(in srgb, var(--color-focus) 45%, transparent);
-  transform: scale(1);
-}
-.events:has(.event:focus-visible) .event:not(:focus-visible) { opacity: .62 !important; }
 
 .lock {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: .25rem .85rem;
-  margin: 1.05rem 0 0 7.35rem;
-  padding: 1rem 1.05rem;
-  border: 1px solid color-mix(in srgb, var(--color-signal) 16%, transparent);
+  gap: .35rem 1rem;
+  margin: 1.25rem 0 0 7.35rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--color-separator-subtle);
+  border-left: 1px solid var(--color-signal);
   border-radius: var(--radius-detail);
-  background-image: linear-gradient(90deg,
-    color-mix(in srgb, var(--color-signal) 7%, transparent),
-    color-mix(in srgb, var(--color-surface-elevated) 18%, transparent) 70%,
-    transparent);
+  background-color: var(--color-surface-primary);
   opacity: 0;
   transform: translate3d(0, 3px, 0);
 }
 .lock > span {
   grid-row: 1 / 3;
   align-self: start;
+  max-width: 9.5rem;
   padding-top: .08rem;
   color: var(--color-signal-hover);
   font-family: var(--font-mono);
-  font-size: .5rem;
+  font-size: .6875rem;
   font-weight: 700;
-  letter-spacing: .065em;
+  letter-spacing: .055em;
 }
-.lock strong { font-size: 1rem; font-weight: 650; letter-spacing: -.015em; }
-.lock small { color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: .52rem; text-transform: uppercase; }
+.lock strong { font-size: 1rem; font-weight: 650; letter-spacing: -.015em; line-height: 1.35; }
+.lock small { color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: .6875rem; line-height: 1.45; text-transform: uppercase; }
 
 .section[data-motion-state="visible"] .trajectory::before { animation: timelineLineDrawY var(--motion-duration-signal) var(--motion-duration-fast) var(--motion-ease-standard) forwards; }
 .section[data-motion-state="visible"] .trajectory i { animation: timelineLineDrawX var(--motion-duration-context) var(--motion-duration-scan) var(--motion-ease-standard) forwards; }
@@ -225,25 +156,30 @@
 }
 
 @media (max-width: 1040px) {
-  .layout { grid-template-columns: 1fr; gap: 2.2rem; }
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 2.5rem; }
   .intro { max-width: 44rem; }
-  .intro h2 { max-width: 13ch; }
+  .intro h2 { max-width: 16ch; }
 }
 
 @media (max-width: 680px) {
   .section { padding-block: 4rem; }
-  .trajectory { left: .95rem; bottom: 7.2rem; }
-  .event { grid-template-columns: 1.9rem minmax(0,1fr) auto; gap: .45rem .7rem; min-height: 6.1rem; padding-block: .55rem; }
-  .event::before { left: -.15rem; }
-  .event time { grid-column: 2; grid-row: 1; text-align: left; }
-  .node { grid-column: 1; grid-row: 1 / 3; }
-  .eventCopy { grid-column: 2 / 4; grid-row: 2; }
-  .eventState { grid-column: 3; grid-row: 1; }
-  .lock { margin-left: 0; grid-template-columns: 1fr; }
-  .lock > span { grid-row: auto; }
+  .intro h2 { font-size: clamp(2rem, 10vw, 2.5rem); }
+  .trajectory { top: 2.65rem; bottom: 9.5rem; left: .7rem; }
+  .event {
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+    gap: .4rem .8rem;
+    min-height: 0;
+    padding-block: 1rem;
+  }
+  .stepLabel { grid-column: 2; grid-row: 1; text-align: left; }
+  .node { grid-column: 1; grid-row: 1 / 4; width: 1.5rem; height: 1.5rem; }
+  .eventCopy { grid-column: 2; grid-row: 2; }
+  .eventState { grid-column: 2; grid-row: 3; justify-self: start; }
+  .lock { margin-left: 0; grid-template-columns: minmax(0, 1fr); }
+  .lock > span { grid-row: auto; max-width: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .trajectory::before, .trajectory i, .event, .lock { animation: none !important; opacity: 1 !important; transform: none !important; }
-  .event, .event::before, .node i, .node::after { transition: none !important; }
+  .event { transition: none !important; }
 }

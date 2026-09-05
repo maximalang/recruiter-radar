@@ -99,15 +99,16 @@ describe("landing runtime truth contract", () => {
     expect(homepage).toContain("buildLandingFaqItems(paymentSetup.configured)");
   });
 
-  test("public preview keeps live/demo distinction without authenticated-workspace density", () => {
+  test("public preview keeps the honest demo labeling without live-data claims", () => {
     const workspace = webSource("app/landing/workspace-scene.tsx");
     const previewRelevance = webSource("lib/preview-relevance.ts");
 
     expect(previewRelevance).toContain("not an output of the production FIUR engine");
     expect(workspace).toContain("Обезличенный пример");
     expect(workspace).toContain("логика приоритета и типы источников сохранены");
-    expect(workspace).toContain('previewState.isLive ? "свежие данные" : "демо"');
+    expect(workspace).toContain("getStaticDemoDigestItems");
     expect(workspace).not.toContain("тот же алгоритм");
     expect(workspace).not.toContain("production FIUR");
+    expect(workspace).not.toContain("свежие данные");
   });
 });

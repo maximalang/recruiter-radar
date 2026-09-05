@@ -72,7 +72,7 @@ describe("checkout navigation", () => {
     expect(text).not.toContain("Карта и CVC вводятся");
   });
 
-  it("returns to the landing preview when the user edits radar parameters", async () => {
+  it("returns to the landing example from checkout", async () => {
     const page = await CheckoutPage({
       searchParams: Promise.resolve({
         specialization: "инженерный подбор",
@@ -84,7 +84,7 @@ describe("checkout navigation", () => {
     const url = new URL(backLink.props.href, "https://radar.example");
 
     expect(url.pathname).toBe("/");
-    expect(url.hash).toBe("#preview");
+    expect(url.hash).toBe("#preview-configurator");
     expect(url.searchParams.get("specialization")).toBe("инженерный подбор");
     expect(url.searchParams.get("targetCity")).toBe("Москва");
     expect(url.searchParams.has("plan")).toBe(false);

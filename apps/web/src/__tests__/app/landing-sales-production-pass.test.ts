@@ -36,12 +36,12 @@ describe("landing sales production pass", () => {
     expect(runbook).not.toContain("| Месяц | 30 дней | 9 990 ₽ | Нет |");
   });
 
-  it("focuses the preview on the top-ranked visible lead and discloses the rest", () => {
+  it("focuses the static story on the top-ranked visible lead and discloses the rest", () => {
     const workspace = source("app/landing/workspace-scene.tsx");
     const list = source("app/landing/workspace-lead-list.tsx");
-    expect(workspace).toContain("const visibleItems = previewState.items.slice(0, 5)");
+    expect(workspace).toContain("const visibleItems = demoItems.slice(0, 5)");
     expect(workspace).toContain("defaultOpen={index === 0}");
-    expect(list).toContain("const defaultVisible = mobileEnhanced ? 3 : 4");
+    expect(list).toContain("const defaultVisible = mobileEnhanced ? 2 : 4");
     expect(list).toContain("Показать ещё");
   });
 

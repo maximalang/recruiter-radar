@@ -36,10 +36,10 @@ describe("landing restoration narrative", () => {
   it("keeps the restored ambient hero payment-aware and connected to the preview", () => {
     const hero = source("app/landing/detection-scene.tsx");
 
-    expect(hero).toContain('data-hero-layout="morning-list"');
+    expect(hero).toContain('data-hero-layout="product-workspace"');
     expect(hero).toContain('data-theme="inverse"');
     expect(hero).toContain("data-payment-offer=");
-    expect(hero).toContain("Открыть пример");
+    expect(hero).toContain("Посмотреть пример продукта");
     expect(hero).toContain("data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("без автопродления · сообщения отправляете вы");
@@ -81,28 +81,27 @@ describe("landing restoration narrative", () => {
     const leadList = source("app/landing/workspace-lead-list.tsx");
     const workspaceCss = source("app/landing/workspace-scene.module.css");
 
-    // One product frame with a visible identity rail — not a generic
-    // SaaS form/table grid.
-    expect(workspace).toContain('data-product-preview="live-radar"');
+    // Static story: the workspace is one fixed, honestly-labeled demo product
+    // object with visible identity rail — no SaaS form/table grid.
+    expect(workspace).toContain('data-product-preview="static-story"');
     expect(workspace).toContain('data-preview-editorial="true"');
     expect(workspace).toContain("data-preview-rail");
     expect(workspace).toContain("<span>Recruiter Radar</span>");
     expect(workspace).toContain("ПРИМЕР");
 
-    // Editorial intro stays bound to the live configurator.
-    expect(workspace).toContain("Интерактивный пример");
-    expect(workspace).toContain("Проверьте на своей нише");
-    expect(workspace).toContain("Так выглядит ваша рабочая выдача.");
+    // Editorial intro is bound to the static story anchors.
+    expect(workspace).toContain("Пример выдачи · демо-сценарий");
+    expect(workspace).toContain("Так радар ведёт компанию от сигнала до вашего решения.");
+    expect(workspace).toContain("Один обезличенный сценарий от 12 мая");
     expect(workspace).toContain("Обезличенный пример.");
 
-    // Current runtime behavior preserved: personalization, ranked leads,
+    // Current runtime behavior preserved: evidence-backed ranked leads,
     // progressive disclosure, unclamped prose.
-    expect(workspace).toContain("props.previewState.isPersonalized && appliedProfile.length > 0");
     expect(workspace).toContain("<WorkspaceLeadList");
     expect(lead).toContain("limit: 2");
     expect(lead).toContain("Уверенность");
     expect(lead).toContain("Следующий ход");
-    expect(leadList).toContain("const defaultVisible = mobileEnhanced ? 3 : 4");
+    expect(leadList).toContain("const defaultVisible = mobileEnhanced ? 2 : 4");
     expect(leadList).toContain("Показать ещё");
     expect(workspaceCss).not.toContain("-webkit-line-clamp");
   });
@@ -133,7 +132,7 @@ describe("landing restoration narrative", () => {
     expect(delivery).not.toMatch(/сообщения отправляются автоматически|автоматическая рассылка/i);
   });
 
-  it("makes the pilot the only dominant offer and closes on the dark radar echo", () => {
+  it("makes the pilot the only dominant offer and closes on manual outreach proof", () => {
     const conversion = source("app/landing/conversion-panel.tsx");
     const conversionCss = source("app/landing/conversion-panel.module.css");
 
@@ -143,9 +142,10 @@ describe("landing restoration narrative", () => {
     expect(conversion).not.toContain("data-recommended={plan.isPrimary");
     expect(conversion).not.toContain("TargetIcon");
 
-    // Final scene echoes the dark ambient hero identity through the
-    // abstract radar echo field instead of becoming a second hero.
-    expect(conversion).toContain('data-final-radar="echo"');
+    // Final scene resolves the journey with explicit human control instead of
+    // repeating the retired abstract radar echo treatment.
+    expect(conversion).not.toContain('data-final-radar="echo"');
+    expect(conversion).toContain('data-final-proof="manual-outreach"');
     expect(conversion).toContain("Сообщения отправляете вы");
     expect(conversionCss).toContain("min-height: 21rem");
     expect(conversionCss).not.toContain("min-height: 26rem");
