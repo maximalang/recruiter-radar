@@ -1,46 +1,51 @@
+/* Stage 1/2: compact dark consent dialog. Deepened dark+green identity:
+ * near-black green canvas, inverse text, signal-on-dark primary action that
+ * reads as a button (contrasting fill + border). Legal copy lives in
+ * yandex-metrika.tsx and is untouched. */
 .dialog {
   position: fixed;
   z-index: 1000;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  left: max(16px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(12px, env(safe-area-inset-left));
   display: flex;
-  max-width: 760px;
+  max-width: 680px;
   margin: 0 auto;
-  padding: 12px 14px;
+  padding: 10px 12px;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  border: 1px solid color-mix(in srgb, var(--color-warning) 14%, transparent);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--color-signal) 97%, transparent);
+  gap: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 24%, transparent);
+  border-radius: var(--radius-surface);
+  background: color-mix(in srgb, var(--color-text-primary) 97%, #04100c);
   box-shadow: var(--shadow-overlay);
-  color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
+  color: var(--color-text-inverse);
   backdrop-filter: blur(10px);
 }
 
 .copy {
   display: grid;
-  flex: 1 1 480px;
-  gap: 6px;
+  flex: 1 1 420px;
+  gap: 4px;
 }
 
 .title {
-  font-size: .95rem;
+  color: var(--color-text-inverse);
+  font-size: .9rem;
 }
 
 .text {
-  color: color-mix(in srgb, var(--color-warning) 72%, transparent);
-  font-size: .82rem;
-  line-height: 1.55;
+  color: color-mix(in srgb, var(--color-text-inverse) 76%, transparent);
+  font-size: .8rem;
+  line-height: 1.5;
 }
 
 .link {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
-  color: inherit;
+  color: var(--color-signal-on-dark);
   text-decoration: underline;
   text-underline-offset: 3px;
   vertical-align: middle;
@@ -48,7 +53,7 @@
 
 .actions {
   display: flex;
-  flex: 1 1 280px;
+  flex: 0 1 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
@@ -58,7 +63,7 @@
 .secondaryButton {
   min-height: 44px;
   padding: 0 16px;
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-control);
   font: inherit;
   font-size: .82rem;
   font-weight: 700;
@@ -66,61 +71,62 @@
 }
 
 .primaryButton {
-  border: 1px solid var(--color-signal);
-  background: var(--color-signal);
-  color: var(--color-text-inverse);
+  border: 1px solid color-mix(in srgb, var(--color-text-inverse) 55%, var(--color-signal-on-dark));
+  background: var(--color-signal-on-dark);
+  color: var(--color-text-primary);
 }
 
 .secondaryButton {
-  border: 1px solid color-mix(in srgb, var(--color-warning) 20%, transparent);
-  background: color-mix(in srgb, var(--color-warning) 6%, transparent);
-  color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
+  border: 1px solid color-mix(in srgb, var(--color-text-inverse) 40%, transparent);
+  background: color-mix(in srgb, var(--color-text-inverse) 8%, transparent);
+  color: var(--color-text-inverse);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .primaryButton:hover {
-    background: var(--color-signal);
+    border-color: var(--color-text-inverse);
+    background: color-mix(in srgb, var(--color-signal-on-dark) 82%, var(--color-text-inverse));
   }
 
   .secondaryButton:hover {
-    border-color: color-mix(in srgb, var(--color-signal) 62%, transparent);
-    color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
+    border-color: var(--color-signal-on-dark);
+    color: var(--color-signal-on-dark);
     opacity: 1;
   }
 }
 
 .primaryButton:focus-visible {
-  background: var(--color-signal);
+  background: var(--color-signal-on-dark);
 }
 
 .secondaryButton:focus-visible {
-  border-color: color-mix(in srgb, var(--color-signal) 62%, transparent);
-  color: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary));
+  border-color: var(--color-signal-on-dark);
+  color: var(--color-signal-on-dark);
   opacity: 1;
 }
 
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible,
 .link:focus-visible {
-  outline: 2px solid var(--color-signal);
+  outline: 2px solid var(--color-signal-on-dark);
   outline-offset: 3px;
 }
 
 @media (max-width: 620px) {
   .dialog {
-    padding: 14px;
-    gap: 12px;
+    padding: 12px;
+    gap: 10px;
   }
 
   .actions {
+    width: 100%;
     justify-content: stretch;
   }
 
   .primaryButton,
   .secondaryButton {
-    flex: 1 1 12rem;
+    flex: 1 1 11rem;
   }
-
 }
 
 @media (prefers-reduced-motion: reduce) {

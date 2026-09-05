@@ -29,9 +29,9 @@ export default function HeroProductPreview() {
       aria-label="Демо рабочего кабинета Recruiter Radar от 12 мая: разделы Сегодня, Компании, Ситуации, Радар и Настройки; список компаний; выбранная карточка с причиной, источником, официальным контактом и ручными действиями."
     >
       <div className={sceneStyles.shotBar} aria-hidden="true">
-        <span className={sceneStyles.shotDot} />
-        <span className={sceneStyles.shotDot} />
-        <span className={sceneStyles.shotDot} />
+        <span className={sceneStyles.shotDot} data-shot-dot="red" />
+        <span className={sceneStyles.shotDot} data-shot-dot="yellow" />
+        <span className={sceneStyles.shotDot} data-shot-dot="green" />
         <span className={sceneStyles.shotTitle}>Recruiter Radar</span>
         <span className={sceneStyles.shotDemoTag}>Демо · 12 мая</span>
       </div>
