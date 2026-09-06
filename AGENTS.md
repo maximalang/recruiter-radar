@@ -14,7 +14,8 @@ All product, scoring, security, validation, and code-style rules live in `CLAUDE
 
 ### Git discipline for agents
 
-- Start every git task with `git status --short --branch`, `git remote -v`, and a duplicate-PR check for the intended head/base pair.
+- Start local work with `git status --short --branch` so existing changes are not overwritten.
+- Before the first push or PR action, verify `git remote -v` and check for a matching open PR for the intended head/base pair.
 - Keep commits atomic: one logical product/runtime/docs change per commit. Do not mix broad formatting with behavior changes.
 - Before staging, review `git diff --stat` and the relevant `git diff`. Before committing, review `git diff --staged`.
 - Stage only intentional files. Never add `.env`, `.env.*`, `.next`, `node_modules`, local caches, dumps, ZIPs, or private credentials.
@@ -23,9 +24,11 @@ All product, scoring, security, validation, and code-style rules live in `CLAUDE
 - Push task work to the task branch, not directly to `main`.
 - Final reports for git tasks must include changed files, commit SHA, push target, PR URL or exact PR blocker, and check results.
 
-## 2) Required preflight
+## 2) Push / PR preflight
 
-Before code changes and before creating a PR, report:
+Before local changes, check only the current branch and working tree. Do not require remote inspection, a duplicate-PR lookup, or a full check plan for a local-only edit.
+
+Before the first push or PR action, report:
 
 1. current branch: `git branch --show-current`
 2. working tree status: `git status --short`
