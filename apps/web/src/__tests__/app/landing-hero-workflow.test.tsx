@@ -66,6 +66,7 @@ describe("landing hero advertising workflow", () => {
 
   it("scopes the production audit exceptions to the hero teaser only", () => {
     const audit = source("scripts/verify-landing-production.mjs");
+    const responsive = readFileSync(resolve(WEB_ROOT, "../../scripts/verify-responsive-surfaces.mjs"), "utf8");
 
     // The hero CTA now targets the interactive workflow card, and the audit
     // documents why the miniature product shot is exempt from the 44px and
@@ -76,5 +77,13 @@ describe("landing hero advertising workflow", () => {
     expect(audit).toMatch(/От сигнала до сообщения/);
     expect(audit).not.toContain("Компании, которым стоит написать сегодня");
     expect(audit).not.toContain('assert.equal(new URL(page.url()).hash, "#preview-configurator")');
+
+    // The responsive-surface audit exemption is desktop-only (>900px): on mobile
+    // the hero shot renders full-width and its controls stay subject to the 44px
+    // touch contract.
+    expect(responsive).toContain("const insideHeroTeaser = (element) => (");
+    expect(responsive).toMatch(/window\.innerWidth > 900\s+&& Boolean\(element\.closest\('#scene-detection \[data-hero-visual\]'\)\)/);
+    expect(responsive).toContain(".filter((element) => !insideHeroTeaser(element))");
+    expect(responsive).toContain("!insideHorizontalScroller(element) && !insideHeroTeaser(element)");
   });
 });

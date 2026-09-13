@@ -42,7 +42,7 @@ describe("polished unified landing visual contract", () => {
 
     expect(heroScene).toContain("data-mobile-hero-signal");
     expect(heroScene).toContain('className={sceneStyles.fieldFigure}');
-    expect(sceneStyles).toContain("@media (max-width: 700px)");
+    expect(sceneStyles).toContain("@media (max-width: 900px)");
     expect(sceneStyles).toContain(".fieldFigure");
     expect(sceneStyles).not.toContain("HeroRadar");
   });

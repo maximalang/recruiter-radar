@@ -126,7 +126,7 @@ describe("landing product story v2", () => {
       /@media \(max-width: 900px\)[\s\S]*?\.section\s*\{[^}]*display:\s*block[\s\S]*?\.fieldFigure\s*\{[^}]*width:\s*100%/,
     );
     expect(heroCss).toMatch(
-      /@media \(max-width: 700px\)[\s\S]*?\.workflowTabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/,
+      /@media \(max-width: 900px\)[\s\S]*?\.workflowTabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/,
     );
     expect(preview).not.toContain("data-shot-dot");
   });
@@ -287,8 +287,8 @@ describe("landing product story v2", () => {
     expect(workspaceCss).toMatch(/\.outcomeMeta:nth-child\(2\)\s*\{\s*display:\s*none;/);
     expect(workspaceCss).toContain(".evidenceBlock li");
     expect(workspaceCss).toContain(".nextMove");
-    expect(detectionCss).toMatch(/@media \(max-width: 700px\)[\s\S]*?\.workflowTabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)/);
-    expect(detectionCss).toMatch(/@media \(max-width: 700px\)[\s\S]*?\.workflowTabs > button\s*\{[^}]*min-height:\s*64px/);
+    expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.workflowTabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)/);
+    expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.workflowTabs > button\s*\{[^}]*min-height:\s*64px/);
     expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.productShot[^}]*transform:\s*none/);
     expect(deliveryCss).toMatch(/@media \(max-width: 520px\)[\s\S]*?\.deliveryRoutes\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
     expect(deliveryCss).toMatch(/\.deliveryRoutes \.channelRoute p\s*\{\s*display:\s*none/);
