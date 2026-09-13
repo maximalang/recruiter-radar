@@ -229,9 +229,9 @@
   .shotBar { height: 2.75rem; }
   .shotMode { display: none; }
   .shotBody { display: block; min-height: 0; }
-  .shotSide { display: block; padding: .55rem; border-right: 0; border-bottom: 1px solid var(--color-separator-subtle); overflow-x: auto; white-space: nowrap; }
+  .shotSide { display: block; padding: .55rem; border-right: 0; border-bottom: 1px solid var(--color-separator-subtle); }
   .shotSide > p,.shotPromise { display: none; }
-  .shotNav { display: inline-flex; gap: .25rem; margin-right: .3rem; }
+  .shotNav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; }
   .shotNav button { min-height: 44px; padding: 0 .7rem; font-size: .72rem; }
   .shotWorkspace { padding: .85rem; }
   .shotWorkspaceHeader small { display: none; }
@@ -250,7 +250,7 @@
   .workflowValue strong { font-size: .92rem; }
   .workflowValue p { font-size: .73rem; }
   .workflowValue button,.infoPage button { min-height: 44px; font-size: .75rem; }
-  .autoHint { font-size: .58rem; line-height: 1.45; }
+  .autoHint { font-size: .68rem; line-height: 1.45; }
   .infoPage dl div { grid-template-columns: 1.4rem minmax(0,1fr); }
   .infoPage dd { grid-column: 2; font-size: .72rem; }
   .infoPage dt { font-size: .74rem; }
