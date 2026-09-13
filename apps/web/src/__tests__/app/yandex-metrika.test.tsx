@@ -75,7 +75,7 @@ describe("YandexMetrika", () => {
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
     expect(screen.queryByRole("button", { name: "Изменить настройки cookies" })).toBeNull();
     expect(window.localStorage.getItem("rr_analytics_consent")).toContain('"analytics":false');
-    expect(window.localStorage.getItem("rr_analytics_consent")).toContain('"policyVersion":2');
+    expect(window.localStorage.getItem("rr_analytics_consent")).toContain('"policyVersion":3');
   });
 
   it("reopens settings from the footer event without a floating control", async () => {
@@ -157,7 +157,7 @@ describe("YandexMetrika", () => {
     process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
     window.localStorage.setItem("rr_analytics_consent", JSON.stringify({
       analytics: true,
-      policyVersion: 2,
+      policyVersion: 3,
       updatedAt: "2024-01-01T00:00:00.000Z",
     }));
 

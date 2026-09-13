@@ -49,15 +49,6 @@ function normalizeHeader(
   return trimmed ? trimmed : null;
 }
 
-function firstSearchParam(
-  params: Record<string, string | string[] | undefined>,
-  key: string,
-): string | null {
-  const value = params[key];
-  const raw = Array.isArray(value) ? value[0] : value;
-  return normalizeHeader(raw);
-}
-
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const previewInput = readPublicPreviewInput(resolvedSearchParams);
@@ -97,9 +88,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         refererClass={dimensions.refererClass}
         utmSourceClass={dimensions.utmSourceClass}
         uaClass={dimensions.uaClass}
-        internalMarker={
-          firstSearchParam(resolvedSearchParams, "rr_internal") ?? undefined
-        }
+        internalMarker={dimensions.internalMarker}
       />
       <script
         type="application/ld+json"

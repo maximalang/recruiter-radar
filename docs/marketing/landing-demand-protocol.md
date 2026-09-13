@@ -40,46 +40,53 @@ hex-символа HMAC-SHA256 от суточного бакета и норм�
 
 | Класс | Значение |
 |---|---|
-| `search` | Google, Bing, DuckDuckGo, Yahoo, Yandex, Mail.ru, Rambler |
-| `social` | VK, OK, Telegram (web), WhatsApp (web), Pinterest, Reddit, X/Twitter |
-| `internal` | собственный домен (включая `recruiter-radar.ru` и хост приложения) |
-| `not_relevant` | прочие внешние источники |
-| `unknown` | Referer отсутствует или не разобран |
+| `relevant` | hh.ru, career.habr.com, habr.com, superjob.ru, zarplata.ru, vk.com, t.me, telegram.me, youtube.com, www.youtube.com, habr.career, getmatch.ru, huntly.ru, geekjob.ru |
+| `not_relevant` | google.com, yandex.ru, ya.ru, duckduckgo.com, bing.com, mail.ru, go.mail.ru, rambler.ru, facebook.com, instagram.com, собственный домен (recruiter-radar.ru и хост приложения) |
+| `unknown` | Referer отсутствует, не разобран или не входит в списки выше |
 
-### utm_source_class (по `utm_source` GET-запроса)
+### utm_source_class (по `utm_source`, fallback `utm_campaign`)
 
 | Класс | Значение |
 |---|---|
-| `relevant` | yandex_direct, google_ads, vk_ads, telegram, email, partner |
-| `not_relevant` | другие значения `utm_source` |
-| `unknown` | параметр отсутствует |
+| `relevant` | значение содержит один из маркеров: hh, habr, telegram, telega, tg, vk, vpiski, recruiter, recruiting, podbor, hr-, hr_, agency |
+| `not_relevant` | значение содержит один из маркеров: google, yandex, ya-, ya_, seo, ads, cpc, context, direct, email, newsletter, unsubscribe |
+| `unknown` | оба параметра отсутствуют или не содержат маркеров |
+
+При совпадении маркеров разных классов побеждает `relevant` (порядок
+проверки зафиксирован в коде).
 
 ### ua_class (по User-Agent GET-запроса)
 
-| Класс | Значение |
-|---|---|
-| `desktop` | Windows/Mac классические браузеры, Linux-десктоп, десктоп-режим без мобильного токена |
-| `mobile` | iPhone/Android-токены в UA |
-| `tablet` | iPad/Android-планшетные токены |
-| `bot` | боты/краулеры/превью-агенты: Googlebot, Bingbot, YandexBot, DuckDuckBot, Baiduspider, facebookexternalhit, Twitterbot, TelegramBot, WhatsApp, embedly, preview, monitor, pingdom, uptime, curl, wget, python-requests, headless |
-| `unknown` | UA отсутствует или не опознан |
+Словарь `isUaClass` (`apps/web/lib/telemetry-dimensions.ts`): `browser`,
+`bot`, `monitoring`, `internal`. `browser` — обычные браузеры, включая
+мобильные и планшетные; класс не разделяет форм-факторы. `bot` —
+боты/краулеры/превью-агенты и все клиентские библиотеки (bot/crawl/
+spider/slurp, curl, wget, python-requests, python-urllib, java, okhttp,
+go-http-client, headlesschrome, phantomjs, puppeteer, playwright,
+lighthouse). `monitoring` — uptime/мониторинг (uptime, pingdom,
+uptimerobot, betteruptime, statuspage, monitor, healthcheck, site24x7,
+newrelic). `internal` — зарезервировано под внутренние инструментальные
+агенты (сейчас не присваивается автоматически). Значение `unknown` в
+словаре не существует: пустой или отсутствующий UA классифицируется как
+`bot` (fail-closed), осмысленная строка всегда получает один из четырёх
+классов.
 
-### internal_marker (исключения из окна измерения, по consent-переменным GET)
+### internal_marker (исключения из окна измерения, по параметру GET)
 
-Пустой = визит измеряем. Не-пустой = визит НЕ попадает в окно (и в funnel,
-и в composition), но события сохраняются как есть.
-
-| Маркер | Значение |
-|---|---|
-| `healthcheck` | `?rr_internal=healthcheck` — uptime-мониторинг |
-| `preview` | `?rr_internal=preview` — предпросмотр из админских/инструментальных контекстов |
-| `staff` | `?rr_internal=staff` — ручные проверки команды |
+Словарь `isInternalMarker` (`apps/web/lib/telemetry-dimensions.ts`):
+`none`, `preview`, `staff`, `healthcheck`. `none` (или отсутствие
+параметра) = визит измеряем. Любое другое значение словаря = визит НЕ
+попадает в окно (и в funnel, и в composition), но события сохраняются
+как есть: `healthcheck` (`?rr_internal=healthcheck`) — uptime-мониторинг;
+`preview` (`?rr_internal=preview`) — предпросмотр из
+админских/инструментальных контекстов; `staff` (`?rr_internal=staff`) —
+ручные проверки команды.
 
 Ключ `rr_internal` выбран нейтральным и не пересекается с бизнес-параметрами
 лендинга (`specialization`, `targetCity`, `includeKeywords`, `excludeKeywords`,
-`planCode`). Значение вне словаря маркируется как unknown и в метрики не
-попадает — но и визит не исключает (fail-closed в сторону измеримости,
-решение по классу принимает ingress-нормализация, а не клиент).
+`planCode`). Значение вне словаря приравнивается к отсутствию маркера
+(маркер остаётся `none`): визит не исключается и маркер в метрики не
+пишется — решение по классу принимает ingress-нормализация, а не клиент.
 
 ## 4. Окно и воронка
 
@@ -98,8 +105,10 @@ hex-символа HMAC-SHA256 от суточного бакета и норм�
 
 ### Исключения (часть словаря, не ad-hoc фильтры)
 
-Из окна исключаются визиты с `ua_class = 'bot'` и с любым непустым
-`internal_marker`. Дедупликация — по `visit_id`.
+Из окна исключаются визиты с любым непустым `internal_marker` (т.е.
+отличным от `none`) и с `ua_class` отличным от `browser` — мониторинг,
+боты и внутренние агенты покидают окно целиком, осмысленный трафик без
+классификации тоже (fail-closed). Дедупликация — по `visit_id`.
 
 ### Anti-spoofing
 
@@ -116,9 +125,10 @@ hex-символа HMAC-SHA256 от суточного бакета и норм�
   лендинга (`landing_viewed`, `preview_started`, `checkout_started`,
   `continuation_cta_clicked` и др.) — обеспечивается дедупликация и
   упорядочивание стадий внутри визита.
-- `attachment`-поле (data-analytics-attachment на continuation-CTA, словарь
-  internal-marker-значений, максимум 64 символа `[0-9a-z_.:-]`) фиксирует
-  контекст, из которого сделан клик — дольнейшее связывание с signup/order
+- `attachment`-поле (data-analytics-attachment на continuation-CTA) —
+  контекстная строка из безопасного алфавита `[0-9a-z_.:-]` длиной до 64
+  символов, словарём не является; фиксирует контекст, из которого сделан
+  клик — дольнейшее связывание с signup/order
   добавляется отдельным протоколом, когда соответствующие события начнут
   принимать binding key.
 - Публичные обещания приватности (см. `/cookies`, §2) ограничивают хранение

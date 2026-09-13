@@ -3,9 +3,10 @@
 -- Funnel: landing_viewed -> preview_started -> checkout_started (+1:4:3
 -- ratio guard) with per-stage demand composition by traffic source
 -- (referer/UTM classes), device and internal markers. Exclusions are part
--- of the dimension vocabulary (ua_class = 'bot', internal_marker IS NOT
--- NULL), not ad-hoc WHERE clauses, so the definition is auditable against
--- the preregistered protocol in docs/marketing/landing-demand-protocol.md.
+-- of the dimension vocabulary (ua_class = 'browser' rows only; internal
+-- marker 'none' rows only), not ad-hoc WHERE clauses, so the definition is
+-- auditable against the preregistered protocol in
+-- docs/marketing/landing-demand-protocol.md.
 --
 -- Usage:
 --   psql "$DATABASE_URL" -f packages/db/scripts/landing-demand-funnel.sql
@@ -40,8 +41,8 @@ measurable_visits AS (
   SELECT *
   FROM landing_events
   WHERE visit_id IS NOT NULL
-    AND COALESCE(ua_class, 'unknown') <> 'bot'
-    AND internal_marker IS NULL
+    AND COALESCE(ua_class, 'unknown') = 'browser'
+    AND COALESCE(internal_marker, 'none') = 'none'
 )
 
 SELECT
@@ -137,8 +138,8 @@ measurable_visits AS (
   SELECT *
   FROM landing_events
   WHERE visit_id IS NOT NULL
-    AND COALESCE(ua_class, 'unknown') <> 'bot'
-    AND internal_marker IS NULL
+    AND COALESCE(ua_class, 'unknown') = 'browser'
+    AND COALESCE(internal_marker, 'none') = 'none'
 ),
 
 per_visit AS (

@@ -1414,7 +1414,7 @@ describe('opportunity background jobs', () => {
             hiringEpisodeId: '20',
             status: 'snoozed',
             supersededAt: null,
-            validUntil: '2026-08-30T09:00:00.000Z',
+            validUntil: new Date(resumeNow.getTime() + 24 * 60 * 60 * 1000).toISOString(),
             scoringVersion: 'opportunity-v1',
             confidenceGate: 'A',
             opportunityScore: 0.8,

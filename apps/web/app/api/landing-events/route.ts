@@ -22,7 +22,7 @@ import {
 } from "@/lib/landing-analytics-contract";
 import { tryRecordProductEvent } from "@/lib/telemetry";
 
-const MAX_BODY_BYTES = 2_048;
+const MAX_BODY_BYTES = 1_024;
 const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
 const RATE_LIMIT_SECRET = resolveLandingAnalyticsRateLimitSecret();
 const MAX_ATTACHMENT_LENGTH = 64;

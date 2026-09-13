@@ -100,7 +100,7 @@ export function extractLandingRequestDimensions(input: {
   now?: Date;
 }): LandingRequestDimensions {
   let utmSourceClass = "unknown" as UtmSourceClass;
-  let internalMarker = INTERNAL_MARKER.none;
+  let internalMarker: InternalMarker = INTERNAL_MARKER.none;
   try {
     const url = new URL(input.requestUrl);
     utmSourceClass = classifyUtmSource(
@@ -115,7 +115,11 @@ export function extractLandingRequestDimensions(input: {
     // Malformed request URL: UTM stays unknown, no internal marker.
   }
 
-  const normalizedIp = normalizeTrustedClientIp(input.rawClientIp);
+  const normalizedIp = normalizeTrustedClientIp(
+    input.rawClientIp,
+    process.env.NODE_ENV,
+    input.requestUrl,
+  );
 
   return {
     visitId: normalizedIp

@@ -59,10 +59,10 @@ function sanitizeAttachment(value: string | undefined): string | undefined {
 export function sendLandingEvent(
   detail: LandingAnalyticsDetail,
   dimensions?: {
-    refererClass?: string;
-    utmSourceClass?: string;
-    uaClass?: string;
-    internalMarker?: string;
+    referer_class?: string;
+    utm_source_class?: string;
+    ua_class?: string;
+    internal_marker?: string;
     attachment?: string;
   },
 ) {
