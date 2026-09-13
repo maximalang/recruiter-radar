@@ -220,7 +220,7 @@
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .section { padding-inline: 1rem; }
   .title { font-size: clamp(2.45rem,11vw,3.2rem); }
   .description { font-size: .95rem; }
