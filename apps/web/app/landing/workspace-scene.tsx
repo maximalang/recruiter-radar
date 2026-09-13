@@ -17,38 +17,9 @@ import WorkspaceLeadList from "./workspace-lead-list";
 /**
  * Static product story (landing polish v2, stage 2): the interactive
  * configurator is replaced by one fixed, clearly-labeled demo scenario
- * (anchor date 2026-05-12). Signals → dossier → cabinet, with colored
- * story steps and source badges. No form, no presets, no URL-driven
+ * (anchor date 2026-05-12). No form, no presets, no URL-driven
  * personalization: every visit renders the same honest demo.
  */
-
-const STORY_STEPS = [
-  {
-    key: "signals",
-    tone: "signal",
-    title: "Сигналы",
-    text: "Радар находит публичные сигналы найма: новые вакансии, повторные публикации и редкие роли.",
-  },
-  {
-    key: "dossier",
-    tone: "warning",
-    title: "Досье",
-    text: "По каждой компании собирается досье: почему сейчас, подтверждающие факты, источники и уверенность.",
-  },
-  {
-    key: "cabinet",
-    tone: "accent",
-    title: "Рабочий кабинет",
-    text: "Приоритетный список и следующий безопасный шаг ждут в кабинете. Сообщения компаниям отправляете вы.",
-  },
-] as const;
-
-const SOURCE_BADGES = [
-  { key: "hh", label: "Вакансии" },
-  { key: "career-pages", label: "Карьерные страницы" },
-  { key: "egrul-fns", label: "Реестры ЕГРЮЛ" },
-  { key: "company-site", label: "Сайты компаний" },
-] as const;
 
 type WorkspaceProps = {
   checkoutHref: string;
@@ -72,25 +43,6 @@ export default function WorkspaceScene(props: WorkspaceProps) {
         <LandingPreviewInteractions />
         <WorkspaceIntro />
 
-        <ol
-          className={sceneStyles.storyPath}
-          data-story-path="signals-dossier-cabinet"
-          aria-label="Путь сигнала: от находки до кабинета"
-        >
-          {STORY_STEPS.map((step, index) => (
-            <li
-              key={step.key}
-              className={sceneStyles.storyStep}
-              data-story-step={step.key}
-              data-story-tone={step.tone}
-            >
-              <span className={sceneStyles.storyIndex}>{`0${index + 1}`}</span>
-              <strong>{step.title}</strong>
-              <p>{step.text}</p>
-            </li>
-          ))}
-        </ol>
-
         <div
           id="preview-configurator"
           className={sceneStyles.productFrame}
@@ -111,23 +63,11 @@ export default function WorkspaceScene(props: WorkspaceProps) {
           >
             <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
               <div>
-                <strong>Пример выдачи · демо-сценарий от 12 мая</strong>
                 <small className={sceneStyles.demoDisclosure}>
                   <strong>Обезличенный пример.</strong> Названия и часть фактов изменены; логика приоритета и типы источников сохранены.
                 </small>
               </div>
               <span>{visibleItems.length} {pluralCompanies(visibleItems.length)}</span>
-            </div>
-
-            <div
-              className={sceneStyles.sourceBadges}
-              aria-label="Типы источников в демо-сценарии"
-              data-source-badges
-            >
-              <span>Источники</span>
-              {SOURCE_BADGES.map((badge) => (
-                <em key={badge.key} data-source-badge={badge.key}>{badge.label}</em>
-              ))}
             </div>
 
             <WorkspaceLeadList>
@@ -167,7 +107,7 @@ function WorkspaceIntro() {
         <h2 id="workspace-title" className={styles.sceneHeading}>Так радар ведёт компанию от сигнала до вашего решения.</h2>
       </div>
       <p className={styles.sceneLead}>
-        Один обезличенный сценарий от 12 мая: какие сигналы находит радар, как собирает досье с источниками и что вы видите в рабочем списке перед контактом.
+        Один обезличенный сценарий от 12 мая: так выглядит приоритетный список перед контактом.
       </p>
     </header>
   );

@@ -145,7 +145,8 @@ describe("final unified evidence-first landing contract", () => {
     expect(workspace).toContain('id="preview-configurator"');
     expect(workspace).toContain('id="preview-results"');
     expect(workspace).toContain("data-preview-results-ready");
-    expect(workspace).toContain('data-story-path="signals-dossier-cabinet"');
+    expect(workspace).not.toContain("data-story-path");
+    expect(workspace).not.toContain("data-source-badges");
     expect(workspace).not.toContain('action="/#preview-results"');
     expect(workspace).not.toContain("data-preview-form");
 
@@ -184,7 +185,8 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).toContain("Обезличенный пример.");
     expect(html).toContain('id="preview-configurator"');
     expect(html).toContain('id="preview-results"');
-    expect(html).toContain('data-story-path="signals-dossier-cabinet"');
+    expect(html).not.toContain("data-story-path");
+    expect(html).not.toContain("data-source-badges");
     expect(html).not.toContain("data-preview-form");
     expect(html).toContain('id="scene-evidence"');
     expect(html).toContain('id="scene-delivery"');
