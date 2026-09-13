@@ -88,7 +88,7 @@ describe("polished unified landing visual contract", () => {
     const landingPage = source("app/landing/landing-page.tsx");
     const landingPageBody = landingPage.slice(landingPage.indexOf("export default function LandingPage"));
     const skipLinkIndex = home.indexOf("<LandingSkipLink />");
-    const analyticsIndex = home.indexOf("<LandingAnalytics />");
+    const analyticsIndex = home.indexOf("<LandingAnalytics");
     const landingIndex = home.indexOf("{landing}");
     const cookieSettingsIndex = home.indexOf("<YandexMetrika />");
 
@@ -247,6 +247,7 @@ describe("polished unified landing visual contract", () => {
     expect(footer).toContain('href="/payment-and-refund"');
     expect(footer).toContain('href="/privacy"');
     expect(footer).toContain('href="/personal-data-consent"');
+    expect(footer).toContain('href="/cookies"');
     expect(offerAlias.trim()).toBe('export { default, metadata } from "../terms/page";');
     expect(footer).toContain("OPERATOR_REQUISITES.inn");
     expect(footer).toContain("OPERATOR_REQUISITES.email");

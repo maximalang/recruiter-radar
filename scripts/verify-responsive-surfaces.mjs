@@ -131,10 +131,18 @@ try {
 
       const analyticsConsent = page.locator('[data-analytics-consent="true"]');
       if (await analyticsConsent.isVisible().catch(() => false)) {
-        const allowAnalytics = analyticsConsent.getByRole('button', { name: 'Разрешить' });
+        const allowAnalytics = analyticsConsent.getByRole('button', { name: 'Принять аналитику' });
         if (await allowAnalytics.count() > 0) {
           await allowAnalytics.click();
           await analyticsConsent.waitFor({ state: 'hidden', timeout: 5_000 });
+        } else {
+          // Nothing to accept (analytics not configured): dismiss via rejection
+          // so the fixed banner cannot intercept pointer events below.
+          const rejectAnalytics = analyticsConsent.getByRole('button', { name: 'Отклонить необязательные' });
+          if (await rejectAnalytics.count() > 0) {
+            await rejectAnalytics.click();
+            await analyticsConsent.waitFor({ state: 'hidden', timeout: 5_000 });
+          }
         }
       }
 

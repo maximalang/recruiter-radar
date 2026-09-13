@@ -150,14 +150,16 @@ for (const token of [
 }
 
 for (const token of [
-  "Отклонить",
-  "Разрешить",
+  "Отклонить необязательные",
+  "Принять аналитику",
+  "Настроить",
+  "/cookies",
   "CONSENT_TTL_MS = 426",
 ]) requireText("metrika", token, `analytics consent requirement ${token}`);
 
 for (const token of [
   'ANALYTICS_CONSENT_STORAGE_KEY = "rr_analytics_consent"',
-  "ANALYTICS_CONSENT_POLICY_VERSION = 2",
+  "ANALYTICS_CONSENT_POLICY_VERSION = 3",
 ]) requireText("analyticsConsent", token, `versioned analytics consent requirement ${token}`);
 
 if (process.argv.includes("--network")) await verifyDeployedOrigin();

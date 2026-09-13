@@ -71,18 +71,18 @@ describe("YandexMetrika", () => {
     await screen.findByRole("dialog", { name: "Необязательная аналитика" });
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Отклонить" }));
+    fireEvent.click(screen.getByRole("button", { name: "Отклонить необязательные" }));
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
     expect(screen.queryByRole("button", { name: "Изменить настройки cookies" })).toBeNull();
     expect(window.localStorage.getItem("rr_analytics_consent")).toContain('"analytics":false');
-    expect(window.localStorage.getItem("rr_analytics_consent")).toContain('"policyVersion":2');
+    expect(window.localStorage.getItem("rr_analytics_consent")).toContain('"policyVersion":3');
   });
 
   it("reopens settings from the footer event without a floating control", async () => {
     process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
     render(<YandexMetrika />);
     await screen.findByRole("dialog", { name: "Необязательная аналитика" });
-    fireEvent.click(screen.getByRole("button", { name: "Отклонить" }));
+    fireEvent.click(screen.getByRole("button", { name: "Отклонить необязательные" }));
     expect(screen.queryByRole("dialog", { name: "Необязательная аналитика" })).toBeNull();
 
     act(() => window.dispatchEvent(new Event(ANALYTICS_SETTINGS_OPEN_EVENT)));
@@ -96,7 +96,7 @@ describe("YandexMetrika", () => {
     const { container } = render(<YandexMetrika />);
 
     await screen.findByRole("dialog", { name: "Необязательная аналитика" });
-    fireEvent.click(screen.getByRole("button", { name: "Разрешить" }));
+    fireEvent.click(screen.getByRole("button", { name: "Принять аналитику" }));
 
     const loader = await waitFor(() => {
       const node = container.querySelector("#yandex-metrika-loader");
@@ -132,10 +132,10 @@ describe("YandexMetrika", () => {
     const { container } = render(<YandexMetrika />);
 
     await screen.findByRole("dialog", { name: "Необязательная аналитика" });
-    fireEvent.click(screen.getByRole("button", { name: "Разрешить" }));
+    fireEvent.click(screen.getByRole("button", { name: "Принять аналитику" }));
     await waitFor(() => expect(container.querySelector("#yandex-metrika-loader")).not.toBeNull());
     act(() => window.dispatchEvent(new Event(ANALYTICS_SETTINGS_OPEN_EVENT)));
-    fireEvent.click(await screen.findByRole("button", { name: "Отклонить" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Отклонить необязательные" }));
 
     expect(ym).toHaveBeenCalledWith(12345678, "destruct");
     expect((window as unknown as Record<string, unknown>).disableYaCounter12345678).toBe(true);
@@ -157,7 +157,7 @@ describe("YandexMetrika", () => {
     process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
     window.localStorage.setItem("rr_analytics_consent", JSON.stringify({
       analytics: true,
-      policyVersion: 2,
+      policyVersion: 3,
       updatedAt: "2024-01-01T00:00:00.000Z",
     }));
 
