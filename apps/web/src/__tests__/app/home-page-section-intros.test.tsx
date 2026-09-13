@@ -222,9 +222,9 @@ describe("final unified evidence-first landing contract", () => {
     const evidence = renderToStaticMarkup(<EvidenceScene />);
     const delivery = renderToStaticMarkup(<DeliveryScene />);
 
-    expect(hero).toContain("Компании, которым стоит написать сегодня");
-    expect(hero).toContain("Посмотреть пример продукта");
-    expect(hero).toContain("Демо-сценарий от 12 мая · без регистрации");
+    expect(hero).toContain("От сигнала до сообщения");
+    expect(hero).toContain("Посмотреть workflow");
+    expect(hero).toContain("Наведите или выберите этап · внутри всё интерактивно");
     expect(hero).toContain(">Войти</a>");
     expect(hero).toContain("заявка без списания");
     expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);

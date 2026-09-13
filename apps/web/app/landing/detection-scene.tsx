@@ -16,27 +16,27 @@ export default function DetectionScene(props: { previewHref: string; paymentConf
       aria-labelledby="detection-title"
       data-theme="inverse"
       data-header-tone="light"
-      data-hero-layout="product-workspace"
+      data-hero-layout="interactive-workflow"
       data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}
     >
       <div className={sceneStyles.copy} data-hero-copy>
-        <p className={sceneStyles.serviceLabel}>Рабочий радар для рекрутинговых агентств</p>
+        <p className={sceneStyles.serviceLabel}>Радар находит повод. Пишете вы.</p>
         <h1 id="detection-title" className={sceneStyles.title} data-hero-title>
-          Компании, которым стоит написать сегодня
+          От сигнала до сообщения
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Радар собирает публичные сигналы найма в рабочий список: показывает, что изменилось, чем это подтверждено и с какого безопасного шага начать контакт.
+          Настройте рынок один раз. Радар проверит подключённые открытые источники, подтвердит изменения и подготовит понятный следующий шаг.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a
-            href={props.previewHref}
+            href="#hero-workflow"
             className={sceneStyles.primaryButton}
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Посмотреть пример продукта <ArrowGlyph />
+            Посмотреть workflow <ArrowGlyph />
           </a>
-          <span className={sceneStyles.actionHint}>Демо-сценарий от 12 мая · без регистрации</span>
+          <span className={sceneStyles.actionHint}>Наведите или выберите этап · внутри всё интерактивно</span>
         </div>
         <Link href="/login?returnTo=%2Fdashboard" className={sceneStyles.loginLink}>Войти</Link>
         <p className={sceneStyles.microcopy} data-hero-trust-line>

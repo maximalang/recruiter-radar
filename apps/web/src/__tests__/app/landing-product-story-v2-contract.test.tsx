@@ -36,30 +36,24 @@ describe("landing product story v2", () => {
     const previewText = visibleText(preview);
     const heroCss = source("app/landing/detection-scene.module.css");
 
-    expect(heroText).toContain("Компании, которым стоит написать сегодня");
-    expect(heroText).toContain("Посмотреть пример продукта");
-    expect(heroText).toContain("рабочий список");
-    expect(preview).toContain('data-hero-workspace="today"');
+    expect(heroText).toContain("От сигнала до сообщения");
+    expect(heroText).toContain("Посмотреть workflow");
+    expect(heroText).toContain("проверит подключённые открытые источники");
+    expect(preview).toContain('data-hero-product-preview="workflow"');
     expect(previewText).toContain("Сегодня");
     expect(previewText).toContain("Компании");
-    expect(previewText).toContain("Ситуации");
-    expect(previewText).toContain("Радар");
-    expect(previewText).toContain("Настройки");
-    expect(previewText).toContain("10 в списке");
-    expect(previewText).toContain("Почему сейчас");
-    expect(previewText).toContain("Официальный контакт");
-    expect(previewText).toContain("В работу");
-    expect(previewText).toContain("Отложить");
-    expect(previewText).toContain("Не подходит");
-    expect(previewText).toContain("Демо · 12 мая");
+    expect(previewText).toContain("Как работает");
+    expect(previewText).toContain("Инженерный подбор");
+    expect(previewText).toContain("Финансовый софт");
+    expect(previewText).toContain("Настройте рынок");
+    expect(previewText).toContain("Радар проверяет");
+    expect(previewText).toContain("Получите повод");
+    expect(previewText).toContain("Подготовьте сообщение");
+    expect(previewText).not.toMatch(/Промет|Северные системы|Техноформ|Демо · 12 мая/);
     expect(heroCss).toMatch(/\.title\s*\{[^}]*animation:\s*none/);
 
-    expect(heroCss).not.toMatch(
-      /@media\s*\(max-width:\s*959px\)[\s\S]*?\.shotSide\s*\{\s*display:\s*none;/,
-    );
-    expect(heroCss).not.toMatch(
-      /@media\s*\(max-width:\s*430px\)[\s\S]*?\.shotEvidence div:nth-child\(2\)\s*\{\s*display:\s*none;/,
-    );
+    expect(heroCss).toMatch(/\.section\s*\{[\s\S]*?overflow:\s*hidden/);
+    expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.productShot,\.fieldFigure:hover \.productShot[^}]*transform:\s*none/);
   });
 
   it("uses the approved dark split-screen composition at desktop widths", () => {
@@ -75,10 +69,10 @@ describe("landing product story v2", () => {
     expect(visualCss).toMatch(/--landing-ink:\s*var\(--color-text-inverse\)/);
     expect(visualCss).toMatch(/--landing-accent:\s*color-mix\(/);
     expect(heroCss).toMatch(
-      /\.section\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*\.92fr\)\s+minmax\(0,\s*1\.08fr\)/,
+      /\.section\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*\.82fr\)\s+minmax\(0,\s*1\.18fr\)/,
     );
-    expect(heroCss).toMatch(/gap:\s*3rem/);
-    expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/);
+    expect(heroCss).toMatch(/gap:\s*2rem/);
+    expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.section\s*\{[^}]*display:\s*block/);
   });
 
   it("applies the premium C1 tone, product hierarchy and narrow-screen contract", () => {
@@ -105,47 +99,35 @@ describe("landing product story v2", () => {
     expect(heroCss).not.toContain(".section::before");
     expect(heroCss).not.toContain(".section::after");
     expect(heroCss).toMatch(
-      /\.title\s*\{[^}]*font-size:\s*clamp\(2\.75rem, 4\.3vw, 3\.375rem\)[^}]*font-weight:\s*600[^}]*line-height:\s*1\.05/,
+      /\.title\s*\{[^}]*font-size:\s*clamp\(2\.8rem, 4\.5vw, 4rem\)[^}]*font-weight:\s*610[^}]*line-height:\s*1\.02/,
     );
     expect(heroCss).toMatch(
       /\.primaryButton\s*\{[^}]*min-height:\s*48px[^}]*background:\s*var\(--color-signal\)[^}]*color:\s*var\(--color-text-inverse\)/,
     );
     expect(heroCss).toMatch(
-      /\.productShot\s*\{[^}]*max-width:\s*100%[^}]*background:\s*var\(--color-surface-elevated\)/,
+      /\.productShot\s*\{[^}]*width:\s*100%[^}]*background:\s*#101318[^}]*transform:\s*translateX\(/,
     );
 
     const hierarchy = [
-      'data-hero-company-detail="selected"',
-      'data-hero-why-now="true"',
-      'data-hero-evidence="fixed-date"',
-      'data-hero-confidence="A"',
-      'data-hero-next-step="manual"',
+      "Настройте рынок",
+      "Радар проверяет",
+      "Получите повод",
+      "Подготовьте сообщение",
     ];
     let cursor = -1;
     for (const marker of hierarchy) {
-      const next = preview.indexOf(marker);
+      const next = previewText.indexOf(marker, cursor + 1);
       expect(next).toBeGreaterThan(cursor);
       cursor = next;
     }
-    expect(previewText).toContain("Демо · 12 мая");
-    expect(previewText).not.toContain("Профиль активен");
+    expect(previewText).not.toMatch(/Демо|Промет|Северные системы|Техноформ/);
     expect(heroCss).toMatch(
-      /@media \(max-width: 900px\)[\s\S]*?\.section\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[\s\S]*?\.fieldFigure\s*\{[^}]*width:\s*100%/,
+      /@media \(max-width: 900px\)[\s\S]*?\.section\s*\{[^}]*display:\s*block[\s\S]*?\.fieldFigure\s*\{[^}]*width:\s*100%/,
     );
     expect(heroCss).toMatch(
-      /@media \(max-width: 700px\)[\s\S]*?\.shotBody\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/,
+      /@media \(max-width: 700px\)[\s\S]*?\.workflowTabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/,
     );
-    // Stage 1/2 (owner scope guard): the three macOS traffic lights stay
-    // visible and colored at every width, including 390px mobile.
-    expect(heroCss).not.toMatch(/\.shotDot[^{]*\{[^}]*display:\s*none/);
-    expect(heroCss).toMatch(
-      /\.shotDot\[data-shot-dot="red"\]\s*\{[^}]*background:\s*var\(--shot-dot-close\)/,
-    );
-    expect(preview.match(/data-shot-dot="(red|yellow|green)"/g)).toEqual([
-      'data-shot-dot="red"',
-      'data-shot-dot="yellow"',
-      'data-shot-dot="green"',
-    ]);
+    expect(preview).not.toContain("data-shot-dot");
   });
 
   it("explains the full profile-to-contact workflow before the interactive example", () => {
@@ -304,9 +286,9 @@ describe("landing product story v2", () => {
     expect(workspaceCss).toMatch(/\.outcomeMeta:nth-child\(2\)\s*\{\s*display:\s*none;/);
     expect(workspaceCss).toContain(".evidenceBlock li");
     expect(workspaceCss).toContain(".nextMove");
-    expect(detectionCss).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.shotNav b\s*\{[^}]*font-size:\s*\.68rem/);
-    expect(detectionCss).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.shotWhy p\s*\{[^}]*font-size:\s*\.68rem/);
-    expect(detectionCss).not.toContain(".shotNav > span:nth-child(4),");
+    expect(detectionCss).toMatch(/@media \(max-width: 700px\)[\s\S]*?\.workflowTabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)/);
+    expect(detectionCss).toMatch(/@media \(max-width: 700px\)[\s\S]*?\.workflowTabs > button\s*\{[^}]*min-height:\s*64px/);
+    expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.productShot[^}]*transform:\s*none/);
     expect(deliveryCss).toMatch(/@media \(max-width: 520px\)[\s\S]*?\.deliveryRoutes\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
     expect(deliveryCss).toMatch(/\.deliveryRoutes \.channelRoute p\s*\{\s*display:\s*none/);
   });

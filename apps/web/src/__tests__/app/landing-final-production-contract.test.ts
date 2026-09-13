@@ -16,18 +16,18 @@ describe("landing final production contract", () => {
     const heroCss = source("app/landing/detection-scene.module.css");
 
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
-    expect(hero).toContain("Компании, которым стоит написать сегодня");
-    expect(hero).toContain('data-hero-layout="product-workspace"');
+    expect(hero).toContain("От сигнала до сообщения");
+    expect(hero).toContain('data-hero-layout="interactive-workflow"');
     expect(hero).toContain('data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
-    expect(hero).toContain("Посмотреть пример продукта");
+    expect(hero).toContain("Посмотреть workflow");
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain('data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}');
     expect(hero).toContain('data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}');
-    expect(hero).toContain("Демо-сценарий от 12 мая · без регистрации");
+    expect(hero).toContain("Наведите или выберите этап · внутри всё интерактивно");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");
-    expect(heroCss).toMatch(/\.title\s*\{[^}]*font-size:\s*clamp\(2\.75rem,\s*4\.3vw,\s*3\.375rem\);[^}]*font-weight:\s*600;[^}]*line-height:\s*1\.05;/);
+    expect(heroCss).toMatch(/\.title\s*\{[^}]*font-size:\s*clamp\(2\.8rem,\s*4\.5vw,\s*4rem\);[^}]*font-weight:\s*610;[^}]*line-height:\s*1\.02;/);
   });
 
   test("uses one Pilot decision, centered FAQ, and compact closing CTA", () => {

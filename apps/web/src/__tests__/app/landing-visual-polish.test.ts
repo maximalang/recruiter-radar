@@ -19,11 +19,11 @@ describe("polished unified landing visual contract", () => {
     const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
     const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(heroScene).toContain('data-hero-layout="product-workspace"');
+    expect(heroScene).toContain('data-hero-layout="interactive-workflow"');
     expect(heroScene).toContain('data-theme="inverse"');
     expect(heroScene).toContain('data-hero-visual');
     expect(heroScene).toContain("HeroProductPreview");
-    expect(heroScene).toContain("Посмотреть пример продукта");
+    expect(heroScene).toContain("Посмотреть workflow");
     expect(heroScene).not.toContain("HeroRadar");
     expect(heroScene).not.toContain("HeroInstrument");
     expect(existsSync(retiredRadar)).toBe(false);
@@ -42,7 +42,7 @@ describe("polished unified landing visual contract", () => {
 
     expect(heroScene).toContain("data-mobile-hero-signal");
     expect(heroScene).toContain('className={sceneStyles.fieldFigure}');
-    expect(sceneStyles).toContain("@media (max-width: 600px)");
+    expect(sceneStyles).toContain("@media (max-width: 700px)");
     expect(sceneStyles).toContain(".fieldFigure");
     expect(sceneStyles).not.toContain("HeroRadar");
   });
