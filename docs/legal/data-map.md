@@ -33,10 +33,13 @@
 
 | Данные | Цель | Основание | Источник | Хранение | Срок | Получатели | Трансгранично | Удаление |
 |---|---|---|---|---|---|---|---|---|
-| product_telemetry_events: event_name из белого списка, metadata {context}, owner_id nullable | обезличенная оценка воронки | законный интерес; события только после opt-in аналитики на лендинге | браузер пользователя | PostgreSQL | не определён | нет | нет | MANUAL → ACTION REQUIRED |
+| product_telemetry_events: event_name из белого списка, metadata {context, referer_class, utm_source_class, ua_class, internal_marker, attachment} из закрытых словарей, visit_id (псевдонимный ключ визита, суточная ротация), owner_id nullable | обезличенная оценка воронки и спроса | законный интерес; события только после opt-in аналитики на лендинге | браузер пользователя | PostgreSQL | 24 месяца (TTL-джоба) | нет | нет | ENFORCED: `packages/db/scripts/cleanup-product-telemetry.mjs` (по расписанию ops) |
 
-Важно: `/api/landing-events` принимает только имя события + контекст из закрытого
-списка; IP используется лишь для rate-limit как суточный HMAC-ключ и не сохраняется.
+Важно: `/api/landing-events` принимает только имя события + контекст и
+dimension-классы из закрытых словарей; visit_id вычисляется на сервере из
+нормализованного IP как суточный HMAC-токен, сырой IP и сырые строки Referer
+и User-Agent не сохраняются. Определения классов, воронки (1:4:3) и
+исключений зафиксированы в `docs/marketing/landing-demand-protocol.md`.
 
 ## Внешняя веб-аналитика (opt-in)
 

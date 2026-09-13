@@ -84,7 +84,7 @@ export default function YandexMetrika() {
           <div className={styles.copy}>
             <strong id="analytics-consent-title" className={styles.title}>Необязательная аналитика</strong>
             <span className={styles.text}>
-              Мы используем Яндекс Метрику только для обезличенной оценки публичного сайта. Она не загружается без вашего согласия и не работает на checkout или в личном кабинете. Подробнее — в <Link href="/cookies" className={styles.link}>политике cookies</Link>.
+              Мы используем Яндекс Метрику и собственную обезличенную телеметрию только для оценки публичного сайта: какие источники приводят посетителей и как они пользуются лендингом. Мы не храним IP-адрес, сырые строки Referer или User-Agent — только широкие категории и псевдонимный идентификатор визита. Аналитика не загружается без вашего согласия и не работает на checkout или в личном кабинете. Подробнее — в <Link href="/cookies" className={styles.link}>политике cookies</Link>.
             </span>
           </div>
           <div className={styles.actions}>
