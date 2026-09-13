@@ -375,20 +375,6 @@ async function assertLeadRows(page, label, viewport) {
   }
 }
 
-async function assertMobileStoryComposition(page, viewport) {
-  if (viewport.width > 480) return;
-  const path = page.locator('[data-story-path="signals-dossier-cabinet"]');
-  const pathBox = await path.boundingBox();
-  assert.ok(pathBox, `${viewport.name}: missing story path`);
-  const clipped = await path.locator("[data-story-step]").evaluateAll((elements, bounds) => elements.flatMap((element) => {
-    const rect = element.getBoundingClientRect();
-    return rect.left < bounds.left - 1 || rect.right > bounds.right + 1
-      ? [{ text: element.textContent?.trim(), left: rect.left, right: rect.right }]
-      : [];
-  }), pathBox);
-  assert.deepEqual(clipped, [], `${viewport.name}: story steps must stack without half-clipped options`);
-}
-
 async function measurePageHeight(page, viewport) {
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   assert.ok(height >= viewport.height, `${viewport.name}: invalid full-page height ${height}px`);
@@ -450,7 +436,6 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertHeaderLayout(page, viewport);
   await assertHeroGeometry(page, viewport.name);
   await assertLeadRows(page, viewport.name, viewport);
-  await assertMobileStoryComposition(page, viewport);
   await revealAllMotionSections(page, viewport.name);
 
   await assertNoHorizontalOverflow(page, viewport.name);

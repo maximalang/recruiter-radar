@@ -218,14 +218,9 @@ describe("landing product story v2", () => {
     expect(workspaceCss).toMatch(
       /\.nextMove\s*\{[^}]*border-top:\s*2px solid var\(--workspace-accent\)/,
     );
-    expect(workspaceCss).toMatch(/\.sourceBadges\s*\{/);
-    expect(workspaceCss).toMatch(
-      /\.sourceBadges em\[data-source-badge="hh"\]\s*\{[^}]*border-color:\s*color-mix/,
-    );
-    expect(workspaceCss).toMatch(/\.storyPath\s*\{/);
-    expect(workspaceCss).toMatch(
-      /\.storyStep\[data-story-tone="signal"\]\s*\{[^}]*border-top-color:\s*var\(--color-signal\)/,
-    );
+    expect(workspaceCss).not.toContain(".storyPath");
+    expect(workspaceCss).not.toContain(".storyStep");
+    expect(workspaceCss).not.toContain(".sourceBadges");
     expect(workspaceCss).toMatch(/@media \(max-width: 400px\)/);
     expect(workspaceCss).toMatch(
       /\.leadRow:focus-visible,[\s\S]*?outline:\s*3px solid var\(--workspace-accent\)/,
