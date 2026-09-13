@@ -53,7 +53,8 @@ describe("landing product story v2", () => {
     expect(heroCss).toMatch(/\.title\s*\{[^}]*animation:\s*none/);
 
     expect(heroCss).toMatch(/\.section\s*\{[\s\S]*?overflow:\s*hidden/);
-    expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.productShot,\.fieldFigure:hover \.productShot[^}]*transform:\s*none/);
+    expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.productShot,\.fieldFigure:focus-within \.productShot[^}]*transform:\s*none/);
+    expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?@media \(hover: hover\) and \(pointer: fine\)[\s\S]*?\.fieldFigure:hover \.productShot\s*\{\s*transform:\s*none;\s*\}/);
   });
 
   it("uses the approved dark split-screen composition at desktop widths", () => {
@@ -105,7 +106,7 @@ describe("landing product story v2", () => {
       /\.primaryButton\s*\{[^}]*min-height:\s*48px[^}]*background:\s*var\(--color-signal\)[^}]*color:\s*var\(--color-text-inverse\)/,
     );
     expect(heroCss).toMatch(
-      /\.productShot\s*\{[^}]*width:\s*100%[^}]*background:\s*#101318[^}]*transform:\s*translateX\(/,
+      /\.productShot\s*\{[^}]*width:\s*100%[^}]*background:\s*var\(--color-canvas\)[^}]*transform:\s*translateX\(/,
     );
 
     const hierarchy = [
