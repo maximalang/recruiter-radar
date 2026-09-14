@@ -18,6 +18,20 @@
   position: relative;
   z-index: 3;
   width: min(100%, 34rem);
+  transition: opacity var(--motion-duration-context) var(--motion-ease-standard);
+}
+
+/* Expanded workflow becomes the temporary focus of the frame (Accio pattern):
+ * the dimmed hero makes the overlap read as an intentional overlay, not a
+ * layout collision. Hover variant stays behind the pointer capability gate. */
+.section:has(.fieldFigure:focus-within) .copy {
+  opacity: .28;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .section:has(.fieldFigure:hover) .copy {
+    opacity: .28;
+  }
 }
 
 .serviceLabel {

@@ -61,6 +61,9 @@ describe("landing hero advertising workflow", () => {
     expect(css).toMatch(/\.productShot\s*\{[\s\S]*?transform:\s*translateX\(/);
     expect(css).toMatch(/\.fieldFigure:hover\s+\.productShot/);
     expect(css).toMatch(/\.fieldFigure:focus-within\s+\.productShot/);
+    expect(css).toMatch(/\.section:has\(\.fieldFigure:focus-within\) \.copy/);
+    expect(css).toMatch(/\.section:has\(\.fieldFigure:hover\) \.copy/);
+    expect(css).toMatch(/opacity:\s*\.28/);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?transition:\s*none/);
   });
 
