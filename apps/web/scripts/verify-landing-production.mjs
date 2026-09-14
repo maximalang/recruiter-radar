@@ -734,7 +734,7 @@ async function assertNoJs(browser) {
   assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня/);
   const noJsWorkspaceText = await page.locator("#scene-workspace").innerText();
   assert.match(noJsWorkspaceText, /пример выдачи · демо-сценарий/i);
-  assert.match(noJsWorkspaceText, /Сигналы/i);
+  assert.match(noJsWorkspaceText, /от сигнала до вашего решения/i);
   assert.equal(await page.locator("#preview-configurator form").count(), 0, "no-JS static story must not render a form");
   assert.equal(await page.locator("[data-noscript-disclosure]").count(), 1, "no-JS disclosure missing");
   const results = page.locator("#preview-results[data-preview-results-ready]").first();
