@@ -25,7 +25,7 @@
 .skipLink {
   position: fixed;
   z-index: 120;
-  top: -5rem;
+  top: 1rem;
   left: 1rem;
   min-height: 44px;
   padding: .8rem 1rem;
@@ -35,9 +35,14 @@
   font-size: .82rem;
   font-weight: 650;
   text-decoration: none;
+  /* Off-screen by transform, not top: unlike top, a transform still moves the
+   * link off-screen even if a transformed ancestor makes `position: fixed`
+   * resolve against that ancestor instead of the viewport (owner verdict
+   * 2026-09-14: link rendered visible without focus). */
+  transform: translateY(calc(-100% - 1rem));
 }
 
-.skipLink:focus { top: 1rem; }
+.skipLink:focus { transform: translateY(0); }
 
 .headerBrand {
   display: inline-flex;
