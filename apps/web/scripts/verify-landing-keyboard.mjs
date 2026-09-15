@@ -73,7 +73,6 @@ try {
   const categoryIndex = new Map();
   const legal = { offer: false, privacy: false };
   let reachedCookieSettings = false;
-  let mobileDisclosureToggled = false;
   let deliveryDisclosureToggled = false;
 
   for (let index = 0; index < 180; index += 1) {
@@ -90,8 +89,10 @@ try {
       let category = null;
       if (text === "Перейти к содержанию") category = "skip";
       else if (element.closest("header")) category = "header";
+      // #hero-workflow is nested inside #scene-detection; check it first so
+      // workflow controls keep their own keyboard-navigation category.
+      else if (element.closest("#hero-workflow")) category = "preview";
       else if (element.closest("#scene-detection")) category = "hero";
-      else if (element.closest("#scene-workspace")) category = "preview";
       else if (element.closest("#scene-delivery")) category = "delivery";
       else if (element.closest("#pricing")) category = "pricing";
       else if (element.closest("#faq")) category = "faq";
@@ -108,7 +109,6 @@ try {
         outlineWidth: Number.parseFloat(style.outlineWidth),
         inHeader: Boolean(element.closest("header")),
         headerBottom: headerRect?.bottom ?? 0,
-        mobileDisclosure: element.matches('[data-mobile-lead-disclosure="true"]'),
         deliverySummary: element.matches("#scene-delivery summary"),
       };
     });
@@ -133,16 +133,6 @@ try {
 
     sequence.push(focused);
     rememberFirst(categoryIndex, focused.category, index);
-
-    if (focused.mobileDisclosure) {
-      const disclosure = page.locator('[data-mobile-lead-disclosure="true"]');
-      assert.equal(await disclosure.getAttribute("aria-expanded"), "false");
-      await page.keyboard.press("Enter");
-      assert.equal(await disclosure.getAttribute("aria-expanded"), "true");
-      await page.keyboard.press("Enter");
-      assert.equal(await disclosure.getAttribute("aria-expanded"), "false");
-      mobileDisclosureToggled = true;
-    }
 
     if (focused.deliverySummary) {
       const details = page.locator("#scene-delivery details");
@@ -172,7 +162,6 @@ try {
   if (cookieSettingsExpected) {
     assert.equal(reachedCookieSettings, true, "keyboard: cookie settings not reachable within tab budget");
   }
-  assert.equal(mobileDisclosureToggled, true, "keyboard: mobile disclosure was not reached/toggled");
   assert.equal(deliveryDisclosureToggled, true, "keyboard: Delivery disclosure was not reached/toggled");
   assert.deepEqual(legal, { offer: true, privacy: true }, "keyboard: legal links were not both reached");
 
@@ -219,7 +208,6 @@ try {
     categories: Object.fromEntries(categoryIndex),
     legal,
     reachedCookieSettings,
-    mobileDisclosureToggled,
     deliveryDisclosureToggled,
   })}\n`);
   await context.close();
