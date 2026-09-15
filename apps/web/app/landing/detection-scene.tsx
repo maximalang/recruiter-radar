@@ -8,7 +8,7 @@ import { ArrowGlyph } from "./brand-glyphs";
 import HeroProductPreview from "./hero-product-preview";
 import sceneStyles from "./detection-scene.module.css";
 
-export default function DetectionScene(props: { previewHref: string; paymentConfigured: boolean }) {
+export default function DetectionScene(props: { paymentConfigured: boolean }) {
   return (
     <section
       id="scene-detection"
