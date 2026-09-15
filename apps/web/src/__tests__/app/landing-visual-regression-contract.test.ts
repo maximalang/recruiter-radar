@@ -16,7 +16,7 @@ describe("landing visual regression contract", () => {
 
     expect(hero).toContain('data-theme="inverse"');
     expect(hero).toContain('data-header-tone="light"');
-    expect(hero).toContain('data-hero-layout="product-workspace"');
+    expect(hero).toContain('data-hero-layout="interactive-workflow"');
     expect(hero).not.toContain('data-header-tone="dark"');
 
     expect(timeline).toContain('data-header-tone="light"');

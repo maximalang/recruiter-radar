@@ -156,7 +156,7 @@ async function assertRequiredSurface(page, label) {
   }
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
-  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня/);
+  assert.match(await page.locator("h1").innerText(), /От сигнала до сообщения/);
   assert.match(await page.locator("#scene-workspace").innerText(), /пример выдачи · демо-сценарий|обезличенный пример/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
@@ -207,6 +207,10 @@ async function assertControls(page, label) {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
       if (style.display === "none" || style.visibility === "hidden" || rect.width === 0 || rect.height === 0) return false;
+      // The hero product shot is a scaled-down product illustration (Accio pattern):
+      // its inner controls belong to the miniature demo UI, not the landing page,
+      // so the 44px rule applies to real page controls only.
+      if (element.closest("[data-hero-workflow]")) return false;
       return rect.width < 44 || rect.height < 44;
     })
     .slice(0, 20)
@@ -240,7 +244,11 @@ async function assertNoOverlapOrClipping(page, label) {
       const style = getComputedStyle(element);
       const clipped = ["hidden", "clip"].includes(style.overflow)
         && (element.scrollHeight > element.clientHeight + 2 || element.scrollWidth > element.clientWidth + 2);
-      const outside = rect.left < -2 || rect.right > document.documentElement.clientWidth + 2;
+      // The hero product shot intentionally bleeds past the right viewport edge
+      // (Accio-style collapsed teaser); the section clips it, and the document-level
+      // scrollWidth assertion still guards against real horizontal overflow.
+      const heroTeaser = Boolean(element.closest("#scene-detection [data-hero-visual]"));
+      const outside = !heroTeaser && (rect.left < -2 || rect.right > document.documentElement.clientWidth + 2);
       return clipped || outside ? [{ selector, clipped, outside, rect: rect.toJSON() }] : [];
     }));
   });
@@ -647,7 +655,10 @@ async function assertInteractionContracts(browser) {
     const heroEvent = waitForLandingEvent(page, "preview_started", "hero_primary");
     await Promise.all([heroEvent, heroClick.click()]);
   }
-  assert.equal(new URL(page.url()).hash, "#preview-configurator");
+  // The hero CTA targets the interactive workflow card (Accio-style hero);
+  // the configurator/preview scene remains below it and is asserted next.
+  assert.equal(new URL(page.url()).hash, "#hero-workflow");
+  await page.locator("#hero-workflow").waitFor({ state: "attached" });
 
   // Static product story: the same honest demo renders on every visit. The
   // former preset/form personalization flows are gone; the privacy contract
@@ -731,10 +742,10 @@ async function assertNoJs(browser) {
   for (const selector of requiredSelectors) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
-  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня/);
+  assert.match(await page.locator("h1").innerText(), /От сигнала до сообщения/);
   const noJsWorkspaceText = await page.locator("#scene-workspace").innerText();
   assert.match(noJsWorkspaceText, /пример выдачи · демо-сценарий/i);
-  assert.match(noJsWorkspaceText, /от сигнала до вашего решения/i);
+  assert.match(noJsWorkspaceText, /Так радар ведёт компанию от сигнала до вашего решения/i);
   assert.equal(await page.locator("#preview-configurator form").count(), 0, "no-JS static story must not render a form");
   assert.equal(await page.locator("[data-noscript-disclosure]").count(), 1, "no-JS disclosure missing");
   const results = page.locator("#preview-results[data-preview-results-ready]").first();

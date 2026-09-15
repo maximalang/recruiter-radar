@@ -36,10 +36,10 @@ describe("landing restoration narrative", () => {
   it("keeps the restored ambient hero payment-aware and connected to the preview", () => {
     const hero = source("app/landing/detection-scene.tsx");
 
-    expect(hero).toContain('data-hero-layout="product-workspace"');
+    expect(hero).toContain('data-hero-layout="interactive-workflow"');
     expect(hero).toContain('data-theme="inverse"');
     expect(hero).toContain("data-payment-offer=");
-    expect(hero).toContain("Посмотреть пример продукта");
+    expect(hero).toContain("Посмотреть workflow");
     expect(hero).toContain("data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("без автопродления · сообщения отправляете вы");
