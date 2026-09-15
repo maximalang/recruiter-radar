@@ -1,7 +1,6 @@
 import { DEFAULT_LANDING_DEMO_STORY } from "../../lib/landing-demo";
 
 export const LANDING_NAV_ITEMS = [
-  { id: "scene-workspace", label: "Пример" },
   { id: "scene-evidence", label: "Как работает" },
   { id: "pricing", label: "Тариф" },
   { id: "faq", label: "FAQ" },
