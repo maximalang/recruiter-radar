@@ -16,18 +16,18 @@ describe("landing final production contract", () => {
     const heroCss = source("app/landing/detection-scene.module.css");
 
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
-    expect(hero).toContain("Список компаний, где найм уже идёт");
-    expect(hero).toContain('data-hero-layout="morning-list"');
+    expect(hero).toContain("От сигнала до сообщения");
+    expect(hero).toContain('data-hero-layout="interactive-workflow"');
     expect(hero).toContain('data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
-    expect(hero).toContain("Открыть пример");
+    expect(hero).toContain("Посмотреть workflow");
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain('data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}');
     expect(hero).toContain('data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}');
-    expect(hero).toContain("Настройте нишу и географию · без регистрации");
+    expect(hero).toContain("Наведите или выберите этап · внутри всё интерактивно");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");
-    expect(heroCss).toMatch(/\.title\s*\{[\s\S]*?font-size:\s*clamp\(3\.55rem,\s*5\.4vw,\s*5\.45rem\)/);
+    expect(heroCss).toMatch(/\.title\s*\{[^}]*font-size:\s*clamp\(2\.8rem,\s*4\.5vw,\s*4rem\);[^}]*font-weight:\s*610;[^}]*line-height:\s*1\.02;/);
   });
 
   test("uses one Pilot decision, centered FAQ, and compact closing CTA", () => {
@@ -114,7 +114,6 @@ describe("landing final production contract", () => {
     const cadenceFiles = [
       source("app/landing/detection-scene.tsx"),
       source("app/landing/conversion-panel.tsx"),
-      source("app/landing/workspace-scene.tsx"),
       source("app/landing/hero-product-preview.tsx"),
       source("app/home-page-content.tsx"),
       source("app/api/telegram/webhook/route.ts"),
@@ -142,7 +141,7 @@ describe("landing final production contract", () => {
     const timeline = source("app/landing/signal-timeline.tsx");
     expect(timeline).toContain("6 мая · демо-сценарий");
     expect(timeline).toContain("10 мая · демо-сценарий");
-    expect(timeline).toContain("11 мая · демо-сценарий");
+    expect(timeline).toContain('data-product-workflow="profile-to-contact"');
     expect(timeline).toContain("STORY.company.freshness");
 
     // Demo story freshness is an explicit fixed date, never "today".
@@ -162,7 +161,6 @@ describe("landing final production contract", () => {
     // every dated event is anchored to the fixed scenario (12 мая 2026).
     const relativeFreshnessFiles = [
       source("app/landing/signal-timeline.tsx"),
-      source("app/landing/workspace-scene.tsx"),
       source("app/landing/evidence-scene.tsx"),
       source("app/landing/hero-product-preview.tsx"),
       source("app/landing/detection-scene.tsx"),
@@ -182,7 +180,7 @@ describe("landing final production contract", () => {
     // Timeline and demo story agree with the fixed anchor dates.
     expect(timeline).toContain("6 мая · демо-сценарий");
     expect(timeline).toContain("10 мая · демо-сценарий");
-    expect(timeline).toContain("11 мая · демо-сценарий");
+    expect(timeline).toContain("Решение остаётся за вами");
     expect(timeline).toContain("STORY.company.freshness");
     // Demo fallback items use hard-coded dates; no wall-clock generation.
     const publicProduct = source("lib/publicProduct.ts");

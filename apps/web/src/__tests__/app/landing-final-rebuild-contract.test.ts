@@ -18,28 +18,27 @@ function source(path: string): string {
  * composition geometry. */
 
 describe("landing restoration narrative", () => {
-  it("restores the timeline scene between the promise and the product example", () => {
+  it("restores the timeline scene between the promise and the proof", () => {
     const page = source("app/landing/landing-page.tsx");
     const heroIndex = page.indexOf("<DetectionScene");
-    const workspaceIndex = page.indexOf("<WorkspaceScene");
     const proofIndex = page.indexOf("<EvidenceScene");
 
     expect(heroIndex).toBeGreaterThan(-1);
-    expect(workspaceIndex).toBeGreaterThan(heroIndex);
-    expect(proofIndex).toBeGreaterThan(workspaceIndex);
+    expect(proofIndex).toBeGreaterThan(heroIndex);
     const timelineIndex = page.indexOf("<SignalTimeline />");
     expect(timelineIndex).toBeGreaterThan(heroIndex);
-    expect(timelineIndex).toBeLessThan(workspaceIndex);
+    expect(timelineIndex).toBeLessThan(proofIndex);
+    expect(page).not.toContain("<WorkspaceScene");
     expect(page).not.toContain("<RadarScene");
   });
 
   it("keeps the restored ambient hero payment-aware and connected to the preview", () => {
     const hero = source("app/landing/detection-scene.tsx");
 
-    expect(hero).toContain('data-hero-layout="morning-list"');
+    expect(hero).toContain('data-hero-layout="interactive-workflow"');
     expect(hero).toContain('data-theme="inverse"');
     expect(hero).toContain("data-payment-offer=");
-    expect(hero).toContain("Открыть пример");
+    expect(hero).toContain("Посмотреть workflow");
     expect(hero).toContain("data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("без автопродления · сообщения отправляете вы");
@@ -75,36 +74,21 @@ describe("landing restoration narrative", () => {
     expect(proofCss).not.toContain(".proofObject");
   });
 
-  it("presents the preview as one coherent Recruiter Radar product object", () => {
-    const workspace = source("app/landing/workspace-scene.tsx");
-    const lead = source("app/landing/workspace-lead.tsx");
-    const leadList = source("app/landing/workspace-lead-list.tsx");
-    const workspaceCss = source("app/landing/workspace-scene.module.css");
+  it("presents the interactive hero demo as one coherent Recruiter Radar product object", () => {
+    const hero = source("app/landing/hero-product-preview.tsx");
 
-    // One product frame with a visible identity rail — not a generic
-    // SaaS form/table grid.
-    expect(workspace).toContain('data-product-preview="live-radar"');
-    expect(workspace).toContain('data-preview-editorial="true"');
-    expect(workspace).toContain("data-preview-rail");
-    expect(workspace).toContain("<span>Recruiter Radar</span>");
-    expect(workspace).toContain("ПРИМЕР");
-
-    // Editorial intro stays bound to the live configurator.
-    expect(workspace).toContain("Интерактивный пример");
-    expect(workspace).toContain("Проверьте на своей нише");
-    expect(workspace).toContain("Так выглядит ваша рабочая выдача.");
-    expect(workspace).toContain("Обезличенный пример.");
-
-    // Current runtime behavior preserved: personalization, ranked leads,
-    // progressive disclosure, unclamped prose.
-    expect(workspace).toContain("props.previewState.isPersonalized && appliedProfile.length > 0");
-    expect(workspace).toContain("<WorkspaceLeadList");
-    expect(lead).toContain("limit: 2");
-    expect(lead).toContain("Уверенность");
-    expect(lead).toContain("Следующий ход");
-    expect(leadList).toContain("const defaultVisible = mobileEnhanced ? 3 : 4");
-    expect(leadList).toContain("Показать ещё");
-    expect(workspaceCss).not.toContain("-webkit-line-clamp");
+    // Single example (PART 2): the interactive workflow demo replaces the
+    // retired static workspace story.
+    expect(hero).toContain('data-hero-product-preview="workflow"');
+    expect(hero).toContain('id="hero-workflow"');
+    expect(hero).toContain("Интерактивный workflow");
+    expect(hero).toContain("Радар находит повод. Пишете вы.");
+    expect(hero).not.toContain("data-lead-row");
+    expect(hero).not.toContain("getStaticDemoDigestItems");
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.tsx"))).toBe(false);
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-lead.tsx"))).toBe(false);
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-lead-list.tsx"))).toBe(false);
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.module.css"))).toBe(false);
   });
 
   it("tells the delivery story around the manual outreach boundary with truthful channels", () => {
@@ -133,7 +117,7 @@ describe("landing restoration narrative", () => {
     expect(delivery).not.toMatch(/сообщения отправляются автоматически|автоматическая рассылка/i);
   });
 
-  it("makes the pilot the only dominant offer and closes on the dark radar echo", () => {
+  it("makes the pilot the only dominant offer and closes on manual outreach proof", () => {
     const conversion = source("app/landing/conversion-panel.tsx");
     const conversionCss = source("app/landing/conversion-panel.module.css");
 
@@ -143,9 +127,10 @@ describe("landing restoration narrative", () => {
     expect(conversion).not.toContain("data-recommended={plan.isPrimary");
     expect(conversion).not.toContain("TargetIcon");
 
-    // Final scene echoes the dark ambient hero identity through the
-    // abstract radar echo field instead of becoming a second hero.
-    expect(conversion).toContain('data-final-radar="echo"');
+    // Final scene resolves the journey with explicit human control instead of
+    // repeating the retired abstract radar echo treatment.
+    expect(conversion).not.toContain('data-final-radar="echo"');
+    expect(conversion).toContain('data-final-proof="manual-outreach"');
     expect(conversion).toContain("Сообщения отправляете вы");
     expect(conversionCss).toContain("min-height: 21rem");
     expect(conversionCss).not.toContain("min-height: 26rem");

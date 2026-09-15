@@ -25,7 +25,7 @@
 .skipLink {
   position: fixed;
   z-index: 120;
-  top: -5rem;
+  top: 1rem;
   left: 1rem;
   min-height: 44px;
   padding: .8rem 1rem;
@@ -35,9 +35,14 @@
   font-size: .82rem;
   font-weight: 650;
   text-decoration: none;
+  /* Off-screen by transform, not top: unlike top, a transform still moves the
+   * link off-screen even if a transformed ancestor makes `position: fixed`
+   * resolve against that ancestor instead of the viewport (owner verdict
+   * 2026-09-14: link rendered visible without focus). */
+  transform: translateY(calc(-100% - 1rem));
 }
 
-.skipLink:focus { top: 1rem; }
+.skipLink:focus { transform: translateY(0); }
 
 .headerBrand {
   display: inline-flex;
@@ -133,11 +138,12 @@
 
 .landingFooter {
   width: 100%;
+  border-top: 1px solid var(--color-separator);
   background: var(--color-canvas);
 }
 
-.landingFooter :global(footer > div) { padding-top: clamp(1.5rem, 2.5vw, 2.25rem); }
-.landingFooter :global(footer > div > div:first-child) { gap: clamp(1.5rem, 4vw, 4rem); padding-bottom: 1.5rem; }
+.landingFooter :global(footer > div) { padding-top: clamp(1.25rem, 2vw, 1.75rem); }
+.landingFooter :global(footer > div > div:first-child) { gap: clamp(1rem, 3vw, 3rem); padding-bottom: 1.25rem; }
 
 @media (max-width: 820px) {
   .landingPage { margin: -24px -16px -60px; }

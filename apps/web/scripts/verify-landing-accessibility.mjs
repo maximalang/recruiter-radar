@@ -228,7 +228,7 @@ async function auditHeader(browser, viewport) {
   const heroBackground = "#scene-detection";
 
   await page.evaluate(() => window.scrollTo(0, 0));
-  await assertHeaderTone(page, `${viewport.name} Hero top`, "dark");
+  await assertHeaderTone(page, `${viewport.name} Hero top`, "light");
   await page.waitForFunction(() => !document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
   assert.equal(await header.getAttribute("data-scrolled"), null, `${viewport.name}: header must stay transparent at page top`);
 
@@ -236,7 +236,9 @@ async function auditHeader(browser, viewport) {
   await assertContrast(brand, `${viewport.name} Header BrandLogo`, 4.5, heroBackground);
 
   if (viewport.width >= 960) {
-    const nav = header.getByRole("navigation", { name: "Разделы лендинга" }).getByRole("link", { name: "Пример", exact: true });
+    // The retired workspace scene took its "Пример" nav link with it; the
+    // first remaining section link keeps the Header nav contrast contract.
+    const nav = header.getByRole("navigation", { name: "Разделы лендинга" }).getByRole("link", { name: "Как работает", exact: true });
     const login = header.getByRole("link", { name: "Войти", exact: true });
     const cta = header.locator('[data-analytics-context="header"]:visible');
     await assertContrast(nav, `${viewport.name} Header nav`, 4.5, heroBackground);
@@ -251,7 +253,7 @@ async function auditHeader(browser, viewport) {
     await assertFocus(page, menu, `${viewport.name} Header menu focus`, heroBackground);
   }
 
-  await scrollSectionUnderHeader(page, "#scene-workspace");
+  await scrollSectionUnderHeader(page, "#hero-workflow");
   await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
   await assertContrast(brand, `${viewport.name} Scrolled header BrandLogo`);
   if (viewport.width >= 960) {
@@ -267,7 +269,7 @@ async function auditHeader(browser, viewport) {
   await scrollSectionUnderHeader(page, "#pricing");
   await assertHeaderTone(page, `${viewport.name} light Pricing`, "light");
   await page.evaluate(() => window.scrollTo(0, 0));
-  await assertHeaderTone(page, `${viewport.name} Hero restored`, "dark");
+  await assertHeaderTone(page, `${viewport.name} Hero restored`, "light");
 
   assertCleanConsole();
   await context.close();
