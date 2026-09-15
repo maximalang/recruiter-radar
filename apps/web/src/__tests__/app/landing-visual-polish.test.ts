@@ -51,13 +51,14 @@ describe("polished unified landing visual contract", () => {
     const page = source("app/landing/landing-page.tsx");
     const detectionIndex = page.indexOf("<DetectionScene");
     const timelineIndex = page.indexOf("<SignalTimeline />");
-    const workspaceIndex = page.indexOf("<WorkspaceScene");
 
     expect(page).not.toContain("SignalTimelineScene");
+    // PART 2: the static workspace section is retired; the hero workflow demo
+    // is the single example surface, so no WorkspaceScene may follow.
+    expect(page).not.toContain("WorkspaceScene");
     expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.tsx"))).toBe(false);
     expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.module.css"))).toBe(false);
     expect(timelineIndex).toBeGreaterThan(detectionIndex);
-    expect(workspaceIndex).toBeGreaterThan(timelineIndex);
   });
 
   it("separates the core workspace from connected delivery routes", () => {
@@ -111,20 +112,16 @@ describe("polished unified landing visual contract", () => {
     expect(footerControl).toContain("window.dispatchEvent");
   });
 
-  it("uses one stable preview anchor without duplicating it in the skeleton export", () => {
-    // Stable anchors: the compact anchor belt keeps one stable preview anchor
-    // without duplicating it in the page-level skeleton export.
-    const workspace = source("app/landing/workspace-scene.tsx");
-    const skeletonStart = workspace.indexOf("export function WorkspaceResultsSkeleton");
-    const skeletonSource = workspace.slice(skeletonStart);
+  it("keeps the hero workflow demo as the single example anchor", () => {
+    // Single example (PART 2): the static workspace story is retired; the
+    // interactive hero demo owns the one stable example anchor.
+    const hero = source("app/landing/hero-product-preview.tsx");
+    const landing = source("app/landing/landing-page.tsx");
 
-    expect(workspace).toContain('id="preview-results"');
-    expect(workspace).toContain('id="preview-configurator"');
-    expect(workspace).toContain("data-preview-results-ready");
-    expect(workspace).not.toContain("<Suspense");
-    expect(workspace).toContain("LandingPreviewInteractions");
-    expect(skeletonSource).not.toContain('id="preview-results"');
-    expect(skeletonSource).toContain("data-preview-results-skeleton");
+    expect(hero).toContain('id="hero-workflow"');
+    expect(hero).toContain("data-hero-workflow");
+    expect(landing).not.toContain("WorkspaceScene");
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.tsx"))).toBe(false);
   });
 
   it("switches header tone at the actual pricing, faq, and closing surfaces", () => {
@@ -229,7 +226,10 @@ describe("polished unified landing visual contract", () => {
     expect(productionAudit).toContain('async function revealAllMotionSections');
     expect(productionAudit).toContain('[data-motion-reveal="section"]');
     expect(productionAudit).toContain('data-motion-state');
-    expect(productionAudit).not.toContain('#scene-signal-timeline');
+    // PART 2: the audit now pins the hero demo and the signal timeline as the
+    // required example/navigation anchors (replacing the retired workspace).
+    expect(productionAudit).toContain('#hero-workflow');
+    expect(productionAudit).toContain('#scene-signal-timeline');
     expect(productionAudit).toContain('pending motion sections');
     expect(productionAudit).not.toContain("surfaceSpecs");
   });
@@ -239,7 +239,7 @@ describe("polished unified landing visual contract", () => {
     const offerAlias = source("app/offer/page.tsx");
 
     expect(footer).not.toContain('href: "/#scene-timeline"');
-    expect(footer).toContain('href: "/#scene-workspace"');
+    expect(footer).not.toContain('href: "/#scene-workspace"');
     expect(footer).toContain('href: "/#scene-evidence"');
     expect(footer).not.toContain('href: "/#scene-delivery"');
     expect(footer).not.toContain('href: "/#scene-outreach"');

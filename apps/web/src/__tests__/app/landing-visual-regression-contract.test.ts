@@ -25,12 +25,11 @@ describe("landing visual regression contract", () => {
     expect(timeline).toContain("Решение остаётся за вами");
   });
 
-  it("keeps the static product story on the canonical scene stylesheet", () => {
-    const workspace = source("app/landing/workspace-scene.tsx");
+  it("keeps the hero demo as the single interactive example on the landing", () => {
+    const landing = source("app/landing/landing-page.tsx");
 
-    expect(workspace).toContain('className={sceneStyles.productFrame}');
-    expect(workspace).toContain('className={sceneStyles.checkout}');
-    expect(workspace).not.toContain("styles.workspaceProductFrame");
-    expect(workspace).not.toContain("styles.workspaceCheckout");
+    expect(landing).not.toContain("WorkspaceScene");
+    expect(landing).not.toContain("<HeroProductPreview");
+    expect(source("app/landing/detection-scene.tsx")).toContain("<HeroProductPreview />");
   });
 });

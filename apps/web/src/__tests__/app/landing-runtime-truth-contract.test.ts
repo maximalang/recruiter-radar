@@ -100,15 +100,15 @@ describe("landing runtime truth contract", () => {
   });
 
   test("public preview keeps the honest demo labeling without live-data claims", () => {
-    const workspace = webSource("app/landing/workspace-scene.tsx");
+    const heroPreview = webSource("app/landing/hero-product-preview.tsx");
     const previewRelevance = webSource("lib/preview-relevance.ts");
 
     expect(previewRelevance).toContain("not an output of the production FIUR engine");
-    expect(workspace).toContain("Обезличенный пример");
-    expect(workspace).toContain("логика приоритета и типы источников сохранены");
-    expect(workspace).toContain("getStaticDemoDigestItems");
-    expect(workspace).not.toContain("тот же алгоритм");
-    expect(workspace).not.toContain("production FIUR");
-    expect(workspace).not.toContain("свежие данные");
+    // Single example (PART 2): the hero demo shows product benefits only —
+    // no real/demo company data and no live/production scoring claims.
+    expect(heroPreview).not.toContain("тот же алгоритм");
+    expect(heroPreview).not.toContain("production FIUR");
+    expect(heroPreview).not.toContain("свежие данные");
+    expect(heroPreview).not.toMatch(/Промет|Северные системы|Техноформ/);
   });
 });

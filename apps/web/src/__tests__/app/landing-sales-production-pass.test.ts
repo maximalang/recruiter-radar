@@ -36,13 +36,12 @@ describe("landing sales production pass", () => {
     expect(runbook).not.toContain("| Месяц | 30 дней | 9 990 ₽ | Нет |");
   });
 
-  it("focuses the static story on the top-ranked visible lead and discloses the rest", () => {
-    const workspace = source("app/landing/workspace-scene.tsx");
-    const list = source("app/landing/workspace-lead-list.tsx");
-    expect(workspace).toContain("const visibleItems = demoItems.slice(0, 5)");
-    expect(workspace).toContain("defaultOpen={index === 0}");
-    expect(list).toContain("const defaultVisible = mobileEnhanced ? 2 : 4");
-    expect(list).toContain("Показать ещё");
+  it("keeps the hero demo focused on the workflow with the first stage open", () => {
+    const hero = source("app/landing/hero-product-preview.tsx");
+    expect(hero).toContain("const [stage, setStage] = useState<Stage>(1);");
+    expect(hero).toContain('role="tablist"');
+    expect(hero).toContain('id="hero-workflow-panel"');
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.tsx"))).toBe(false);
   });
 
   it("keeps the pricing hierarchy and closing trust points concise", () => {

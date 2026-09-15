@@ -43,9 +43,8 @@ const viewportMatrix = [
 
 const requiredSelectors = [
   "#scene-detection",
-  "#scene-workspace",
-  "#preview-configurator",
-  "#preview-results",
+  "#hero-workflow",
+  "#scene-signal-timeline",
   "#scene-evidence",
   "#scene-delivery",
   "#pricing",
@@ -54,9 +53,8 @@ const requiredSelectors = [
 ];
 
 const hashSpecs = [
-  { name: "hash-workspace-1440x900", hash: "scene-workspace", target: "#scene-workspace" },
-  { name: "hash-preview-configurator-1440x900", hash: "preview-configurator", target: "#preview-configurator" },
-  { name: "hash-preview-results-1440x900", hash: "preview-results", target: "#preview-results" },
+  { name: "hash-hero-workflow-1440x900", hash: "hero-workflow", target: "#hero-workflow" },
+  { name: "hash-signal-timeline-1440x900", hash: "scene-signal-timeline", target: "#scene-signal-timeline" },
   { name: "hash-evidence-1440x900", hash: "scene-evidence", target: "#scene-evidence" },
   { name: "hash-delivery-1440x900", hash: "scene-delivery", target: "#scene-delivery" },
   { name: "hash-pricing-1440x900", hash: "pricing", target: "#pricing" },
@@ -107,10 +105,7 @@ async function waitForLanding(page) {
     throw new Error("LANDING_AUDIT_MODE=disabled requires an analytics-disabled production bundle (rebuild without NEXT_PUBLIC_YANDEX_METRIKA_ID)");
   }
   await page.locator("#scene-detection").waitFor({ state: "visible" });
-  await page.locator("#preview-configurator").waitFor({ state: "attached" });
-  await page.locator("#preview-results[data-preview-results-ready]")
-    .first()
-    .waitFor({ state: "attached" });
+  await page.locator("#hero-workflow").waitFor({ state: "attached" });
   await page.waitForFunction(
     () => document.readyState === "complete"
       && Array.from(document.querySelectorAll("script"))
@@ -157,7 +152,7 @@ async function assertRequiredSurface(page, label) {
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
   assert.match(await page.locator("h1").innerText(), /От сигнала до сообщения/);
-  assert.match(await page.locator("#scene-workspace").innerText(), /пример выдачи · демо-сценарий|обезличенный пример/i);
+  assert.match(await page.locator("#hero-workflow").innerText(), /Интерактивный workflow/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
   assert.ok(await page.locator("#scene-evidence [data-proof-event]").count() >= 3);
@@ -230,8 +225,6 @@ async function assertNoOverlapOrClipping(page, label) {
       "#scene-detection h1",
       "#scene-detection figure",
       "#scene-detection article",
-      "#preview-configurator",
-      "#preview-results",
       "#scene-evidence",
       "#scene-evidence [data-proof-brief] *",
       "#scene-delivery",
@@ -259,7 +252,6 @@ async function assertKeyHeadingBounds(page, label) {
   const issues = await page.evaluate(() => {
     const selectors = [
       "#scene-detection h1",
-      "#scene-workspace h2",
       "#scene-evidence h2",
       "#scene-delivery h2",
       "#pricing h2",
@@ -473,11 +465,6 @@ async function assertHashNavigation(browser, spec) {
   const { page, assertCleanConsole } = await preparePage(context, spec.name, `${baseUrl}/#${spec.hash}`);
   const target = page.locator(spec.target).first();
   await target.waitFor({ state: "attached" });
-  if (spec.target === "#preview-results") {
-    await page.locator("#preview-results[data-preview-results-ready], #preview-results[data-preview-results-skeleton]")
-      .first()
-      .waitFor({ state: "attached" });
-  }
   await page.waitForTimeout(160);
   const firstPosition = await target.evaluate((element) => {
     const header = document.querySelector("header");
@@ -495,16 +482,16 @@ async function assertHashNavigation(browser, spec) {
 
 async function assertHistoryNavigation(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const { page, assertCleanConsole } = await preparePage(context, "hash-history", `${baseUrl}/#scene-workspace`);
+  const { page, assertCleanConsole } = await preparePage(context, "hash-history", `${baseUrl}/#scene-signal-timeline`);
   await page.evaluate(() => {
     window.location.hash = "scene-evidence";
   });
   await page.waitForURL(/#scene-evidence$/);
   await Promise.all([
-    page.waitForURL(/#scene-workspace$/),
+    page.waitForURL(/#scene-signal-timeline$/),
     page.goBack(),
   ]);
-  assert.match(page.url(), /#scene-workspace$/);
+  assert.match(page.url(), /#scene-signal-timeline$/);
   await Promise.all([
     page.waitForURL(/#scene-evidence$/),
     page.goForward(),
@@ -586,13 +573,13 @@ async function assertActiveNavigationAndTone(browser) {
   assert.equal(await activeLink.count(), 0, "header: active section must clear after returning to hero");
 
   await page.evaluate(() => {
-    window.location.hash = "preview-configurator";
+    window.location.hash = "scene-evidence";
   });
-  await page.waitForURL(/#preview-configurator$/);
-  await page.waitForFunction(() => /Пример/.test(
+  await page.waitForURL(/#scene-evidence$/);
+  await page.waitForFunction(() => /Как работает/.test(
     document.querySelector('header[data-brand-header="recruiter-radar"] a[aria-current="location"]')?.textContent ?? "",
   ));
-  assert.match(await activeLink.first().innerText(), /Пример/, "header: hash navigation must not retain stale FAQ state");
+  assert.match(await activeLink.first().innerText(), /Как работает/, "header: hash navigation must not retain stale FAQ state");
 
   await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
   await page.evaluate(() => {
