@@ -171,6 +171,7 @@ export default function HeroProductPreview() {
     <figure
       id="hero-workflow"
       className={sceneStyles.productShot}
+      style={{ scrollMarginTop: "calc(72px + 32px)" }}
       data-hero-product-preview="workflow"
       data-hero-workflow
       data-active-page={page}
