@@ -27,7 +27,10 @@ const viewports = [
 const focusedSurfaces = [
   { name: "hero", selector: "#scene-detection" },
   { name: "timeline", selector: "#scene-signal-timeline" },
-  { name: "preview", selector: '#scene-workspace [data-product-preview="static-story"]' },
+  // Surface name stays "preview": the pre-218 integrity guard compares
+  // `${viewport}-preview.png` against this restored directory, and the
+  // historical baseline capture keeps its own workspace-scene selector.
+  { name: "preview", selector: "#hero-workflow" },
   { name: "proof", selector: "#scene-evidence" },
   { name: "delivery", selector: "#scene-delivery" },
   { name: "pricing", selector: "#pricing" },
@@ -74,14 +77,6 @@ async function resetInteractionState(page) {
     });
   });
 
-  const mobileDisclosure = page.locator('[data-mobile-lead-disclosure="true"]');
-  if (await mobileDisclosure.count() === 1 && await mobileDisclosure.getAttribute("aria-expanded") === "true") {
-    await mobileDisclosure.click();
-    await page.waitForFunction(() => (
-      document.querySelector('[data-mobile-lead-disclosure="true"]')?.getAttribute("aria-expanded") === "false"
-    ));
-  }
-
   await page.evaluate(() => {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     window.scrollTo(0, 0);
@@ -120,7 +115,7 @@ async function preparePage(context, targetUrl = baseUrl) {
   // masking genuinely pending requests.
   await page.locator('[data-landing-experience="signal-lock"]').waitFor({ state: "attached" });
   await page.locator("#scene-detection").waitFor({ state: "visible" });
-  await page.locator("#preview-results").waitFor({ state: "attached" });
+  await page.locator("#hero-workflow").waitFor({ state: "attached" });
   await page.waitForFunction(
     () => document.readyState === "complete"
       && Array.from(document.querySelectorAll("script"))
@@ -219,7 +214,7 @@ async function captureHeaderEvidence(page, viewportName) {
   }
 
   if (viewportName === "1440x900") {
-    await scrollSectionUnderHeader(page, "#scene-workspace");
+    await scrollSectionUnderHeader(page, "#hero-workflow");
     await movePointerToNeutral(page);
     await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
     let fileName = `${viewportName}-header-preview.png`;
