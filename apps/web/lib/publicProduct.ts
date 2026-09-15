@@ -186,7 +186,7 @@ export function buildPublicPreviewHref(input: PublicPreviewHrefInput): string {
   appendPublicPreviewParams(params, input)
   const query = params.toString()
 
-  return query === "" ? "/#preview-configurator" : `/?${query}#preview-configurator`
+  return query === "" ? "/#hero-workflow" : `/?${query}#hero-workflow`
 }
 
 export function readPublicPreviewInput(searchParams: Record<string, string | string[] | undefined>): PublicPreviewInput {

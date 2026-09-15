@@ -33,14 +33,10 @@
   border-radius: var(--radius-control);
 }
 
-.visualSystem :global([data-preview-configurator] button),
 .visualSystem :global([data-pricing-primary] > a) {
   min-height: 44px;
   border-radius: var(--radius-control);
 }
-
-.visualSystem :global([data-preview-results] article) { box-shadow: none; }
-.visualSystem :global([data-preview-results] [data-lead-score]) { font-variant-numeric: tabular-nums; }
 
 .visualSystem :global(footer) {
   border-top: 1px solid var(--color-separator);

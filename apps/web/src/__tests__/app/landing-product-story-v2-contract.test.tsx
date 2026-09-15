@@ -29,7 +29,7 @@ function feedbackActionsFromSource(contents: string): Array<[string, string]> {
 describe("landing product story v2", () => {
   it("opens with a clear buyer outcome and a believable product workspace", () => {
     const hero = renderToStaticMarkup(
-      <DetectionScene previewHref="#preview-configurator" paymentConfigured={false} />,
+      <DetectionScene paymentConfigured={false} />,
     );
     const preview = renderToStaticMarkup(<HeroProductPreview />);
     const heroText = visibleText(hero);
@@ -78,7 +78,7 @@ describe("landing product story v2", () => {
 
   it("applies the premium C1 tone, product hierarchy and narrow-screen contract", () => {
     const hero = renderToStaticMarkup(
-      <DetectionScene previewHref="#preview-configurator" paymentConfigured={false} />,
+      <DetectionScene paymentConfigured={false} />,
     );
     const preview = renderToStaticMarkup(<HeroProductPreview />);
     const previewText = visibleText(preview);
@@ -138,7 +138,6 @@ describe("landing product story v2", () => {
     const order = [
       "<DetectionScene",
       "<SignalTimeline",
-      "<WorkspaceScene",
       "<EvidenceScene",
       "<DeliveryScene",
       "<ConversionPanel",
@@ -185,32 +184,14 @@ describe("landing product story v2", () => {
     );
   });
 
-  it("frames the static story as one paper product with an evidence-first selected lead", () => {
-    const workspaceCss = source("app/landing/workspace-scene.module.css");
-
-    expect(workspaceCss).toMatch(/--workspace-paper:\s*var\(--landing-paper\)/);
-    expect(workspaceCss).toMatch(/--workspace-ink:\s*var\(--landing-ink\)/);
-    expect(workspaceCss).toMatch(/--workspace-accent:\s*var\(--landing-accent\)/);
-    expect(workspaceCss).not.toMatch(/gradient\(/);
-    expect(workspaceCss).toMatch(
-      /\.leadPrimary\s*\{[^}]*border-left:\s*3px solid var\(--workspace-accent\)/,
-    );
-    expect(workspaceCss).toMatch(
-      /\.evidenceBlock li\s*\{[^}]*border-bottom:\s*1px solid var\(--workspace-line\)[^}]*background:\s*transparent/,
-    );
-    expect(workspaceCss).toMatch(
-      /\.nextMove\s*\{[^}]*border-top:\s*2px solid var\(--workspace-accent\)/,
-    );
-    expect(workspaceCss).not.toContain(".storyPath");
-    expect(workspaceCss).not.toContain(".storyStep");
-    expect(workspaceCss).not.toContain(".sourceBadges");
-    expect(workspaceCss).toMatch(/@media \(max-width: 400px\)/);
-    expect(workspaceCss).toMatch(
-      /\.leadRow:focus-visible,[\s\S]*?outline:\s*3px solid var\(--workspace-accent\)/,
-    );
-    expect(workspaceCss).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?transition:\s*none\s*!important/,
-    );
+  it("retires the static workspace story in favor of the hero demo", () => {
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.tsx"))).toBe(false);
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.module.css"))).toBe(false);
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-lead.tsx"))).toBe(false);
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-lead-list.tsx"))).toBe(false);
+    expect(source("app/landing/landing-page.tsx")).not.toContain("WorkspaceScene");
+    expect(source("app/landing/landing-copy.ts")).not.toContain("scene-workspace");
+    expect(source("app/ui/site-footer.tsx")).not.toContain("scene-workspace");
   });
 
   it("presents one light evidence ledger with proof before the manual resolution", () => {
@@ -276,17 +257,10 @@ describe("landing product story v2", () => {
   });
 
   it("keeps the mobile interactive example concise without hiding the primary proof", () => {
-    const workspace = source("app/landing/workspace-scene.tsx");
-    const leadList = source("app/landing/workspace-lead-list.tsx");
-    const workspaceCss = source("app/landing/workspace-scene.module.css");
     const detectionCss = source("app/landing/detection-scene.module.css");
     const deliveryCss = source("app/landing/delivery-scene.module.css");
 
-    expect(workspace).toContain("Пример выдачи · демо-сценарий");
-    expect(leadList).toContain("mobileEnhanced ? 2 : 4");
-    expect(workspaceCss).toMatch(/\.outcomeMeta:nth-child\(2\)\s*\{\s*display:\s*none;/);
-    expect(workspaceCss).toContain(".evidenceBlock li");
-    expect(workspaceCss).toContain(".nextMove");
+    expect(source("app/landing/hero-product-preview.tsx")).toContain('id="hero-workflow"');
     expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.workflowTabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)/);
     expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.workflowTabs > button\s*\{[^}]*min-height:\s*64px/);
     expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.productShot[^}]*transform:\s*none/);

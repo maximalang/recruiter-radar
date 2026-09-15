@@ -114,7 +114,6 @@ describe("landing final production contract", () => {
     const cadenceFiles = [
       source("app/landing/detection-scene.tsx"),
       source("app/landing/conversion-panel.tsx"),
-      source("app/landing/workspace-scene.tsx"),
       source("app/landing/hero-product-preview.tsx"),
       source("app/home-page-content.tsx"),
       source("app/api/telegram/webhook/route.ts"),
@@ -162,7 +161,6 @@ describe("landing final production contract", () => {
     // every dated event is anchored to the fixed scenario (12 мая 2026).
     const relativeFreshnessFiles = [
       source("app/landing/signal-timeline.tsx"),
-      source("app/landing/workspace-scene.tsx"),
       source("app/landing/evidence-scene.tsx"),
       source("app/landing/hero-product-preview.tsx"),
       source("app/landing/detection-scene.tsx"),

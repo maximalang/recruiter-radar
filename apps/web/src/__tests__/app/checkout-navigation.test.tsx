@@ -84,7 +84,7 @@ describe("checkout navigation", () => {
     const url = new URL(backLink.props.href, "https://radar.example");
 
     expect(url.pathname).toBe("/");
-    expect(url.hash).toBe("#preview-configurator");
+    expect(url.hash).toBe("#hero-workflow");
     expect(url.searchParams.get("specialization")).toBe("инженерный подбор");
     expect(url.searchParams.get("targetCity")).toBe("Москва");
     expect(url.searchParams.has("plan")).toBe(false);

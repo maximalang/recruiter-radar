@@ -151,7 +151,7 @@ export default function ConversionPanel(props: {
           >
             {props.paymentConfigured ? `Запустить на 7 дней — ${pilotPlan.price}` : "Оставить заявку на пилот"} <ArrowGlyph />
           </Link>
-          <a className={panelStyles.finalSecondaryLink} href="#preview-configurator">Сначала посмотреть пример</a>
+          <a className={panelStyles.finalSecondaryLink} href="#hero-workflow">Сначала посмотреть пример</a>
         </div>
       </div>
     </section>

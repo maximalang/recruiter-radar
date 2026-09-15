@@ -5,20 +5,20 @@ import { existsSync, readFileSync } from "node:fs";
 import { PassThrough } from "node:stream";
 import { resolve } from "node:path";
 
-import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/home-page-content";
+import HomePage from "@/app/home-page-content";
 import ConversionPanel from "@/app/landing/conversion-panel";
 import DeliveryScene from "@/app/landing/delivery-scene";
 import DetectionScene from "@/app/landing/detection-scene";
 import EvidenceScene from "@/app/landing/evidence-scene";
+import HeroProductPreview from "@/app/landing/hero-product-preview";
 import LandingHeader from "@/app/landing/landing-header";
-import WorkspaceScene from "@/app/landing/workspace-scene";
 import { SiteFooter } from "@/app/ui/site-footer";
 import {
   LANDING_ANALYTICS_CONTEXT,
   LANDING_ANALYTICS_EVENT,
 } from "@/lib/landing-analytics-contract";
 import {
-  buildCheckoutHref,
+  buildPublicPreviewHref,
   hasPublicPreviewInput,
   readPublicPreviewInput,
 } from "@/lib/publicProduct";
@@ -93,11 +93,10 @@ function source(path: string) {
 }
 
 describe("final unified evidence-first landing contract", () => {
-  it("keeps the required scene order and conversion outside workspace suspense", async () => {
+  it("keeps the required scene order with the hero demo as the single example", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     expect(collectElements(page, LandingHeader)).toHaveLength(1);
     expect(collectElements(page, DetectionScene)).toHaveLength(1);
-    expect(collectElements(page, WorkspaceScene)).toHaveLength(1);
     expect(collectElements(page, EvidenceScene)).toHaveLength(1);
     expect(collectElements(page, DeliveryScene)).toHaveLength(1);
     expect(collectElements(page, ConversionPanel)).toHaveLength(1);
@@ -106,7 +105,7 @@ describe("final unified evidence-first landing contract", () => {
     const landing = source("app/landing/landing-page.tsx");
     const expectedOrder = [
       "<DetectionScene",
-      "<WorkspaceScene",
+      "<SignalTimeline",
       "<EvidenceScene",
       "<DeliveryScene",
       "<ConversionPanel",
@@ -118,59 +117,50 @@ describe("final unified evidence-first landing contract", () => {
       expect(next).toBeGreaterThan(cursor);
       cursor = next;
     }
+    expect(landing).not.toContain("<WorkspaceScene");
     expect(landing).not.toContain("<Suspense");
   });
 
-  it("keeps the static product story fully synchronous", () => {
-    const workspace = source("app/landing/workspace-scene.tsx");
-    expect(workspace).toContain("export default function WorkspaceScene");
-    expect(workspace).toContain("function WorkspaceIntro");
-    expect(workspace).toContain("getStaticDemoDigestItems()");
-    expect(workspace).not.toContain("<Suspense");
-    expect(workspace).not.toContain("getPublicSampleDigestState(");
-    expect(workspace).not.toContain("PreviewConfigurator");
-    expect(workspace).not.toContain("data-preview-form");
+  it("keeps the hero workflow demo as the single example surface", () => {
+    const hero = source("app/landing/hero-product-preview.tsx");
+    expect(hero).toContain('id="hero-workflow"');
+    expect(hero).toContain("data-hero-workflow");
+    expect(hero).not.toContain("getStaticDemoDigestItems");
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.tsx"))).toBe(false);
+    expect(existsSync(resolve(WEB_ROOT, "app/landing-preview-interactions.tsx"))).toBe(false);
   });
 
-  it("renders the static product story with stable anchors and no form", () => {
-    const input = readPublicPreviewInput({ specialization: "инженерный подбор" });
-    const preview = PreviewSection({
-      previewInput: input,
-      hasPreview: hasPublicPreviewInput(input),
-      checkoutHref: buildCheckoutHref(input),
-    });
-    expect(preview.type).toBe(WorkspaceScene);
+  it("points every public example anchor at the hero workflow", () => {
+    const detection = source("app/landing/detection-scene.tsx");
+    const landing = source("app/landing/landing-page.tsx");
+    const header = source("app/landing/landing-header.tsx");
 
-    const workspace = source("app/landing/workspace-scene.tsx");
-    expect(workspace).toContain('id="preview-configurator"');
-    expect(workspace).toContain('id="preview-results"');
-    expect(workspace).toContain("data-preview-results-ready");
-    expect(workspace).not.toContain("data-story-path");
-    expect(workspace).not.toContain("data-source-badges");
-    expect(workspace).not.toContain('action="/#preview-results"');
-    expect(workspace).not.toContain("data-preview-form");
+    expect(detection).toContain('href="#hero-workflow"');
+    expect(landing).toContain('<LandingHeader previewHref="#hero-workflow" />');
+    expect(landing).not.toContain("preview-configurator");
+    expect(landing).not.toContain("preview-results");
+    expect(header).toContain("Посмотреть пример");
 
-    const skeleton = renderToStaticMarkup(<PreviewSkeleton />);
-    expect(skeleton).toContain('id="preview-results"');
-    expect(skeleton).toContain("data-preview-results-skeleton");
-    expect(skeleton).toContain('aria-busy="true"');
+    // Checkout return links keep the filters and land on the single example.
+    const href = buildPublicPreviewHref(readPublicPreviewInput({ specialization: "инженерный подбор" }));
+    expect(new URL(href, "https://radar.example").hash).toBe("#hero-workflow");
   });
 
-  it("keeps checkout analytics on the static story product footer", () => {
-    const checkoutHref = buildCheckoutHref(readPublicPreviewInput({}));
-    const markup = renderToStaticMarkup(<WorkspaceScene checkoutHref={checkoutHref} />);
+  it("keeps checkout analytics on the pilot pricing CTA", () => {
+    const markup = renderToStaticMarkup(
+      <ConversionPanel
+        previewInput={readPublicPreviewInput({})}
+        paymentConfigured
+        faqItems={[]}
+      />,
+    );
 
-    expect(markup).toContain('id="preview-results"');
-    expect(markup).toContain("data-preview-results-ready");
-    expect(markup).toContain(`href="${checkoutHref.replaceAll("&", "&amp;")}"`);
     expect(markup).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.checkoutStarted}"`);
-    expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.preview}"`);
-    expect(markup).toContain("Запустить радар на 7 дней");
-    expect(markup).toContain("7 дней · без автопродления");
-    expect(source("app/landing/workspace-scene.module.css")).toMatch(/\.checkout\s*\{[\s\S]*?min-height:\s*52px/);
+    expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.pricingPilot}"`);
+    expect(markup).toContain('href="#hero-workflow"');
   });
 
-  it("streams the complete landing composition with the static story", async () => {
+  it("streams the complete landing composition with the hero demo", async () => {
     const page = await HomePage({
       searchParams: Promise.resolve({ specialization: "инженерный подбор", targetCity: "Москва" }),
     });
@@ -180,11 +170,11 @@ describe("final unified evidence-first landing contract", () => {
     const footerSource = source("app/ui/site-footer.tsx");
     const offerAliasSource = source("app/offer/page.tsx");
 
-    expect(html).toContain('id="scene-workspace"');
-    expect(html).toContain("Пример выдачи · демо-сценарий");
-    expect(html).toContain("Обезличенный пример.");
-    expect(html).toContain('id="preview-configurator"');
-    expect(html).toContain('id="preview-results"');
+    expect(html).toContain('id="hero-workflow"');
+    expect(html).toContain("Интерактивный workflow");
+    expect(html).not.toContain('id="scene-workspace"');
+    expect(html).not.toContain('id="preview-configurator"');
+    expect(html).not.toContain('id="preview-results"');
     expect(html).not.toContain("data-story-path");
     expect(html).not.toContain("data-source-badges");
     expect(html).not.toContain("data-preview-form");
@@ -194,7 +184,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).not.toContain('id="scene-timeline"');
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
-    expect(html).toContain("Так радар ведёт компанию от сигнала до вашего решения");
+    expect(html).toContain("Радар находит повод. Пишете вы.");
     expect(footerSource).toContain('href="/legal"');
     expect(footerSource).toContain('href="/terms"');
     expect(footerSource).toContain('href="/payment-and-refund"');
@@ -206,19 +196,19 @@ describe("final unified evidence-first landing contract", () => {
     expect(footerSource).toContain("Recruiter Radar");
   });
 
-  it("renders an evidence-backed lead list with one expanded recommendation", () => {
-    const panel = renderToStaticMarkup(<WorkspaceScene checkoutHref="/checkout?plan=weekly" />);
-    const markup = panel;
-    expect(markup.match(/data-lead-row="true"/g)).toHaveLength(4);
-    expect(markup.match(/data-primary-lead="true"/g)).toHaveLength(1);
-    expect(markup.match(/data-selected-lead-detail/g)).toHaveLength(1);
-    expect(markup).toContain("Почему сейчас");
-    expect(markup).toContain("Подтверждения и источники");
-    expect(markup).toContain("Сообщения не отправляются автоматически");
+  it("renders the hero workflow demo with the four product stages", () => {
+    const markup = renderToStaticMarkup(<HeroProductPreview />);
+    expect(markup).toContain('role="tablist"');
+    expect(markup.match(/role="tab"/g)).toHaveLength(4);
+    expect(markup).toContain("Настройте рынок");
+    expect(markup).toContain("Радар проверяет");
+    expect(markup).toContain("Получите повод");
+    expect(markup).toContain("Подготовьте сообщение");
+    expect(markup).not.toContain("data-lead-row");
   });
 
-  it("keeps the hero example CTA and trust copy static-story aware", () => {
-    const hero = renderToStaticMarkup(<DetectionScene previewHref="#preview-configurator" paymentConfigured={false} />);
+  it("keeps the hero example CTA and trust copy single-demo aware", () => {
+    const hero = renderToStaticMarkup(<DetectionScene paymentConfigured={false} />);
     const evidence = renderToStaticMarkup(<EvidenceScene />);
     const delivery = renderToStaticMarkup(<DeliveryScene />);
 
