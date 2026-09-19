@@ -63,7 +63,10 @@ describe("landing hero advertising workflow", () => {
     expect(css).toMatch(/\.fieldFigure:focus-within\s+\.productShot/);
     expect(css).toMatch(/\.section:has\(\.fieldFigure:focus-within\) \.copy/);
     expect(css).toMatch(/\.section:has\(\.fieldFigure:hover\) \.copy/);
-    expect(css).toMatch(/opacity:\s*\.28/);
+    // The dim floor is .9: below that the receding hero copy drops under
+    // WCAG AA 4.5:1 on the inverse surface (design spec §2.3 hover-defect rule).
+    expect(css).toMatch(/opacity:\s*\.9\s*;/);
+    expect(css).not.toMatch(/opacity:\s*\.(?:0|1?[0-8])\d*\s*;/);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?transition:\s*none/);
   });
 

@@ -22,15 +22,16 @@
 }
 
 /* Expanded workflow becomes the temporary focus of the frame (Accio pattern):
- * the dimmed hero makes the overlap read as an intentional overlay, not a
- * layout collision. Hover variant stays behind the pointer capability gate. */
+ * the copy recedes only slightly — WCAG AA caps the dim at opacity .9 so every
+ * layer keeps ≥4.5:1 on the inverse surface (design spec §2.3 hover-defect
+ * rule; QA t_86dbd5c0 measured 2.06:1 at the previous value). */
 .section:has(.fieldFigure:focus-within) .copy {
-  opacity: .28;
+  opacity: .9;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .section:has(.fieldFigure:hover) .copy {
-    opacity: .28;
+    opacity: .9;
   }
 }
 
