@@ -2,7 +2,7 @@
   --color-canvas: #ece9e1;
   --color-surface-primary: #f8f6f0;
   --color-surface-secondary: #f1eee6;
-  --color-surface-selected: #e4efeb;
+  --color-surface-selected: #F3EAD8;
   --color-surface-elevated: #fffdf8;
 
   --color-text-primary: #14201c;
@@ -15,23 +15,23 @@
   --color-separator: #d7d6cf;
   --color-separator-strong: #b7bcb8;
 
-  --color-signal: #2f7467;
-  --color-signal-hover: #245b51;
-  --color-signal-soft: #e4efeb;
-  --color-signal-on-dark: #8fc7b8;
+  --color-signal: #6E5220;
+  --color-signal-hover: #5C431A;
+  --color-signal-soft: #F3EAD8;
+  --color-signal-on-dark: #D8BC82;
   --color-copper: #8e5d42;
 
-  --color-positive: #2e6b4d;
+  --color-positive: #3F5C33;
   --color-warning: #8a5a1f;
   --color-destructive: #a33d36;
   --color-information: #3f687a;
 
-  --color-confidence-high: #416f5c;
+  --color-confidence-high: #6E5220;
   --color-confidence-medium: #75663d;
   --color-confidence-low: #707975;
 
-  --color-focus: #1e6d60;
-  --color-selection: #d5e7e1;
+  --color-focus: #6E5220;
+  --color-selection: #F3EAD8;
   --color-overlay: rgba(14, 21, 19, 0.52);
 
   --font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
