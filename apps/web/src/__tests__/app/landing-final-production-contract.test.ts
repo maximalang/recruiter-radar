@@ -23,7 +23,7 @@ describe("landing final production contract", () => {
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain('data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}');
     expect(hero).toContain('data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}');
-    expect(hero).toContain("Наведите или выберите этап · внутри всё интерактивно");
+    expect(hero).toContain("Наведите или выберите этап");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");

@@ -1,7 +1,8 @@
 /* Stage 1/2: compact dark consent dialog. Deepened dark+green identity:
  * near-black green canvas, inverse text, signal-on-dark primary action that
  * reads as a button (contrasting fill + border). Legal copy lives in
- * yandex-metrika.tsx and is untouched. */
+ * yandex-metrika.tsx and is untouched. Owner verdict 23.09: keep it visually
+ * quiet and corner-anchored so it never covers the hero on phones. */
 .dialog {
   position: fixed;
   z-index: 1000;
@@ -9,13 +10,11 @@
   bottom: max(12px, env(safe-area-inset-bottom));
   left: max(12px, env(safe-area-inset-left));
   display: flex;
-  max-width: 680px;
-  margin: 0 auto;
+  max-width: 420px;
+  margin: 0 0 0 auto;
   padding: 10px 12px;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 16px;
+  flex-direction: column;
+  gap: 8px;
   border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 24%, transparent);
   border-radius: var(--radius-surface);
   background: color-mix(in srgb, var(--color-text-primary) 94%, var(--color-signal) 6%);
@@ -26,19 +25,18 @@
 
 .copy {
   display: grid;
-  flex: 1 1 420px;
   gap: 4px;
 }
 
 .title {
   color: var(--color-text-inverse);
-  font-size: .9rem;
+  font-size: .84rem;
 }
 
 .text {
   color: color-mix(in srgb, var(--color-text-inverse) 76%, transparent);
-  font-size: .8rem;
-  line-height: 1.5;
+  font-size: .74rem;
+  line-height: 1.45;
 }
 
 .link {
@@ -53,8 +51,6 @@
 
 .actions {
   display: flex;
-  flex: 0 1 auto;
-  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
 }
@@ -114,8 +110,9 @@
 
 @media (max-width: 620px) {
   .dialog {
-    padding: 12px;
-    gap: 10px;
+    max-width: none;
+    padding: 10px 12px;
+    gap: 8px;
   }
 
   .actions {
@@ -125,7 +122,7 @@
 
   .primaryButton,
   .secondaryButton {
-    flex: 1 1 11rem;
+    flex: 1 1 0;
   }
 }
 

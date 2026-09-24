@@ -263,7 +263,7 @@ export default function HeroProductPreview() {
                   </button>
                 </aside>
               </article>
-              <p className={sceneStyles.autoHint}>Следующий этап откроется автоматически через 8 секунд · выбор этапа перезапускает таймер</p>
+              <p className={sceneStyles.autoHint}>Этап сменится автоматически через 8 секунд · клик перезапускает таймер</p>
             </div>
           ) : (
             <article className={sceneStyles.infoPage} aria-live="polite">

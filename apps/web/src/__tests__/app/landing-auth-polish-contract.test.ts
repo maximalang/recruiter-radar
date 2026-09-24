@@ -67,7 +67,9 @@ describe("landing visual and login reliability polish", () => {
     expect(accessibilityAudit).toContain("Header BrandLogo");
     expect(accessibilityAudit).toContain("Header nav");
     expect(accessibilityAudit).toContain("Header login");
-    expect(accessibilityAudit).toContain("Header preview CTA");
+    // The duplicated header preview CTA is retired (owner verdict 23.09):
+    // the hero workflow CTA is the single path to the example.
+    expect(accessibilityAudit).not.toContain("Header preview CTA");
     expect(accessibilityAudit).toContain("Header menu glyph");
     expect(accessibilityAudit).toContain("Header menu focus");
     expect(accessibilityAudit).toContain('Hero top`, "light"');

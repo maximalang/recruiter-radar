@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import { BrandLogo } from "../ui/brand-logo";
-import { ArrowGlyph } from "./brand-glyphs";
 import headerStyles from "./landing-header.module.css";
 import { LANDING_NAV_ITEMS } from "./landing-copy";
 import styles from "./landing.module.css";
@@ -22,7 +20,7 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
-export default function LandingHeader({ previewHref }: { previewHref: string }) {
+export default function LandingHeader() {
   const [activeId, setActiveId] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [tone, setTone] = useState<HeaderTone>("dark");
@@ -200,14 +198,6 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
 
         <div className={headerStyles.actions}>
           <Link href={LOGIN_HREF} className={headerStyles.login}>Войти</Link>
-          <a
-            href={previewHref}
-            className={headerStyles.cta}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
-            data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
-          >
-            Посмотреть пример <ArrowGlyph />
-          </a>
           <button
             ref={menuButtonRef}
             type="button"
@@ -237,14 +227,6 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
         </nav>
         <div className={headerStyles.mobileActions}>
           <Link href={LOGIN_HREF} onClick={() => closeMenu(false)}>Войти</Link>
-          <a
-            href={previewHref}
-            onClick={() => closeMenu(false)}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
-            data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
-          >
-            Посмотреть пример <ArrowGlyph />
-          </a>
         </div>
       </div>
     </header>
