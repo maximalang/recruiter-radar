@@ -94,10 +94,9 @@
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  border: 1px solid var(--color-separator);
-  border-radius: var(--radius-overlay);
+  border: 1px solid var(--color-separator-subtle);
+  border-radius: 0;
   background: var(--color-canvas);
-  box-shadow: var(--shadow-overlay);
   color: var(--color-text-primary);
   text-align: left;
 }
@@ -109,23 +108,20 @@
   gap: .65rem;
   padding: 0 1rem;
   border-bottom: 1px solid var(--color-separator-subtle);
-  background: var(--color-surface-primary);
+  background: transparent;
 }
 .shotMark { display: grid; width: 1.55rem; height: 1.55rem; place-items: center; border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 45%, transparent); border-radius: var(--radius-control); color: var(--color-signal-on-dark); font: 700 .53rem var(--font-mono); }
 .shotBar strong { font-size: .72rem; font-weight: 610; }
 .shotMode { margin-left: auto; color: var(--color-text-secondary); font: .68rem var(--font-sans); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 
-.shotBody { display: grid; min-height: 35rem; grid-template-columns: 11rem minmax(0,1fr); }
-.shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .8rem; border-right: 1px solid var(--color-separator-subtle); background: var(--color-surface-primary); }
+.shotBody { display: grid; min-height: 27rem; grid-template-columns: 11rem minmax(0,1fr); }
+.shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .8rem; border-right: 1px solid var(--color-separator-subtle); background: transparent; }
 .shotSide > p { margin: .8rem .55rem .38rem; color: var(--color-text-secondary); font: .68rem var(--font-sans); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .shotSide > p:first-child { margin-top: 0; }
 .shotNav { display: grid; gap: .16rem; }
 .shotNav button { min-height: 2.15rem; padding: 0 .55rem; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text-secondary); font: 500 .66rem var(--font-sans); text-align: left; cursor: pointer; }
 .shotNav button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .shotNav .shotNavActive { background: var(--color-surface-selected); color: var(--color-text-primary); }
-.shotPromise { display: grid; gap: .25rem; margin-top: auto; padding: .8rem .55rem 0; border-top: 1px solid var(--color-separator-subtle); }
-.shotPromise strong { font-size: .64rem; font-weight: 580; }
-.shotPromise span { color: var(--color-text-secondary); font-size: .62rem; }
 
 .shotWorkspace { min-width: 0; padding: 1.15rem; }
 .shotWorkspaceHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: .9rem; border-bottom: 1px solid var(--color-separator-subtle); }
@@ -134,9 +130,8 @@
 .shotWorkspaceHeader strong { font-size: 1rem; font-weight: 590; letter-spacing: -.02em; }
 .shotWorkspaceHeader small { color: var(--color-text-secondary); font-size: .62rem; }
 .workflowArea { padding-top: .85rem; }
-.workflowTabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); overflow: hidden; border: 1px solid var(--color-separator-subtle); border-radius: var(--radius-control); }
-.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 3.65rem; align-items: center; gap: .55rem; padding: .55rem .65rem; border: 0; border-right: 1px solid var(--color-separator-subtle); background: transparent; color: var(--color-text-secondary); text-align: left; cursor: pointer; }
-.workflowTabs > button:last-child { border-right: 0; }
+.workflowTabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); overflow: hidden; border-bottom: 1px solid var(--color-separator-subtle); }
+.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 3.65rem; align-items: center; gap: .55rem; padding: .55rem .65rem; border: 0; background: transparent; color: var(--color-text-secondary); text-align: left; cursor: pointer; }
 .workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .workflowTabs i { display: grid; width: 1.3rem; height: 1.3rem; flex: none; place-items: center; border: 1px solid var(--color-separator); border-radius: 50%; font: normal .5rem var(--font-mono); }
 .workflowTabs span { min-width: 0; }
@@ -150,21 +145,17 @@
 .workflowTabs .workflowTabActive::after { content: ""; position: absolute; inset: auto 0 0; height: 2px; background: var(--color-signal-on-dark); }
 .workflowTabActive i { border-color: var(--color-signal-on-dark); color: var(--color-signal-on-dark); }
 
-.workflowPanel { display: grid; min-height: 22.4rem; grid-template-columns: minmax(0,1fr) 14rem; margin-top: .7rem; overflow: hidden; border: 1px solid var(--color-separator-subtle); border-radius: var(--radius-control); background: var(--color-surface-primary); }
-.workflowMain { padding: 1.25rem 1.35rem; }
-.workflowEyebrow,.workflowValue > span,.infoPage > span { color: var(--color-signal-on-dark); font: .53rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.workflowPanel { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr); margin-top: .7rem; overflow: hidden; background: transparent; }
+.workflowMain { padding: 1.25rem .35rem; }
+.workflowEyebrow,.infoPage > span { color: var(--color-signal-on-dark); font: .53rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
 .workflowMain h2,.infoPage h2 { max-width: 25ch; margin: .55rem 0 0; font-size: 1.28rem; font-weight: 570; letter-spacing: -.035em; line-height: 1.15; }
 .workflowIntro,.infoPage > p { max-width: 54ch; margin: .68rem 0 0; color: var(--color-text-secondary); font-size: .68rem; line-height: 1.55; }
 .workflowRows { margin: .8rem 0 0; }
-.workflowRows div { display: grid; grid-template-columns: 7.4rem minmax(0,1fr); gap: .8rem; padding: .62rem 0; border-bottom: 1px solid var(--color-separator-subtle); }
-.workflowRows dt { color: var(--color-text-secondary); font-size: .62rem; font-weight: 540; }
-.workflowRows dd { margin: 0; color: var(--color-text-secondary); font-size: .63rem; line-height: 1.4; }
-.workflowValue { padding: 1.2rem; border-left: 1px solid var(--color-separator-subtle); background: var(--color-surface-secondary); }
-.workflowValue strong { display: block; margin-top: .6rem; font-size: .83rem; font-weight: 560; line-height: 1.35; }
-.workflowValue p { margin: .55rem 0 0; color: var(--color-text-secondary); font-size: .64rem; line-height: 1.5; }
-.workflowValue button,.infoPage button { width: 100%; min-height: 2.35rem; margin-top: 1rem; padding: 0 .7rem; border: 0; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .63rem; font-weight: 680; cursor: pointer; }
-.workflowValue button:focus-visible,.infoPage button:focus-visible { outline: 2px solid var(--color-text-primary); outline-offset: 2px; }
-.autoHint { margin: .6rem 0 0; color: var(--color-text-secondary); font: .7rem/1.4 var(--font-sans); }
+.workflowRows div { display: grid; grid-template-columns: 9.5rem minmax(0,1fr); gap: .8rem; padding: .62rem 0; border-bottom: 1px solid var(--color-separator-subtle); }
+.workflowRows dt { color: var(--color-text-primary); font-size: .66rem; font-weight: 600; }
+.workflowRows dd { margin: 0; color: var(--color-text-secondary); font-size: .66rem; line-height: 1.4; }
+.infoPage button { min-height: 2.35rem; margin-top: 1rem; padding: 0 1rem; border: 0; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .63rem; font-weight: 680; cursor: pointer; }
+.infoPage button:focus-visible { outline: 2px solid var(--color-text-primary); outline-offset: 2px; }
 
 .infoPage { padding: 1.25rem .25rem 0; }
 .infoPage h2 { max-width: 32ch; font-size: 1.45rem; }
@@ -181,13 +172,12 @@
   .loginLink:hover { color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); }
   .shotNav button:hover { background: var(--color-surface-selected); color: var(--color-text-primary); }
   .workflowTabs > button:hover { background: var(--color-surface-secondary); color: var(--color-text-secondary); }
-  .workflowValue button:hover,.infoPage button:hover { background: var(--color-signal-hover); }
+  .infoPage button:hover { background: var(--color-signal-hover); }
 }
 
 @media (max-width: 1100px) {
   .section { grid-template-columns: minmax(0,.72fr) minmax(0,1.28fr); gap: 1rem; }
   .shotBody { grid-template-columns: 9.8rem minmax(0,1fr); }
-  .workflowPanel { grid-template-columns: minmax(0,1fr) 12.5rem; }
 }
 
 @media (max-width: 900px) {
@@ -206,7 +196,7 @@
   .shotMode { display: none; }
   .shotBody { display: block; min-height: 0; }
   .shotSide { display: block; padding: .55rem; border-right: 0; border-bottom: 1px solid var(--color-separator-subtle); }
-  .shotSide > p,.shotPromise { display: none; }
+  .shotSide > p { display: none; }
   .shotNav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; }
   .shotNav button { min-height: 44px; padding: 0 .7rem; font-size: .72rem; }
   .shotWorkspace { padding: .85rem; }
@@ -222,11 +212,7 @@
   .workflowIntro,.infoPage > p { font-size: .77rem; }
   .workflowRows div { grid-template-columns: minmax(0,1fr); gap: .2rem; }
   .workflowRows dt,.workflowRows dd { font-size: .72rem; }
-  .workflowValue { padding: 1rem; border-top: 1px solid var(--color-separator-subtle); border-left: 0; }
-  .workflowValue strong { font-size: .92rem; }
-  .workflowValue p { font-size: .73rem; }
-  .workflowValue button,.infoPage button { min-height: 44px; font-size: .75rem; }
-  .autoHint { font-size: .68rem; line-height: 1.45; }
+  .infoPage button { min-height: 44px; font-size: .75rem; }
   .infoPage dl div { grid-template-columns: 1.4rem minmax(0,1fr); }
   .infoPage dd { grid-column: 2; font-size: .72rem; }
   .infoPage dt { font-size: .74rem; }
