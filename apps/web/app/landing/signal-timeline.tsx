@@ -51,10 +51,10 @@ export default function SignalTimeline() {
         <div className={styles.intro} data-motion-primitive="editorialReveal">
           <p className={shared.sceneLabel}>От профиля к первому контакту</p>
           <h2 id="timeline-title" className={shared.sceneHeading}>
-            От профиля до первого контакта — четыре понятных шага.
+            От профиля к контакту — четыре шага.
           </h2>
           <p className={shared.sceneLead}>
-            Вы задаёте практику и географию. Радар собирает публичные сигналы, расставляет компании по приоритету и оставляет решение за вами.
+            Радар собирает публичные сигналы и расставляет компании по приоритету. Решение остаётся за вами.
           </p>
         </div>
 

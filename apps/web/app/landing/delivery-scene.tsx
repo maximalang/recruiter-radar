@@ -99,7 +99,7 @@ export default function DeliveryScene() {
         <div className={sceneStyles.intro}>
           <p>Как приходят результаты</p>
           <h2 id="delivery-title">Радар находит повод. Пишете вы.</h2>
-          <p className={sceneStyles.introSub}>Полная карточка остаётся в веб-кабинете. Короткий сигнал можно получить в Telegram, отметить решение и вернуться к фактам перед контактом.</p>
+          <p className={sceneStyles.introSub}>Полная карточка — в веб-кабинете. Короткий сигнал — в Telegram: отметить решение и вернуться к фактам.</p>
         </div>
 
         <div className={sceneStyles.capabilityBand} aria-label="Демонстрация доставки сигнала">
@@ -107,7 +107,7 @@ export default function DeliveryScene() {
           <div className={sceneStyles.deliverySystem}>
             <div className={sceneStyles.routeIntro}>
               <span>Один сигнал — два уровня деталей</span>
-              <strong>Telegram помогает выбрать карточку. Веб-кабинет хранит весь контекст.</strong>
+              <strong>Telegram помогает выбрать. Веб-кабинет хранит контекст.</strong>
             </div>
             <article className={sceneStyles.cabinet} data-channel="cabinet" data-delivery-core="workspace">
               <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel="cabinet" /></span>

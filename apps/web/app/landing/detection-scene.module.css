@@ -18,21 +18,6 @@
   position: relative;
   z-index: 3;
   width: min(100%, 34rem);
-  transition: opacity var(--motion-duration-context) var(--motion-ease-standard);
-}
-
-/* Expanded workflow becomes the temporary focus of the frame (Accio pattern):
- * the copy recedes only slightly — WCAG AA caps the dim at opacity .9 so every
- * layer keeps ≥4.5:1 on the inverse surface (design spec §2.3 hover-defect
- * rule; QA t_86dbd5c0 measured 2.06:1 at the previous value). */
-.section:has(.fieldFigure:focus-within) .copy {
-  opacity: .9;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .section:has(.fieldFigure:hover) .copy {
-    opacity: .9;
-  }
 }
 
 .serviceLabel {
@@ -93,15 +78,14 @@
 .loginLink { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; margin-top: .25rem; color: color-mix(in srgb, var(--color-text-primary) 68%, transparent); font-size: .75rem; text-underline-offset: 3px; }
 .microcopy { max-width: 31rem; margin: .5rem 0 0; color: color-mix(in srgb, var(--color-text-primary) 55%, transparent); font-size: .7rem; line-height: 1.45; }
 
-/* Accio-style collapsed teaser: the miniature product shot bleeds past the
- * right edge of the section (which clips it) and expands left on hover or
- * keyboard focus. Touch layouts show the shot in full (see max-width media). */
+/* Fitted product shot: the workflow mock sits fully inside its hero column —
+ * no clipped right edge, no hover/focus expansion (owner verdict 23.09:
+ * clarity + minimalism). */
 .fieldFigure {
   position: relative;
   z-index: 4;
-  width: min(58rem, 58vw);
-  min-width: 48rem;
-  justify-self: start;
+  width: 100%;
+  min-width: 0;
   pointer-events: auto;
 }
 
@@ -116,13 +100,6 @@
   box-shadow: var(--shadow-overlay);
   color: var(--color-text-primary);
   text-align: left;
-  transform: translateX(34%) scale(.985);
-  transform-origin: center right;
-  transition: transform var(--motion-duration-signal) var(--motion-ease-enter), box-shadow var(--motion-duration-signal) var(--motion-ease-enter);
-}
-
-.fieldFigure:focus-within .productShot {
-  transform: translateX(-16%) scale(1.015);
 }
 
 .shotBar {
@@ -202,10 +179,6 @@
 @media (hover: hover) and (pointer: fine) {
   .primaryButton:hover { background: var(--color-signal-hover); transform: translateY(-1px); }
   .loginLink:hover { color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); }
-  .fieldFigure:hover .productShot {
-    box-shadow: var(--shadow-overlay);
-    transform: translateX(-16%) scale(1.015);
-  }
   .shotNav button:hover { background: var(--color-surface-selected); color: var(--color-text-primary); }
   .workflowTabs > button:hover { background: var(--color-surface-secondary); color: var(--color-text-secondary); }
   .workflowValue button:hover,.infoPage button:hover { background: var(--color-signal-hover); }
@@ -213,26 +186,14 @@
 
 @media (max-width: 1100px) {
   .section { grid-template-columns: minmax(0,.72fr) minmax(0,1.28fr); gap: 1rem; }
-  .fieldFigure { width: min(58rem,72vw); min-width: 46rem; }
-  .productShot { transform: translateX(38%) scale(.98); }
-  .fieldFigure:focus-within .productShot { transform: translateX(-20%) scale(1.01); }
   .shotBody { grid-template-columns: 9.8rem minmax(0,1fr); }
   .workflowPanel { grid-template-columns: minmax(0,1fr) 12.5rem; }
-
-  @media (hover: hover) and (pointer: fine) {
-    .fieldFigure:hover .productShot { transform: translateX(-20%) scale(1.01); }
-  }
 }
 
 @media (max-width: 900px) {
   .section { display: block; min-height: auto; padding: 6rem var(--page-gutter) 3.5rem; overflow: visible; }
   .copy { width: min(100%,42rem); }
   .fieldFigure { width: 100%; min-width: 0; margin-top: 2rem; }
-  .productShot,.fieldFigure:focus-within .productShot { transform: none; }
-
-  @media (hover: hover) and (pointer: fine) {
-    .fieldFigure:hover .productShot { transform: none; }
-  }
 }
 
 @media (max-width: 900px) {
@@ -292,9 +253,4 @@
 
 @media (prefers-reduced-motion: reduce) {
   .section *, .section *::before, .section *::after { animation: none !important; transition: none !important; }
-  .productShot,.fieldFigure:focus-within .productShot { transform: none; }
-
-  @media (hover: hover) and (pointer: fine) {
-    .fieldFigure:hover .productShot { transform: none; }
-  }
 }

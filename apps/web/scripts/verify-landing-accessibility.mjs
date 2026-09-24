@@ -238,13 +238,12 @@ async function auditHeader(browser, viewport) {
   if (viewport.width >= 960) {
     // The retired workspace scene took its "Пример" nav link with it; the
     // first remaining section link keeps the Header nav contrast contract.
+    // The duplicated header preview CTA is retired (owner verdict 23.09):
+    // the hero workflow CTA is the single path to the example.
     const nav = header.getByRole("navigation", { name: "Разделы лендинга" }).getByRole("link", { name: "Как работает", exact: true });
     const login = header.getByRole("link", { name: "Войти", exact: true });
-    const cta = header.locator('[data-analytics-context="header"]:visible');
     await assertContrast(nav, `${viewport.name} Header nav`, 4.5, heroBackground);
     await assertContrast(login, `${viewport.name} Header login`, 4.5, heroBackground);
-    await assertContrast(cta, `${viewport.name} Header preview CTA`, 4.5, heroBackground);
-    await assertFocus(page, cta, `${viewport.name} Header preview CTA focus`, heroBackground);
   } else {
     const menu = header.getByRole("button", { name: "Открыть меню" });
     const target = await menu.boundingBox();
@@ -257,7 +256,7 @@ async function auditHeader(browser, viewport) {
   await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
   await assertContrast(brand, `${viewport.name} Scrolled header BrandLogo`);
   if (viewport.width >= 960) {
-    await assertContrast(header.locator('[data-analytics-context="header"]:visible'), `${viewport.name} Scrolled header preview CTA`);
+    await assertContrast(header.getByRole("link", { name: "Войти", exact: true }), `${viewport.name} Scrolled header login`);
   } else {
     await assertContrast(header.getByRole("button", { name: "Открыть меню" }), `${viewport.name} Scrolled header menu glyph`, 3);
   }

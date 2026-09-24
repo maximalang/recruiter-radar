@@ -25,7 +25,7 @@ export default function DetectionScene(props: { paymentConfigured: boolean }) {
           От сигнала до сообщения
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Настройте рынок один раз. Радар проверит подключённые открытые источники, подтвердит изменения и подготовит понятный следующий шаг.
+          Настройте рынок один раз — Радар найдёт повод, подтвердит его фактами и покажет следующий шаг.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a
@@ -36,7 +36,7 @@ export default function DetectionScene(props: { paymentConfigured: boolean }) {
           >
             Посмотреть workflow <ArrowGlyph />
           </a>
-          <span className={sceneStyles.actionHint}>Наведите или выберите этап · внутри всё интерактивно</span>
+          <span className={sceneStyles.actionHint}>Наведите или выберите этап</span>
         </div>
         <Link href="/login?returnTo=%2Fdashboard" className={sceneStyles.loginLink}>Войти</Link>
         <p className={sceneStyles.microcopy} data-hero-trust-line>

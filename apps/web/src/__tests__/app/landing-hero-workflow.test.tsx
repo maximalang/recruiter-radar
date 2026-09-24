@@ -54,19 +54,18 @@ describe("landing hero advertising workflow", () => {
     expect(screen.getByRole("tab", { name: /Подготовьте сообщение/i })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("defines an Accio-style clipped state that expands left on hover and keyboard focus", () => {
+  it("keeps the hero product shot fitted inside its column without a clipped edge", () => {
     const css = source("app/landing/detection-scene.module.css");
 
     expect(css).toMatch(/\.section\s*\{[\s\S]*?overflow:\s*hidden/);
-    expect(css).toMatch(/\.productShot\s*\{[\s\S]*?transform:\s*translateX\(/);
-    expect(css).toMatch(/\.fieldFigure:hover\s+\.productShot/);
-    expect(css).toMatch(/\.fieldFigure:focus-within\s+\.productShot/);
-    expect(css).toMatch(/\.section:has\(\.fieldFigure:focus-within\) \.copy/);
-    expect(css).toMatch(/\.section:has\(\.fieldFigure:hover\) \.copy/);
-    // The dim floor is .9: below that the receding hero copy drops under
-    // WCAG AA 4.5:1 on the inverse surface (design spec §2.3 hover-defect rule).
-    expect(css).toMatch(/opacity:\s*\.9\s*;/);
-    expect(css).not.toMatch(/opacity:\s*\.(?:0|1?[0-8])\d*\s*;/);
+    expect(css).toMatch(/\.fieldFigure\s*\{[^}]*width:\s*100%/);
+    // Owner verdict 23.09: no Accio-style bleed/expansion — the mock is fully
+    // visible at every width, and the hero copy never dims on interaction.
+    expect(css).not.toMatch(/translateX/);
+    expect(css).not.toMatch(/\.fieldFigure:hover\s+\.productShot/);
+    expect(css).not.toMatch(/\.fieldFigure:focus-within\s+\.productShot/);
+    expect(css).not.toMatch(/\.section:has\(/);
+    expect(css).not.toMatch(/opacity:\s*\.\d+\s*;/);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?transition:\s*none/);
   });
 

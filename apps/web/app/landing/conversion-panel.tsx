@@ -15,7 +15,6 @@ import panelStyles from "./conversion-panel.module.css";
 const PILOT_BULLETS = [
   "Приоритет компаний вашей ниши",
   "Почему сейчас + факты и источники",
-  "Профиль по нише и географии",
 ] as const;
 
 export default function ConversionPanel(props: {
@@ -40,7 +39,7 @@ export default function ConversionPanel(props: {
         <div className={panelStyles.pricingIntro} data-pricing-intro>
           <span>Попробуйте на своей нише</span>
           <h2>Попробовать 7 дней — {pilotPlan.price}</h2>
-          <p>Полноценная неделя работы с радаром: приоритетные компании вашей ниши с поводом, фактами и источниками. Оплата разовая, без автопродления.</p>
+          <p>Полноценная неделя работы: приоритетные компании вашей ниши с поводом, фактами и источниками. Оплата разовая, без автопродления.</p>
         </div>
 
         <div className={panelStyles.pricingDecision}>
@@ -74,7 +73,7 @@ export default function ConversionPanel(props: {
           </div>
 
           <div className={panelStyles.secondaryOffers} aria-label="Продолжение после пилота" data-pricing-secondary="true">
-            <span className={panelStyles.secondaryOfferLabel}>После пилота — тот же радар, на более длинный срок</span>
+            <span className={panelStyles.secondaryOfferLabel}>После пилота — тот же радар на более долгий срок</span>
             {secondaryPlans.map((plan) => {
               const quarterly = plan.code === "quarterly";
               return (
@@ -110,8 +109,6 @@ export default function ConversionPanel(props: {
         <div className={panelStyles.faqHeading} data-faq-heading>
           <span>FAQ · Коротко о главном</span>
           <h2>Что важно знать перед запуском.</h2>
-          <p>Как появляются компании, откуда берутся данные и как устроен запуск.</p>
-          <small data-faq-trust>Пример можно настроить без регистрации.</small>
         </div>
         <div className={panelStyles.faqList} data-faq-list>
           {props.faqItems.map((item, index) => (
@@ -133,7 +130,7 @@ export default function ConversionPanel(props: {
 
           <span className={panelStyles.finalEyebrow}>7 дней / своя ниша</span>
           <h2>Посмотрите, кому стоит написать сейчас.</h2>
-          <p>Вы увидите компании своей ниши с активным наймом: что изменилось, чем подтверждено и с чего начать разговор.</p>
+          <p>Компании вашей ниши с активным наймом: что изменилось, чем подтверждено и с чего начать разговор.</p>
         </div>
         <div className={panelStyles.finalDecision}>
           <ul className={panelStyles.finalTrust} aria-label="Условия запуска">

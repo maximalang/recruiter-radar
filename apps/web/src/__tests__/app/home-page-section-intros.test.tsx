@@ -136,10 +136,13 @@ describe("final unified evidence-first landing contract", () => {
     const header = source("app/landing/landing-header.tsx");
 
     expect(detection).toContain('href="#hero-workflow"');
-    expect(landing).toContain('<LandingHeader previewHref="#hero-workflow" />');
+    expect(landing).toContain("<LandingHeader />");
     expect(landing).not.toContain("preview-configurator");
     expect(landing).not.toContain("preview-results");
-    expect(header).toContain("Посмотреть пример");
+    // One primary path to the example (owner verdict 23.09): the header no
+    // longer duplicates the hero workflow CTA.
+    expect(header).not.toContain("Посмотреть пример");
+    expect(header).not.toContain("previewHref");
 
     // Checkout return links keep the filters and land on the single example.
     const href = buildPublicPreviewHref(readPublicPreviewInput({ specialization: "инженерный подбор" }));
@@ -214,7 +217,7 @@ describe("final unified evidence-first landing contract", () => {
 
     expect(hero).toContain("От сигнала до сообщения");
     expect(hero).toContain("Посмотреть workflow");
-    expect(hero).toContain("Наведите или выберите этап · внутри всё интерактивно");
+    expect(hero).toContain("Наведите или выберите этап");
     expect(hero).toContain(">Войти</a>");
     expect(hero).toContain("заявка без списания");
     expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
@@ -273,7 +276,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(header).toContain('document.body.style.overflow = "hidden"');
     expect(header).toContain("scrollbarWidth");
     expect(header).toContain("menuButtonRef.current?.focus");
-    expect(header).toContain("Посмотреть пример");
+    expect(header).not.toContain("Посмотреть пример");
     expect(header).not.toContain("Посмотреть возможности");
     expect(headerCss).toMatch(/\.navLink\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/);
   });

@@ -32,10 +32,10 @@ export default function LandingPage(props: {
       data-landing-analytics={isYandexMetrikaConfigured() ? "enabled" : "disabled"}
     >
       <LandingMotion />
-      <LandingHeader previewHref="#hero-workflow" />
+      <LandingHeader />
       <noscript>
         <div className={styles.noScriptNotice} data-noscript-disclosure role="note">
-          Интерактивный пример продукта в первом экране требует JavaScript. Продуктовый рассказ, тарифы и условия остаются доступны без него.
+          Интерактивный пример в первом экране требует JavaScript; рассказ, тарифы и условия доступны без него.
         </div>
       </noscript>
       <main id="main-content">

@@ -38,7 +38,7 @@ describe("landing product story v2", () => {
 
     expect(heroText).toContain("От сигнала до сообщения");
     expect(heroText).toContain("Посмотреть workflow");
-    expect(heroText).toContain("проверит подключённые открытые источники");
+    expect(heroText).toContain("Настройте рынок один раз");
     expect(preview).toContain('data-hero-product-preview="workflow"');
     expect(previewText).toContain("Сегодня");
     expect(previewText).toContain("Компании");
@@ -53,8 +53,9 @@ describe("landing product story v2", () => {
     expect(heroCss).toMatch(/\.title\s*\{[^}]*animation:\s*none/);
 
     expect(heroCss).toMatch(/\.section\s*\{[\s\S]*?overflow:\s*hidden/);
-    expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.productShot,\.fieldFigure:focus-within \.productShot[^}]*transform:\s*none/);
-    expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?@media \(hover: hover\) and \(pointer: fine\)[\s\S]*?\.fieldFigure:hover \.productShot\s*\{\s*transform:\s*none;\s*\}/);
+    // Fitted shot (owner verdict 23.09): no clipped-edge expansion at any width.
+    expect(heroCss).not.toMatch(/translateX/);
+    expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.fieldFigure\s*\{[^}]*width:\s*100%/);
   });
 
   it("uses the approved dark split-screen composition at desktop widths", () => {
@@ -106,7 +107,7 @@ describe("landing product story v2", () => {
       /\.primaryButton\s*\{[^}]*min-height:\s*48px[^}]*background:\s*var\(--color-signal\)[^}]*color:\s*var\(--color-text-inverse\)/,
     );
     expect(heroCss).toMatch(
-      /\.productShot\s*\{[^}]*width:\s*100%[^}]*background:\s*var\(--color-canvas\)[^}]*transform:\s*translateX\(/,
+      /\.productShot\s*\{[^}]*width:\s*100%[^}]*background:\s*var\(--color-canvas\)/,
     );
 
     const hierarchy = [
@@ -263,7 +264,7 @@ describe("landing product story v2", () => {
     expect(source("app/landing/hero-product-preview.tsx")).toContain('id="hero-workflow"');
     expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.workflowTabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)/);
     expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.workflowTabs > button\s*\{[^}]*min-height:\s*64px/);
-    expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.productShot[^}]*transform:\s*none/);
+    expect(detectionCss).not.toMatch(/translateX/);
     expect(deliveryCss).toMatch(/@media \(max-width: 520px\)[\s\S]*?\.deliveryRoutes\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
     expect(deliveryCss).toMatch(/\.deliveryRoutes \.channelRoute p\s*\{\s*display:\s*none/);
   });

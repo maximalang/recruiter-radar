@@ -637,8 +637,9 @@ async function assertInteractionContracts(browser) {
     const heroEvent = waitForLandingEvent(page, "preview_started", "hero_primary");
     await Promise.all([heroEvent, heroClick.click()]);
   }
-  // The hero CTA targets the interactive workflow card (Accio-style hero);
-  // the configurator/preview scene remains below it and is asserted next.
+  // The hero CTA targets the interactive workflow card; the configurator/form
+  // scene stays retired. The duplicated header preview CTA is retired too
+  // (owner verdict 23.09 — one primary path to the example).
   assert.equal(new URL(page.url()).hash, "#hero-workflow");
   await page.locator("#hero-workflow").waitFor({ state: "attached" });
 
@@ -650,7 +651,7 @@ async function assertInteractionContracts(browser) {
   await page.locator("#hero-workflow").waitFor({ state: "attached" });
   assert.equal(await page.locator("#hero-workflow form").count(), 0, "hero demo must not render a form");
   assert.equal(await page.locator("#hero-workflow input").count(), 0, "hero demo must not render inputs");
-  assert.equal(await page.locator('[data-analytics-event="preview_started"][data-analytics-context="header"]').count(), 2, "desktop + mobile-menu header preview CTAs must stay analytics-connected");
+  assert.equal(await page.locator('[data-analytics-event="preview_started"][data-analytics-context="header"]').count(), 0, "the header preview CTA must stay retired (single example path)");
 
   const firstRender = await page.locator("#hero-workflow").innerText();
 
