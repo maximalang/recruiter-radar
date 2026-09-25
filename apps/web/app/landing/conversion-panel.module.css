@@ -66,10 +66,8 @@
   display: grid;
   gap: 1.35rem;
   padding: clamp(1.5rem, 2.5vw, 2.1rem);
-  border-radius: var(--radius-overlay);
   background: var(--conversion-deep);
   color: var(--color-text-inverse);
-  border: 1px solid var(--color-separator);
 }
 
 .pilotTopline {
@@ -224,7 +222,20 @@
   .pricingIntro h2 { font-size: clamp(1.9rem, 8.5vw, 2.5rem); }
 }
 
+/* Pass 4 (owner verdict 25.09): staggered scroll reveals via motion tokens */
+@keyframes conversionRise { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+.pricing[data-motion-state="visible"] .pilotOffer { animation: conversionRise var(--motion-duration-signal) var(--motion-ease-enter) both; }
+.pricing[data-motion-state="visible"] .secondaryOffers article:nth-of-type(1) { animation: conversionRise var(--motion-duration-emphasis) 200ms var(--motion-ease-enter) both; }
+.pricing[data-motion-state="visible"] .secondaryOffers article:nth-of-type(2) { animation: conversionRise var(--motion-duration-emphasis) 280ms var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(1) { animation: conversionRise var(--motion-duration-emphasis) 80ms var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(2) { animation: conversionRise var(--motion-duration-emphasis) 140ms var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(3) { animation: conversionRise var(--motion-duration-emphasis) 200ms var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(4) { animation: conversionRise var(--motion-duration-emphasis) 260ms var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(5) { animation: conversionRise var(--motion-duration-emphasis) 320ms var(--motion-ease-enter) both; }
+.final[data-motion-state="visible"] .finalCopy { animation: conversionRise var(--motion-duration-signal) var(--motion-ease-enter) both; }
+.final[data-motion-state="visible"] .finalDecision { animation: conversionRise var(--motion-duration-signal) 140ms var(--motion-ease-enter) both; }
+
 @media (prefers-reduced-motion: reduce) {
   .faqList details[open] p { animation: none; }
-  .panel * { transition: none !important; }
+  .panel * { transition: none !important; animation: none !important; }
 }
