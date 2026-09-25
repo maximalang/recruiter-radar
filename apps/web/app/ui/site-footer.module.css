@@ -50,8 +50,6 @@
   height: 24px;
   flex: 0 0 24px;
   object-fit: contain;
-  filter: grayscale(.85) saturate(.45) brightness(1.08);
-  opacity: .88;
   user-select: none;
 }
 
@@ -182,11 +180,6 @@
 
 .siteFooter[data-tone="light"] .footerCopy {
   color: var(--color-text-tertiary);
-}
-
-.siteFooter[data-tone="light"] .footerMark {
-  filter: none;
-  opacity: 1;
 }
 
 /* Adapt to the footer's own inline size instead of assuming viewport width equals

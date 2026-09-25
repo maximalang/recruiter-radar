@@ -217,7 +217,7 @@ describe("final unified evidence-first landing contract", () => {
 
     expect(hero).toContain("От сигнала до сообщения");
     expect(hero).toContain("Посмотреть workflow");
-    expect(hero).toContain("Наведите или выберите этап");
+    expect(hero).toContain("Этапы сменяются автоматически");
     expect(hero).toContain(">Войти</a>");
     expect(hero).toContain("заявка без списания");
     expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);

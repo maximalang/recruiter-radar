@@ -141,15 +141,6 @@
   min-width: 0;
 }
 
-.routeIntro {
-  display: grid;
-  gap: .3rem;
-  padding-bottom: .9rem;
-  border-bottom: 1px solid var(--color-separator);
-}
-.routeIntro span { color: var(--color-signal-hover); font-size: .66rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
-.routeIntro strong { max-width: 31rem; font-size: clamp(1.25rem, 2vw, 1.75rem); font-weight: 590; letter-spacing: -.035em; line-height: 1.18; }
-
 .cabinet {
   display: grid;
   grid-template-columns: auto 1fr;

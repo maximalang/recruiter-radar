@@ -127,7 +127,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: .75rem 1rem;
+  gap: .75rem 1.5rem;
   min-height: 5rem;
   border-top: 1px solid var(--color-separator);
 }
@@ -141,7 +141,6 @@
 
 .faq {
   padding-block: clamp(3.25rem, 4.5vw, 4.5rem);
-  background: color-mix(in srgb, var(--color-copper) 7%, var(--color-canvas));
 }
 
 .faqHeading,
@@ -150,8 +149,8 @@
   margin-inline: auto;
 }
 
-.faqHeading { text-align: center; }
-.faqHeading h2 { max-width: 20ch; margin: .7rem auto 0; font-size: clamp(2.25rem, 3vw, 2.85rem); font-weight: 580; letter-spacing: -.045em; line-height: 1.04; }
+.faqHeading { text-align: left; }
+.faqHeading h2 { max-width: 20ch; margin: .7rem 0 0; font-size: clamp(2.25rem, 3vw, 2.85rem); font-weight: 580; letter-spacing: -.045em; line-height: 1.04; }
 
 .faqList { margin-top: 1.75rem; }
 .faqList details { border-bottom: 1px solid var(--color-separator); }

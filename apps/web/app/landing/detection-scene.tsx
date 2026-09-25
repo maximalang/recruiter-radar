@@ -36,7 +36,7 @@ export default function DetectionScene(props: { paymentConfigured: boolean }) {
           >
             Посмотреть workflow <ArrowGlyph />
           </a>
-          <span className={sceneStyles.actionHint}>Наведите или выберите этап</span>
+          <span className={sceneStyles.actionHint}>Этапы сменяются автоматически — или выберите вручную</span>
         </div>
         <Link href="/login?returnTo=%2Fdashboard" className={sceneStyles.loginLink}>Войти</Link>
         <p className={sceneStyles.microcopy} data-hero-trust-line>

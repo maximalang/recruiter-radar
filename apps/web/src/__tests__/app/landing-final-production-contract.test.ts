@@ -23,7 +23,7 @@ describe("landing final production contract", () => {
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain('data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}');
     expect(hero).toContain('data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}');
-    expect(hero).toContain("Наведите или выберите этап");
+    expect(hero).toContain("Этапы сменяются автоматически");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");
@@ -80,7 +80,7 @@ describe("landing final production contract", () => {
     expect(page).not.toContain("SignalTimelineScene");
     expect(page).not.toContain("<RadarScene");
     expect(page.indexOf("<EvidenceScene")).toBeLessThan(page.indexOf("<DeliveryScene"));
-    expect(delivery).toContain("Радар находит повод. Пишете вы.");
+    expect(delivery).toContain("Результаты приходят туда, где вы работаете");
     expect(delivery).toContain("Сообщения компаниям не отправляются автоматически.");
     expect(delivery).toContain('data-delivery-routes="connected"');
     expect(delivery).toContain("PRIMARY_ROUTES.map");
