@@ -237,6 +237,16 @@
   border: 0;
 }
 
+/* Pass 4 (owner verdict 25.09): professional entrance + stage transitions */
+@keyframes heroShotEnter { from { opacity: 0; transform: translate3d(0, 14px, 0); } to { opacity: 1; transform: none; } }
+@keyframes heroStageIn { from { opacity: 0; transform: translate3d(0, 6px, 0); } to { opacity: 1; transform: none; } }
+.copy { animation: heroShotEnter var(--motion-duration-signal) var(--motion-ease-enter) both; }
+.productShot { animation: heroShotEnter var(--motion-duration-scan) 120ms var(--motion-ease-enter) both; }
+.workflowMain { animation: heroStageIn var(--motion-duration-emphasis) var(--motion-ease-enter) both; }
+.infoPage { animation: heroStageIn var(--motion-duration-emphasis) var(--motion-ease-enter) both; }
+.workflowTabs > button { transition: color var(--motion-duration-fast) var(--motion-ease-standard); }
+.workflowTabs i { transition: border-color var(--motion-duration-fast) var(--motion-ease-standard), color var(--motion-duration-fast) var(--motion-ease-standard); }
+
 @media (prefers-reduced-motion: reduce) {
   .section *, .section *::before, .section *::after { animation: none !important; transition: none !important; }
 }

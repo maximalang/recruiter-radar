@@ -214,7 +214,7 @@ export default function HeroProductPreview() {
                 aria-live="polite"
                 aria-labelledby={`hero-workflow-tab-${stage}`}
               >
-                <div className={sceneStyles.workflowMain}>
+                <div className={sceneStyles.workflowMain} key={`stage-${stage}`}>
                   <span className={sceneStyles.workflowEyebrow}>{currentStage.eyebrow}</span>
                   <h2>{currentStage.title}</h2>
                   <p className={sceneStyles.workflowIntro}>{currentStage.intro}</p>
@@ -227,7 +227,7 @@ export default function HeroProductPreview() {
               </article>
             </div>
           ) : (
-            <article className={sceneStyles.infoPage} aria-live="polite">
+            <article className={sceneStyles.infoPage} key={`page-${page}`} aria-live="polite">
               <span>{PAGE_CONTENT[page].eyebrow}</span>
               <h2>{PAGE_CONTENT[page].title}</h2>
               <p>{PAGE_CONTENT[page].intro}</p>

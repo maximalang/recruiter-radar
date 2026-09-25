@@ -19,6 +19,7 @@ export default function EvidenceScene() {
       aria-label="Почему эта компания сейчас"
       data-header-tone="dark"
       data-proof-story="why-now"
+      data-motion-reveal="section"
     >
       <div className={styles.layout}>
         <header className={styles.intro}>

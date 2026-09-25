@@ -61,7 +61,7 @@
   justify-self: center;
   overflow: hidden;
   border: 1px solid var(--delivery-line);
-  border-radius: var(--radius-overlay);
+  border-radius: 0;
   background: var(--delivery-paper);
   color: var(--delivery-ink);
 }
@@ -127,11 +127,11 @@
 .messageFacts div { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: .7rem; padding-top: .65rem; border-top: 1px solid var(--delivery-line); }
 .messageFacts dt { color: var(--delivery-muted); font-family: var(--font-mono); font-size: .56rem; text-transform: uppercase; }
 .messageFacts dd { margin: 0; font-size: .72rem; line-height: 1.45; }
-.messageConfidence { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; margin-top: .75rem; padding: .6rem .7rem; border-left: 2px solid var(--delivery-accent); background: color-mix(in srgb, var(--delivery-accent) 8%, transparent); }
+.messageConfidence { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; margin-top: .75rem; padding: .6rem .7rem; border-left: 2px solid var(--delivery-accent); background: transparent; }
 .messageConfidence span { color: var(--delivery-accent); font-size: .62rem; }
 .messageConfidence strong { color: var(--delivery-accent); font-size: .72rem; }
 .messageActions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; margin-top: .8rem; }
-.messageActions span { display: grid; min-height: 2.35rem; place-items: center; padding: .35rem; border: 1px solid var(--delivery-line); border-radius: var(--radius-control); color: var(--delivery-muted); font-size: .62rem; font-weight: 620; text-align: center; }
+.messageActions span { display: grid; min-height: 2.35rem; place-items: center; padding: .35rem; color: var(--delivery-muted); font-size: .62rem; font-weight: 620; text-align: center; }
 .messageActions .messageActionPrimary { border-color: var(--delivery-accent); background: var(--delivery-accent); color: var(--delivery-paper); }
 .messageBoundary { margin: .65rem 0 0; color: var(--delivery-muted); font-size: .56rem; text-align: center; }
 
@@ -147,7 +147,7 @@
   gap: 1rem;
   align-items: start;
   padding: 1.2rem 0;
-  border-block: 1px solid var(--color-separator);
+  border-top: 1px solid var(--color-separator);
   background: transparent;
 }
 
@@ -275,13 +275,21 @@
   .deliveryRoutes .channelRoute { grid-template-columns: 1fr; gap: .45rem; padding: .75rem; }
   .deliveryRoutes .channelIcon { width: 2rem; height: 2rem; }
   .deliveryRoutes .channelRoute p { display: none; }
-  .telegramPreview { width: 100%; border-radius: var(--radius-overlay); }
+  .telegramPreview { width: 100%; border-radius: 0; }
   .telegramCanvas { padding: 1rem .65rem 1.25rem; }
   .telegramMessage { padding: .85rem; }
   .messageFacts div { grid-template-columns: 1fr; gap: .2rem; }
   .messageActions span { font-size: .56rem; }
 }
 
+/* Pass 4 (owner verdict 25.09): staggered scroll reveal via motion tokens */
+@keyframes deliveryRise { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+.section[data-motion-state="visible"] .telegramPreview { animation: deliveryRise var(--motion-duration-signal) var(--motion-ease-enter) both; }
+.section[data-motion-state="visible"] .cabinet { animation: deliveryRise var(--motion-duration-emphasis) 140ms var(--motion-ease-enter) both; }
+.section[data-motion-state="visible"] .deliveryRoutes .channelRoute:nth-child(1) { animation: deliveryRise var(--motion-duration-emphasis) 220ms var(--motion-ease-enter) both; }
+.section[data-motion-state="visible"] .deliveryRoutes .channelRoute:nth-child(2) { animation: deliveryRise var(--motion-duration-emphasis) 300ms var(--motion-ease-enter) both; }
+.section[data-motion-state="visible"] .boundaryRow { animation: deliveryRise var(--motion-duration-emphasis) 380ms var(--motion-ease-enter) both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .section * { transition: none !important; }
+  .section * { transition: none !important; animation: none !important; }
 }
