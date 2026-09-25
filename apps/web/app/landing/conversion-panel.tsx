@@ -40,7 +40,7 @@ export default function ConversionPanel(props: {
         <div className={panelStyles.pricingIntro} data-pricing-intro>
           <span>Попробуйте на своей нише</span>
           <h2>Попробовать 7 дней — {pilotPlan.price}</h2>
-          <p>Полноценная неделя работы: приоритетные компании вашей ниши с поводом, фактами и источниками.</p>
+          <p>Полноценная неделя работы: 10 приоритетных компаний вашей ниши с поводом, фактами и источниками.</p>
         </div>
 
         <div className={panelStyles.pricingDecision}>

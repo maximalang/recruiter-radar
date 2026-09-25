@@ -7,7 +7,6 @@ import DeliveryScene from "@/app/landing/delivery-scene";
 import DetectionScene from "@/app/landing/detection-scene";
 import EvidenceScene from "@/app/landing/evidence-scene";
 import HeroProductPreview from "@/app/landing/hero-product-preview";
-import SignalTimeline from "@/app/landing/signal-timeline";
 
 const WEB_ROOT = existsSync(resolve(process.cwd(), "app"))
   ? process.cwd()
@@ -42,13 +41,13 @@ describe("landing product story v2", () => {
     expect(preview).toContain('data-hero-product-preview="workflow"');
     expect(previewText).toContain("Сегодня");
     expect(previewText).toContain("Компании");
-    expect(previewText).toContain("Как работает");
+    expect(previewText).toContain("Результат");
     expect(previewText).toContain("Инженерный подбор");
     expect(previewText).toContain("Финансовый софт");
-    expect(previewText).toContain("Настройте рынок");
-    expect(previewText).toContain("Радар проверяет");
-    expect(previewText).toContain("Получите повод");
-    expect(previewText).toContain("Подготовьте сообщение");
+    expect(previewText).toContain("Ваш рынок");
+    expect(previewText).toContain("42 источника");
+    expect(previewText).toContain("10 компаний");
+    expect(previewText).toContain("Готовый черновик");
     expect(previewText).not.toMatch(/Промет|Северные системы|Техноформ|Демо · 12 мая/);
     expect(heroCss).toMatch(/\.title\s*\{[^}]*animation:\s*none/);
 
@@ -111,10 +110,10 @@ describe("landing product story v2", () => {
     );
 
     const hierarchy = [
-      "Настройте рынок",
-      "Радар проверяет",
-      "Получите повод",
-      "Подготовьте сообщение",
+      "Ваш рынок",
+      "42 источника",
+      "10 компаний",
+      "Готовый черновик",
     ];
     let cursor = -1;
     for (const marker of hierarchy) {
@@ -132,13 +131,10 @@ describe("landing product story v2", () => {
     expect(preview).not.toContain("data-shot-dot");
   });
 
-  it("explains the full profile-to-contact workflow before the interactive example", () => {
+  it("keeps the scene order: hero demo, proof, delivery, conversion", () => {
     const landing = source("app/landing/landing-page.tsx");
-    const workflow = renderToStaticMarkup(<SignalTimeline />);
-    const workflowText = visibleText(workflow);
     const order = [
       "<DetectionScene",
-      "<SignalTimeline",
       "<EvidenceScene",
       "<DeliveryScene",
       "<ConversionPanel",
@@ -150,39 +146,7 @@ describe("landing product story v2", () => {
       expect(next).toBeGreaterThan(cursor);
       cursor = next;
     }
-
-    expect(workflow).toContain('data-product-workflow="profile-to-contact"');
-    expect(workflow.match(/data-workflow-step=/g)).toHaveLength(4);
-    expect(workflowText).toContain("Настраиваете профиль");
-    expect(workflowText).toContain("Радар проверяет публичные сигналы");
-    expect(workflowText).toContain("Получаете приоритетный список");
-    expect(workflowText).toContain("Решение остаётся за вами");
-  });
-
-  it("presents the workflow as one flat signal path with a final manual-control lock", () => {
-    const workflow = renderToStaticMarkup(<SignalTimeline />);
-    const workflowCss = source("app/landing/signal-timeline.module.css");
-    const workflowText = visibleText(workflow);
-
-    expect(workflow.match(/class="[^"]*trajectory[^"]*"/g)).toHaveLength(1);
-    expect(workflow.match(/data-workflow-step=/g)).toHaveLength(4);
-    expect(workflow).toContain('data-manual-decision="true"');
-    expect(workflowText).toContain("10 компаний · почему сейчас · источник · уверенность");
-    expect(workflowText).toContain("никакой автоматической массовой рассылки");
-
-    expect(workflowCss).toMatch(/\.section\s*\{[^}]*background-color:\s*var\(--color-canvas\)/);
-    expect(workflowCss).not.toMatch(/gradient\(/);
-    expect(workflowCss).not.toContain(".section::before");
-    expect(workflowCss).not.toContain(".section::after");
-    expect(workflowCss).toMatch(
-      /\.layout\s*\{[^}]*grid-template-columns:\s*minmax\(18rem,\s*\.72fr\)\s+minmax\(34rem,\s*1\.28fr\)/,
-    );
-    expect(workflowCss).toMatch(
-      /@media \(max-width: 1040px\)[\s\S]*?\.layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/,
-    );
-    expect(workflowCss).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.event,[\s\S]*?opacity:\s*1\s*!important[^}]*transform:\s*none\s*!important/,
-    );
+    expect(landing).not.toContain("<SignalTimeline");
   });
 
   it("retires the static workspace story in favor of the hero demo", () => {

@@ -47,20 +47,6 @@ describe("polished unified landing visual contract", () => {
     expect(sceneStyles).not.toContain("HeroRadar");
   });
 
-  it("restores the signal timeline scene after the hero", () => {
-    const page = source("app/landing/landing-page.tsx");
-    const detectionIndex = page.indexOf("<DetectionScene");
-    const timelineIndex = page.indexOf("<SignalTimeline />");
-
-    expect(page).not.toContain("SignalTimelineScene");
-    // PART 2: the static workspace section is retired; the hero workflow demo
-    // is the single example surface, so no WorkspaceScene may follow.
-    expect(page).not.toContain("WorkspaceScene");
-    expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.tsx"))).toBe(false);
-    expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.module.css"))).toBe(false);
-    expect(timelineIndex).toBeGreaterThan(detectionIndex);
-  });
-
   it("separates the core workspace from connected delivery routes", () => {
     const delivery = source("app/landing/delivery-scene.tsx");
 
@@ -229,7 +215,7 @@ describe("polished unified landing visual contract", () => {
     // PART 2: the audit now pins the hero demo and the signal timeline as the
     // required example/navigation anchors (replacing the retired workspace).
     expect(productionAudit).toContain('#hero-workflow');
-    expect(productionAudit).toContain('#scene-signal-timeline');
+    expect(productionAudit).toContain('#scene-evidence');
     expect(productionAudit).toContain('pending motion sections');
     expect(productionAudit).not.toContain("surfaceSpecs");
   });

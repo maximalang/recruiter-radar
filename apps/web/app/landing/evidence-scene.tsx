@@ -27,9 +27,6 @@ export default function EvidenceScene() {
             <p className={styles.introLabel}>Разбор карточки · {DEMO_COMPANY.name}</p>
             <h2>Одна рекомендация — цепочка проверяемых фактов.</h2>
           </div>
-          <p>
-            Что произошло, где опубликовано и когда зафиксировано. Уверенность задаёт приоритет.
-          </p>
         </header>
 
         <div className={styles.evidenceChain} data-proof-chain="source-fact-conclusion">

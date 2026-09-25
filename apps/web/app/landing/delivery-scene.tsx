@@ -6,7 +6,7 @@ type DeliveryChannel = { key: DeliveryChannelKey; title: string; status: string;
 const CORE_CHANNEL = {
   title: "Веб-кабинет",
   status: "Всегда доступен",
-  text: "Полная карточка остаётся в кабинете: компания, почему сейчас, факты, уверенность и официальный путь контакта.",
+  text: "Полная карточка остаётся в кабинете: компания, повод, факты, уверенность и официальный путь контакта.",
 } as const;
 
 const PRIMARY_ROUTES: ReadonlyArray<DeliveryChannel> = [

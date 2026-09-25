@@ -105,7 +105,6 @@ describe("final unified evidence-first landing contract", () => {
     const landing = source("app/landing/landing-page.tsx");
     const expectedOrder = [
       "<DetectionScene",
-      "<SignalTimeline",
       "<EvidenceScene",
       "<DeliveryScene",
       "<ConversionPanel",
@@ -203,10 +202,10 @@ describe("final unified evidence-first landing contract", () => {
     const markup = renderToStaticMarkup(<HeroProductPreview />);
     expect(markup).toContain('role="tablist"');
     expect(markup.match(/role="tab"/g)).toHaveLength(4);
-    expect(markup).toContain("Настройте рынок");
-    expect(markup).toContain("Радар проверяет");
-    expect(markup).toContain("Получите повод");
-    expect(markup).toContain("Подготовьте сообщение");
+    expect(markup).toContain("Ваш рынок");
+    expect(markup).toContain("42 источника");
+    expect(markup).toContain("10 компаний");
+    expect(markup).toContain("Готовый черновик");
     expect(markup).not.toContain("data-lead-row");
   });
 

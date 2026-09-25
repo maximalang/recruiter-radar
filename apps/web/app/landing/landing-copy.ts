@@ -1,7 +1,7 @@
 import { DEFAULT_LANDING_DEMO_STORY } from "../../lib/landing-demo";
 
 export const LANDING_NAV_ITEMS = [
-  { id: "scene-evidence", label: "Как работает" },
+  { id: "scene-evidence", label: "Разбор" },
   { id: "pricing", label: "Тариф" },
   { id: "faq", label: "FAQ" },
 ] as const;
