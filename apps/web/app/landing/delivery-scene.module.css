@@ -6,7 +6,7 @@
   --delivery-accent: var(--landing-accent);
   background: var(--color-canvas);
   color: var(--color-text-primary);
-  padding: clamp(3rem, 4.5vw, 4.5rem) var(--scene-pad);
+  padding: clamp(6rem, 9vw, 9rem) var(--scene-pad);
 }
 
 .layout {
@@ -32,9 +32,9 @@
 
 .intro h2 {
   margin: 0;
-  max-width: 31ch;
-  font-size: clamp(1.85rem, 2.6vw, 2.55rem);
-  font-weight: 580;
+  max-width: 22ch;
+  font-size: clamp(2.4rem, 3.6vw, 3.3rem);
+  font-weight: 600;
   letter-spacing: -.04em;
   line-height: 1.08;
 }

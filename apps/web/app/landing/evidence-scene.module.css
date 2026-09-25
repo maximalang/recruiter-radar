@@ -1,13 +1,13 @@
 .section {
-  --evidence-paper: var(--landing-paper);
-  --evidence-ink: var(--landing-ink);
-  --evidence-muted: var(--landing-muted);
-  --evidence-accent: var(--landing-accent);
-  --evidence-line: var(--landing-line);
+  --evidence-paper: var(--color-canvas);
+  --evidence-ink: var(--color-text-primary);
+  --evidence-muted: var(--color-text-secondary);
+  --evidence-accent: var(--color-signal);
+  --evidence-line: var(--color-separator);
   box-sizing: border-box;
   background: var(--evidence-paper);
   color: var(--evidence-ink);
-  padding: clamp(4rem, 6vw, 6.5rem) var(--scene-pad);
+  padding: clamp(6rem, 9vw, 9rem) var(--scene-pad);
 }
 
 .layout {
@@ -35,8 +35,8 @@
 .intro h2 {
   max-width: 16ch;
   margin: 0;
-  font-size: clamp(2.2rem, 3.5vw, 3.25rem);
-  font-weight: 570;
+  font-size: clamp(2.5rem, 3.9vw, 3.5rem);
+  font-weight: 600;
   letter-spacing: -.055em;
   line-height: .98;
   text-wrap: balance;

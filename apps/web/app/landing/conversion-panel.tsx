@@ -13,8 +13,9 @@ import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
 import panelStyles from "./conversion-panel.module.css";
 
 const PILOT_BULLETS = [
-  "Приоритет компаний вашей ниши",
-  "Почему сейчас + факты и источники",
+  "10 приоритетных компаний за 7 дней",
+  "Повод, факты и источники по каждой",
+  "Черновик первого сообщения",
 ] as const;
 
 export default function ConversionPanel(props: {
@@ -50,7 +51,7 @@ export default function ConversionPanel(props: {
           >
             <div className={panelStyles.pilotTopline}>
               <div className={panelStyles.pilotMeta}>
-                <span className={panelStyles.pilotEyebrow}>Пилот · 7 дней</span>
+                <span className={panelStyles.pilotEyebrow}>Пилот</span>
                 <strong>{pilotPlan.cadence}</strong>
               </div>
               <div className={panelStyles.pilotPrice}>{pilotPlan.price}</div>

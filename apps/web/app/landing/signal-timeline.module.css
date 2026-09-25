@@ -1,7 +1,7 @@
 .section {
   position: relative;
   overflow: hidden;
-  padding-block: clamp(4.5rem, 7vw, 7rem);
+  padding-block: clamp(6rem, 9vw, 9rem);
   background-color: var(--color-canvas);
 }
 
@@ -18,8 +18,8 @@
 .intro { max-width: 31rem; }
 .intro h2 {
   max-width: 14ch;
-  font-size: clamp(2.5rem, 3.6vw, 3rem);
-  line-height: 1.04;
+  font-size: clamp(2.6rem, 3.9vw, 3.5rem);
+  line-height: 1.03;
   text-wrap: balance;
 }
 .intro h2 em { display: inline; color: var(--color-signal-hover); font-size: 1em; }

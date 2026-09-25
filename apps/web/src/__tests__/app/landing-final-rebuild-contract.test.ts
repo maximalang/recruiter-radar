@@ -38,7 +38,7 @@ describe("landing restoration narrative", () => {
     expect(hero).toContain('data-hero-layout="interactive-workflow"');
     expect(hero).toContain('data-theme="inverse"');
     expect(hero).toContain("data-payment-offer=");
-    expect(hero).toContain("Посмотреть workflow");
+    expect(hero).toContain("Посмотреть, как это работает");
     expect(hero).toContain("data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("без автопродления · сообщения отправляете вы");
@@ -82,7 +82,7 @@ describe("landing restoration narrative", () => {
     expect(hero).toContain('data-hero-product-preview="workflow"');
     expect(hero).toContain('id="hero-workflow"');
     expect(hero).toContain("Интерактивный workflow");
-    expect(hero).toContain("Радар находит повод. Пишете вы.");
+    expect(hero).toContain("Черновик готов — отправляете только вы");
     expect(hero).not.toContain("data-lead-row");
     expect(hero).not.toContain("getStaticDemoDigestItems");
     expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.tsx"))).toBe(false);

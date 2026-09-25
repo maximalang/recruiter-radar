@@ -30,19 +30,19 @@
 .title {
   max-width: 12ch;
   margin: 0;
-  font-size: clamp(2.8rem, 4.5vw, 4rem);
-  font-weight: 610;
+  font-size: clamp(3.2rem, 5.2vw, 4.7rem);
+  font-weight: 620;
   letter-spacing: -.052em;
-  line-height: 1.02;
+  line-height: 1;
   text-wrap: balance;
   animation: none;
 }
 
 .description {
-  max-width: 43ch;
-  margin: 1.35rem 0 0;
+  max-width: 46ch;
+  margin: 1.5rem 0 0;
   color: var(--color-text-secondary);
-  font-size: clamp(1rem, 1.3vw, 1.125rem);
+  font-size: clamp(1.05rem, 1.4vw, 1.2rem);
   line-height: 1.6;
   text-wrap: pretty;
 }

@@ -23,7 +23,7 @@ describe("landing hero advertising workflow", () => {
 
     expect(container.querySelector('[data-hero-product-preview="workflow"]')).not.toBeNull();
     expect(screen.getByRole("tab", { name: /Настройте рынок/i })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Так вы задаёте рынок и признаки спроса")).toBeInTheDocument();
+    expect(screen.getByText("Один профиль вместо десятков сохранённых поисков")).toBeInTheDocument();
     expect(container).not.toHaveTextContent(/Промет|Демо|12 мая|10 компаний/i);
   });
 
@@ -34,7 +34,7 @@ describe("landing hero advertising workflow", () => {
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Каждая компания приходит с причиной написать сейчас");
 
     fireEvent.click(screen.getByRole("tab", { name: /Подготовьте сообщение/i }));
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("Радар находит повод. Пишете вы.");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Черновик готов — отправляете только вы");
   });
 
   it("advances to the next idea after a comfortable reading interval", () => {
