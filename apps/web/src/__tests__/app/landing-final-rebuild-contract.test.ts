@@ -18,18 +18,16 @@ function source(path: string): string {
  * composition geometry. */
 
 describe("landing restoration narrative", () => {
-  it("restores the timeline scene between the promise and the proof", () => {
+  it("keeps the promise directly followed by the proof", () => {
     const page = source("app/landing/landing-page.tsx");
     const heroIndex = page.indexOf("<DetectionScene");
     const proofIndex = page.indexOf("<EvidenceScene");
 
     expect(heroIndex).toBeGreaterThan(-1);
     expect(proofIndex).toBeGreaterThan(heroIndex);
-    const timelineIndex = page.indexOf("<SignalTimeline />");
-    expect(timelineIndex).toBeGreaterThan(heroIndex);
-    expect(timelineIndex).toBeLessThan(proofIndex);
     expect(page).not.toContain("<WorkspaceScene");
     expect(page).not.toContain("<RadarScene");
+    expect(page).not.toContain("<SignalTimeline");
   });
 
   it("keeps the restored ambient hero payment-aware and connected to the preview", () => {

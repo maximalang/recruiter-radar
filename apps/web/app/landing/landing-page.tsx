@@ -11,7 +11,6 @@ import LandingMotion from "./landing-motion";
 import motionStyles from "./landing-motion.module.css";
 import styles from "./landing.module.css";
 import visualStyles from "./landing-visual-system.module.css";
-import SignalTimeline from "./signal-timeline";
 
 export function LandingSkipLink() {
   return <a href="#main-content" className={styles.skipLink}>Перейти к содержанию</a>;
@@ -40,7 +39,6 @@ export default function LandingPage(props: {
       </noscript>
       <main id="main-content">
         <DetectionScene paymentConfigured={props.paymentConfigured} />
-        <SignalTimeline />
         <EvidenceScene />
         <DeliveryScene />
         <ConversionPanel

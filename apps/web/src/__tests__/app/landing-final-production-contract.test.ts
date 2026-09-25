@@ -131,19 +131,12 @@ describe("landing final production contract", () => {
     // Relative-freshness phrasing is banned on the landing: demo facts must
     // carry an absolute, labeled scenario date instead of "N days ago".
     for (const file of [
-      source("app/landing/signal-timeline.tsx"),
       source("app/landing/hero-product-preview.tsx"),
       source("lib/landing-demo.ts"),
     ]) {
       expect(file).not.toMatch(/дней назад|дня назад|час назад|только что/i);
       expect(file).not.toMatch(/(^|[^\S])вчера(?![а-я])/i);
     }
-    const timeline = source("app/landing/signal-timeline.tsx");
-    expect(timeline).toContain("6 мая · демо-сценарий");
-    expect(timeline).toContain("10 мая · демо-сценарий");
-    expect(timeline).toContain('data-product-workflow="profile-to-contact"');
-    expect(timeline).toContain("STORY.company.freshness");
-
     // Demo story freshness is an explicit fixed date, never "today".
     const demoStory = source("lib/landing-demo.ts");
     expect(demoStory).toContain("демо-сценарий");
@@ -160,7 +153,6 @@ describe("landing final production contract", () => {
     // No relative freshness for demo facts anywhere on the landing surface:
     // every dated event is anchored to the fixed scenario (12 мая 2026).
     const relativeFreshnessFiles = [
-      source("app/landing/signal-timeline.tsx"),
       source("app/landing/evidence-scene.tsx"),
       source("app/landing/hero-product-preview.tsx"),
       source("app/landing/detection-scene.tsx"),
@@ -177,11 +169,9 @@ describe("landing final production contract", () => {
       expect(file).not.toMatch(/за последние \d+ (дн|нед)/i);
     }
 
-    // Timeline and demo story agree with the fixed anchor dates.
-    expect(timeline).toContain("6 мая · демо-сценарий");
-    expect(timeline).toContain("10 мая · демо-сценарий");
-    expect(timeline).toContain("Решение остаётся за вами");
-    expect(timeline).toContain("STORY.company.freshness");
+    // Demo story agrees with the fixed anchor dates (timeline scene retired in pass 6).
+    expect(source("lib/landing-demo.ts")).toContain("6 мая · демо-сценарий");
+    expect(source("lib/landing-demo.ts")).toContain("10 мая · демо-сценарий");
     // Demo fallback items use hard-coded dates; no wall-clock generation.
     const publicProduct = source("lib/publicProduct.ts");
     expect(publicProduct).toContain('demoAnchorDate = "2026-05-12T09:00:00.000Z"');

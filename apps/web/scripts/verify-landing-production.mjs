@@ -44,7 +44,6 @@ const viewportMatrix = [
 const requiredSelectors = [
   "#scene-detection",
   "#hero-workflow",
-  "#scene-signal-timeline",
   "#scene-evidence",
   "#scene-delivery",
   "#pricing",
@@ -54,7 +53,6 @@ const requiredSelectors = [
 
 const hashSpecs = [
   { name: "hash-hero-workflow-1440x900", hash: "hero-workflow", target: "#hero-workflow" },
-  { name: "hash-signal-timeline-1440x900", hash: "scene-signal-timeline", target: "#scene-signal-timeline" },
   { name: "hash-evidence-1440x900", hash: "scene-evidence", target: "#scene-evidence" },
   { name: "hash-delivery-1440x900", hash: "scene-delivery", target: "#scene-delivery" },
   { name: "hash-pricing-1440x900", hash: "pricing", target: "#pricing" },
@@ -477,21 +475,21 @@ async function assertHashNavigation(browser, spec) {
 
 async function assertHistoryNavigation(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const { page, assertCleanConsole } = await preparePage(context, "hash-history", `${baseUrl}/#scene-signal-timeline`);
+  const { page, assertCleanConsole } = await preparePage(context, "hash-history", `${baseUrl}/#scene-evidence`);
   await page.evaluate(() => {
-    window.location.hash = "scene-evidence";
+    window.location.hash = "scene-delivery";
   });
-  await page.waitForURL(/#scene-evidence$/);
-  await Promise.all([
-    page.waitForURL(/#scene-signal-timeline$/),
-    page.goBack(),
-  ]);
-  assert.match(page.url(), /#scene-signal-timeline$/);
+  await page.waitForURL(/#scene-delivery$/);
   await Promise.all([
     page.waitForURL(/#scene-evidence$/),
-    page.goForward(),
+    page.goBack(),
   ]);
   assert.match(page.url(), /#scene-evidence$/);
+  await Promise.all([
+    page.waitForURL(/#scene-delivery$/),
+    page.goForward(),
+  ]);
+  assert.match(page.url(), /#scene-delivery$/);
   assertCleanConsole();
   await context.close();
 }
@@ -512,7 +510,7 @@ async function assertMobileKeyboardNavigation(browser) {
   assert.equal(await trigger.evaluate((element) => element === document.activeElement), true, "focus did not return to menu trigger");
 
   await trigger.click();
-  await dialog.getByRole("link", { name: "Как работает" }).click();
+  await dialog.getByRole("link", { name: "Разбор" }).click();
   await page.waitForURL(/#scene-evidence$/);
   await dialog.waitFor({ state: "hidden" });
   assert.notEqual(await page.evaluate(() => document.body.style.overflow), "hidden");
@@ -571,10 +569,10 @@ async function assertActiveNavigationAndTone(browser) {
     window.location.hash = "scene-evidence";
   });
   await page.waitForURL(/#scene-evidence$/);
-  await page.waitForFunction(() => /Как работает/.test(
+  await page.waitForFunction(() => /Разбор/.test(
     document.querySelector('header[data-brand-header="recruiter-radar"] a[aria-current="location"]')?.textContent ?? "",
   ));
-  assert.match(await activeLink.first().innerText(), /Как работает/, "header: hash navigation must not retain stale FAQ state");
+  assert.match(await activeLink.first().innerText(), /Разбор/, "header: hash navigation must not retain stale FAQ state");
 
   await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
   await page.evaluate(() => {
@@ -582,7 +580,7 @@ async function assertActiveNavigationAndTone(browser) {
     if (evidence) window.scrollTo(0, window.scrollY + evidence.getBoundingClientRect().top - 48);
   });
   await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark");
-  assert.match(await activeLink.first().innerText(), /Как работает/);
+  assert.match(await activeLink.first().innerText(), /Разбор/);
   assert.equal(await brandHeader.getAttribute("data-tone"), "dark");
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
   await page.locator("#scene-delivery").scrollIntoViewIfNeeded();
@@ -716,7 +714,7 @@ async function assertNoJs(browser) {
   assert.match(await page.locator("h1").innerText(), /От сигнала до сообщения/);
   const noJsHeroText = await page.locator("#hero-workflow").textContent();
   assert.match(noJsHeroText, /Интерактивный workflow/i);
-  assert.match(noJsHeroText, /Настройте рынок/);
+  assert.match(noJsHeroText, /Ваш рынок/);
   assert.equal(await page.locator("#hero-workflow form").count(), 0, "no-JS hero demo must not render a form");
   assert.equal(await page.locator("[data-noscript-disclosure]").count(), 1, "no-JS disclosure missing");
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);

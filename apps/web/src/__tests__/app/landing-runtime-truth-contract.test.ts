@@ -84,8 +84,8 @@ describe("landing runtime truth contract", () => {
     expect(landingDemo).toContain("Прямой источник");
     expect(evidence).not.toContain("SOURCE_ROLES");
 
-    expect(faq).toContain("включая hh.ru, «Работу России» и карьерные страницы");
-    expect(faq).toContain("Сайты компаний и данные ФНС используются для проверки организации");
+    expect(faq).toContain("hh.ru, «Работа России», карьерные страницы компаний");
+    expect(faq).toContain("Сайты компаний и данные ФНС — для проверки организации");
     expect(faq).toContain("официального пути контакта");
     expect(evidence).not.toContain("adapter ready / digest gated");
     expect(evidence).not.toContain("promotion gate");

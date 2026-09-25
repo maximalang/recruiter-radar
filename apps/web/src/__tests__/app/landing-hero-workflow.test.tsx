@@ -22,18 +22,18 @@ describe("landing hero advertising workflow", () => {
     const { container } = render(<HeroProductPreview />);
 
     expect(container.querySelector('[data-hero-product-preview="workflow"]')).not.toBeNull();
-    expect(screen.getByRole("tab", { name: /Настройте рынок/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /Ваш рынок/i })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Один профиль вместо десятков сохранённых поисков")).toBeInTheDocument();
-    expect(container).not.toHaveTextContent(/Промет|Демо|12 мая|10 компаний/i);
+    expect(container).not.toHaveTextContent(/Промет|Демо|12 мая/i);
   });
 
   it("lets the visitor inspect every workflow stage", () => {
     render(<HeroProductPreview />);
 
-    fireEvent.click(screen.getByRole("tab", { name: /Получите повод/i }));
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("Каждая компания приходит с причиной написать сейчас");
+    fireEvent.click(screen.getByRole("tab", { name: /10 компаний/i }));
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("10 компаний за 7 дней — каждая с причиной написать");
 
-    fireEvent.click(screen.getByRole("tab", { name: /Подготовьте сообщение/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Готовый черновик/i }));
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Черновик готов — отправляете только вы");
   });
 
@@ -45,13 +45,13 @@ describe("landing hero advertising workflow", () => {
 
     fireEvent.pointerEnter(workflow!);
     act(() => jest.advanceTimersByTime(7_999));
-    expect(screen.getByRole("tab", { name: /Настройте рынок/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /Ваш рынок/i })).toHaveAttribute("aria-selected", "true");
     act(() => jest.advanceTimersByTime(1));
-    expect(screen.getByRole("tab", { name: /Радар проверяет/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /42 источника/i })).toHaveAttribute("aria-selected", "true");
 
-    fireEvent.click(screen.getByRole("tab", { name: /Получите повод/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /10 компаний/i }));
     act(() => jest.advanceTimersByTime(8_000));
-    expect(screen.getByRole("tab", { name: /Подготовьте сообщение/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /Готовый черновик/i })).toHaveAttribute("aria-selected", "true");
   });
 
   it("keeps the hero product shot fitted inside its column without a clipped edge", () => {
