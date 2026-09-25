@@ -96,7 +96,7 @@ describe("landing premium restoration contract", () => {
     // The priority-list description names the product value directly and makes
     // no delivery-cadence promise; no extra screen-reader account is needed.
     expect(hero).toContain(
-      "Настройте рынок один раз — Радар найдёт повод, подтвердит его фактами и покажет следующий шаг.",
+      "Радар следит за публичными источниками и приносит компании, где найм только начался. По каждой — повод, факты и черновик сообщения. Отправляете только вы.",
     );
     expect(hero).not.toContain("со свежими сигналами");
     expect(heroCss).toContain(".visuallyHidden");

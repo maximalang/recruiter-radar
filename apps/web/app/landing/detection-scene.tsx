@@ -20,12 +20,12 @@ export default function DetectionScene(props: { paymentConfigured: boolean }) {
       data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}
     >
       <div className={sceneStyles.copy} data-hero-copy>
-        <p className={sceneStyles.serviceLabel}>Радар находит повод. Пишете вы.</p>
+        <p className={sceneStyles.serviceLabel}>Для рекрутинговых агентств</p>
         <h1 id="detection-title" className={sceneStyles.title} data-hero-title>
           От сигнала до сообщения
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Настройте рынок один раз — Радар найдёт повод, подтвердит его фактами и покажет следующий шаг.
+          Радар следит за публичными источниками и приносит компании, где найм только начался. По каждой — повод, факты и черновик сообщения. Отправляете только вы.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a
@@ -34,7 +34,7 @@ export default function DetectionScene(props: { paymentConfigured: boolean }) {
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Посмотреть workflow <ArrowGlyph />
+            Посмотреть, как это работает <ArrowGlyph />
           </a>
           <span className={sceneStyles.actionHint}>Этапы сменяются автоматически — или выберите вручную</span>
         </div>

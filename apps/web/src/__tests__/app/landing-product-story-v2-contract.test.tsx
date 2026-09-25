@@ -37,8 +37,8 @@ describe("landing product story v2", () => {
     const heroCss = source("app/landing/detection-scene.module.css");
 
     expect(heroText).toContain("От сигнала до сообщения");
-    expect(heroText).toContain("Посмотреть workflow");
-    expect(heroText).toContain("Настройте рынок один раз");
+    expect(heroText).toContain("Посмотреть, как это работает");
+    expect(heroText).toContain("Радар следит за публичными источниками");
     expect(preview).toContain('data-hero-product-preview="workflow"');
     expect(previewText).toContain("Сегодня");
     expect(previewText).toContain("Компании");
@@ -101,7 +101,7 @@ describe("landing product story v2", () => {
     expect(heroCss).not.toContain(".section::before");
     expect(heroCss).not.toContain(".section::after");
     expect(heroCss).toMatch(
-      /\.title\s*\{[^}]*font-size:\s*clamp\(2\.8rem, 4\.5vw, 4rem\)[^}]*font-weight:\s*610[^}]*line-height:\s*1\.02/,
+      /\.title\s*\{[^}]*font-size:\s*clamp\(3\.2rem, 5\.2vw, 4\.7rem\)[^}]*font-weight:\s*620[^}]*line-height:\s*1;/,
     );
     expect(heroCss).toMatch(
       /\.primaryButton\s*\{[^}]*min-height:\s*48px[^}]*background:\s*var\(--color-signal\)[^}]*color:\s*var\(--color-text-inverse\)/,
@@ -210,9 +210,9 @@ describe("landing product story v2", () => {
     expect(evidenceText).toContain("Уверенность");
     expect(evidenceText).toContain("Следующий ход");
 
-    expect(evidenceCss).toMatch(/--evidence-paper:\s*var\(--landing-paper\)/);
-    expect(evidenceCss).toMatch(/--evidence-ink:\s*var\(--landing-ink\)/);
-    expect(evidenceCss).toMatch(/--evidence-accent:\s*var\(--landing-accent\)/);
+    expect(evidenceCss).toMatch(/--evidence-paper:\s*var\(--color-canvas\)/);
+    expect(evidenceCss).toMatch(/--evidence-ink:\s*var\(--color-text-primary\)/);
+    expect(evidenceCss).toMatch(/--evidence-accent:\s*var\(--color-signal\)/);
     expect(evidenceCss).not.toMatch(/gradient\(|box-shadow:/);
     expect(evidenceCss).toMatch(
       /\.timeline li\s*\{[^}]*grid-template-columns:\s*minmax\(8rem, \.6fr\)\s+minmax\(7rem, \.45fr\)\s+minmax\(0, 1\.55fr\)/,

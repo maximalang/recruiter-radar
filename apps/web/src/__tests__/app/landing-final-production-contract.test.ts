@@ -19,7 +19,7 @@ describe("landing final production contract", () => {
     expect(hero).toContain("От сигнала до сообщения");
     expect(hero).toContain('data-hero-layout="interactive-workflow"');
     expect(hero).toContain('data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}');
-    expect(hero).toContain("Посмотреть workflow");
+    expect(hero).toContain("Посмотреть, как это работает");
     expect(hero).toContain(">Войти</Link>");
     expect(hero).toContain('data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}');
     expect(hero).toContain('data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}');
@@ -27,7 +27,7 @@ describe("landing final production contract", () => {
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");
-    expect(heroCss).toMatch(/\.title\s*\{[^}]*font-size:\s*clamp\(2\.8rem,\s*4\.5vw,\s*4rem\);[^}]*font-weight:\s*610;[^}]*line-height:\s*1\.02;/);
+    expect(heroCss).toMatch(/\.title\s*\{[^}]*font-size:\s*clamp\(3\.2rem,\s*5\.2vw,\s*4\.7rem\);[^}]*font-weight:\s*620;[^}]*line-height:\s*1;/);
   });
 
   test("uses one Pilot decision, centered FAQ, and compact closing CTA", () => {

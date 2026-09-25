@@ -187,7 +187,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).not.toContain('id="scene-timeline"');
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
-    expect(html).toContain("Радар находит повод. Пишете вы.");
+    expect(html).toContain("Один профиль вместо десятков сохранённых поисков");
     expect(footerSource).toContain('href="/legal"');
     expect(footerSource).toContain('href="/terms"');
     expect(footerSource).toContain('href="/payment-and-refund"');
@@ -216,7 +216,7 @@ describe("final unified evidence-first landing contract", () => {
     const delivery = renderToStaticMarkup(<DeliveryScene />);
 
     expect(hero).toContain("От сигнала до сообщения");
-    expect(hero).toContain("Посмотреть workflow");
+    expect(hero).toContain("Посмотреть, как это работает");
     expect(hero).toContain("Этапы сменяются автоматически");
     expect(hero).toContain(">Войти</a>");
     expect(hero).toContain("заявка без списания");
