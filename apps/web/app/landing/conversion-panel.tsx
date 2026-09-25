@@ -39,7 +39,7 @@ export default function ConversionPanel(props: {
         <div className={panelStyles.pricingIntro} data-pricing-intro>
           <span>Попробуйте на своей нише</span>
           <h2>Попробовать 7 дней — {pilotPlan.price}</h2>
-          <p>Полноценная неделя работы: приоритетные компании вашей ниши с поводом, фактами и источниками. Оплата разовая, без автопродления.</p>
+          <p>Полноценная неделя работы: приоритетные компании вашей ниши с поводом, фактами и источниками.</p>
         </div>
 
         <div className={panelStyles.pricingDecision}>
@@ -130,7 +130,7 @@ export default function ConversionPanel(props: {
 
           <span className={panelStyles.finalEyebrow}>7 дней / своя ниша</span>
           <h2>Посмотрите, кому стоит написать сейчас.</h2>
-          <p>Компании вашей ниши с активным наймом: что изменилось, чем подтверждено и с чего начать разговор.</p>
+          <p>Что изменилось, чем подтверждено и с чего начать разговор — по каждой компании.</p>
         </div>
         <div className={panelStyles.finalDecision}>
           <ul className={panelStyles.finalTrust} aria-label="Условия запуска">

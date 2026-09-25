@@ -95,8 +95,8 @@ describe("landing restoration narrative", () => {
     const delivery = source("app/landing/delivery-scene.tsx");
     const deliveryCss = source("app/landing/delivery-scene.module.css");
 
-    // Narrative headline: the radar finds the reason, the human writes.
-    expect(delivery).toContain("Радар находит повод. Пишете вы.");
+    // Delivery headline: results arrive where the user already works.
+    expect(delivery).toContain("Результаты приходят туда, где вы работаете");
 
     // Truthful channel hierarchy: web cabinet is the core surface,
     // connected notification routes come next, secondary routes are

@@ -80,7 +80,7 @@ export default function SignalTimeline() {
           </ol>
           <div className={styles.lock} data-manual-decision="true">
             <span>КОНТАКТ ПОД ВАШИМ КОНТРОЛЕМ</span>
-            <strong>Радар даёт повод и факты. Сообщение отправляете вы.</strong>
+            <strong>Ни одного письма без вашего решения.</strong>
             <small>никакой автоматической массовой рассылки</small>
           </div>
         </div>
