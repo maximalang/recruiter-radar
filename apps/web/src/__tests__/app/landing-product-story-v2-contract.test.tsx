@@ -20,11 +20,6 @@ function visibleText(markup: string): string {
   return markup.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function feedbackActionsFromSource(contents: string): Array<[string, string]> {
-  return [...contents.matchAll(/\{\s*key:\s*"([^"]+)",\s*label:\s*"([^"]+)"\s*\}/g)]
-    .map((match) => [match[1], match[2]]);
-}
-
 describe("landing product story v2", () => {
   it("opens with a clear buyer outcome and a believable product workspace", () => {
     const hero = renderToStaticMarkup(
@@ -106,7 +101,7 @@ describe("landing product story v2", () => {
       /\.primaryButton\s*\{[^}]*min-height:\s*48px[^}]*background:\s*var\(--color-signal\)[^}]*color:\s*var\(--color-text-inverse\)/,
     );
     expect(heroCss).toMatch(
-      /\.productShot\s*\{[^}]*width:\s*100%[^}]*background:\s*var\(--color-canvas\)/,
+      /\.productShot\s*\{[^}]*width:\s*100%[^}]*background:\s*var\(--color-surface-secondary\)/,
     );
 
     const hierarchy = [
@@ -193,32 +188,17 @@ describe("landing product story v2", () => {
     expect(evidenceCss).toMatch(/overflow-wrap:\s*anywhere/);
   });
 
-  it("shows a concrete Telegram digest and keeps outreach under manual control", () => {
+  it("keeps delivery surfaces and manual control without the telegram mock", () => {
     const delivery = renderToStaticMarkup(<DeliveryScene />);
     const deliveryText = visibleText(delivery);
-    const deliveryCss = source("app/landing/delivery-scene.module.css");
-    const landingFeedbackActions = feedbackActionsFromSource(
-      source("app/landing/delivery-scene.tsx"),
-    );
 
-    expect(delivery).toContain('data-telegram-preview="static-demo"');
-    expect(deliveryText).toContain("Новый приоритетный сигнал");
-    expect(deliveryText).toContain("Демо · 12 мая");
-    expect(deliveryText).toContain("Почему сейчас");
-    expect(deliveryText).toContain("Источник и дата");
-    expect(delivery).toContain('data-telegram-feedback-actions="production"');
-    expect(delivery.match(/data-feedback-action=/g)).toHaveLength(4);
-    expect(landingFeedbackActions).toHaveLength(4);
-    expect(landingFeedbackActions.map(([key]) => key)).toEqual(["accepted", "badfit", "snooze", "dismissed"]);
-    for (const label of ["Беру", "Мимо", "Позже", "Скрыть"]) {
-      expect(deliveryText).toContain(label);
-    }
+    expect(delivery).not.toContain("data-telegram-preview");
+    expect(delivery).not.toContain("data-telegram-feedback-actions");
+    expect(deliveryText).not.toContain("Новый приоритетный сигнал");
     expect(deliveryText).toContain("Веб-кабинет");
     expect(deliveryText).toContain("Telegram");
+    expect(deliveryText).toContain("Email");
     expect(deliveryText).toContain("Сообщения компаниям не отправляются автоматически.");
-    expect(deliveryCss).toMatch(
-      /\.telegramAvatar\s*\{[^}]*color:\s*var\(--delivery-paper\)/,
-    );
   });
 
   it("keeps the mobile interactive example concise without hiding the primary proof", () => {
@@ -255,9 +235,8 @@ describe("landing product story v2", () => {
     const conversionCss = source("app/landing/conversion-panel.module.css");
     const landing = source("app/landing/landing-page.tsx");
 
-    expect(delivery).toContain('data-telegram-preview="static-demo"');
-    expect(deliveryText).toContain("Статический демо-экран");
-    expect(deliveryText).toContain("Сообщение компании не отправлено");
+    expect(delivery).not.toContain("data-telegram-preview");
+    expect(deliveryText).not.toContain("Статический демо-экран");
     expect(deliveryCss).not.toMatch(/gradient\(|box-shadow:/);
 
     expect(conversion).toContain('data-pricing-path="pilot-first"');
