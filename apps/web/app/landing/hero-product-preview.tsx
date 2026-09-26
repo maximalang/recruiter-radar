@@ -239,7 +239,7 @@ export default function HeroProductPreview() {
                 className={stage === item.id ? sceneStyles.workflowTabActive : undefined}
                 onClick={() => { setStage(item.id); setPage("today"); }}
               >
-                <i>{item.id}</i><span><b>{item.label}</b></span>
+                <span className={sceneStyles.stageState} data-state={item.id < stage ? "done" : item.id === stage ? "active" : "todo"} aria-hidden="true" /><span><b>{item.label}</b></span>
               </button>
             ))}
           </div>
@@ -293,8 +293,10 @@ export default function HeroProductPreview() {
                   <dl className={sceneStyles.workflowRows}>
                     {currentStage.rows.map(([label, copy], index) => (
                       <div key={label}>
-                        <span className={sceneStyles.rowIco} data-i={index % 3} aria-hidden="true"><Ico name={["search", "chart", "target"][index % 3]} /></span>
-                        <dt>{label}</dt>
+                        {index % 3 === 0 && <span className={sceneStyles.rowIco} data-i={index % 3} aria-hidden="true"><Ico name={["search", "chart", "target"][index % 3]} /></span>}
+                        {index % 3 === 1 && <span className={sceneStyles.rowLabel}>{label}</span>}
+                        {index % 3 === 2 && <span className={sceneStyles.rowAv} aria-hidden="true">RR</span>}
+                        {index % 3 !== 1 && <dt>{label}</dt>}
                         <dd>{copy}</dd>
                         <span className={sceneStyles.rowTime}>{["сейчас", "1 мин назад", "2 мин назад"][index % 3]}</span>
                       </div>
@@ -311,9 +313,8 @@ export default function HeroProductPreview() {
                 <aside className={sceneStyles.shotProps} aria-label="Сводка этапа">
                   <div className={sceneStyles.propsCard}>
                     <h3>Сводка</h3>
-                    <div><span aria-hidden="true"><Ico name="branch" /></span>Этап {stage} из 4</div>
-                    <div><span aria-hidden="true"><Ico name="target" /></span>Пилот · 7 дней</div>
-                    <div><span aria-hidden="true"><Ico name="bolt" /></span>Этапы сменяются сами</div>
+                    <p className={sceneStyles.propsStatus}><span className={sceneStyles.statusDot} aria-hidden="true" />Этап {stage} из 4</p>
+                    <p className={sceneStyles.propsMeta}>Пилот · 7 дней. Этапы сменяются сами</p>
                   </div>
                   <div className={sceneStyles.aiFloat} aria-hidden="true">
                     <div className={sceneStyles.aiFloatHead}>
