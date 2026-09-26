@@ -98,9 +98,24 @@
 
   color: var(--color-text-primary);
   text-align: left;
+
+  /* Linear-demo exact palette (owner 26.09): neutral graphite, no green cast */
+  --color-surface-primary: #131416;
+  --color-surface-secondary: #17181a;
+  --color-surface-elevated: #1e1f21;
+  --color-surface-selected: #202123;
+  --color-separator: #2e2f32;
+  --color-separator-subtle: #262729;
+  --color-text-primary: #dcdddf;
+  --color-text-secondary: #a8a9ac;
+  --color-text-tertiary: #898b8e;
+  --color-text-disabled: #696b70;
+  --color-signal: #f0b429;
+  --color-signal-on-dark: #f0b429;
+  --color-signal-soft: rgba(240, 180, 41, 0.14);
 }
 
-.shotMark { display: grid; width: 1.3rem; height: 1.3rem; place-items: center; border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 40%, transparent); border-radius: 6px; color: var(--color-signal-on-dark); font: 700 .5rem var(--font-mono); }
+.shotMark { display: grid; width: 1.3rem; height: 1.3rem; place-items: center; border: 1px solid var(--color-separator); border-radius: 6px; background: var(--color-surface-elevated); color: var(--color-text-primary); font: 700 .5rem var(--font-mono); }
 
 .shotBody { display: grid; min-height: 33rem; grid-template-columns: 14rem minmax(0,1fr); }
 .shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .9rem; border-right: 1px solid var(--color-separator-subtle); background: rgba(255, 255, 255, 0.012); }
@@ -139,7 +154,7 @@
 .sideUser small { color: var(--color-text-tertiary); font-size: .66rem; }
 .shotNav button { display: flex; align-items: center; gap: .5rem; }
 .shotNav button svg { width: 15px; height: 15px; flex: none; color: var(--color-text-tertiary); }
-.shotNav .shotNavActive svg { color: var(--color-signal-on-dark); }
+.shotNav .shotNavActive svg { color: var(--color-text-primary); }
 .workflowTabs { display: grid; grid-template-columns: minmax(0,1fr); gap: .12rem; }
 .workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 2rem; align-items: center; gap: .5rem; padding: 0 .55rem; border: 0; border-radius: 8px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); text-align: left; cursor: pointer; transition: background-color 0.18s var(--motion-ease-standard), color 0.18s var(--motion-ease-standard); }
 .workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
@@ -151,7 +166,7 @@
   .workflowTabs b,.workflowTabs small { overflow: visible; white-space: normal; text-overflow: clip; line-height: 1.2; }
 }
 .workflowTabs .workflowTabActive { background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-selected)); color: var(--color-text-primary); }
-.workflowTabActive i { border-color: var(--color-signal-on-dark); background: var(--color-signal-soft); color: var(--color-signal-on-dark); }
+.workflowTabActive i { border-color: var(--color-separator); background: var(--color-surface-elevated); color: var(--color-text-primary); }
 
 .workflowPanel { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr) 14rem; gap: .5rem; margin-top: .2rem; background: transparent; }
 .workflowMain { padding: 2.1rem 1.15rem 1.3rem; }
@@ -159,9 +174,9 @@
 .shotProps h3 { margin: 0 0 .5rem; color: var(--color-text-tertiary); font-size: .64rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
 .shotProps > div { display: flex; align-items: center; gap: .45rem; padding: .28rem 0; color: color-mix(in srgb, var(--color-text-primary) 82%, transparent); font-size: .7rem; }
 .shotProps > .aiFloat { display: block; padding: .85rem .95rem; color: var(--color-text-primary); }
-.shotProps svg { width: 13px; height: 13px; flex: none; color: var(--color-signal-on-dark); }
+.shotProps svg { width: 13px; height: 13px; flex: none; color: #5e6ad2; }
 .activityHead { margin: 1.6rem 0 0; color: color-mix(in srgb, var(--color-text-primary) 88%, transparent); font-size: .95rem; font-weight: 600; letter-spacing: -.01em; }
-.workflowEyebrow,.infoPage > span { color: var(--color-signal-on-dark); font: .58rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
+.workflowEyebrow,.infoPage > span { color: var(--color-text-tertiary); font: .58rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
 .workflowMain h2,.infoPage h2 { max-width: 28ch; margin: .55rem 0 0; font-size: 1.3rem; font-weight: 600; letter-spacing: -.025em; line-height: 1.25; }
 .workflowIntro,.infoPage > p { max-width: 62ch; margin: .5rem 0 0; color: var(--color-text-secondary); font-size: .82rem; line-height: 1.55; }
 .workflowRows { margin: .85rem 0 0; }
@@ -176,6 +191,9 @@
   content: "";
   transform: translateY(-1px);
 }
+.workflowRows > div:nth-child(1) dt::before { background: #5e6ad2; }
+.workflowRows > div:nth-child(2) dt::before { background: #4cb782; }
+.workflowRows > div:nth-child(3) dt::before { background: #9d7be8; }
 .workflowRows dd { margin: 0; color: color-mix(in srgb, var(--color-text-primary) 74%, transparent); font-size: .78rem; line-height: 1.5; }
 .workflowRows > div { animation: rowIn 0.5s var(--motion-ease-enter) both; }
 .workflowRows > div:nth-child(2) { animation-delay: 70ms; }
