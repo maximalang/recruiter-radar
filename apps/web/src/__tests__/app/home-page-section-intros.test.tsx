@@ -5,21 +5,20 @@ import { existsSync, readFileSync } from "node:fs";
 import { PassThrough } from "node:stream";
 import { resolve } from "node:path";
 
-import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/home-page-content";
+import HomePage from "@/app/home-page-content";
 import ConversionPanel from "@/app/landing/conversion-panel";
 import DeliveryScene from "@/app/landing/delivery-scene";
 import DetectionScene from "@/app/landing/detection-scene";
 import EvidenceScene from "@/app/landing/evidence-scene";
+import HeroProductPreview from "@/app/landing/hero-product-preview";
 import LandingHeader from "@/app/landing/landing-header";
-import WorkspaceScene, { WorkspaceResults } from "@/app/landing/workspace-scene";
 import { SiteFooter } from "@/app/ui/site-footer";
 import {
   LANDING_ANALYTICS_CONTEXT,
   LANDING_ANALYTICS_EVENT,
 } from "@/lib/landing-analytics-contract";
 import {
-  buildCheckoutHref,
-  getPublicSampleDigestState,
+  buildPublicPreviewHref,
   hasPublicPreviewInput,
   readPublicPreviewInput,
 } from "@/lib/publicProduct";
@@ -28,20 +27,9 @@ jest.mock("@/lib/payments", () => ({
   getPaymentProviderSetupState: () => ({ configured: false }),
 }));
 
-jest.mock("@/lib/publicProduct", () => {
-  const actual = jest.requireActual("@/lib/publicProduct");
-  return { ...actual, getPublicSampleDigestState: jest.fn() };
-});
-
-const mockGetPublicSampleDigestState = getPublicSampleDigestState as jest.MockedFunction<
-  typeof getPublicSampleDigestState
->;
-
 const WEB_ROOT = existsSync(resolve(process.cwd(), "app"))
   ? process.cwd()
   : resolve(process.cwd(), "apps/web");
-
-type PreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
 function collectElements(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
   const matches: ReactElement<Record<string, any>>[] = [];
@@ -100,55 +88,15 @@ function renderServerHtml(node: ReactNode): Promise<string> {
   });
 }
 
-function makePreviewItem(overrides: Partial<PreviewItem> = {}): PreviewItem {
-  return {
-    rank: 1,
-    org_id: "demo-industrial",
-    hh_employer_id: "demo-industrial",
-    employer_name: "Производственная компания",
-    vacancies_count: 14,
-    distinct_vacancy_names_count: 6,
-    latest_published_at: "2026-07-19T09:00:00.000Z",
-    total_score: 348,
-    reasons: ["14 новых вакансий за 6 дней", "Сигнал подтверждён двумя источниками"],
-    opener: "Предложить точечный подбор по инженерным ролям",
-    source_families: ["hh", "career-pages"],
-    evidence_titles: ["Инженер-конструктор", "Руководитель производства"],
-    candidate_source_keys: ["demo:hh", "demo:career"],
-    location_names: ["Москва и область"],
-    confidence_gate: "A",
-    confidenceLabel: "high",
-    sourceCount: 2,
-    sourceKeys: ["demo:hh", "demo:career"],
-    structuredSignalCount: 2,
-    curationLabels: [],
-    lawfulContactPath: "career-page",
-    negativeSignals: [],
-    relevanceSignals: { fit: 0.88, intent: 0.84, urgency: 0.94, reachability: 0.82 },
-    ...overrides,
-  };
-}
-
 function source(path: string) {
   return readFileSync(resolve(WEB_ROOT, path), "utf8");
 }
 
 describe("final unified evidence-first landing contract", () => {
-  beforeEach(() => {
-    mockGetPublicSampleDigestState.mockReset();
-    mockGetPublicSampleDigestState.mockResolvedValue({
-      isLive: true,
-      isPersonalized: false,
-      hasExactMatches: true,
-      items: [],
-    });
-  });
-
-  it("keeps the required scene order and conversion outside workspace suspense", async () => {
+  it("keeps the required scene order with the hero demo as the single example", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     expect(collectElements(page, LandingHeader)).toHaveLength(1);
     expect(collectElements(page, DetectionScene)).toHaveLength(1);
-    expect(collectElements(page, WorkspaceScene)).toHaveLength(1);
     expect(collectElements(page, EvidenceScene)).toHaveLength(1);
     expect(collectElements(page, DeliveryScene)).toHaveLength(1);
     expect(collectElements(page, ConversionPanel)).toHaveLength(1);
@@ -157,7 +105,6 @@ describe("final unified evidence-first landing contract", () => {
     const landing = source("app/landing/landing-page.tsx");
     const expectedOrder = [
       "<DetectionScene",
-      "<WorkspaceScene",
       "<EvidenceScene",
       "<DeliveryScene",
       "<ConversionPanel",
@@ -169,63 +116,53 @@ describe("final unified evidence-first landing contract", () => {
       expect(next).toBeGreaterThan(cursor);
       cursor = next;
     }
+    expect(landing).not.toContain("<WorkspaceScene");
     expect(landing).not.toContain("<Suspense");
   });
 
-  it("keeps the workspace shell synchronous and only results asynchronous", () => {
-    const workspace = source("app/landing/workspace-scene.tsx");
-    expect(workspace).toContain("export default function WorkspaceScene");
-    expect(workspace).toContain("function WorkspaceIntro");
-    expect(workspace).toContain("function PreviewConfigurator");
-    expect(workspace).toContain("export async function WorkspaceResults");
-    expect(workspace).toContain("<Suspense fallback={<WorkspaceResultsSkeleton />}");
-    expect(workspace.indexOf("<PreviewConfigurator")).toBeLessThan(workspace.indexOf("<Suspense"));
-    expect(workspace.match(/getPublicSampleDigestState\(/g)).toHaveLength(1);
+  it("keeps the hero workflow demo as the single example surface", () => {
+    const hero = source("app/landing/hero-product-preview.tsx");
+    expect(hero).toContain('id="hero-workflow"');
+    expect(hero).toContain("data-hero-workflow");
+    expect(hero).not.toContain("getStaticDemoDigestItems");
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.tsx"))).toBe(false);
+    expect(existsSync(resolve(WEB_ROOT, "app/landing-preview-interactions.tsx"))).toBe(false);
   });
 
-  it("renders the static configurator and stable results target before data resolves", () => {
-    const input = readPublicPreviewInput({ specialization: "инженерный подбор" });
-    const preview = PreviewSection({
-      previewInput: input,
-      hasPreview: hasPublicPreviewInput(input),
-      checkoutHref: buildCheckoutHref(input),
-    });
-    expect(preview.type).toBe(WorkspaceScene);
+  it("points every public example anchor at the hero workflow", () => {
+    const detection = source("app/landing/detection-scene.tsx");
+    const landing = source("app/landing/landing-page.tsx");
+    const header = source("app/landing/landing-header.tsx");
 
-    const workspace = source("app/landing/workspace-scene.tsx");
-    const configuratorCallIndex = workspace.indexOf("<PreviewConfigurator");
-    const suspenseIndex = workspace.indexOf("<Suspense");
-    expect(configuratorCallIndex).toBeGreaterThan(-1);
-    expect(configuratorCallIndex).toBeLessThan(suspenseIndex);
-    expect(workspace).toContain('id="preview-configurator"');
-    expect(workspace).toContain('action="/#preview-results"');
+    expect(detection).toContain('href="#hero-workflow"');
+    expect(landing).toContain("<LandingHeader />");
+    expect(landing).not.toContain("preview-configurator");
+    expect(landing).not.toContain("preview-results");
+    // One primary path to the example (owner verdict 23.09): the header no
+    // longer duplicates the hero workflow CTA.
+    expect(header).not.toContain("Посмотреть пример");
+    expect(header).not.toContain("previewHref");
 
-    const skeleton = renderToStaticMarkup(<PreviewSkeleton />);
-    expect(skeleton).toContain('id="preview-results"');
-    expect(skeleton).toContain("data-preview-results-skeleton");
-    expect(skeleton).toContain('aria-busy="true"');
+    // Checkout return links keep the filters and land on the single example.
+    const href = buildPublicPreviewHref(readPublicPreviewInput({ specialization: "инженерный подбор" }));
+    expect(new URL(href, "https://radar.example").hash).toBe("#hero-workflow");
   });
 
-  it("fails open when preview data throws and preserves checkout analytics", async () => {
-    mockGetPublicSampleDigestState.mockRejectedValueOnce(new Error("database unavailable"));
-    const input = readPublicPreviewInput({ specialization: "инженерный подбор", targetCity: "Москва" });
-    const checkoutHref = buildCheckoutHref(input);
-    const results = await WorkspaceResults({ previewInput: input, checkoutHref });
-    const markup = renderToStaticMarkup(results);
+  it("keeps checkout analytics on the pilot pricing CTA", () => {
+    const markup = renderToStaticMarkup(
+      <ConversionPanel
+        previewInput={readPublicPreviewInput({})}
+        paymentConfigured
+        faqItems={[]}
+      />,
+    );
 
-    expect(markup).toContain('id="preview-results"');
-    expect(markup).toContain("data-preview-results-ready");
-    expect(markup).toContain("Не удалось обновить пример");
-    expect(markup).toContain("Тарифы и ответы на вопросы доступны ниже");
-    expect(markup).toContain(`href="${checkoutHref.replaceAll("&", "&amp;")}"`);
     expect(markup).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.checkoutStarted}"`);
-    expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.preview}"`);
-    expect(markup).toContain("Попробовать 7 дней");
-    expect(source("app/landing/workspace-scene.module.css")).toMatch(/\.checkout\s*\{[\s\S]*?min-height:\s*52px/);
+    expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.pricingPilot}"`);
+    expect(markup).toContain('href="#hero-workflow"');
   });
 
-  it("streams the complete landing composition when preview data throws", async () => {
-    mockGetPublicSampleDigestState.mockRejectedValueOnce(new Error("database unavailable"));
+  it("streams the complete landing composition with the hero demo", async () => {
     const page = await HomePage({
       searchParams: Promise.resolve({ specialization: "инженерный подбор", targetCity: "Москва" }),
     });
@@ -235,19 +172,21 @@ describe("final unified evidence-first landing contract", () => {
     const footerSource = source("app/ui/site-footer.tsx");
     const offerAliasSource = source("app/offer/page.tsx");
 
-    expect(html).toContain('id="scene-workspace"');
-    expect(html).toContain("Интерактивный пример");
-    expect(html).toContain("Показать компании");
-    expect(html).toContain('id="preview-configurator"');
-    expect(html).toContain('id="preview-results"');
-    expect(html).toContain("Не удалось обновить пример");
+    expect(html).toContain('id="hero-workflow"');
+    expect(html).toContain("Интерактивный workflow");
+    expect(html).not.toContain('id="scene-workspace"');
+    expect(html).not.toContain('id="preview-configurator"');
+    expect(html).not.toContain('id="preview-results"');
+    expect(html).not.toContain("data-story-path");
+    expect(html).not.toContain("data-source-badges");
+    expect(html).not.toContain("data-preview-form");
     expect(html).toContain('id="scene-evidence"');
     expect(html).toContain('id="scene-delivery"');
     expect(html).not.toContain('id="scene-outreach"');
     expect(html).not.toContain('id="scene-timeline"');
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
-    expect(html).toContain("Задайте нишу и географию");
+    expect(html).toContain("Один профиль вместо десятков сохранённых поисков");
     expect(footerSource).toContain('href="/legal"');
     expect(footerSource).toContain('href="/terms"');
     expect(footerSource).toContain('href="/payment-and-refund"');
@@ -259,35 +198,25 @@ describe("final unified evidence-first landing contract", () => {
     expect(footerSource).toContain("Recruiter Radar");
   });
 
-  it("renders an evidence-backed lead list with one expanded recommendation", async () => {
-    mockGetPublicSampleDigestState.mockResolvedValueOnce({
-      isLive: false,
-      isPersonalized: false,
-      hasExactMatches: true,
-      items: [
-        makePreviewItem(),
-        makePreviewItem({ rank: 2, org_id: "demo-service", employer_name: "Сервисная B2B-компания" }),
-      ],
-    });
-    const input = readPublicPreviewInput({});
-    const results = await WorkspaceResults({ previewInput: input, checkoutHref: buildCheckoutHref(input) });
-    const markup = renderToStaticMarkup(results);
-
-    expect(markup.match(/data-lead-row="true"/g)).toHaveLength(2);
-    expect(markup.match(/data-primary-lead="true"/g)).toHaveLength(1);
-    expect(markup.match(/data-selected-lead-detail/g)).toHaveLength(1);
-    expect(markup).toContain("Почему сейчас");
-    expect(markup).toContain("Подтверждения и источники");
-    expect(markup).toContain("Сообщения не отправляются автоматически");
+  it("renders the hero workflow demo with the four product stages", () => {
+    const markup = renderToStaticMarkup(<HeroProductPreview />);
+    expect(markup).toContain('role="tablist"');
+    expect(markup.match(/role="tab"/g)).toHaveLength(4);
+    expect(markup).toContain("Ваш рынок");
+    expect(markup).toContain("42 источника");
+    expect(markup).toContain("10 компаний");
+    expect(markup).toContain("Готовый черновик");
+    expect(markup).not.toContain("data-lead-row");
   });
 
-  it("keeps product copy, analytics and manual outreach boundary", () => {
-    const hero = renderToStaticMarkup(<DetectionScene previewHref="#preview-configurator" paymentConfigured={false} />);
+  it("keeps the hero example CTA and trust copy single-demo aware", () => {
+    const hero = renderToStaticMarkup(<DetectionScene paymentConfigured={false} />);
     const evidence = renderToStaticMarkup(<EvidenceScene />);
     const delivery = renderToStaticMarkup(<DeliveryScene />);
 
-    expect(hero).toContain("Список компаний, где найм уже идёт");
-    expect(hero).toContain("Открыть пример");
+    expect(hero).toContain("От сигнала до сообщения");
+    expect(hero).toContain("Посмотреть, как это работает");
+    expect(hero).toContain("Этапы сменяются автоматически");
     expect(hero).toContain(">Войти</a>");
     expect(hero).toContain("заявка без списания");
     expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
@@ -346,7 +275,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(header).toContain('document.body.style.overflow = "hidden"');
     expect(header).toContain("scrollbarWidth");
     expect(header).toContain("menuButtonRef.current?.focus");
-    expect(header).toContain("Посмотреть пример");
+    expect(header).not.toContain("Посмотреть пример");
     expect(header).not.toContain("Посмотреть возможности");
     expect(headerCss).toMatch(/\.navLink\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/);
   });

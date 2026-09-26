@@ -55,38 +55,22 @@ describe("landing premium restoration contract", () => {
     expect(fieldCss).toMatch(/\.focusCore[^{]*\{[^}]*62%/);
   });
 
-  it("derives hero radar annotations and timeline events from the canonical demo story only", () => {
+  it("derives hero radar annotations from the canonical demo story only", () => {
     const field = source("app/landing/hero-signal-field.tsx");
-    const timeline = source("app/landing/signal-timeline.tsx");
     const demo = source("lib/landing-demo.ts");
 
     expect(field).toContain('import { DEFAULT_LANDING_DEMO_STORY } from "../../lib/landing-demo"');
     expect(field).toContain("STORY.company.name");
     expect(field).toContain("STORY.company.signal");
-    expect(timeline).toContain('import { DEFAULT_LANDING_DEMO_STORY } from "../../lib/landing-demo"');
 
     // The retired fake numbers stay retired everywhere on the landing.
     expect(demo).toContain("vacanciesCount: 14");
-    for (const scene of [field, timeline]) {
+    for (const scene of [field]) {
       expect(scene).not.toContain('"Промышленная группа"');
       expect(scene).not.toContain("8 позиций");
       expect(scene).not.toContain("4 авг");
       expect(scene).not.toContain("9 авг");
     }
-  });
-
-  it("keeps informational timeline rows out of the keyboard order while preserving list semantics", () => {
-    const timeline = source("app/landing/signal-timeline.tsx");
-    const timelineCss = source("app/landing/signal-timeline.module.css");
-
-    expect(timeline).not.toContain("tabIndex");
-    expect(timeline).toContain("<ol className={styles.events}>");
-    expect(timeline).toContain("<time>{event.date}</time>");
-    expect(timeline).toContain('data-timeline-event');
-    expect(timeline).toContain("ПОВОД СОБРАН");
-    // No fake button affordances on rows.
-    expect(timelineCss).not.toMatch(/\.event\s*\{[^}]*cursor:\s*pointer/);
-    expect(timelineCss).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
   it("keeps the hero description self-sufficient for screen readers", () => {
@@ -96,7 +80,7 @@ describe("landing premium restoration contract", () => {
     // The priority-list description names the product value directly and makes
     // no delivery-cadence promise; no extra screen-reader account is needed.
     expect(hero).toContain(
-      "Приоритетный список компаний с сигналами найма: почему компания в списке, какие факты это подтверждают и с чего начать контакт.",
+      "Радар следит за публичными источниками и приносит компании, где найм только начался. По каждой — повод, факты и черновик сообщения. Отправляете только вы.",
     );
     expect(hero).not.toContain("со свежими сигналами");
     expect(heroCss).toContain(".visuallyHidden");

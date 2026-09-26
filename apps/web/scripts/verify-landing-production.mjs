@@ -43,9 +43,7 @@ const viewportMatrix = [
 
 const requiredSelectors = [
   "#scene-detection",
-  "#scene-workspace",
-  "#preview-configurator",
-  "#preview-results",
+  "#hero-workflow",
   "#scene-evidence",
   "#scene-delivery",
   "#pricing",
@@ -54,9 +52,7 @@ const requiredSelectors = [
 ];
 
 const hashSpecs = [
-  { name: "hash-workspace-1440x900", hash: "scene-workspace", target: "#scene-workspace" },
-  { name: "hash-preview-configurator-1440x900", hash: "preview-configurator", target: "#preview-configurator" },
-  { name: "hash-preview-results-1440x900", hash: "preview-results", target: "#preview-results" },
+  { name: "hash-hero-workflow-1440x900", hash: "hero-workflow", target: "#hero-workflow" },
   { name: "hash-evidence-1440x900", hash: "scene-evidence", target: "#scene-evidence" },
   { name: "hash-delivery-1440x900", hash: "scene-delivery", target: "#scene-delivery" },
   { name: "hash-pricing-1440x900", hash: "pricing", target: "#pricing" },
@@ -107,10 +103,7 @@ async function waitForLanding(page) {
     throw new Error("LANDING_AUDIT_MODE=disabled requires an analytics-disabled production bundle (rebuild without NEXT_PUBLIC_YANDEX_METRIKA_ID)");
   }
   await page.locator("#scene-detection").waitFor({ state: "visible" });
-  await page.locator("#preview-configurator").waitFor({ state: "attached" });
-  await page.locator("#preview-results[data-preview-results-ready], #preview-results[data-preview-results-skeleton]")
-    .first()
-    .waitFor({ state: "attached" });
+  await page.locator("#hero-workflow").waitFor({ state: "attached" });
   await page.waitForFunction(
     () => document.readyState === "complete"
       && Array.from(document.querySelectorAll("script"))
@@ -156,8 +149,9 @@ async function assertRequiredSurface(page, label) {
   }
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
-  assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
-  assert.match(await page.locator("#scene-workspace").innerText(), /пример выдачи · демо-сценарий|обезличенный пример/i);
+  assert.match(await page.locator("h1").innerText(), /От сигнала до сообщения/);
+  // shotMode label is display:none below 900px; textContent stays viewport-independent.
+  assert.match(await page.locator("#hero-workflow").textContent(), /Интерактивный workflow/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт|подтвержден/i);
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
   assert.ok(await page.locator("#scene-evidence [data-proof-event]").count() >= 3);
@@ -207,6 +201,10 @@ async function assertControls(page, label) {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
       if (style.display === "none" || style.visibility === "hidden" || rect.width === 0 || rect.height === 0) return false;
+      // The hero product shot is a scaled-down product illustration (Accio pattern):
+      // its inner controls belong to the miniature demo UI, not the landing page,
+      // so the 44px rule applies to real page controls only.
+      if (element.closest("[data-hero-workflow]")) return false;
       return rect.width < 44 || rect.height < 44;
     })
     .slice(0, 20)
@@ -226,8 +224,6 @@ async function assertNoOverlapOrClipping(page, label) {
       "#scene-detection h1",
       "#scene-detection figure",
       "#scene-detection article",
-      "#preview-configurator",
-      "#preview-results",
       "#scene-evidence",
       "#scene-evidence [data-proof-brief] *",
       "#scene-delivery",
@@ -240,7 +236,11 @@ async function assertNoOverlapOrClipping(page, label) {
       const style = getComputedStyle(element);
       const clipped = ["hidden", "clip"].includes(style.overflow)
         && (element.scrollHeight > element.clientHeight + 2 || element.scrollWidth > element.clientWidth + 2);
-      const outside = rect.left < -2 || rect.right > document.documentElement.clientWidth + 2;
+      // The hero product shot intentionally bleeds past the right viewport edge
+      // (Accio-style collapsed teaser); the section clips it, and the document-level
+      // scrollWidth assertion still guards against real horizontal overflow.
+      const heroTeaser = Boolean(element.closest("#scene-detection [data-hero-visual]"));
+      const outside = !heroTeaser && (rect.left < -2 || rect.right > document.documentElement.clientWidth + 2);
       return clipped || outside ? [{ selector, clipped, outside, rect: rect.toJSON() }] : [];
     }));
   });
@@ -251,7 +251,6 @@ async function assertKeyHeadingBounds(page, label) {
   const issues = await page.evaluate(() => {
     const selectors = [
       "#scene-detection h1",
-      "#scene-workspace h2",
       "#scene-evidence h2",
       "#scene-delivery h2",
       "#pricing h2",
@@ -349,44 +348,24 @@ async function assertHeroGeometry(page, label) {
   }
 }
 
-async function assertLeadRows(page, label, viewport) {
-  const leads = page.locator("article[data-lead-row]");
-  const disclosure = page.locator('[data-mobile-lead-disclosure="true"]');
-  if (viewport.width <= 480) await disclosure.waitFor({ state: "visible" });
-  const count = await leads.count();
-  assert.ok(count >= 2, `${label}: expected at least two recommendations, received ${count}`);
-  const primary = leads.nth(0);
-  const secondary = leads.nth(count - 1);
-  assert.equal(await primary.getAttribute("data-primary-lead"), "true", `${label}: top-ranked recommendation must be the primary lead`);
-  await primary.locator("[data-selected-lead-detail]").waitFor({ state: "visible" });
-  await primary.getByText("Подтверждения и источники", { exact: true }).waitFor({ state: "visible" });
-  assert.equal(await secondary.locator("[data-selected-lead-detail]").count(), 0, `${label}: secondary recommendation must remain a scan row`);
-
-  if (viewport.width <= 480) {
-    assert.equal(count, 3, `${label}: mobile should initially show one full and two compact recommendations`);
-    assert.equal(await disclosure.getAttribute("aria-expanded"), "false");
-    const visibleCompactSignals = await leads.locator(':scope:not([data-primary-lead]) [data-lead-why-now]').evaluateAll((elements) => (
-      elements.filter((element) => getComputedStyle(element).display !== "none").length
-    ));
-    assert.equal(visibleCompactSignals, 0, `${label}: compact mobile rows must not contain clipped why-now prose`);
-    await disclosure.click();
-    assert.equal(await page.locator("article[data-lead-row]").count(), 5, `${label}: disclosure must reveal all five recommendations`);
-    assert.equal(await disclosure.getAttribute("aria-expanded"), "true");
+async function assertHeroWorkflowContract(page, label, viewport) {
+  const workflow = page.locator("#hero-workflow");
+  await workflow.waitFor({ state: "attached" });
+  assert.equal(await workflow.getAttribute("data-active-stage"), "1", `${label}: hero workflow must start at stage 1 without user input`);
+  for (const stageId of ["1", "2", "3", "4"]) {
+    await page.locator(`#hero-workflow-tab-${stageId}`).waitFor({ state: "attached" });
   }
-}
-
-async function assertMobilePresetComposition(page, viewport) {
-  if (viewport.width > 480) return;
-  const strip = page.locator('[aria-label="Готовые профили радара"]');
-  const stripBox = await strip.boundingBox();
-  assert.ok(stripBox, `${viewport.name}: missing preset group`);
-  const clipped = await strip.locator("[data-preview-preset]").evaluateAll((elements, bounds) => elements.flatMap((element) => {
-    const rect = element.getBoundingClientRect();
-    return rect.left < bounds.left - 1 || rect.right > bounds.right + 1
-      ? [{ text: element.textContent?.trim(), left: rect.left, right: rect.right }]
-      : [];
-  }), stripBox);
-  assert.deepEqual(clipped, [], `${viewport.name}: preset controls must wrap without half-clipped options`);
+  // CSS uppercases the stage eyebrow; innerText returns transformed text.
+  assert.match(await page.locator("#hero-workflow-panel").innerText(), /шаг 1 · настройка/i);
+  assert.equal(await page.locator("#hero-workflow form, #hero-workflow input").count(), 0, `${label}: hero workflow must not collect user input`);
+  if (viewport.width <= 480) {
+    // On phones the workflow tabs are the primary compact navigation; each
+    // stage button must be reachable (attached) and the panel must follow.
+    await page.locator("#hero-workflow-tab-2").click();
+    assert.equal(await workflow.getAttribute("data-active-stage"), "2", `${label}: mobile stage navigation must switch the workflow panel`);
+    await page.locator("#hero-workflow-tab-1").click();
+    assert.equal(await workflow.getAttribute("data-active-stage"), "1", `${label}: mobile stage navigation must return to the first stage`);
+  }
 }
 
 async function measurePageHeight(page, viewport) {
@@ -449,8 +428,7 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertRequiredSurface(page, viewport.name);
   await assertHeaderLayout(page, viewport);
   await assertHeroGeometry(page, viewport.name);
-  await assertLeadRows(page, viewport.name, viewport);
-  await assertMobilePresetComposition(page, viewport);
+  await assertHeroWorkflowContract(page, viewport.name, viewport);
   await revealAllMotionSections(page, viewport.name);
 
   await assertNoHorizontalOverflow(page, viewport.name);
@@ -480,11 +458,6 @@ async function assertHashNavigation(browser, spec) {
   const { page, assertCleanConsole } = await preparePage(context, spec.name, `${baseUrl}/#${spec.hash}`);
   const target = page.locator(spec.target).first();
   await target.waitFor({ state: "attached" });
-  if (spec.target === "#preview-results") {
-    await page.locator("#preview-results[data-preview-results-ready], #preview-results[data-preview-results-skeleton]")
-      .first()
-      .waitFor({ state: "attached" });
-  }
   await page.waitForTimeout(160);
   const firstPosition = await target.evaluate((element) => {
     const header = document.querySelector("header");
@@ -502,21 +475,21 @@ async function assertHashNavigation(browser, spec) {
 
 async function assertHistoryNavigation(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const { page, assertCleanConsole } = await preparePage(context, "hash-history", `${baseUrl}/#scene-workspace`);
+  const { page, assertCleanConsole } = await preparePage(context, "hash-history", `${baseUrl}/#scene-evidence`);
   await page.evaluate(() => {
-    window.location.hash = "scene-evidence";
+    window.location.hash = "scene-delivery";
   });
-  await page.waitForURL(/#scene-evidence$/);
-  await Promise.all([
-    page.waitForURL(/#scene-workspace$/),
-    page.goBack(),
-  ]);
-  assert.match(page.url(), /#scene-workspace$/);
+  await page.waitForURL(/#scene-delivery$/);
   await Promise.all([
     page.waitForURL(/#scene-evidence$/),
-    page.goForward(),
+    page.goBack(),
   ]);
   assert.match(page.url(), /#scene-evidence$/);
+  await Promise.all([
+    page.waitForURL(/#scene-delivery$/),
+    page.goForward(),
+  ]);
+  assert.match(page.url(), /#scene-delivery$/);
   assertCleanConsole();
   await context.close();
 }
@@ -537,7 +510,7 @@ async function assertMobileKeyboardNavigation(browser) {
   assert.equal(await trigger.evaluate((element) => element === document.activeElement), true, "focus did not return to menu trigger");
 
   await trigger.click();
-  await dialog.getByRole("link", { name: "Как работает" }).click();
+  await dialog.getByRole("link", { name: "Разбор" }).click();
   await page.waitForURL(/#scene-evidence$/);
   await dialog.waitFor({ state: "hidden" });
   assert.notEqual(await page.evaluate(() => document.body.style.overflow), "hidden");
@@ -593,13 +566,13 @@ async function assertActiveNavigationAndTone(browser) {
   assert.equal(await activeLink.count(), 0, "header: active section must clear after returning to hero");
 
   await page.evaluate(() => {
-    window.location.hash = "preview-configurator";
+    window.location.hash = "scene-evidence";
   });
-  await page.waitForURL(/#preview-configurator$/);
-  await page.waitForFunction(() => /Пример/.test(
+  await page.waitForURL(/#scene-evidence$/);
+  await page.waitForFunction(() => /Разбор/.test(
     document.querySelector('header[data-brand-header="recruiter-radar"] a[aria-current="location"]')?.textContent ?? "",
   ));
-  assert.match(await activeLink.first().innerText(), /Пример/, "header: hash navigation must not retain stale FAQ state");
+  assert.match(await activeLink.first().innerText(), /Разбор/, "header: hash navigation must not retain stale FAQ state");
 
   await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
   await page.evaluate(() => {
@@ -607,7 +580,7 @@ async function assertActiveNavigationAndTone(browser) {
     if (evidence) window.scrollTo(0, window.scrollY + evidence.getBoundingClientRect().top - 48);
   });
   await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "dark");
-  assert.match(await activeLink.first().innerText(), /Как работает/);
+  assert.match(await activeLink.first().innerText(), /Разбор/);
   assert.equal(await brandHeader.getAttribute("data-tone"), "dark");
   assert.equal(await page.locator('#scene-evidence[data-proof-story="why-now"]').count(), 1);
   await page.locator("#scene-delivery").scrollIntoViewIfNeeded();
@@ -662,72 +635,51 @@ async function assertInteractionContracts(browser) {
     const heroEvent = waitForLandingEvent(page, "preview_started", "hero_primary");
     await Promise.all([heroEvent, heroClick.click()]);
   }
-  assert.equal(new URL(page.url()).hash, "#preview-configurator");
+  // The hero CTA targets the interactive workflow card; the configurator/form
+  // scene stays retired. The duplicated header preview CTA is retired too
+  // (owner verdict 23.09 — one primary path to the example).
+  assert.equal(new URL(page.url()).hash, "#hero-workflow");
+  await page.locator("#hero-workflow").waitFor({ state: "attached" });
 
-  const presetClick = page.locator("[data-preview-preset]").nth(1);
-  const presetNavigation = page.waitForURL((url) => url.searchParams.has("specialization") && url.searchParams.has("targetCity"));
-  if (analyticsEventsSkipped) {
-    await Promise.all([presetNavigation, presetClick.click()]);
-  } else {
-    const presetEvent = waitForLandingEvent(page, "preview_started", "preset");
-    await Promise.all([presetEvent, presetNavigation, presetClick.click()]);
-  }
-  await page.locator("[data-preview-preset][data-selected]").waitFor({ state: "visible" });
+  // Interactive workflow card: the honest hero demo renders on every visit.
+  // The former configurator/form personalization flows are retired with the
+  // workspace scene; the privacy contract now anti-asserts that the hero demo
+  // collects no user input and that repeated deep-link visits render the same
+  // four-stage story.
+  await page.locator("#hero-workflow").waitFor({ state: "attached" });
+  assert.equal(await page.locator("#hero-workflow form").count(), 0, "hero demo must not render a form");
+  assert.equal(await page.locator("#hero-workflow input").count(), 0, "hero demo must not render inputs");
+  assert.equal(await page.locator('[data-analytics-event="preview_started"][data-analytics-context="header"]').count(), 0, "the header preview CTA must stay retired (single example path)");
 
-  const privateInclude = "include-secret-8472";
-  const privateExclude = "exclude-secret-8472";
-  const specialization = "Конфиденциальный инженерный подбор 8472";
-  const geography = "Москва секрет 8472";
+  const firstRender = await page.locator("#hero-workflow").innerText();
+
   const privateUrl = new URL(baseUrl);
-  privateUrl.searchParams.set("specialization", "инженерный подбор");
-  privateUrl.searchParams.set("targetCity", "Москва");
-  privateUrl.searchParams.set("includeKeywords", privateInclude);
-  privateUrl.searchParams.set("excludeKeywords", privateExclude);
-  privateUrl.hash = "preview-configurator";
+  privateUrl.searchParams.set("specialization", "Конфиденциальный инженерный подбор 8472");
+  privateUrl.searchParams.set("targetCity", "Москва секрет 8472");
+  privateUrl.searchParams.set("includeKeywords", "include-secret-8472");
+  privateUrl.searchParams.set("excludeKeywords", "exclude-secret-8472");
+  privateUrl.hash = "hero-workflow";
   await page.goto(privateUrl.toString(), { waitUntil: "load", timeout: PAGE_SETTLE_TIMEOUT_MS });
   await waitForLanding(page);
 
-  await page.getByLabel("Специализация").fill(specialization);
-  await page.getByLabel("География").fill(geography);
-  const formSubmit = page.locator("[data-preview-submit]");
-  const formNavigation = page.waitForURL((url) => url.searchParams.get("targetCity") === geography);
-  if (analyticsEventsSkipped) {
-    await Promise.all([formNavigation, formSubmit.click()]);
-  } else {
-    const formEvent = waitForLandingEvent(page, "preview_started", "form");
-    await Promise.all([formEvent, formNavigation, formSubmit.click()]);
-  }
-  await page.locator("#preview-results [data-preview-results-ready]").waitFor({ state: "attached" });
-  assert.equal(await page.getByLabel("Специализация").inputValue(), specialization);
-  assert.equal(await page.getByLabel("География").inputValue(), geography);
-  assert.equal(new URL(page.url()).searchParams.get("includeKeywords"), privateInclude);
-  assert.equal(new URL(page.url()).searchParams.get("excludeKeywords"), privateExclude);
+  await page.locator("#hero-workflow").waitFor({ state: "attached" });
+  assert.equal(await page.locator("#hero-workflow form").count(), 0, "personalized deep link must not reveal a form");
+  const secondRender = await page.locator("#hero-workflow").innerText();
+  assert.equal(secondRender, firstRender, "hero demo must ignore personalization params and render the same workflow");
 
-  const leads = page.locator("article[data-lead-row]");
-  const leadCount = await leads.count();
-  assert.ok(leadCount >= 2, "interaction: expected at least two recommendations");
-  const activeLead = leads.nth(0);
-  const secondaryLead = leads.nth(leadCount - 1);
-  assert.equal(await activeLead.getAttribute("data-primary-lead"), "true", "interaction: top-ranked recommendation is not primary");
-  await activeLead.locator("[data-selected-lead-detail]").waitFor({ state: "visible" });
-  assert.equal(await secondaryLead.locator("[data-selected-lead-detail]").count(), 0, "interaction: secondary recommendation must remain a compact scan row");
-
-  const companyNames = (await page.locator("[data-lead-company] strong").allTextContents())
-    .map((value) => value.trim())
-    .filter(Boolean);
-  const previewCta = page.locator('#preview-results [data-analytics-event="checkout_started"][data-analytics-context="preview"]');
-  assert.equal(await previewCta.count(), 1, "interaction: missing preview checkout CTA");
-  assert.match(await previewCta.getAttribute("href"), /^\/checkout(?:\?|$)/);
-  const previewCtaBox = await previewCta.boundingBox();
-  assert.ok(previewCtaBox && previewCtaBox.width >= 44 && previewCtaBox.height >= 44, "interaction: preview checkout CTA is below 44x44");
-  assert.match((await previewCta.innerText()).trim(), /радар|неделю/i);
+  const pricingCta = page.locator('#pricing [data-analytics-event="checkout_started"][data-analytics-context="pricing_pilot"]');
+  assert.equal(await pricingCta.count(), 1, "interaction: missing pilot checkout CTA in the pricing decision");
+  assert.match(await pricingCta.getAttribute("href"), /^\/checkout(?:\?|$)/);
+  const pricingCtaBox = await pricingCta.boundingBox();
+  assert.ok(pricingCtaBox && pricingCtaBox.width >= 44 && pricingCtaBox.height >= 44, "interaction: pilot checkout CTA is below 44x44");
+  assert.match((await pricingCta.innerText()).trim(), /запустить|пилот/i);
 
   const checkoutNavigation = page.waitForURL((url) => url.pathname === "/checkout");
   if (analyticsEventsSkipped) {
-    await Promise.all([checkoutNavigation, previewCta.click()]);
+    await Promise.all([checkoutNavigation, pricingCta.click()]);
   } else {
-    const checkoutEvent = waitForLandingEvent(page, "checkout_started", "preview");
-    await Promise.all([checkoutEvent, checkoutNavigation, previewCta.click()]);
+    const checkoutEvent = waitForLandingEvent(page, "checkout_started", "pricing_pilot");
+    await Promise.all([checkoutEvent, checkoutNavigation, pricingCta.click()]);
   }
   const checkoutEntryPoints = await page.locator('[data-checkout-form], a[href^="/login?returnTo="]').count();
   assert.equal(checkoutEntryPoints, 1, "checkout: expected a checkout form or fail-closed login gate");
@@ -737,9 +689,11 @@ async function assertInteractionContracts(browser) {
     for (const payload of analyticsEvents) {
       const unexpectedKeys = Object.keys(payload).filter((key) => !["name", "context", "timestamp"].includes(key));
       assert.deepEqual(unexpectedKeys, [], `analytics payload has unexpected keys: ${JSON.stringify(payload)}`);
+      assert.notEqual(payload.context, "form", "retired form context must not be emitted");
+      assert.notEqual(payload.context, "preset", "retired preset context must not be emitted");
     }
     const serializedAnalytics = JSON.stringify(analyticsEvents);
-    for (const privateValue of [specialization, geography, privateInclude, privateExclude, ...companyNames]) {
+    for (const privateValue of ["Конфиденциальный инженерный подбор 8472", "Москва секрет 8472", "include-secret-8472", "exclude-secret-8472"]) {
       assert.equal(serializedAnalytics.includes(privateValue), false, `analytics payload leaked private value: ${privateValue}`);
     }
   }
@@ -757,17 +711,12 @@ async function assertNoJs(browser) {
   for (const selector of requiredSelectors) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
-  assert.match(await page.locator("h1").innerText(), /Список компаний, где найм уже идёт/);
-  const noJsWorkspaceText = await page.locator("#scene-workspace").innerText();
-  assert.match(noJsWorkspaceText, /интерактивный пример/i);
-  assert.match(noJsWorkspaceText, /показать компании/i);
-  assert.equal(await page.locator("#preview-configurator form").count(), 1, "no-JS configurator missing");
-  await page.getByLabel("Специализация").waitFor({ state: "attached" });
-  await page.getByLabel("География").waitFor({ state: "attached" });
-  await page.locator("#preview-configurator button[type='submit']").waitFor({ state: "attached" });
-  const skeleton = page.locator("#preview-results[data-preview-results-skeleton]").first();
-  await skeleton.waitFor({ state: "attached" });
-  assert.equal(await skeleton.evaluate((element) => element.closest("#preview-results") === element), true, "no-JS skeleton escaped results boundary");
+  assert.match(await page.locator("h1").innerText(), /От сигнала до сообщения/);
+  const noJsHeroText = await page.locator("#hero-workflow").textContent();
+  assert.match(noJsHeroText, /Интерактивный workflow/i);
+  assert.match(noJsHeroText, /Ваш рынок/);
+  assert.equal(await page.locator("#hero-workflow form").count(), 0, "no-JS hero demo must not render a form");
+  assert.equal(await page.locator("[data-noscript-disclosure]").count(), 1, "no-JS disclosure missing");
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
   assert.match(await page.locator("#scene-delivery").innerText(), /Сообщения компаниям не отправляются автоматически/i);
   const noJsPricingText = await page.locator("#pricing").innerText();
@@ -777,12 +726,12 @@ async function assertNoJs(browser) {
   await page.getByRole("heading", { name: /Посмотрите, кому стоит написать сейчас/ }).waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor({ state: "attached" });
-  const followsResults = await page.evaluate(() => {
-    const results = document.querySelector("#preview-results");
+  const followsHero = await page.evaluate(() => {
+    const hero = document.querySelector("#hero-workflow");
     const footer = document.querySelector("footer");
-    return Boolean(results && footer && (results.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING));
+    return Boolean(hero && footer && (hero.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING));
   });
-  assert.equal(followsResults, true, "no-JS page ended at the preview skeleton");
+  assert.equal(followsHero, true, "no-JS page ended at the hero workflow skeleton");
   await assertNoHorizontalOverflow(page, "no-js-mobile-390x844");
   assertCleanConsole();
   await context.close();

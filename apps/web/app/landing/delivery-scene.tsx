@@ -6,7 +6,7 @@ type DeliveryChannel = { key: DeliveryChannelKey; title: string; status: string;
 const CORE_CHANNEL = {
   title: "Веб-кабинет",
   status: "Всегда доступен",
-  text: "Полная карточка остаётся в кабинете: компания, почему сейчас, факты, уверенность и официальный путь контакта.",
+  text: "Полная карточка остаётся в кабинете: компания, повод, факты, уверенность и официальный путь контакта.",
 } as const;
 
 const PRIMARY_ROUTES: ReadonlyArray<DeliveryChannel> = [
@@ -40,32 +40,34 @@ function ChannelRoute({ channel }: { channel: DeliveryChannel }) {
 
 export default function DeliveryScene() {
   return (
-    <section id="scene-delivery" className={sceneStyles.section} style={{ scrollMarginTop: "calc(72px + 32px)" }} aria-labelledby="delivery-title" data-header-tone="light" data-motion-reveal="section" data-delivery-summary="compact">
+    <section id="scene-delivery" className={sceneStyles.section} style={{ scrollMarginTop: "calc(72px + 32px)" }} aria-labelledby="delivery-title" data-header-tone="light" data-motion-reveal="section" data-delivery-summary="telegram-workflow">
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.intro}>
-          <p>Как приходят результаты</p>
-          <h2 id="delivery-title">Радар находит повод. Пишете вы.</h2>
-          <p className={sceneStyles.introSub}>Работайте там, где удобно: карточка возможности всегда в веб-кабинете, сигналы приходят в привычные каналы.</p>
+          <p>Доставка</p>
+          <h2 id="delivery-title">Результаты приходят туда, где вы работаете</h2>
+          <p className={sceneStyles.introSub}>Короткий сигнал — чтобы решить. Полная карточка — чтобы написать.</p>
         </div>
 
-        <div className={sceneStyles.capabilityBand} aria-label="Поддерживаемые способы доставки">
-          <article className={sceneStyles.cabinet} data-channel="cabinet" data-delivery-core="workspace">
-            <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel="cabinet" /></span>
-            <div><small>{CORE_CHANNEL.status}</small><strong>{CORE_CHANNEL.title}</strong><p>{CORE_CHANNEL.text}</p></div>
-          </article>
-          <div className={sceneStyles.deliveryRoutes} data-delivery-routes="connected">
-            {PRIMARY_ROUTES.map((channel) => <ChannelRoute key={channel.key} channel={channel} />)}
+        <div className={sceneStyles.capabilityBand} aria-label="Демонстрация доставки сигнала">
+          <div className={sceneStyles.deliverySystem}>
+            <article className={sceneStyles.cabinet} data-channel="cabinet" data-delivery-core="workspace">
+              <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel="cabinet" /></span>
+              <div><small>{CORE_CHANNEL.status}</small><strong>{CORE_CHANNEL.title}</strong><p>{CORE_CHANNEL.text}</p></div>
+            </article>
+            <div className={sceneStyles.deliveryRoutes} data-delivery-routes="connected">
+              {PRIMARY_ROUTES.map((channel) => <ChannelRoute key={channel.key} channel={channel} />)}
+            </div>
+
+            <div className={sceneStyles.boundaryRow}>
+              <aside className={sceneStyles.manualBoundary} data-manual-outreach-boundary="true">
+                <span>Ручной контроль</span><strong>Сообщения компаниям не отправляются автоматически.</strong>
+              </aside>
+              <details className={sceneStyles.moreRoutes}>
+                <summary>Ещё каналы: VK · Push · Webhook</summary>
+                <div className={sceneStyles.extraRoutes}>{EXTRA_ROUTES.map((channel) => <ChannelRoute key={channel.key} channel={channel} />)}</div>
+              </details>
+            </div>
           </div>
-        </div>
-
-        <div className={sceneStyles.boundaryRow}>
-          <aside className={sceneStyles.manualBoundary} data-manual-outreach-boundary="true">
-            <span>Ручной контроль</span><strong>Сообщения компаниям не отправляются автоматически.</strong>
-          </aside>
-          <details className={sceneStyles.moreRoutes}>
-            <summary>Ещё каналы: VK · Push · Webhook</summary>
-            <div className={sceneStyles.extraRoutes}>{EXTRA_ROUTES.map((channel) => <ChannelRoute key={channel.key} channel={channel} />)}</div>
-          </details>
         </div>
       </div>
     </section>

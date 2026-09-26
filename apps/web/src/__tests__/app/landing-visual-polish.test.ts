@@ -19,11 +19,11 @@ describe("polished unified landing visual contract", () => {
     const retiredRadar = resolve(WEB_ROOT, "app/landing/hero-radar.tsx");
     const retiredRadarStyles = resolve(WEB_ROOT, "app/landing/hero-radar.module.css");
 
-    expect(heroScene).toContain('data-hero-layout="morning-list"');
+    expect(heroScene).toContain('data-hero-layout="interactive-workflow"');
     expect(heroScene).toContain('data-theme="inverse"');
     expect(heroScene).toContain('data-hero-visual');
     expect(heroScene).toContain("HeroProductPreview");
-    expect(heroScene).toContain("Открыть пример");
+    expect(heroScene).toContain("Посмотреть, как это работает");
     expect(heroScene).not.toContain("HeroRadar");
     expect(heroScene).not.toContain("HeroInstrument");
     expect(existsSync(retiredRadar)).toBe(false);
@@ -42,22 +42,9 @@ describe("polished unified landing visual contract", () => {
 
     expect(heroScene).toContain("data-mobile-hero-signal");
     expect(heroScene).toContain('className={sceneStyles.fieldFigure}');
-    expect(sceneStyles).toContain("@media (max-width: 600px)");
+    expect(sceneStyles).toContain("@media (max-width: 900px)");
     expect(sceneStyles).toContain(".fieldFigure");
     expect(sceneStyles).not.toContain("HeroRadar");
-  });
-
-  it("restores the signal timeline scene after the hero", () => {
-    const page = source("app/landing/landing-page.tsx");
-    const detectionIndex = page.indexOf("<DetectionScene");
-    const timelineIndex = page.indexOf("<SignalTimeline />");
-    const workspaceIndex = page.indexOf("<WorkspaceScene");
-
-    expect(page).not.toContain("SignalTimelineScene");
-    expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.tsx"))).toBe(false);
-    expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.module.css"))).toBe(false);
-    expect(timelineIndex).toBeGreaterThan(detectionIndex);
-    expect(workspaceIndex).toBeGreaterThan(timelineIndex);
   });
 
   it("separates the core workspace from connected delivery routes", () => {
@@ -111,16 +98,16 @@ describe("polished unified landing visual contract", () => {
     expect(footerControl).toContain("window.dispatchEvent");
   });
 
-  it("uses one stable preview anchor without duplicating it in the suspense fallback", () => {
-    const workspace = source("app/landing/workspace-scene.tsx");
-    const skeletonStart = workspace.indexOf("export function WorkspaceResultsSkeleton");
-    const skeletonSource = workspace.slice(skeletonStart);
+  it("keeps the hero workflow demo as the single example anchor", () => {
+    // Single example (PART 2): the static workspace story is retired; the
+    // interactive hero demo owns the one stable example anchor.
+    const hero = source("app/landing/hero-product-preview.tsx");
+    const landing = source("app/landing/landing-page.tsx");
 
-    expect(workspace).toContain('id="preview-results"');
-    expect(workspace).toContain("<Suspense fallback={<WorkspaceResultsSkeleton />}>");
-    expect(workspace).toContain("embedded");
-    expect(skeletonSource).not.toContain('id="preview-results"');
-    expect(skeletonSource).toContain("data-preview-results-skeleton");
+    expect(hero).toContain('id="hero-workflow"');
+    expect(hero).toContain("data-hero-workflow");
+    expect(landing).not.toContain("WorkspaceScene");
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.tsx"))).toBe(false);
   });
 
   it("switches header tone at the actual pricing, faq, and closing surfaces", () => {
@@ -225,7 +212,10 @@ describe("polished unified landing visual contract", () => {
     expect(productionAudit).toContain('async function revealAllMotionSections');
     expect(productionAudit).toContain('[data-motion-reveal="section"]');
     expect(productionAudit).toContain('data-motion-state');
-    expect(productionAudit).not.toContain('#scene-signal-timeline');
+    // PART 2: the audit now pins the hero demo and the signal timeline as the
+    // required example/navigation anchors (replacing the retired workspace).
+    expect(productionAudit).toContain('#hero-workflow');
+    expect(productionAudit).toContain('#scene-evidence');
     expect(productionAudit).toContain('pending motion sections');
     expect(productionAudit).not.toContain("surfaceSpecs");
   });
@@ -235,7 +225,7 @@ describe("polished unified landing visual contract", () => {
     const offerAlias = source("app/offer/page.tsx");
 
     expect(footer).not.toContain('href: "/#scene-timeline"');
-    expect(footer).toContain('href: "/#scene-workspace"');
+    expect(footer).not.toContain('href: "/#scene-workspace"');
     expect(footer).toContain('href: "/#scene-evidence"');
     expect(footer).not.toContain('href: "/#scene-delivery"');
     expect(footer).not.toContain('href: "/#scene-outreach"');

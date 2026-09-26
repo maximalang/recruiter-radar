@@ -2,6 +2,10 @@
   display: block;
   background: var(--color-canvas);
   color: var(--color-text-primary);
+  /* Pass 5 (linear.app ref): single dark canvas — pilot offer and closing
+   * band are elevated dark surfaces with light ink; >= 4.5:1 preserved
+   * (text-primary on surface-primary ≈ 16:1). */
+  --conversion-deep: var(--color-surface-primary);
 }
 
 .anchor { scroll-margin-top: calc(72px + 24px); }
@@ -42,29 +46,27 @@
 }
 
 .finalEyebrow {
-  color: var(--color-signal-on-dark);
+  color: var(--color-signal);
 }
 
 .pricingIntro > span { grid-area: label; padding-top: .45rem; }
-.pricingIntro h2 { grid-area: title; max-width: 17ch; margin: 0; font-size: clamp(2.25rem, 3vw, 3rem); font-weight: 580; letter-spacing: -.05em; line-height: 1.02; }
+.pricingIntro h2 { grid-area: title; max-width: 17ch; margin: 0; font-size: clamp(2.4rem, 3.6vw, 3.4rem); font-weight: 600; letter-spacing: -.05em; line-height: 1.02; }
 .pricingIntro p { grid-area: lead; max-width: 37rem; margin: .35rem 0 0; color: var(--color-text-secondary); font-size: .98rem; line-height: 1.55; }
 
 .pricingDecision {
   display: grid;
   grid-template-columns: minmax(24rem, 1.15fr) minmax(18rem, .85fr);
-  gap: clamp(1.5rem, 4vw, 4rem);
+  gap: clamp(2rem, 4.5vw, 4.5rem);
   max-width: 72rem;
   margin: 2rem 0 0 auto;
 }
 
 .pilotOffer {
   display: grid;
-  gap: 1.1rem;
-  padding: clamp(1.4rem, 2.5vw, 2rem);
-  border-radius: var(--radius-overlay);
-  background: var(--color-text-primary);
-  color: var(--color-text-inverse);
-  box-shadow: var(--shadow-overlay);
+  gap: 1.35rem;
+  padding: clamp(1.5rem, 2.5vw, 2.1rem);
+  background: var(--conversion-deep);
+  color: var(--color-text-primary);
 }
 
 .pilotTopline {
@@ -75,32 +77,27 @@
 }
 
 .pilotMeta { display: grid; gap: .3rem; }
-.pilotEyebrow { color: var(--color-signal-on-dark); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+.pilotEyebrow { color: var(--color-signal); font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .pilotTopline strong { font-size: 1rem; font-weight: 600; }
-.pilotPrice { font-size: clamp(3rem, 5vw, 4.7rem); font-weight: 520; letter-spacing: -.07em; line-height: .9; }
+.pilotPrice { font-size: clamp(3.3rem, 5.4vw, 5.05rem); font-weight: 540; letter-spacing: -.065em; line-height: .92; font-variant-numeric: tabular-nums; }
 
 .pilotOffer ul { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }
-.pilotOffer li { display: flex; align-items: flex-start; gap: .55rem; color: color-mix(in srgb, var(--color-text-inverse) 78%, transparent); font-size: .9rem; line-height: 1.45; }
+.pilotOffer li { display: flex; align-items: flex-start; gap: .55rem; color: var(--color-text-secondary); font-size: .9rem; line-height: 1.45; }
 .pilotOffer li :global(svg) { flex: 0 0 auto; margin-top: .16rem; color: var(--color-signal); }
 
-.pilotCta {
+.pilotOffer .pilotCta {
   display: inline-flex;
   min-height: 48px;
   align-items: center;
   justify-content: space-between;
   gap: .7rem;
-  padding: .8rem 1rem;
+  padding: .95rem 1.15rem;
   border-radius: var(--radius-control);
   background: var(--color-signal);
   color: var(--color-text-inverse);
   font-size: .88rem;
   font-weight: 700;
   text-decoration: none;
-}
-
-.pilotOffer .pilotCta:focus-visible,
-.final .finalCta:focus-visible {
-  outline-color: var(--color-text-inverse);
 }
 
 .pilotOffer > small { color: color-mix(in srgb, var(--color-text-inverse) 52%, transparent); font-size: .74rem; }
@@ -122,7 +119,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: .75rem 1rem;
+  gap: .75rem 1.5rem;
   min-height: 5rem;
   border-top: 1px solid var(--color-separator);
 }
@@ -131,12 +128,11 @@
 .secondaryOffers article > div { display: grid; gap: .2rem; }
 .secondaryOffers article > div span { font-size: .95rem; font-weight: 650; }
 .secondaryOffers article > div small { color: var(--color-text-tertiary); font-size: .72rem; }
-.secondaryOffers article > strong { font-size: 1.15rem; font-weight: 620; }
+.secondaryOffers article > strong { font-size: 1.25rem; font-weight: 640; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .secondaryOffers article > a { display: inline-flex; min-height: 44px; align-items: center; gap: .35rem; color: var(--color-signal-hover); font-size: .8rem; font-weight: 650; text-decoration: none; }
 
 .faq {
   padding-block: clamp(3.25rem, 4.5vw, 4.5rem);
-  background: color-mix(in srgb, var(--color-copper) 7%, var(--color-canvas));
 }
 
 .faqHeading,
@@ -145,10 +141,8 @@
   margin-inline: auto;
 }
 
-.faqHeading { text-align: center; }
-.faqHeading h2 { max-width: 20ch; margin: .7rem auto 0; font-size: clamp(2.25rem, 3vw, 2.85rem); font-weight: 580; letter-spacing: -.045em; line-height: 1.04; }
-.faqHeading p { max-width: 42rem; margin: .8rem auto 0; color: var(--color-text-secondary); font-size: .96rem; line-height: 1.55; }
-.faqHeading small { display: block; margin-top: .6rem; color: var(--color-text-tertiary); font-size: .76rem; }
+.faqHeading { text-align: left; }
+.faqHeading h2 { max-width: 20ch; margin: .7rem 0 0; font-size: clamp(2.4rem, 3.6vw, 3.3rem); font-weight: 600; letter-spacing: -.045em; line-height: 1.04; }
 
 .faqList { margin-top: 1.75rem; }
 .faqList details { border-bottom: 1px solid var(--color-separator); }
@@ -167,51 +161,21 @@
   gap: clamp(2rem, 5vw, 4rem);
   min-height: 21rem;
   padding-block: clamp(2.75rem, 3.5vw, 3.5rem);
-  background: var(--color-text-primary);
-  color: var(--color-text-inverse);
+  background: var(--conversion-deep);
+  color: var(--color-text-primary);
 }
 
 .finalCopy { position: relative; }
 
-/* Second radar motif: a quiet echo of the hero field — one arc, one signal.
- * Purely decorative; closes the visual story the hero opened. */
-.finalField {
-  position: absolute;
-  top: 50%;
-  right: -14%;
-  width: clamp(20rem, 34vw, 30rem);
-  overflow: visible;
-  opacity: .5;
-  pointer-events: none;
-  transform: translateY(-52%);
-}
-
-.finalArc {
-  fill: none;
-  stroke: color-mix(in srgb, var(--color-signal) 26%, transparent);
-  stroke-width: 1.1;
-  stroke-linecap: round;
-}
-.finalOrbit {
-  fill: none;
-  stroke: color-mix(in srgb, var(--color-text-inverse) 22%, transparent);
-  stroke-width: 1;
-}
-.finalSignal {
-  fill: var(--color-signal);
-}
-.finalEchoCopper { fill: color-mix(in srgb, var(--color-copper) 72%, transparent); }
-.finalHaloCore { stop-color: var(--color-signal); stop-opacity: .1; }
-
-.finalCopy h2 { max-width: 15ch; margin: .65rem 0 0; font-size: clamp(2.35rem, 3.3vw, 3.15rem); font-weight: 560; letter-spacing: -.055em; line-height: 1; position: relative; }
-.finalCopy p { max-width: 36rem; margin: .75rem 0 0; color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent); font-size: .94rem; line-height: 1.5; }
+.finalCopy h2 { max-width: 15ch; margin: .65rem 0 0; font-size: clamp(2.5rem, 3.7vw, 3.4rem); font-weight: 600; letter-spacing: -.055em; line-height: 1; position: relative; }
+.finalCopy p { max-width: 36rem; margin: .75rem 0 0; color: var(--color-text-secondary); font-size: .94rem; line-height: 1.5; }
 
 .finalDecision { display: grid; gap: .75rem; align-content: center; }
 .finalTrust { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none; }
-.finalTrust li { display: flex; align-items: center; gap: .55rem; color: color-mix(in srgb, var(--color-text-inverse) 62%, transparent); font-size: .8rem; }
+.finalTrust li { display: flex; align-items: center; gap: .55rem; color: var(--color-text-secondary); font-size: .8rem; }
 .finalTrust li::before { width: .35rem; height: .35rem; border-radius: 50%; background: var(--color-signal); content: ""; }
-.finalCta { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .88rem; font-weight: 700; text-decoration: none; }
-.finalSecondaryLink { display: inline-flex; min-height: 44px; align-items: center; color: color-mix(in srgb, var(--color-text-inverse) 58%, transparent); font-size: .8rem; text-decoration: none; }
+.final .finalCta { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .88rem; font-weight: 700; text-decoration: none; }
+.finalSecondaryLink { display: inline-flex; min-height: 44px; align-items: center; color: var(--color-text-tertiary); font-size: .8rem; text-decoration: none; }
 
 @keyframes faqReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .faqList details[open] p { animation: faqReveal var(--motion-duration-navigation) var(--motion-ease-enter) both; }
@@ -227,7 +191,6 @@
   .pricingDecision { grid-template-columns: 1fr; max-width: 44rem; margin-left: 0; }
   .final { grid-template-columns: 1fr; min-height: 0; }
   .finalDecision { max-width: 28rem; }
-  .finalField { right: -30%; width: 18rem; opacity: .32; }
 }
 
 @media (max-width: 620px) {
@@ -237,23 +200,36 @@
   .pricing { padding-block: 3rem; }
   .pricingIntro h2 { font-size: clamp(2rem, 9vw, 2.5rem); }
   .pricingIntro p { font-size: .92rem; }
-  .pilotOffer { padding: 1.1rem; }
-  .pilotPrice { font-size: 3.3rem; }
+  .pilotOffer { padding: 1.15rem; }
+  .pilotPrice { font-size: 3.55rem; }
   .secondaryOffers article { grid-template-columns: 1fr auto; gap: .35rem .75rem; }
   .secondaryOffers article > a { grid-column: 1 / -1; }
   .faq { padding-block: 3rem; }
   .faqHeading { text-align: left; }
-  .faqHeading h2,
-  .faqHeading p { margin-left: 0; margin-right: 0; }
-  .faqHeading h2 { font-size: clamp(2rem, 9vw, 2.45rem); }
+  .faqHeading h2 { margin-left: 0; margin-right: 0; }
+  .faqHeading h2 { font-size: clamp(1.85rem, 8vw, 2.45rem); }
   .faqList { margin-top: 1.35rem; }
   .faqList summary { grid-template-columns: 1.6rem 1fr auto; min-height: 4rem; font-size: .9rem; }
   .faqList details p { padding-left: 2.45rem; padding-right: 0; font-size: .88rem; }
   .final { padding-block: 2.75rem; }
-  .finalCopy h2 { font-size: clamp(2.15rem, 9.5vw, 2.7rem); }
+  .finalCopy h2 { font-size: clamp(2rem, 8.5vw, 2.7rem); }
+  .pricingIntro h2 { font-size: clamp(1.9rem, 8.5vw, 2.5rem); }
 }
+
+/* Pass 4 (owner verdict 25.09): staggered scroll reveals via motion tokens */
+@keyframes conversionRise { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+.pricing[data-motion-state="visible"] .pilotOffer { animation: conversionRise var(--motion-duration-signal) var(--motion-ease-enter) both; }
+.pricing[data-motion-state="visible"] .secondaryOffers article:nth-of-type(1) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-4) var(--motion-ease-enter) both; }
+.pricing[data-motion-state="visible"] .secondaryOffers article:nth-of-type(2) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-7) var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(1) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-1) var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(2) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-3) var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(3) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-4) var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(4) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-6) var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(5) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-9) var(--motion-ease-enter) both; }
+.final[data-motion-state="visible"] .finalCopy { animation: conversionRise var(--motion-duration-signal) var(--motion-ease-enter) both; }
+.final[data-motion-state="visible"] .finalDecision { animation: conversionRise var(--motion-duration-signal) var(--motion-delay-3) var(--motion-ease-enter) both; }
 
 @media (prefers-reduced-motion: reduce) {
   .faqList details[open] p { animation: none; }
-  .panel * { transition: none !important; }
+  .panel * { transition: none !important; animation: none !important; }
 }
