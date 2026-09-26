@@ -3,27 +3,10 @@
   --content-max: 76.25rem;
   --scene-pad: var(--page-gutter);
   --content: var(--content-max);
-  /* Pass 5 (refs: linear.app + accio.com/work): neutral near-black canvas,
-   * Linear-grade grayscale, champagne kept as the single restrained accent.
-   * Scoped to the landing root ONLY; the product inverse theme is untouched. */
-  --color-canvas: #08090a;
-  --color-surface-primary: #101112;
-  --color-surface-secondary: #161718;
-  --color-surface-selected: #1c1d1f;
-  --color-surface-elevated: #222325;
-  --color-text-primary: #f7f8f8;
-  --color-text-secondary: #b4b7bc;
-  --color-text-tertiary: #8c8f94;
-  --color-text-disabled: #5e6065;
-  --color-text-inverse: #0b0c0d;
-  --color-separator-subtle: rgba(247, 248, 248, .06);
-  --color-separator: rgba(247, 248, 248, .10);
-  --color-separator-strong: rgba(247, 248, 248, .18);
-  --color-signal: #C9A96A;
-  --color-signal-hover: #D8BC82;
-  --color-signal-soft: rgba(201, 169, 106, .10);
-  --color-focus: #D8BC82;
-  --color-selection: rgba(201, 169, 106, .18);
+  /* Pass 5 palette tokens (refs: linear.app + accio.com/work) live in the
+   * canonical token source — product-visual-system.css, scoped to the
+   * landing root via [data-theme="inverse"][data-landing-experience].
+   * This module only maps them onto landing aliases and layout. */
   /* Landing aliases map the canonical inverse theme onto light product objects. */
   --landing-canvas: var(--color-canvas);
   --landing-paper: var(--color-text-primary);

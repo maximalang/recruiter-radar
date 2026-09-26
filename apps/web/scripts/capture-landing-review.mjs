@@ -26,7 +26,8 @@ const viewports = [
 
 const focusedSurfaces = [
   { name: "hero", selector: "#scene-detection" },
-  { name: "timeline", selector: "#scene-signal-timeline" },
+  // The signal-timeline scene is retired by the product story pass; the
+  // pre-218 historical capture keeps its own timeline selector.
   // Surface name stays "preview": the pre-218 integrity guard compares
   // `${viewport}-preview.png` against this restored directory, and the
   // historical baseline capture keeps its own workspace-scene selector.

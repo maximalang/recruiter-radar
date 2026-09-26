@@ -45,6 +45,32 @@ body {
   --color-overlay: rgba(0, 0, 0, .64);
 }
 
+/* Landing single-canvas dark palette (approved Pass 5, refs: linear.app +
+ * accio.com/work): neutral near-black canvas, Linear-grade grayscale,
+ * champagne kept as the single restrained accent. Scoped to the landing
+ * root ONLY via data-landing-experience; the product inverse theme above
+ * is untouched. */
+[data-theme="inverse"][data-landing-experience] {
+  --color-canvas: #08090a;
+  --color-surface-primary: #101112;
+  --color-surface-secondary: #161718;
+  --color-surface-selected: #1c1d1f;
+  --color-surface-elevated: #222325;
+  --color-text-primary: #f7f8f8;
+  --color-text-secondary: #b4b7bc;
+  --color-text-tertiary: #8c8f94;
+  --color-text-disabled: #5e6065;
+  --color-text-inverse: #0b0c0d;
+  --color-separator-subtle: rgba(247, 248, 248, .06);
+  --color-separator: rgba(247, 248, 248, .10);
+  --color-separator-strong: rgba(247, 248, 248, .18);
+  --color-signal: #C9A96A;
+  --color-signal-hover: #D8BC82;
+  --color-signal-soft: rgba(201, 169, 106, .10);
+  --color-focus: #D8BC82;
+  --color-selection: rgba(201, 169, 106, .18);
+}
+
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea) {
   min-height: 44px;
   border: 1px solid var(--color-separator-strong);
