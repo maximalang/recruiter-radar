@@ -115,16 +115,18 @@
   --color-signal-soft: rgba(240, 180, 41, 0.14);
 }
 
-.shotMark { display: grid; width: 1.3rem; height: 1.3rem; place-items: center; border: 1px solid var(--color-separator); border-radius: 6px; background: var(--color-surface-elevated); color: var(--color-text-primary); font: 700 .5rem var(--font-mono); }
+.shotMark { display: grid; width: 1.4rem; height: 1.4rem; place-items: center; border: 0; border-radius: 50%; background: conic-gradient(from 45deg, #5e6ad2, #9d7be8, #4cb782, #f0b429, #5e6ad2); color: #fff; font: 700 .5rem var(--font-mono); }
 
 .shotBody { display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); }
-.shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .9rem; border-right: 1px solid var(--color-separator-subtle); background: #191a1c; }
+.shotSide { display: flex; min-width: 0; flex-direction: column; padding: .85rem .6rem .8rem; border-right: 1px solid var(--color-separator-subtle); background: #191a1c; }
 .shotSide > p { margin: .85rem .55rem .3rem; color: var(--color-text-tertiary); font: 500 .72rem var(--font-sans); letter-spacing: 0; text-transform: none; }
 .shotSide > p:first-child { margin-top: 0; }
 .shotNav { display: grid; gap: .12rem; }
-.shotNav button { min-height: 2.1rem; padding: 0 .55rem; border: 0; border-radius: 8px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); font: 500 .82rem var(--font-sans); text-align: left; cursor: pointer; transition: background-color 0.18s var(--motion-ease-standard), color 0.18s var(--motion-ease-standard); }
+.shotNav button { min-height: 1.95rem; padding: 0 .55rem; border: 0; border-radius: 8px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); font: 500 .78rem var(--font-sans); text-align: left; cursor: pointer; transition: background-color 0.18s var(--motion-ease-standard), color 0.18s var(--motion-ease-standard); }
 .shotNav button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .shotNav .shotNavActive { background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-selected)); color: var(--color-text-primary); }
+.shotSide > div:nth-of-type(3) button:nth-child(1) svg { color: #4cb782; }
+.shotSide > div:nth-of-type(3) button:nth-child(2) svg { color: #e8935e; }
 
 .shotWorkspace { position: relative; min-width: 0; padding: 0; }
 .shotWorkspaceHeader { display: flex; align-items: center; gap: .6rem; padding: .95rem 1.2rem; border-bottom: 1px solid var(--color-separator-subtle); background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0)); }
@@ -156,7 +158,7 @@
 .shotNav button svg { width: 15px; height: 15px; flex: none; color: var(--color-text-tertiary); }
 .shotNav .shotNavActive svg { color: var(--color-text-primary); }
 .workflowTabs { display: grid; grid-template-columns: minmax(0,1fr); gap: .12rem; }
-.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 2.1rem; align-items: center; gap: .5rem; padding: 0 .55rem; border: 0; border-radius: 8px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); text-align: left; cursor: pointer; transition: background-color 0.18s var(--motion-ease-standard), color 0.18s var(--motion-ease-standard); }
+.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 1.95rem; align-items: center; gap: .5rem; padding: 0 .55rem; border: 0; border-radius: 8px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); text-align: left; cursor: pointer; transition: background-color 0.18s var(--motion-ease-standard), color 0.18s var(--motion-ease-standard); }
 .workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .stageState { display: grid; width: .9rem; height: .9rem; flex: none; place-items: center; border-radius: 50%; }
 .stageState[data-state="todo"] { border: 1.5px solid #4a4b4e; }
@@ -165,7 +167,7 @@
 .stageState[data-state="done"]::after { content: "✓"; color: #fff; font-size: .55rem; font-weight: 700; line-height: 1; }
 .workflowTabs span { min-width: 0; }
 .workflowTabs b,.workflowTabs small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workflowTabs b { color: inherit; font-size: .82rem; font-weight: 550; letter-spacing: -.005em; }
+.workflowTabs b { color: inherit; font-size: .78rem; font-weight: 550; letter-spacing: -.005em; }
 @media (min-width: 701px) {
   .workflowTabs b,.workflowTabs small { overflow: visible; white-space: normal; text-overflow: clip; line-height: 1.2; }
 }
@@ -253,7 +255,6 @@
 
 @media (max-width: 1100px) {
   .section { grid-template-columns: minmax(0,.72fr) minmax(0,1.28fr); gap: 1rem; }
-  .shotBody { grid-template-columns: 12.5rem minmax(0,1fr); }
   .aiFloat { display: none; }
 }
 
@@ -261,6 +262,26 @@
   .section { display: block; min-height: auto; padding: 6rem var(--page-gutter) 3.5rem; overflow: visible; }
   .copy { width: min(100%,42rem); }
   .fieldFigure { width: 100%; min-width: 0; margin-top: 2rem; }
+}
+
+@media (max-width: 1100px) {
+  .shotToolRow { padding: .5rem .9rem 0; }
+  .shotProps { display: none; }
+  .shotBody { display: block; min-height: 0; }
+  .shotSide { display: block; padding: .55rem; border-right: 0; border-bottom: 1px solid var(--color-separator-subtle); }
+  .shotSide > p { display: none; }
+  .shotNav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; }
+  .shotNav button { min-height: 44px; padding: 0 .7rem; font-size: .72rem; }
+  .shotWorkspace { padding: 0; }
+  .shotWorkspaceHeader { padding: .75rem .9rem; }
+  .shotWorkspaceHeader small { display: none; }
+  .workflowTabs { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .workflowTabs > button { min-height: 48px; }
+  .workflowPanel { display: block; min-height: 0; }
+  .workflowMain { padding: 1.1rem .9rem; }
+  .workflowMain h2,.infoPage h2 { font-size: 1.25rem; }
+  .workflowIntro,.infoPage > p { font-size: .77rem; }
+  .infoPage button { min-height: 44px; font-size: .75rem; }
 }
 
 @media (max-width: 900px) {
