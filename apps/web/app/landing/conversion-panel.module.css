@@ -4,7 +4,7 @@
   color: var(--color-text-primary);
   /* Pass 5 (linear.app ref): single dark canvas — pilot offer and closing
    * band are elevated dark surfaces with light ink; >= 4.5:1 preserved
-   * (#f7f8f8 on #101112 ≈ 16:1). */
+   * (text-primary on surface-primary ≈ 16:1). */
   --conversion-deep: var(--color-surface-primary);
 }
 
@@ -85,7 +85,7 @@
 .pilotOffer li { display: flex; align-items: flex-start; gap: .55rem; color: var(--color-text-secondary); font-size: .9rem; line-height: 1.45; }
 .pilotOffer li :global(svg) { flex: 0 0 auto; margin-top: .16rem; color: var(--color-signal); }
 
-.pilotCta {
+.pilotOffer .pilotCta {
   display: inline-flex;
   min-height: 48px;
   align-items: center;
@@ -98,11 +98,6 @@
   font-size: .88rem;
   font-weight: 700;
   text-decoration: none;
-}
-
-.pilotOffer .pilotCta:focus-visible,
-.final .finalCta:focus-visible {
-  outline-color: var(--color-text-inverse);
 }
 
 .pilotOffer > small { color: color-mix(in srgb, var(--color-text-inverse) 52%, transparent); font-size: .74rem; }
@@ -179,7 +174,7 @@
 .finalTrust { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none; }
 .finalTrust li { display: flex; align-items: center; gap: .55rem; color: var(--color-text-secondary); font-size: .8rem; }
 .finalTrust li::before { width: .35rem; height: .35rem; border-radius: 50%; background: var(--color-signal); content: ""; }
-.finalCta { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .88rem; font-weight: 700; text-decoration: none; }
+.final .finalCta { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .88rem; font-weight: 700; text-decoration: none; }
 .finalSecondaryLink { display: inline-flex; min-height: 44px; align-items: center; color: var(--color-text-tertiary); font-size: .8rem; text-decoration: none; }
 
 @keyframes faqReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
@@ -224,15 +219,15 @@
 /* Pass 4 (owner verdict 25.09): staggered scroll reveals via motion tokens */
 @keyframes conversionRise { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
 .pricing[data-motion-state="visible"] .pilotOffer { animation: conversionRise var(--motion-duration-signal) var(--motion-ease-enter) both; }
-.pricing[data-motion-state="visible"] .secondaryOffers article:nth-of-type(1) { animation: conversionRise var(--motion-duration-emphasis) 200ms var(--motion-ease-enter) both; }
-.pricing[data-motion-state="visible"] .secondaryOffers article:nth-of-type(2) { animation: conversionRise var(--motion-duration-emphasis) 280ms var(--motion-ease-enter) both; }
-.faq[data-motion-state="visible"] .faqList details:nth-child(1) { animation: conversionRise var(--motion-duration-emphasis) 80ms var(--motion-ease-enter) both; }
-.faq[data-motion-state="visible"] .faqList details:nth-child(2) { animation: conversionRise var(--motion-duration-emphasis) 140ms var(--motion-ease-enter) both; }
-.faq[data-motion-state="visible"] .faqList details:nth-child(3) { animation: conversionRise var(--motion-duration-emphasis) 200ms var(--motion-ease-enter) both; }
-.faq[data-motion-state="visible"] .faqList details:nth-child(4) { animation: conversionRise var(--motion-duration-emphasis) 260ms var(--motion-ease-enter) both; }
-.faq[data-motion-state="visible"] .faqList details:nth-child(5) { animation: conversionRise var(--motion-duration-emphasis) 320ms var(--motion-ease-enter) both; }
+.pricing[data-motion-state="visible"] .secondaryOffers article:nth-of-type(1) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-4) var(--motion-ease-enter) both; }
+.pricing[data-motion-state="visible"] .secondaryOffers article:nth-of-type(2) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-7) var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(1) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-1) var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(2) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-3) var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(3) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-4) var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(4) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-6) var(--motion-ease-enter) both; }
+.faq[data-motion-state="visible"] .faqList details:nth-child(5) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-9) var(--motion-ease-enter) both; }
 .final[data-motion-state="visible"] .finalCopy { animation: conversionRise var(--motion-duration-signal) var(--motion-ease-enter) both; }
-.final[data-motion-state="visible"] .finalDecision { animation: conversionRise var(--motion-duration-signal) 140ms var(--motion-ease-enter) both; }
+.final[data-motion-state="visible"] .finalDecision { animation: conversionRise var(--motion-duration-signal) var(--motion-delay-3) var(--motion-ease-enter) both; }
 
 @media (prefers-reduced-motion: reduce) {
   .faqList details[open] p { animation: none; }

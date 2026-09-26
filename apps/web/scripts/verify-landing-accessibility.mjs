@@ -240,7 +240,7 @@ async function auditHeader(browser, viewport) {
     // first remaining section link keeps the Header nav contrast contract.
     // The duplicated header preview CTA is retired (owner verdict 23.09):
     // the hero workflow CTA is the single path to the example.
-    const nav = header.getByRole("navigation", { name: "Разделы лендинга" }).getByRole("link", { name: "Как работает", exact: true });
+    const nav = header.getByRole("navigation", { name: "Разделы лендинга" }).getByRole("link", { name: "Разбор", exact: true });
     const login = header.getByRole("link", { name: "Войти", exact: true });
     await assertContrast(nav, `${viewport.name} Header nav`, 4.5, heroBackground);
     await assertContrast(login, `${viewport.name} Header login`, 4.5, heroBackground);
