@@ -96,7 +96,7 @@
   display: flex;
   align-items: baseline;
   gap: .6rem;
-  margin-left: auto;
+  margin-left: .25rem;
   color: var(--evidence-accent);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
@@ -110,7 +110,7 @@
 
 .factCell {
   order: 2;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   color: var(--evidence-ink);
   font-size: 1rem;

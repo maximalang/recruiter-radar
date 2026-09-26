@@ -118,7 +118,7 @@
 .shotMark { display: grid; width: 1.3rem; height: 1.3rem; place-items: center; border: 1px solid var(--color-separator); border-radius: 6px; background: var(--color-surface-elevated); color: var(--color-text-primary); font: 700 .5rem var(--font-mono); }
 
 .shotBody { display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); }
-.shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .9rem; border-right: 1px solid var(--color-separator-subtle); background: rgba(255, 255, 255, 0.012); }
+.shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .9rem; border-right: 1px solid var(--color-separator-subtle); background: #191a1c; }
 .shotSide > p { margin: .85rem .55rem .3rem; color: var(--color-text-tertiary); font: 500 .72rem var(--font-sans); letter-spacing: 0; text-transform: none; }
 .shotSide > p:first-child { margin-top: 0; }
 .shotNav { display: grid; gap: .12rem; }
@@ -170,27 +170,29 @@
 
 .workflowPanel { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr) 15.5rem; gap: .5rem; margin-top: .2rem; background: transparent; }
 .workflowMain { padding: 2.4rem 1.35rem 1.4rem; }
-.shotProps { display: grid; align-self: start; gap: .15rem; padding: 2.4rem 0 1.2rem 1.1rem; border-left: 1px solid var(--color-separator-subtle); }
-.shotProps h3 { margin: 0 0 .55rem; color: var(--color-text-tertiary); font-size: .7rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-.shotProps > div { display: flex; align-items: center; gap: .45rem; padding: .3rem 0; color: color-mix(in srgb, var(--color-text-primary) 82%, transparent); font-size: .78rem; }
+.shotProps { display: grid; align-self: start; gap: .6rem; padding: 2.4rem .9rem 1.2rem .55rem; }
+.propsCard { padding: .95rem 1.05rem; border: 1px solid var(--color-separator-subtle); border-radius: 12px; background: rgba(255, 255, 255, 0.015); }
+.propsCard h3 { margin: 0 0 .55rem; color: var(--color-text-tertiary); font-size: .7rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.propsCard > div { display: flex; align-items: center; gap: .45rem; padding: .3rem 0; color: color-mix(in srgb, var(--color-text-primary) 82%, transparent); font-size: .78rem; }
 .shotProps > .aiFloat { display: block; padding: .85rem .95rem; color: var(--color-text-primary); }
-.shotProps svg { width: 13px; height: 13px; flex: none; color: #5e6ad2; }
+.propsCard svg { width: 14px; height: 14px; flex: none; color: #5e6ad2; }
 .activityHead { margin: 1.8rem 0 0; color: color-mix(in srgb, var(--color-text-primary) 88%, transparent); font-size: 1.05rem; font-weight: 600; letter-spacing: -.01em; }
 .workflowEyebrow,.infoPage > span { color: var(--color-text-tertiary); font: .58rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
 .workflowMain h2,.infoPage h2 { max-width: 28ch; margin: .6rem 0 0; font-size: 1.5rem; font-weight: 600; letter-spacing: -.025em; line-height: 1.25; }
 .workflowIntro,.infoPage > p { max-width: 62ch; margin: .55rem 0 0; color: var(--color-text-secondary); font-size: .92rem; line-height: 1.55; }
 .workflowRows { margin: .85rem 0 0; }
-.workflowRows div { display: flex; align-items: center; gap: .65rem; padding: .68rem 0; }
-.workflowRows dt { flex: 0 0 auto; color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); font-size: .86rem; font-weight: 560; }
+.workflowRows div { display: block; padding: .52rem 0; }
+.workflowRows dt { display: inline; color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); font-size: .86rem; font-weight: 560; }
 .shotBack { display: grid; width: 1.5rem; height: 1.5rem; flex: none; place-items: center; border-radius: 6px; color: var(--color-text-tertiary); }
 .shotBack svg { width: 14px; height: 14px; }
-.rowIco { display: grid; width: 1.45rem; height: 1.45rem; flex: none; place-items: center; border-radius: 6px; }
+.rowIco { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 6px; margin-right: .65rem; vertical-align: -.45em; }
 .rowIco svg { width: 13px; height: 13px; }
 .rowIco[data-i="0"] { background: rgba(94, 106, 210, 0.16); color: #7b86e8; }
 .rowIco[data-i="1"] { background: rgba(76, 183, 130, 0.16); color: #4cb782; }
 .rowIco[data-i="2"] { background: rgba(157, 123, 232, 0.16); color: #9d7be8; }
-.rowTime { flex: none; margin-left: auto; color: var(--color-text-disabled); font-size: .74rem; }
-.workflowRows dd { flex: 1 1 auto; min-width: 0; margin: 0; color: color-mix(in srgb, var(--color-text-primary) 74%, transparent); font-size: .86rem; line-height: 1.5; }
+.rowTime { display: inline; margin-left: .55rem; color: var(--color-text-disabled); font-size: .74rem; }
+.rowTime::before { content: "·"; margin-right: .45rem; }
+.workflowRows dd { display: inline; margin: 0; color: color-mix(in srgb, var(--color-text-primary) 74%, transparent); font-size: .86rem; line-height: 1.5; }
 .workflowRows dd::before { content: "—"; margin-right: .4rem; color: var(--color-text-disabled); }
 .cmtCard { display: flex; gap: .65rem; margin-top: 1.1rem; padding: .85rem .95rem; border: 1px solid var(--color-separator-subtle); border-radius: 10px; background: linear-gradient(160deg, #1b1c1e, #191a1c 80%); }
 .cmtAv { display: grid; width: 1.7rem; height: 1.7rem; flex: none; place-items: center; border-radius: 50%; background: #5e6ad2; color: #fff; font: 600 .58rem var(--font-mono); }
@@ -203,7 +205,7 @@
 .workflowRows > div:nth-child(2) { animation-delay: 70ms; }
 .workflowRows > div:nth-child(3) { animation-delay: 140ms; }
 @keyframes rowIn { from { opacity: 0; transform: translate3d(0, 5px, 0); } to { opacity: 1; transform: none; } }
-.aiFloat { margin-top: .9rem; padding: .85rem .95rem; border: 1px solid var(--color-separator); border-radius: 10px; background: linear-gradient(160deg, #1b1c1e, #17181a 75%); box-shadow: none; }
+.aiFloat { margin-top: 0; padding: .95rem 1.05rem; border-radius: 10px; background: linear-gradient(160deg, #1b1c1e, #17181a 75%); box-shadow: none; }
 .aiFloatHead { display: flex; align-items: center; gap: .45rem; }
 .aiFloatHead strong { font-size: .82rem; font-weight: 590; }
 .aiFloatHead em { padding: .08rem .4rem; border: 1px solid var(--color-separator); border-radius: 999px; color: var(--color-text-tertiary); font-size: .56rem; font-style: normal; font-weight: 600; letter-spacing: .06em; }
@@ -222,10 +224,10 @@
 .infoPage h2 { max-width: 32ch; font-size: 1.45rem; }
 .infoPage > p { max-width: 65ch; }
 .infoPage dl { margin: 1.2rem 0 0; }
-.infoPage dl div { display: flex; align-items: center; gap: .65rem; padding: .68rem 0; }
-.infoPage i { display: grid; width: 1.45rem; height: 1.45rem; flex: none; place-items: center; border-radius: 6px; background: rgba(94, 106, 210, 0.16); color: #7b86e8; font: 600 .56rem var(--font-mono); }
-.infoPage dt { flex: 0 0 auto; color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); font-size: .86rem; font-weight: 560; }
-.infoPage dd { flex: 1 1 auto; min-width: 0; margin: 0; color: color-mix(in srgb, var(--color-text-primary) 74%, transparent); font-size: .86rem; line-height: 1.5; }
+.infoPage dl div { display: block; padding: .55rem 0; }
+.infoPage i { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 6px; margin-right: .65rem; vertical-align: -.45em; background: rgba(94, 106, 210, 0.16); color: #7b86e8; font: 600 .56rem var(--font-mono); }
+.infoPage dt { display: inline; color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); font-size: .86rem; font-weight: 560; }
+.infoPage dd { display: inline; margin: 0; color: color-mix(in srgb, var(--color-text-primary) 74%, transparent); font-size: .86rem; line-height: 1.5; }
 .infoPage dd::before { content: "—"; margin-right: .4rem; color: var(--color-text-disabled); }
 .infoPage button { width: auto; padding-inline: 1rem; }
 
