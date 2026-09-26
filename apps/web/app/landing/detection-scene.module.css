@@ -158,7 +158,11 @@
 .workflowTabs { display: grid; grid-template-columns: minmax(0,1fr); gap: .12rem; }
 .workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 2.1rem; align-items: center; gap: .5rem; padding: 0 .55rem; border: 0; border-radius: 8px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); text-align: left; cursor: pointer; transition: background-color 0.18s var(--motion-ease-standard), color 0.18s var(--motion-ease-standard); }
 .workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
-.workflowTabs i { display: grid; width: 1.05rem; height: 1.05rem; flex: none; place-items: center; border: 1px solid var(--color-separator); border-radius: 50%; color: var(--color-text-tertiary); font: normal .5rem var(--font-mono); }
+.stageState { display: grid; width: .9rem; height: .9rem; flex: none; place-items: center; border-radius: 50%; }
+.stageState[data-state="todo"] { border: 1.5px solid #4a4b4e; }
+.stageState[data-state="active"] { border: 1.5px solid #f0b429; background: conic-gradient(from -90deg, #f0b429 0 50%, rgba(240, 180, 41, 0.12) 50% 100%); }
+.stageState[data-state="done"] { background: #5e6ad2; }
+.stageState[data-state="done"]::after { content: "✓"; color: #fff; font-size: .55rem; font-weight: 700; line-height: 1; }
 .workflowTabs span { min-width: 0; }
 .workflowTabs b,.workflowTabs small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workflowTabs b { color: inherit; font-size: .82rem; font-weight: 550; letter-spacing: -.005em; }
@@ -166,7 +170,7 @@
   .workflowTabs b,.workflowTabs small { overflow: visible; white-space: normal; text-overflow: clip; line-height: 1.2; }
 }
 .workflowTabs .workflowTabActive { background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-selected)); color: var(--color-text-primary); }
-.workflowTabActive i { border-color: var(--color-separator); background: var(--color-surface-elevated); color: var(--color-text-primary); }
+.workflowTabActive span b { color: var(--color-text-primary); }
 
 .workflowPanel { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr) 15.5rem; gap: .5rem; margin-top: .2rem; background: transparent; }
 .workflowMain { padding: 2.4rem 1.35rem 1.4rem; }
@@ -192,6 +196,12 @@
 .rowIco[data-i="2"] { background: rgba(157, 123, 232, 0.16); color: #9d7be8; }
 .rowTime { display: inline; margin-left: .55rem; color: var(--color-text-disabled); font-size: .74rem; }
 .rowTime::before { content: "·"; margin-right: .45rem; }
+.rowLabel { display: inline-block; padding: .16rem .6rem; border-radius: 999px; margin-right: .55rem; background: rgba(76, 183, 130, 0.16); color: #4cb782; font-size: .72rem; font-weight: 600; }
+.rowAv { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; margin-right: .65rem; background: #5e6ad2; color: #fff; font: 700 .5rem var(--font-mono); vertical-align: -.45em; }
+.workflowRows div:nth-child(2) dd::before { content: none; margin-right: 0; }
+.propsStatus { display: flex; align-items: center; gap: .5rem; margin: 0; color: var(--color-text-primary); font-size: .88rem; font-weight: 600; }
+.statusDot { width: .55rem; height: .55rem; flex: none; border-radius: 50%; background: #f0b429; }
+.propsMeta { margin: .45rem 0 0; color: var(--color-text-tertiary); font-size: .76rem; line-height: 1.5; }
 .workflowRows dd { display: inline; margin: 0; color: color-mix(in srgb, var(--color-text-primary) 74%, transparent); font-size: .86rem; line-height: 1.5; }
 .workflowRows dd::before { content: "—"; margin-right: .4rem; color: var(--color-text-disabled); }
 .cmtCard { display: flex; gap: .65rem; margin-top: 1.1rem; padding: .85rem .95rem; border: 1px solid var(--color-separator-subtle); border-radius: 10px; background: linear-gradient(160deg, #1b1c1e, #191a1c 80%); }
@@ -225,7 +235,8 @@
 .infoPage > p { max-width: 65ch; }
 .infoPage dl { margin: 1.2rem 0 0; }
 .infoPage dl div { display: block; padding: .55rem 0; }
-.infoPage i { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 6px; margin-right: .65rem; vertical-align: -.45em; background: rgba(94, 106, 210, 0.16); color: #7b86e8; font: 600 .56rem var(--font-mono); }
+.infoPage i { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; margin-right: .65rem; vertical-align: -.45em; background: rgba(94, 106, 210, 0.16); color: #7b86e8; font-size: 0; }
+.infoPage i::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #7b86e8; }
 .infoPage dt { display: inline; color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); font-size: .86rem; font-weight: 560; }
 .infoPage dd { display: inline; margin: 0; color: color-mix(in srgb, var(--color-text-primary) 74%, transparent); font-size: .86rem; line-height: 1.5; }
 .infoPage dd::before { content: "—"; margin-right: .4rem; color: var(--color-text-disabled); }
@@ -288,7 +299,7 @@
 @media (max-width: 430px) {
   .section { padding-top: 5.4rem; }
   .shotWorkspaceHeader strong { font-size: .9rem; }
-  .workflowTabs i { width: 1.15rem; height: 1.15rem; }
+  .stageState { width: 1rem; height: 1rem; }
   .workflowTabs > button { padding-inline: .48rem; }
 }
 
@@ -312,7 +323,7 @@
 .workflowMain { animation: heroStageIn var(--motion-duration-emphasis) var(--motion-ease-enter) both; }
 .infoPage { animation: heroStageIn var(--motion-duration-emphasis) var(--motion-ease-enter) both; }
 .workflowTabs > button { transition: color var(--motion-duration-fast) var(--motion-ease-standard); }
-.workflowTabs i { transition: border-color var(--motion-duration-fast) var(--motion-ease-standard), color var(--motion-duration-fast) var(--motion-ease-standard); }
+.stageState { transition: border-color var(--motion-duration-fast) var(--motion-ease-standard), background-color var(--motion-duration-fast) var(--motion-ease-standard); }
 
 @media (prefers-reduced-motion: reduce) {
   .section *, .section *::before, .section *::after { animation: none !important; transition: none !important; }
