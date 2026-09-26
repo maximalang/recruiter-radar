@@ -52,7 +52,7 @@ describe("landing product story v2", () => {
     expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.fieldFigure\s*\{[^}]*width:\s*100%/);
   });
 
-  it("uses the approved dark split-screen composition at desktop widths", () => {
+  it("uses the approved dark stacked composition at desktop widths", () => {
     const visualCss = source("app/landing/landing-visual-system.module.css");
     const heroCss = source("app/landing/detection-scene.module.css");
     const landing = source("app/landing/landing-page.tsx");
@@ -64,10 +64,8 @@ describe("landing product story v2", () => {
     expect(visualCss).toMatch(/--landing-paper:\s*var\(--color-text-primary\)/);
     expect(visualCss).toMatch(/--landing-ink:\s*var\(--color-text-inverse\)/);
     expect(visualCss).toMatch(/--landing-accent:\s*color-mix\(/);
-    expect(heroCss).toMatch(
-      /\.section\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*\.82fr\)\s+minmax\(0,\s*1\.18fr\)/,
-    );
-    expect(heroCss).toMatch(/gap:\s*2rem/);
+    expect(heroCss).toMatch(/\.section\s*\{[^}]*display:\s*block/);
+    expect(heroCss).toMatch(/\.copy\s*\{[^}]*width:\s*min\(100%,\s*46rem\)/);
     expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.section\s*\{[^}]*display:\s*block/);
   });
 

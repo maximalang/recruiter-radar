@@ -1,14 +1,10 @@
 .section {
   position: relative;
-  display: grid;
+  display: block;
   width: 100%;
-  min-height: max(46rem, 100svh);
   max-width: calc(var(--content-max) + 2 * var(--scene-pad));
   margin-inline: auto;
-  grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
-  align-items: center;
-  gap: 2rem;
-  padding: 6rem var(--scene-pad) 4rem;
+  padding: 5.5rem var(--scene-pad) 4.5rem;
   overflow: hidden;
   background: var(--color-canvas);
   color: var(--color-text-primary);
@@ -17,7 +13,7 @@
 .copy {
   position: relative;
   z-index: 3;
-  width: min(100%, 34rem);
+  width: min(100%, 46rem);
 }
 
 .serviceLabel {
@@ -86,6 +82,7 @@
   z-index: 4;
   width: 100%;
   min-width: 0;
+  margin-top: 2.5rem;
   pointer-events: auto;
 }
 
@@ -98,74 +95,85 @@
   border-radius: var(--radius-overlay);
   background: var(--color-surface-secondary);
   box-shadow: var(--shadow-hero-panel);
+
   color: var(--color-text-primary);
   text-align: left;
 }
 
 .shotBar {
   display: flex;
-  height: 3rem;
+  height: 2.9rem;
   align-items: center;
-  gap: .65rem;
-  padding: 0 1rem;
+  gap: .55rem;
+  padding: 0 .9rem;
   border-bottom: 1px solid var(--color-separator-subtle);
   background: transparent;
 }
-.shotMark { display: grid; width: 1.55rem; height: 1.55rem; place-items: center; border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 45%, transparent); border-radius: var(--radius-control); color: var(--color-signal-on-dark); font: 700 .53rem var(--font-mono); }
-.shotBar strong { font-size: .72rem; font-weight: 610; }
-.shotMode { margin-left: auto; color: var(--color-text-secondary); font: .68rem var(--font-sans); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.shotMark { display: grid; width: 1.3rem; height: 1.3rem; place-items: center; border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 40%, transparent); border-radius: 6px; color: var(--color-signal-on-dark); font: 700 .5rem var(--font-mono); }
+.shotBar strong { font-size: .8rem; font-weight: 590; letter-spacing: -.01em; }
+.shotMode { margin-left: auto; padding: .2rem .55rem; border: 1px solid var(--color-separator-subtle); border-radius: 999px; color: var(--color-text-tertiary); font: .62rem var(--font-sans); font-weight: 600; letter-spacing: .07em; text-transform: uppercase; }
 
-.shotBody { display: grid; min-height: 27rem; grid-template-columns: 11rem minmax(0,1fr); }
-.shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .8rem; border-right: 1px solid var(--color-separator-subtle); background: transparent; }
-.shotSide > p { margin: .8rem .55rem .38rem; color: var(--color-text-secondary); font: .68rem var(--font-sans); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.shotBody { display: grid; min-height: 29rem; grid-template-columns: 12.5rem minmax(0,1fr); }
+.shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .9rem; border-right: 1px solid var(--color-separator-subtle); background: transparent; }
+.shotSide > p { margin: .95rem .55rem .38rem; color: var(--color-text-tertiary); font: .62rem var(--font-sans); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 .shotSide > p:first-child { margin-top: 0; }
-.shotNav { display: grid; gap: .16rem; }
-.shotNav button { min-height: 2.15rem; padding: 0 .55rem; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text-secondary); font: 500 .66rem var(--font-sans); text-align: left; cursor: pointer; }
+.shotNav { display: grid; gap: .12rem; }
+.shotNav button { min-height: 2rem; padding: 0 .55rem; border: 0; border-radius: 6px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 78%, transparent); font: 500 .75rem var(--font-sans); text-align: left; cursor: pointer; }
 .shotNav button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .shotNav .shotNavActive { background: var(--color-surface-selected); color: var(--color-text-primary); }
 
-.shotWorkspace { min-width: 0; padding: 1.15rem; }
-.shotWorkspaceHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: .9rem; border-bottom: 1px solid var(--color-separator-subtle); }
+.shotWorkspace { min-width: 0; padding: 0; }
+.shotWorkspaceHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .85rem 1.1rem; border-bottom: 1px solid var(--color-separator-subtle); }
 .shotWorkspaceHeader div { display: grid; gap: .22rem; }
-.shotWorkspaceHeader span { color: var(--color-signal-on-dark); font: .54rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
-.shotWorkspaceHeader strong { font-size: 1rem; font-weight: 590; letter-spacing: -.02em; }
+.shotWorkspaceHeader span { color: var(--color-text-secondary); font: .6rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.shotWorkspaceHeader strong { font-size: .98rem; font-weight: 590; letter-spacing: -.02em; }
 .shotWorkspaceHeader small { color: var(--color-text-secondary); font-size: .62rem; }
 .workflowArea { padding-top: .85rem; }
 .workflowTabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); overflow: hidden; border-bottom: 1px solid var(--color-separator-subtle); }
-.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 3.65rem; align-items: center; gap: .55rem; padding: .55rem .65rem; border: 0; background: transparent; color: var(--color-text-secondary); text-align: left; cursor: pointer; }
+.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 2.75rem; align-items: center; gap: .45rem; padding: .45rem .6rem; border: 0; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 72%, transparent); text-align: left; cursor: pointer; }
 .workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
-.workflowTabs i { display: grid; width: 1.3rem; height: 1.3rem; flex: none; place-items: center; border: 1px solid var(--color-separator); border-radius: 50%; font: normal .5rem var(--font-mono); }
+.workflowTabs i { display: grid; width: 1.25rem; height: 1.25rem; flex: none; place-items: center; border: 1px solid var(--color-separator); border-radius: 50%; color: var(--color-text-tertiary); font: normal .52rem var(--font-mono); }
 .workflowTabs span { min-width: 0; }
 .workflowTabs b,.workflowTabs small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workflowTabs b { color: inherit; font-size: .59rem; font-weight: 560; }
+.workflowTabs b { color: inherit; font-size: .72rem; font-weight: 550; letter-spacing: -.005em; }
 .workflowTabs small { margin-top: .18rem; color: var(--color-text-secondary); font-size: .68rem; }
 @media (min-width: 701px) {
   .workflowTabs b,.workflowTabs small { overflow: visible; white-space: normal; text-overflow: clip; line-height: 1.2; }
 }
-.workflowTabs .workflowTabActive { background: var(--color-surface-selected); color: var(--color-text-primary); }
+.workflowTabs .workflowTabActive { background: transparent; color: var(--color-text-primary); }
 .workflowTabs .workflowTabActive::after { content: ""; position: absolute; inset: auto 0 0; height: 2px; background: var(--color-signal-on-dark); }
 .workflowTabActive i { border-color: var(--color-signal-on-dark); color: var(--color-signal-on-dark); }
 
 .workflowPanel { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr); margin-top: .7rem; overflow: hidden; background: transparent; }
-.workflowMain { padding: 1.25rem .35rem; }
-.workflowEyebrow,.infoPage > span { color: var(--color-signal-on-dark); font: .53rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
-.workflowMain h2,.infoPage h2 { max-width: 25ch; margin: .55rem 0 0; font-size: 1.28rem; font-weight: 570; letter-spacing: -.035em; line-height: 1.15; }
-.workflowIntro,.infoPage > p { max-width: 54ch; margin: .68rem 0 0; color: var(--color-text-secondary); font-size: .68rem; line-height: 1.55; }
-.workflowRows { margin: .8rem 0 0; }
-.workflowRows div { display: grid; grid-template-columns: 9.5rem minmax(0,1fr); gap: .8rem; padding: .62rem 0; border-bottom: 1px solid var(--color-separator-subtle); }
-.workflowRows dt { color: var(--color-text-primary); font-size: .66rem; font-weight: 600; }
-.workflowRows dd { margin: 0; color: var(--color-text-secondary); font-size: .66rem; line-height: 1.4; }
-.infoPage button { min-height: 2.35rem; margin-top: 1rem; padding: 0 1rem; border: 0; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .63rem; font-weight: 680; cursor: pointer; }
+.workflowMain { padding: 1.1rem 1rem 1.2rem; }
+.workflowEyebrow,.infoPage > span { color: var(--color-signal-on-dark); font: .58rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
+.workflowMain h2,.infoPage h2 { max-width: 28ch; margin: .55rem 0 0; font-size: 1.2rem; font-weight: 590; letter-spacing: -.025em; line-height: 1.22; }
+.workflowIntro,.infoPage > p { max-width: 62ch; margin: .55rem 0 0; color: var(--color-text-secondary); font-size: .75rem; line-height: 1.55; }
+.workflowRows { margin: .85rem 0 0; }
+.workflowRows div { display: grid; grid-template-columns: 10.5rem minmax(0,1fr); gap: .75rem; padding: .6rem 0; border-bottom: 1px solid var(--color-separator-subtle); }
+.workflowRows dt { display: flex; align-items: baseline; gap: .45rem; color: var(--color-text-primary); font-size: .72rem; font-weight: 570; }
+
+.workflowRows dt::before {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-signal-on-dark);
+  content: "";
+  transform: translateY(-1px);
+}
+.workflowRows dd { margin: 0; color: color-mix(in srgb, var(--color-text-primary) 68%, transparent); font-size: .72rem; line-height: 1.5; }
+.infoPage button { min-height: 2.3rem; margin-top: 1rem; padding: 0 1rem; border: 0; border-radius: 7px; background: var(--color-signal); color: var(--color-text-inverse); font-size: .72rem; font-weight: 640; cursor: pointer; }
 .infoPage button:focus-visible { outline: 2px solid var(--color-text-primary); outline-offset: 2px; }
 
-.infoPage { padding: 1.25rem .25rem 0; }
+.infoPage { padding: 1.3rem 1.1rem 0; }
 .infoPage h2 { max-width: 32ch; font-size: 1.45rem; }
 .infoPage > p { max-width: 65ch; }
-.infoPage dl { margin: 1rem 0 0; border-top: 1px solid var(--color-separator-subtle); }
-.infoPage dl div { display: grid; grid-template-columns: 1.6rem 9rem minmax(0,1fr); gap: .7rem; padding: .78rem 0; border-bottom: 1px solid var(--color-separator-subtle); }
-.infoPage i { color: var(--color-text-tertiary); font: normal .58rem var(--font-mono); }
-.infoPage dt { color: var(--color-text-secondary); font-size: .65rem; font-weight: 550; }
-.infoPage dd { margin: 0; color: var(--color-text-secondary); font-size: .65rem; line-height: 1.45; }
+.infoPage dl { margin: 1.1rem 0 0; border-top: 1px solid var(--color-separator-subtle); }
+.infoPage dl div { display: grid; grid-template-columns: 1.6rem 10rem minmax(0,1fr); gap: .75rem; padding: .62rem 0; border-bottom: 1px solid var(--color-separator-subtle); }
+.infoPage i { color: var(--color-text-tertiary); font: normal .6rem var(--font-mono); }
+.infoPage dt { color: var(--color-text-primary); font-size: .72rem; font-weight: 560; }
+.infoPage dd { margin: 0; color: color-mix(in srgb, var(--color-text-primary) 68%, transparent); font-size: .72rem; line-height: 1.5; }
 .infoPage button { width: auto; padding-inline: 1rem; }
 
 @media (hover: hover) and (pointer: fine) {
@@ -200,7 +208,8 @@
   .shotSide > p { display: none; }
   .shotNav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; }
   .shotNav button { min-height: 44px; padding: 0 .7rem; font-size: .72rem; }
-  .shotWorkspace { padding: .85rem; }
+  .shotWorkspace { padding: 0; }
+  .shotWorkspaceHeader { padding: .75rem .9rem; }
   .shotWorkspaceHeader small { display: none; }
   .workflowTabs { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .workflowTabs > button { min-height: 64px; border-bottom: 1px solid var(--color-separator-subtle); }
@@ -208,7 +217,7 @@
   .workflowTabs > button:nth-child(n+3) { border-bottom: 0; }
   .workflowTabs b,.workflowTabs small { overflow: visible; text-overflow: clip; white-space: normal; line-height: 1.15; }
   .workflowPanel { display: block; min-height: 0; }
-  .workflowMain { padding: 1rem; }
+  .workflowMain { padding: 1.1rem .9rem; }
   .workflowMain h2,.infoPage h2 { font-size: 1.25rem; }
   .workflowIntro,.infoPage > p { font-size: .77rem; }
   .workflowRows div { grid-template-columns: minmax(0,1fr); gap: .2rem; }
