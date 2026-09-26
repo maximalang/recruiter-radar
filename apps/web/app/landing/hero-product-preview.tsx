@@ -309,10 +309,12 @@ export default function HeroProductPreview() {
                   </div>
                 </div>
                 <aside className={sceneStyles.shotProps} aria-label="Сводка этапа">
-                  <h3>Сводка</h3>
-                  <div><span aria-hidden="true"><Ico name="branch" /></span>Этап {stage} из 4</div>
-                  <div><span aria-hidden="true"><Ico name="target" /></span>Пилот · 7 дней</div>
-                  <div><span aria-hidden="true"><Ico name="bolt" /></span>Этапы сменяются сами</div>
+                  <div className={sceneStyles.propsCard}>
+                    <h3>Сводка</h3>
+                    <div><span aria-hidden="true"><Ico name="branch" /></span>Этап {stage} из 4</div>
+                    <div><span aria-hidden="true"><Ico name="target" /></span>Пилот · 7 дней</div>
+                    <div><span aria-hidden="true"><Ico name="bolt" /></span>Этапы сменяются сами</div>
+                  </div>
                   <div className={sceneStyles.aiFloat} aria-hidden="true">
                     <div className={sceneStyles.aiFloatHead}>
                       <span className={sceneStyles.shotMark}>RR</span>
