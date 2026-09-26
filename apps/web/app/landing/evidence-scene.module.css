@@ -53,26 +53,33 @@
 /* One continuous proof ledger: facts stay primary, metadata aligns in columns. */
 .evidenceChain {
   margin-top: clamp(2.25rem, 4vw, 3.75rem);
-  border-top: 2px solid var(--evidence-ink);
-  border-bottom: 1px solid var(--evidence-ink);
 }
 
 .timeline {
   display: grid;
-  gap: 0;
+  gap: .55rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .timeline li {
-  display: grid;
-  grid-template-columns: minmax(8rem, .6fr) minmax(7rem, .45fr) minmax(0, 1.55fr);
-  gap: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
+  column-gap: .8rem;
+  row-gap: .35rem;
   min-width: 0;
-  padding: 1.15rem 0;
-  border-bottom: 1px solid var(--evidence-line);
+  padding: .95rem 0;
+}
+
+.sourceCell {
+  order: 1;
+  flex: none;
+  padding: .22rem .65rem;
+  border: 1px solid var(--evidence-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .sourceCell,
@@ -85,8 +92,11 @@
 }
 
 .dateCell {
-  display: grid;
-  gap: .2rem;
+  order: 3;
+  display: flex;
+  align-items: baseline;
+  gap: .6rem;
+  margin-left: auto;
   color: var(--evidence-accent);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
@@ -99,6 +109,8 @@
 }
 
 .factCell {
+  order: 2;
+  flex: 1 1 auto;
   min-width: 0;
   color: var(--evidence-ink);
   font-size: 1rem;
@@ -110,17 +122,20 @@
 /* Score, confidence and the manual next step resolve the same ledger. */
 .resolution {
   display: grid;
-  grid-template-columns: minmax(8rem, .55fr) minmax(12rem, .7fr) minmax(0, 1.75fr);
-  gap: 0;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: .55rem;
   align-items: stretch;
-  border-top: 1px solid var(--evidence-ink);
+  margin-top: .55rem;
 }
 
 .scoreBlock,
 .confidenceBlock,
 .action {
   min-width: 0;
-  padding: 1.25rem 1.5rem 1.35rem 0;
+  padding: 1.05rem 1.15rem;
+  border: 1px solid var(--evidence-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.015);
 }
 
 .confidenceBlock,
@@ -128,8 +143,6 @@
   display: grid;
   align-content: start;
   gap: .32rem;
-  padding-left: 1.5rem;
-  border-left: 1px solid var(--evidence-line);
 }
 
 .blockLabel {

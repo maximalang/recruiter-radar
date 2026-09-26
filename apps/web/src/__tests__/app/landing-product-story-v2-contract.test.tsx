@@ -173,10 +173,10 @@ describe("landing product story v2", () => {
     expect(evidenceCss).toMatch(/--evidence-accent:\s*var\(--color-signal\)/);
     expect(evidenceCss).not.toMatch(/gradient\(|box-shadow:/);
     expect(evidenceCss).toMatch(
-      /\.timeline li\s*\{[^}]*grid-template-columns:\s*minmax\(8rem, \.6fr\)\s+minmax\(7rem, \.45fr\)\s+minmax\(0, 1\.55fr\)/,
+      /\.sourceCell\s*\{[^}]*border-radius:\s*999px/,
     );
     expect(evidenceCss).toMatch(
-      /\.resolution\s*\{[^}]*grid-template-columns:\s*minmax\(8rem, \.55fr\)\s+minmax\(12rem, \.7fr\)\s+minmax\(0, 1\.75fr\)/,
+      /\.resolution\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0,1fr\)\)/,
     );
     expect(evidenceCss).toMatch(
       /@media \(max-width: 820px\)[\s\S]*?grid-template-areas:\s*"source date"\s*"fact fact"/,
