@@ -20,7 +20,12 @@ const PAGES: ReadonlyArray<{ key: PageKey; label: string; group: "cabinet" | "wa
 /* Owner verdict 24.09 (pass 2): the demo reads as one logical product story —
  * настройка → проверка → результат → действие. Each stage keeps one title,
  * one intro line and three compact product facts; marketing asides, cadence
- * sublabels, the price promise and the timer hint are removed as noise. */
+ * sublabels, the price promise and the timer hint are removed as noise.
+ * Owner verdict 26.09 (pass 9): the demo window reproduces the linear.app
+ * hero demo layout — sidebar nav with icons and groups, issue topbar
+ * (status dot + id + title + counter), tool row, activity-style content,
+ * right summary column and a floating assistant panel — with Recruiter
+ * Radar data inside. */
 const STAGES: ReadonlyArray<{
   id: Stage;
   label: string;
@@ -127,12 +132,49 @@ const PAGE_CONTENT: Record<Exclude<PageKey, "today">, {
   },
 };
 
+/* Minimal 16px line-icon set mirroring the reference demo's sidebar/topbar
+ * glyphs. Decorative only — every icon is aria-hidden. */
+const ICON_PATHS: Record<string, string> = {
+  bolt: "M8.8 1.8 4.2 8.6h3.3L7.2 14.2l4.6-6.8H8.5l.3-5.6Z",
+  inbox: "M2 9.6 3.8 4h8.4l1.8 5.6V13H2V9.6Zm0 0h3.1l.9 1.6h4l.9-1.6h3.1",
+  target: "M8 2.6a5.4 5.4 0 1 0 0 10.8A5.4 5.4 0 0 0 8 2.6Zm0 3.6a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6Z",
+  branch: "M4.6 2.4a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6Zm0 7.6a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6ZM4.6 6v4m6.8-7.6a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2Zm0 3.2v1.2a2 2 0 0 1-2 2H6.4",
+  chart: "M3 13V8m5 5V3m5 10V6",
+  search: "M7.2 2.8a4.4 4.4 0 1 0 0 8.8 4.4 4.4 0 0 0 0-8.8Zm3.4 7.8 2.8 2.8",
+  plus: "M8 3.4v9.2M3.4 8h9.2",
+  caret: "m4.6 6.4 3.4 3.2 3.4-3.2",
+  star: "m8 2.6 1.7 3.5 3.8.5-2.8 2.7.7 3.8L8 11.3l-3.4 1.8.7-3.8L2.5 6.6l3.8-.5L8 2.6Z",
+  link: "M6.8 9.2 9.2 6.8M5 7.4l-.8.8a2.4 2.4 0 0 0 3.4 3.4l.8-.8m2.6-4.2.8-.8a2.4 2.4 0 0 0-3.4-3.4l-.8.8",
+  doc: "M3.6 2.4h8.8v11.2H3.6V2.4ZM6 6h4M6 8.6h4",
+  panelIco: "M2.2 3.4h11.6v9.2H2.2V3.4Zm7.2 0v9.2",
+  expand: "M9.6 3.6h2.8v2.8m0-2.8-4 4M6.4 12.4H3.6V9.6m0 2.8 4-4",
+  up: "M8 11.4V4.6M5.2 7.4 8 4.6l2.8 2.8",
+  down: "M8 4.6v6.8M5.2 8.6 8 11.4l2.8-2.8",
+  more: "M3.6 8a1.1 1.1 0 1 0 0-.01Zm4.4 0a1.1 1.1 0 1 0 0-.01Zm4.4 0a1.1 1.1 0 1 0 0-.01Z",
+};
+
+const NAV_ICONS: Record<PageKey, string> = {
+  today: "bolt",
+  companies: "inbox",
+  radar: "target",
+  engineering: "branch",
+  finance: "chart",
+};
+
+function Ico({ name }: { name: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d={ICON_PATHS[name]} />
+    </svg>
+  );
+}
+
 export default function HeroProductPreview() {
   const [page, setPage] = useState<PageKey>("today");
   const [stage, setStage] = useState<Stage>(1);
 
   useEffect(() => {
-    if (page !== "today" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (page !== "today" || window.matchMedia?.("prefers-reduced-motion: reduce)").matches) return;
     const timer = window.setTimeout(() => {
       setStage((current) => (current === 4 ? 1 : (current + 1) as Stage));
     }, AUTO_ADVANCE_MS);
@@ -140,6 +182,8 @@ export default function HeroProductPreview() {
   }, [page, stage]);
 
   const currentStage = STAGES[stage - 1];
+  const prevStage = () => setStage(stage === 1 ? 4 : ((stage - 1) as Stage));
+  const nextStage = () => setStage(stage === 4 ? 1 : ((stage + 1) as Stage));
 
   return (
     <figure
@@ -153,59 +197,85 @@ export default function HeroProductPreview() {
       tabIndex={-1}
       aria-label="Интерактивный workflow Recruiter Radar: настройка рынка, проверка источников, подтверждённый повод и подготовка сообщения."
     >
-      <div className={sceneStyles.shotBar}>
-        <span className={sceneStyles.shotMark} aria-hidden="true">RR</span>
-        <strong>Recruiter Radar</strong>
-        <span className={sceneStyles.shotMode}>Интерактивный workflow</span>
-      </div>
-
       <div className={sceneStyles.shotBody}>
         <aside className={sceneStyles.shotSide} aria-label="Разделы workflow">
-          <p>Кабинет</p>
+          <div className={sceneStyles.sideWorkspace}>
+            <span className={sceneStyles.shotMark} aria-hidden="true">RR</span>
+            <strong>Recruiter Radar</strong>
+            <span className={sceneStyles.sideWorkspaceTools} aria-hidden="true">
+              <Ico name="caret" />
+              <Ico name="search" />
+              <Ico name="plus" />
+            </span>
+          </div>
           <div className={sceneStyles.shotNav}>
             {PAGES.filter((item) => item.group === "cabinet").map((item) => (
               <button key={item.key} type="button" className={page === item.key ? sceneStyles.shotNavActive : undefined} onClick={() => setPage(item.key)}>
+                <Ico name={NAV_ICONS[item.key]} />
                 {item.label}
               </button>
             ))}
           </div>
-          <p>Наблюдения</p>
+          <p className={sceneStyles.sideGroup}>Наблюдения <Ico name="caret" /></p>
           <div className={sceneStyles.shotNav}>
             {PAGES.filter((item) => item.group === "watch").map((item) => (
               <button key={item.key} type="button" className={page === item.key ? sceneStyles.shotNavActive : undefined} onClick={() => setPage(item.key)}>
+                <Ico name={NAV_ICONS[item.key]} />
                 {item.label}
               </button>
             ))}
+          </div>
+          <p className={sceneStyles.sideGroup}>Этапы пилота <Ico name="caret" /></p>
+          <div className={sceneStyles.workflowTabs} role="tablist" aria-label="Этапы workflow">
+            {STAGES.map((item) => (
+              <button
+                key={item.id}
+                id={`hero-workflow-tab-${item.id}`}
+                type="button"
+                role="tab"
+                aria-selected={stage === item.id}
+                aria-controls="hero-workflow-panel"
+                className={stage === item.id ? sceneStyles.workflowTabActive : undefined}
+                onClick={() => { setStage(item.id); setPage("today"); }}
+              >
+                <i>{item.id}</i><span><b>{item.label}</b></span>
+              </button>
+            ))}
+          </div>
+          <div className={sceneStyles.sideUser}>
+            <span aria-hidden="true">7д</span>
+            <small>Недельный пилот</small>
           </div>
         </aside>
 
         <div className={sceneStyles.shotWorkspace}>
           <header className={sceneStyles.shotWorkspaceHeader}>
-            <div>
-              <span>{page === "today" ? "Сегодня" : "Recruiter Radar"}</span>
-              <strong>{page === "today" ? "Приоритетные компании и поводы" : PAGE_CONTENT[page].title}</strong>
-            </div>
+            <span className={sceneStyles.shotStatus} aria-hidden="true" />
+            <span className={sceneStyles.shotIssueId}>RR-1042</span>
+            <strong>{page === "today" ? "Приоритетные компании и поводы" : PAGE_CONTENT[page].title}</strong>
+            <span className={sceneStyles.shotHeaderTools} aria-hidden="true">
+              <Ico name="star" />
+              <Ico name="more" />
+            </span>
+            {page === "today" ? (
+              <span className={sceneStyles.shotCounter}>
+                <b>{stage} / 4</b>
+                <button type="button" aria-label="Предыдущий этап" onClick={prevStage}><Ico name="up" /></button>
+                <button type="button" aria-label="Следующий этап" onClick={nextStage}><Ico name="down" /></button>
+              </span>
+            ) : null}
           </header>
+
+          <div className={sceneStyles.shotToolRow} aria-hidden="true">
+            <span className={sceneStyles.shotToolCaption}>Интерактивный workflow</span>
+            <span className={sceneStyles.shotToolIco}><Ico name="link" /></span>
+            <span className={sceneStyles.shotToolIco}><Ico name="doc" /></span>
+            <span className={sceneStyles.shotToolIco}><Ico name="panelIco" /></span>
+            <span className={sceneStyles.shotToolIco}><Ico name="expand" /></span>
+          </div>
 
           {page === "today" ? (
             <div className={sceneStyles.workflowArea}>
-              <div className={sceneStyles.workflowTabs} role="tablist" aria-label="Этапы workflow">
-                {STAGES.map((item) => (
-                  <button
-                    key={item.id}
-                    id={`hero-workflow-tab-${item.id}`}
-                    type="button"
-                    role="tab"
-                    aria-selected={stage === item.id}
-                    aria-controls="hero-workflow-panel"
-                    className={stage === item.id ? sceneStyles.workflowTabActive : undefined}
-                    onClick={() => setStage(item.id)}
-                  >
-                    <i>{item.id}</i><span><b>{item.label}</b></span>
-                  </button>
-                ))}
-              </div>
-
               <article
                 id="hero-workflow-panel"
                 className={sceneStyles.workflowPanel}
@@ -217,12 +287,30 @@ export default function HeroProductPreview() {
                   <span className={sceneStyles.workflowEyebrow}>{currentStage.eyebrow}</span>
                   <h2>{currentStage.title}</h2>
                   <p className={sceneStyles.workflowIntro}>{currentStage.intro}</p>
+                  <p className={sceneStyles.activityHead}>Активность</p>
                   <dl className={sceneStyles.workflowRows}>
                     {currentStage.rows.map(([label, copy]) => (
                       <div key={label}><dt>{label}</dt><dd>{copy}</dd></div>
                     ))}
                   </dl>
                 </div>
+                <aside className={sceneStyles.shotProps} aria-label="Сводка этапа">
+                  <h3>Сводка</h3>
+                  <div><span aria-hidden="true"><Ico name="branch" /></span>Этап {stage} из 4</div>
+                  <div><span aria-hidden="true"><Ico name="target" /></span>Пилот · 7 дней</div>
+                  <div><span aria-hidden="true"><Ico name="bolt" /></span>Этапы сменяются сами</div>
+                  <div className={sceneStyles.aiFloat} aria-hidden="true">
+                    <div className={sceneStyles.aiFloatHead}>
+                      <span className={sceneStyles.shotMark}>RR</span>
+                      <strong>Радар</strong>
+                      <em>AI</em>
+                      <span className={sceneStyles.aiFloatCaret}><Ico name="caret" /></span>
+                    </div>
+                    <p className={sceneStyles.aiFloatCard}>Найти 10 компаний с поводом написать</p>
+                    <p className={sceneStyles.aiFloatCtx}>RR-1042 · профиль рынка в контексте</p>
+                    <p className={sceneStyles.aiFloatState}><span />Сканирует 42 источника…</p>
+                  </div>
+                </aside>
               </article>
             </div>
           ) : (

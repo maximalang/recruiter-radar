@@ -100,59 +100,73 @@
   text-align: left;
 }
 
-.shotBar {
-  display: flex;
-  height: 2.9rem;
-  align-items: center;
-  gap: .55rem;
-  padding: 0 .9rem;
-  border-bottom: 1px solid var(--color-separator-subtle);
-  background: transparent;
-}
 .shotMark { display: grid; width: 1.3rem; height: 1.3rem; place-items: center; border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 40%, transparent); border-radius: 6px; color: var(--color-signal-on-dark); font: 700 .5rem var(--font-mono); }
-.shotBar strong { font-size: .8rem; font-weight: 590; letter-spacing: -.01em; }
-.shotMode { margin-left: auto; padding: .2rem .55rem; border: 1px solid var(--color-separator-subtle); border-radius: 999px; color: var(--color-text-tertiary); font: .62rem var(--font-sans); font-weight: 600; letter-spacing: .07em; text-transform: uppercase; }
 
-.shotBody { display: grid; min-height: 29rem; grid-template-columns: 12.5rem minmax(0,1fr); }
+.shotBody { display: grid; min-height: 33rem; grid-template-columns: 14rem minmax(0,1fr); }
 .shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .9rem; border-right: 1px solid var(--color-separator-subtle); background: transparent; }
-.shotSide > p { margin: .95rem .55rem .38rem; color: var(--color-text-tertiary); font: .62rem var(--font-sans); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.shotSide > p { margin: .75rem .55rem .34rem; color: var(--color-text-tertiary); font: .62rem var(--font-sans); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 .shotSide > p:first-child { margin-top: 0; }
 .shotNav { display: grid; gap: .12rem; }
-.shotNav button { min-height: 2rem; padding: 0 .55rem; border: 0; border-radius: 6px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 78%, transparent); font: 500 .75rem var(--font-sans); text-align: left; cursor: pointer; }
+.shotNav button { min-height: 2rem; padding: 0 .55rem; border: 0; border-radius: 6px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); font: 500 .75rem var(--font-sans); text-align: left; cursor: pointer; }
 .shotNav button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .shotNav .shotNavActive { background: var(--color-surface-selected); color: var(--color-text-primary); }
 
-.shotWorkspace { min-width: 0; padding: 0; }
-.shotWorkspaceHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .85rem 1.1rem; border-bottom: 1px solid var(--color-separator-subtle); }
-.shotWorkspaceHeader div { display: grid; gap: .22rem; }
-.shotWorkspaceHeader span { color: var(--color-text-secondary); font: .6rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
-.shotWorkspaceHeader strong { font-size: .98rem; font-weight: 590; letter-spacing: -.02em; }
-.shotWorkspaceHeader small { color: var(--color-text-secondary); font-size: .62rem; }
-.workflowArea { padding-top: .85rem; }
-.workflowTabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); overflow: hidden; border-bottom: 1px solid var(--color-separator-subtle); }
-.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 2.75rem; align-items: center; gap: .45rem; padding: .45rem .6rem; border: 0; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 72%, transparent); text-align: left; cursor: pointer; }
+.shotWorkspace { position: relative; min-width: 0; padding: 0; }
+.shotWorkspaceHeader { display: flex; align-items: center; gap: .55rem; padding: .7rem 1rem; border-bottom: 1px solid var(--color-separator-subtle); }
+.shotStatus { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--color-signal); box-shadow: 0 0 0 3px var(--color-signal-soft); }
+.shotIssueId { flex: none; color: var(--color-text-tertiary); font: .64rem var(--font-mono); }
+.shotWorkspaceHeader strong { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .84rem; font-weight: 590; letter-spacing: -.015em; }
+.shotHeaderTools { display: flex; flex: none; align-items: center; gap: .5rem; color: var(--color-text-tertiary); }
+.shotHeaderTools svg { width: 14px; height: 14px; }
+.shotCounter { display: flex; flex: none; align-items: center; gap: .3rem; margin-left: auto; color: var(--color-text-tertiary); }
+.shotCounter b { font: 500 .64rem var(--font-mono); }
+.shotCounter button { display: grid; width: 1.5rem; height: 1.5rem; place-items: center; border: 1px solid var(--color-separator); border-radius: 6px; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.shotCounter button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.shotCounter svg { width: 12px; height: 12px; }
+.shotToolRow { display: flex; align-items: center; gap: .4rem; padding: .6rem 1rem 0; }
+.shotToolCaption { margin-left: auto; color: var(--color-text-tertiary); font: .58rem var(--font-mono); letter-spacing: .07em; text-transform: uppercase; }
+.shotToolIco { display: grid; width: 1.7rem; height: 1.7rem; place-items: center; border: 1px solid var(--color-separator-subtle); border-radius: 50%; color: var(--color-text-tertiary); }
+.shotToolIco svg { width: 13px; height: 13px; }
+.workflowArea { padding-top: .35rem; }
+.sideWorkspace { display: flex; align-items: center; gap: .5rem; margin: 0 .1rem .55rem; padding: .1rem .35rem; }
+.sideWorkspace strong { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; font-weight: 590; letter-spacing: -.01em; }
+.sideWorkspaceTools { display: flex; flex: none; align-items: center; gap: .5rem; color: var(--color-text-tertiary); }
+.sideWorkspaceTools svg { width: 13px; height: 13px; }
+.sideGroup { display: flex; align-items: center; gap: .3rem; }
+.sideGroup svg { width: 10px; height: 10px; color: var(--color-text-disabled); }
+.sideUser { display: flex; align-items: center; gap: .5rem; margin: auto .25rem 0; padding-top: .7rem; }
+.sideUser > span { display: grid; width: 1.4rem; height: 1.4rem; flex: none; place-items: center; border-radius: 50%; background: var(--color-surface-elevated); color: var(--color-text-secondary); font: 600 .55rem var(--font-mono); }
+.sideUser small { color: var(--color-text-tertiary); font-size: .66rem; }
+.shotNav button { display: flex; align-items: center; gap: .5rem; }
+.shotNav button svg { width: 15px; height: 15px; flex: none; color: var(--color-text-tertiary); }
+.shotNav .shotNavActive svg { color: var(--color-signal-on-dark); }
+.workflowTabs { display: grid; grid-template-columns: minmax(0,1fr); gap: .12rem; }
+.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 2rem; align-items: center; gap: .5rem; padding: 0 .55rem; border: 0; border-radius: 6px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 78%, transparent); text-align: left; cursor: pointer; }
 .workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
-.workflowTabs i { display: grid; width: 1.25rem; height: 1.25rem; flex: none; place-items: center; border: 1px solid var(--color-separator); border-radius: 50%; color: var(--color-text-tertiary); font: normal .52rem var(--font-mono); }
+.workflowTabs i { display: grid; width: 1.05rem; height: 1.05rem; flex: none; place-items: center; border: 1px solid var(--color-separator); border-radius: 50%; color: var(--color-text-tertiary); font: normal .5rem var(--font-mono); }
 .workflowTabs span { min-width: 0; }
 .workflowTabs b,.workflowTabs small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workflowTabs b { color: inherit; font-size: .72rem; font-weight: 550; letter-spacing: -.005em; }
-.workflowTabs small { margin-top: .18rem; color: var(--color-text-secondary); font-size: .68rem; }
+.workflowTabs b { color: inherit; font-size: .75rem; font-weight: 550; letter-spacing: -.005em; }
 @media (min-width: 701px) {
   .workflowTabs b,.workflowTabs small { overflow: visible; white-space: normal; text-overflow: clip; line-height: 1.2; }
 }
-.workflowTabs .workflowTabActive { background: transparent; color: var(--color-text-primary); }
-.workflowTabs .workflowTabActive::after { content: ""; position: absolute; inset: auto 0 0; height: 2px; background: var(--color-signal-on-dark); }
-.workflowTabActive i { border-color: var(--color-signal-on-dark); color: var(--color-signal-on-dark); }
+.workflowTabs .workflowTabActive { background: var(--color-surface-selected); color: var(--color-text-primary); }
+.workflowTabActive i { border-color: var(--color-signal-on-dark); background: var(--color-signal-soft); color: var(--color-signal-on-dark); }
 
-.workflowPanel { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr); margin-top: .7rem; overflow: hidden; background: transparent; }
-.workflowMain { padding: 1.1rem 1rem 1.2rem; }
+.workflowPanel { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr) 14rem; gap: .5rem; margin-top: .2rem; background: transparent; }
+.workflowMain { padding: .95rem 1rem 1.2rem; }
+.shotProps { display: grid; align-self: start; gap: .1rem; padding: .95rem 0 1.2rem .95rem; border-left: 1px solid var(--color-separator-subtle); }
+.shotProps h3 { margin: 0 0 .5rem; color: var(--color-text-tertiary); font-size: .64rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.shotProps > div { display: flex; align-items: center; gap: .45rem; padding: .28rem 0; color: color-mix(in srgb, var(--color-text-primary) 82%, transparent); font-size: .7rem; }
+.shotProps > .aiFloat { display: block; padding: .75rem .8rem .8rem; color: var(--color-text-primary); }
+.shotProps svg { width: 13px; height: 13px; flex: none; color: var(--color-signal-on-dark); }
+.activityHead { margin: 1.15rem 0 0; color: var(--color-text-tertiary); font-size: .64rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
 .workflowEyebrow,.infoPage > span { color: var(--color-signal-on-dark); font: .58rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
 .workflowMain h2,.infoPage h2 { max-width: 28ch; margin: .55rem 0 0; font-size: 1.2rem; font-weight: 590; letter-spacing: -.025em; line-height: 1.22; }
 .workflowIntro,.infoPage > p { max-width: 62ch; margin: .55rem 0 0; color: var(--color-text-secondary); font-size: .75rem; line-height: 1.55; }
-.workflowRows { margin: .85rem 0 0; }
-.workflowRows div { display: grid; grid-template-columns: 10.5rem minmax(0,1fr); gap: .75rem; padding: .6rem 0; border-bottom: 1px solid var(--color-separator-subtle); }
-.workflowRows dt { display: flex; align-items: baseline; gap: .45rem; color: var(--color-text-primary); font-size: .72rem; font-weight: 570; }
-
+.workflowRows { margin: .3rem 0 0; border-top: 1px solid var(--color-separator-subtle); }
+.workflowRows div { display: flex; align-items: baseline; gap: .6rem; padding: .62rem 0; border-bottom: 1px solid var(--color-separator-subtle); }
+.workflowRows dt { display: flex; align-items: baseline; gap: .45rem; min-width: 10rem; flex: none; color: var(--color-text-primary); font-size: .74rem; font-weight: 560; }
 .workflowRows dt::before {
   width: 6px;
   height: 6px;
@@ -162,7 +176,19 @@
   content: "";
   transform: translateY(-1px);
 }
-.workflowRows dd { margin: 0; color: color-mix(in srgb, var(--color-text-primary) 68%, transparent); font-size: .72rem; line-height: 1.5; }
+.workflowRows dd { margin: 0; color: color-mix(in srgb, var(--color-text-primary) 68%, transparent); font-size: .74rem; line-height: 1.5; }
+.aiFloat { margin-top: .75rem; padding: .75rem .8rem .8rem; border: 1px solid var(--color-separator); border-radius: 12px; background: var(--color-surface-primary); box-shadow: 0 12px 32px rgba(0, 0, 0, .35); }
+.aiFloatHead { display: flex; align-items: center; gap: .45rem; }
+.aiFloatHead strong { font-size: .74rem; font-weight: 590; }
+.aiFloatHead em { padding: .08rem .4rem; border: 1px solid var(--color-separator); border-radius: 999px; color: var(--color-text-tertiary); font-size: .56rem; font-style: normal; font-weight: 600; letter-spacing: .06em; }
+.aiFloatCaret { margin-left: auto; color: var(--color-text-tertiary); }
+.aiFloatCaret svg { width: 13px; height: 13px; }
+.aiFloatCard { margin: .65rem 0 0; padding: .55rem .65rem; border: 1px solid var(--color-separator-subtle); border-radius: 8px; background: var(--color-surface-primary); color: var(--color-text-primary); font-size: .74rem; line-height: 1.45; }
+.aiFloatCtx { margin: .45rem 0 0; color: var(--color-text-secondary); font-size: .64rem; }
+.aiFloatState { display: flex; align-items: center; gap: .4rem; margin: .55rem 0 0; color: var(--color-text-secondary); font-size: .68rem; }
+.aiFloatState span { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--color-signal); animation: aiPulse 1.6s ease-in-out infinite; }
+@keyframes aiPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
 .infoPage button { min-height: 2.3rem; margin-top: 1rem; padding: 0 1rem; border: 0; border-radius: 7px; background: var(--color-signal); color: var(--color-text-inverse); font-size: .72rem; font-weight: 640; cursor: pointer; }
 .infoPage button:focus-visible { outline: 2px solid var(--color-text-primary); outline-offset: 2px; }
 
@@ -180,13 +206,15 @@
   .primaryButton:hover { background: var(--color-signal-hover); transform: translateY(-1px); }
   .loginLink:hover { color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); }
   .shotNav button:hover { background: var(--color-surface-selected); color: var(--color-text-primary); }
-  .workflowTabs > button:hover { background: var(--color-surface-secondary); color: var(--color-text-secondary); }
+  .workflowTabs > button:hover { background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); color: var(--color-text-primary); }
+  .shotCounter button:hover { background: var(--color-surface-selected); color: var(--color-text-primary); }
   .infoPage button:hover { background: var(--color-signal-hover); }
 }
 
 @media (max-width: 1100px) {
   .section { grid-template-columns: minmax(0,.72fr) minmax(0,1.28fr); gap: 1rem; }
-  .shotBody { grid-template-columns: 9.8rem minmax(0,1fr); }
+  .shotBody { grid-template-columns: 11.5rem minmax(0,1fr); }
+  .aiFloat { display: none; }
 }
 
 @media (max-width: 900px) {
@@ -201,8 +229,8 @@
   .description { font-size: .95rem; }
   .actions { align-items: flex-start; flex-direction: column; }
   .actionHint { max-width: 22rem; }
-  .shotBar { height: 2.75rem; }
-  .shotMode { display: none; }
+  .shotToolRow { padding: .5rem .9rem 0; }
+  .shotProps { display: none; }
   .shotBody { display: block; min-height: 0; }
   .shotSide { display: block; padding: .55rem; border-right: 0; border-bottom: 1px solid var(--color-separator-subtle); }
   .shotSide > p { display: none; }
