@@ -89,7 +89,8 @@ describe("landing product story v2", () => {
       /\.header\[data-scrolled\],[\s\S]*?\.header\[data-menu-open\]\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--color-canvas\) 92%, transparent\)[^}]*color:\s*var\(--color-text-primary\)/,
     );
 
-    expect(heroCss).not.toMatch(/background(?:-image)?:\s*[^;{}]*gradient/);
+    // owner directive 26.09: subtle linear gradients approved (Linear-demo premium look); heavy decor still banned below
+    expect(heroCss).toMatch(/\.productShot\s*\{[^}]*background:\s*linear-gradient\(145deg/);
     expect(heroCss).not.toContain(".section::before");
     expect(heroCss).not.toContain(".section::after");
     expect(heroCss).toMatch(
@@ -99,7 +100,7 @@ describe("landing product story v2", () => {
       /\.primaryButton\s*\{[^}]*min-height:\s*48px[^}]*background:\s*var\(--color-signal\)[^}]*color:\s*var\(--color-text-inverse\)/,
     );
     expect(heroCss).toMatch(
-      /\.productShot\s*\{[^}]*width:\s*100%[^}]*background:\s*var\(--color-surface-secondary\)/,
+      /\.productShot\s*\{[^}]*width:\s*100%[^}]*background:\s*linear-gradient\(145deg, var\(--color-surface-secondary\) 0%, var\(--color-surface-primary\) 70%\)/,
     );
 
     const hierarchy = [

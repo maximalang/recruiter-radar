@@ -93,7 +93,7 @@
   overflow: hidden;
   border: 1px solid var(--color-separator);
   border-radius: var(--radius-overlay);
-  background: var(--color-surface-secondary);
+  background: linear-gradient(145deg, var(--color-surface-secondary) 0%, var(--color-surface-primary) 70%);
   box-shadow: var(--shadow-hero-panel);
 
   color: var(--color-text-primary);
@@ -103,16 +103,16 @@
 .shotMark { display: grid; width: 1.3rem; height: 1.3rem; place-items: center; border: 1px solid color-mix(in srgb, var(--color-signal-on-dark) 40%, transparent); border-radius: 6px; color: var(--color-signal-on-dark); font: 700 .5rem var(--font-mono); }
 
 .shotBody { display: grid; min-height: 33rem; grid-template-columns: 14rem minmax(0,1fr); }
-.shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .9rem; border-right: 1px solid var(--color-separator-subtle); background: transparent; }
-.shotSide > p { margin: .75rem .55rem .34rem; color: var(--color-text-tertiary); font: .62rem var(--font-sans); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.shotSide { display: flex; min-width: 0; flex-direction: column; padding: 1rem .7rem .9rem; border-right: 1px solid var(--color-separator-subtle); background: rgba(255, 255, 255, 0.012); }
+.shotSide > p { margin: .85rem .55rem .3rem; color: var(--color-text-tertiary); font: 500 .68rem var(--font-sans); letter-spacing: 0; text-transform: none; }
 .shotSide > p:first-child { margin-top: 0; }
 .shotNav { display: grid; gap: .12rem; }
-.shotNav button { min-height: 2rem; padding: 0 .55rem; border: 0; border-radius: 6px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); font: 500 .75rem var(--font-sans); text-align: left; cursor: pointer; }
+.shotNav button { min-height: 2rem; padding: 0 .55rem; border: 0; border-radius: 8px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); font: 500 .75rem var(--font-sans); text-align: left; cursor: pointer; transition: background-color 0.18s var(--motion-ease-standard), color 0.18s var(--motion-ease-standard); }
 .shotNav button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
-.shotNav .shotNavActive { background: var(--color-surface-selected); color: var(--color-text-primary); }
+.shotNav .shotNavActive { background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-selected)); color: var(--color-text-primary); }
 
 .shotWorkspace { position: relative; min-width: 0; padding: 0; }
-.shotWorkspaceHeader { display: flex; align-items: center; gap: .55rem; padding: .7rem 1rem; border-bottom: 1px solid var(--color-separator-subtle); }
+.shotWorkspaceHeader { display: flex; align-items: center; gap: .55rem; padding: .85rem 1.1rem; border-bottom: 1px solid var(--color-separator-subtle); background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0)); }
 .shotStatus { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--color-signal); box-shadow: 0 0 0 3px var(--color-signal-soft); }
 .shotIssueId { flex: none; color: var(--color-text-tertiary); font: .64rem var(--font-mono); }
 .shotWorkspaceHeader strong { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .84rem; font-weight: 590; letter-spacing: -.015em; }
@@ -120,7 +120,7 @@
 .shotHeaderTools svg { width: 14px; height: 14px; }
 .shotCounter { display: flex; flex: none; align-items: center; gap: .3rem; margin-left: auto; color: var(--color-text-tertiary); }
 .shotCounter b { font: 500 .64rem var(--font-mono); }
-.shotCounter button { display: grid; width: 1.5rem; height: 1.5rem; place-items: center; border: 1px solid var(--color-separator); border-radius: 6px; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.shotCounter button { display: grid; width: 1.5rem; height: 1.5rem; place-items: center; border: 1px solid var(--color-separator); border-radius: 7px; background: transparent; color: var(--color-text-secondary); cursor: pointer; transition: background-color 0.18s var(--motion-ease-standard), color 0.18s var(--motion-ease-standard); }
 .shotCounter button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .shotCounter svg { width: 12px; height: 12px; }
 .shotToolRow { display: flex; align-items: center; gap: .4rem; padding: .6rem 1rem 0; }
@@ -141,7 +141,7 @@
 .shotNav button svg { width: 15px; height: 15px; flex: none; color: var(--color-text-tertiary); }
 .shotNav .shotNavActive svg { color: var(--color-signal-on-dark); }
 .workflowTabs { display: grid; grid-template-columns: minmax(0,1fr); gap: .12rem; }
-.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 2rem; align-items: center; gap: .5rem; padding: 0 .55rem; border: 0; border-radius: 6px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 78%, transparent); text-align: left; cursor: pointer; }
+.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 2rem; align-items: center; gap: .5rem; padding: 0 .55rem; border: 0; border-radius: 8px; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); text-align: left; cursor: pointer; transition: background-color 0.18s var(--motion-ease-standard), color 0.18s var(--motion-ease-standard); }
 .workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .workflowTabs i { display: grid; width: 1.05rem; height: 1.05rem; flex: none; place-items: center; border: 1px solid var(--color-separator); border-radius: 50%; color: var(--color-text-tertiary); font: normal .5rem var(--font-mono); }
 .workflowTabs span { min-width: 0; }
@@ -150,23 +150,23 @@
 @media (min-width: 701px) {
   .workflowTabs b,.workflowTabs small { overflow: visible; white-space: normal; text-overflow: clip; line-height: 1.2; }
 }
-.workflowTabs .workflowTabActive { background: var(--color-surface-selected); color: var(--color-text-primary); }
+.workflowTabs .workflowTabActive { background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-selected)); color: var(--color-text-primary); }
 .workflowTabActive i { border-color: var(--color-signal-on-dark); background: var(--color-signal-soft); color: var(--color-signal-on-dark); }
 
 .workflowPanel { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr) 14rem; gap: .5rem; margin-top: .2rem; background: transparent; }
-.workflowMain { padding: .95rem 1rem 1.2rem; }
-.shotProps { display: grid; align-self: start; gap: .1rem; padding: .95rem 0 1.2rem .95rem; border-left: 1px solid var(--color-separator-subtle); }
+.workflowMain { padding: 2.1rem 1.15rem 1.3rem; }
+.shotProps { display: grid; align-self: start; gap: .1rem; padding: 2.1rem 0 1.2rem .95rem; border-left: 1px solid var(--color-separator-subtle); }
 .shotProps h3 { margin: 0 0 .5rem; color: var(--color-text-tertiary); font-size: .64rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
 .shotProps > div { display: flex; align-items: center; gap: .45rem; padding: .28rem 0; color: color-mix(in srgb, var(--color-text-primary) 82%, transparent); font-size: .7rem; }
-.shotProps > .aiFloat { display: block; padding: .75rem .8rem .8rem; color: var(--color-text-primary); }
+.shotProps > .aiFloat { display: block; padding: .85rem .95rem; color: var(--color-text-primary); }
 .shotProps svg { width: 13px; height: 13px; flex: none; color: var(--color-signal-on-dark); }
-.activityHead { margin: 1.15rem 0 0; color: var(--color-text-tertiary); font-size: .64rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.activityHead { margin: 1.6rem 0 0; color: color-mix(in srgb, var(--color-text-primary) 88%, transparent); font-size: .95rem; font-weight: 600; letter-spacing: -.01em; }
 .workflowEyebrow,.infoPage > span { color: var(--color-signal-on-dark); font: .58rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
-.workflowMain h2,.infoPage h2 { max-width: 28ch; margin: .55rem 0 0; font-size: 1.2rem; font-weight: 590; letter-spacing: -.025em; line-height: 1.22; }
-.workflowIntro,.infoPage > p { max-width: 62ch; margin: .55rem 0 0; color: var(--color-text-secondary); font-size: .75rem; line-height: 1.55; }
-.workflowRows { margin: .3rem 0 0; border-top: 1px solid var(--color-separator-subtle); }
-.workflowRows div { display: flex; align-items: baseline; gap: .6rem; padding: .62rem 0; border-bottom: 1px solid var(--color-separator-subtle); }
-.workflowRows dt { display: flex; align-items: baseline; gap: .45rem; min-width: 10rem; flex: none; color: var(--color-text-primary); font-size: .74rem; font-weight: 560; }
+.workflowMain h2,.infoPage h2 { max-width: 28ch; margin: .55rem 0 0; font-size: 1.3rem; font-weight: 600; letter-spacing: -.025em; line-height: 1.25; }
+.workflowIntro,.infoPage > p { max-width: 62ch; margin: .5rem 0 0; color: var(--color-text-secondary); font-size: .82rem; line-height: 1.55; }
+.workflowRows { margin: .85rem 0 0; }
+.workflowRows div { display: flex; align-items: baseline; gap: .6rem; padding: .58rem 0; }
+.workflowRows dt { display: flex; align-items: baseline; gap: .45rem; min-width: 10rem; flex: none; color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); font-size: .78rem; font-weight: 560; }
 .workflowRows dt::before {
   width: 6px;
   height: 6px;
@@ -176,14 +176,18 @@
   content: "";
   transform: translateY(-1px);
 }
-.workflowRows dd { margin: 0; color: color-mix(in srgb, var(--color-text-primary) 68%, transparent); font-size: .74rem; line-height: 1.5; }
-.aiFloat { margin-top: .75rem; padding: .75rem .8rem .8rem; border: 1px solid var(--color-separator); border-radius: 12px; background: var(--color-surface-primary); box-shadow: 0 12px 32px rgba(0, 0, 0, .35); }
+.workflowRows dd { margin: 0; color: color-mix(in srgb, var(--color-text-primary) 74%, transparent); font-size: .78rem; line-height: 1.5; }
+.workflowRows > div { animation: rowIn 0.5s var(--motion-ease-enter) both; }
+.workflowRows > div:nth-child(2) { animation-delay: 70ms; }
+.workflowRows > div:nth-child(3) { animation-delay: 140ms; }
+@keyframes rowIn { from { opacity: 0; transform: translate3d(0, 5px, 0); } to { opacity: 1; transform: none; } }
+.aiFloat { margin-top: .9rem; padding: .85rem .95rem; border: 1px solid var(--color-separator); border-radius: 10px; background: linear-gradient(160deg, #1b1c1e, #17181a 75%); box-shadow: none; }
 .aiFloatHead { display: flex; align-items: center; gap: .45rem; }
 .aiFloatHead strong { font-size: .74rem; font-weight: 590; }
 .aiFloatHead em { padding: .08rem .4rem; border: 1px solid var(--color-separator); border-radius: 999px; color: var(--color-text-tertiary); font-size: .56rem; font-style: normal; font-weight: 600; letter-spacing: .06em; }
 .aiFloatCaret { margin-left: auto; color: var(--color-text-tertiary); }
 .aiFloatCaret svg { width: 13px; height: 13px; }
-.aiFloatCard { margin: .65rem 0 0; padding: .55rem .65rem; border: 1px solid var(--color-separator-subtle); border-radius: 8px; background: var(--color-surface-primary); color: var(--color-text-primary); font-size: .74rem; line-height: 1.45; }
+.aiFloatCard { margin: .6rem 0 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); font-size: .76rem; line-height: 1.5; }
 .aiFloatCtx { margin: .45rem 0 0; color: var(--color-text-secondary); font-size: .64rem; }
 .aiFloatState { display: flex; align-items: center; gap: .4rem; margin: .55rem 0 0; color: var(--color-text-secondary); font-size: .68rem; }
 .aiFloatState span { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--color-signal); animation: aiPulse 1.6s ease-in-out infinite; }
@@ -195,8 +199,8 @@
 .infoPage { padding: 1.3rem 1.1rem 0; }
 .infoPage h2 { max-width: 32ch; font-size: 1.45rem; }
 .infoPage > p { max-width: 65ch; }
-.infoPage dl { margin: 1.1rem 0 0; border-top: 1px solid var(--color-separator-subtle); }
-.infoPage dl div { display: grid; grid-template-columns: 1.6rem 10rem minmax(0,1fr); gap: .75rem; padding: .62rem 0; border-bottom: 1px solid var(--color-separator-subtle); }
+.infoPage dl { margin: 1.2rem 0 0; }
+.infoPage dl div { display: grid; grid-template-columns: 1.6rem 10rem minmax(0,1fr); gap: .75rem; padding: .58rem 0; }
 .infoPage i { color: var(--color-text-tertiary); font: normal .6rem var(--font-mono); }
 .infoPage dt { color: var(--color-text-primary); font-size: .72rem; font-weight: 560; }
 .infoPage dd { margin: 0; color: color-mix(in srgb, var(--color-text-primary) 68%, transparent); font-size: .72rem; line-height: 1.5; }
