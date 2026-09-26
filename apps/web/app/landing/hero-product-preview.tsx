@@ -135,6 +135,7 @@ const PAGE_CONTENT: Record<Exclude<PageKey, "today">, {
 /* Minimal 16px line-icon set mirroring the reference demo's sidebar/topbar
  * glyphs. Decorative only — every icon is aria-hidden. */
 const ICON_PATHS: Record<string, string> = {
+  back: "M9.8 3.6 5.4 8l4.4 4.4",
   bolt: "M8.8 1.8 4.2 8.6h3.3L7.2 14.2l4.6-6.8H8.5l.3-5.6Z",
   inbox: "M2 9.6 3.8 4h8.4l1.8 5.6V13H2V9.6Zm0 0h3.1l.9 1.6h4l.9-1.6h3.1",
   target: "M8 2.6a5.4 5.4 0 1 0 0 10.8A5.4 5.4 0 0 0 8 2.6Zm0 3.6a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6Z",
@@ -250,6 +251,7 @@ export default function HeroProductPreview() {
 
         <div className={sceneStyles.shotWorkspace}>
           <header className={sceneStyles.shotWorkspaceHeader}>
+            <span className={sceneStyles.shotBack} aria-hidden="true"><Ico name="back" /></span>
             <span className={sceneStyles.shotStatus} aria-hidden="true" />
             <span className={sceneStyles.shotIssueId}>RR-1042</span>
             <strong>{page === "today" ? "Приоритетные компании и поводы" : PAGE_CONTENT[page].title}</strong>
@@ -289,10 +291,22 @@ export default function HeroProductPreview() {
                   <p className={sceneStyles.workflowIntro}>{currentStage.intro}</p>
                   <p className={sceneStyles.activityHead}>Активность</p>
                   <dl className={sceneStyles.workflowRows}>
-                    {currentStage.rows.map(([label, copy]) => (
-                      <div key={label}><dt>{label}</dt><dd>{copy}</dd></div>
+                    {currentStage.rows.map(([label, copy], index) => (
+                      <div key={label}>
+                        <span className={sceneStyles.rowIco} data-i={index % 3} aria-hidden="true"><Ico name={["search", "chart", "target"][index % 3]} /></span>
+                        <dt>{label}</dt>
+                        <dd>{copy}</dd>
+                        <span className={sceneStyles.rowTime}>{["сейчас", "1 мин назад", "2 мин назад"][index % 3]}</span>
+                      </div>
                     ))}
                   </dl>
+                  <div className={sceneStyles.cmtCard}>
+                    <span className={sceneStyles.cmtAv} aria-hidden="true">RR</span>
+                    <div className={sceneStyles.cmtBody}>
+                      <p className={sceneStyles.cmtHead}><strong>Радар</strong><span>сейчас</span></p>
+                      <p>Следующий этап включится автоматически — сценарий пилота идёт без ручных шагов.</p>
+                    </div>
+                  </div>
                 </div>
                 <aside className={sceneStyles.shotProps} aria-label="Сводка этапа">
                   <h3>Сводка</h3>
