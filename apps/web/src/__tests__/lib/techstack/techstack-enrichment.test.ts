@@ -191,10 +191,12 @@ describe('scanDomainTechstack — happy path (recorded fixtures)', () => {
     expect(opts.env.DATABASE_URL).toBeUndefined()
     expect(opts.env.PYTHONUTF8).toBe('1')
     expect(buildScannerEnv({ DATABASE_URL: 'x', PATH: 'C:\\bin' })).toEqual({
+      NODE_ENV: 'production',
       PYTHONUTF8: '1',
       PYTHONIOENCODING: 'utf-8',
       PATH: 'C:\\bin',
     })
+    expect(buildScannerEnv({ NODE_ENV: 'test' }).NODE_ENV).toBe('test')
   })
 })
 

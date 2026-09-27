@@ -246,11 +246,22 @@ const SCANNER_ENV_PASSTHROUGH = [
 
 /**
  * Minimal env for the scanner subprocess: PATH/TEMP (+ SystemRoot for Windows
- * TLS) and UTF-8 python IO. App secrets (DATABASE_URL, tokens, webhook keys)
- * are deliberately NOT inherited by the child process.
+ * TLS), UTF-8 python IO, and the NODE_ENV literal required by the Next.js
+ * ProcessEnv contract (next/types/global.d.ts) — meaningless for the python
+ * child but part of the type. App secrets (DATABASE_URL, tokens, webhook
+ * keys) are deliberately NOT inherited by the child process.
  */
-export function buildScannerEnv(source: TechstackEnv = process.env): Record<string, string> {
-  const env: Record<string, string> = { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }
+export function buildScannerEnv(source: TechstackEnv = process.env): NodeJS.ProcessEnv {
+  const nodeEnvRaw = readNonEmpty(source, 'NODE_ENV')
+  const nodeEnv: 'development' | 'production' | 'test' =
+    nodeEnvRaw === 'development' || nodeEnvRaw === 'production' || nodeEnvRaw === 'test'
+      ? nodeEnvRaw
+      : 'production'
+  const env: NodeJS.ProcessEnv = {
+    NODE_ENV: nodeEnv,
+    PYTHONUTF8: '1',
+    PYTHONIOENCODING: 'utf-8',
+  }
   for (const name of SCANNER_ENV_PASSTHROUGH) {
     const value = source[name]
     if (typeof value === 'string' && value.length > 0) env[name] = value
