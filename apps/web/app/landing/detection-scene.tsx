@@ -25,7 +25,7 @@ export default function DetectionScene(props: { paymentConfigured: boolean }) {
           От сигнала до сообщения
         </h1>
         <p className={sceneStyles.description} data-hero-description>
-          Радар следит за публичными источниками и приносит компании, где найм только начался. По каждой — повод, факты и черновик сообщения. Отправляете только вы.
+          Не холодная рассылка, а точные обращения. Радар находит компании, где найм только начался, и по каждой даёт повод, факты и черновик сообщения. Отправляете только вы.
         </p>
         <div className={sceneStyles.actions} data-hero-actions>
           <a
