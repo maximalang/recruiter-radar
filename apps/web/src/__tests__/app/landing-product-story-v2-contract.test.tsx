@@ -32,7 +32,7 @@ describe("landing product story v2", () => {
 
     expect(heroText).toContain("От сигнала до сообщения");
     expect(heroText).toContain("Посмотреть, как это работает");
-    expect(heroText).toContain("Радар следит за публичными источниками");
+    expect(heroText).toContain("Радар находит компании, где найм только начался");
     expect(preview).toContain('data-hero-product-preview="workflow"');
     expect(previewText).toContain("Сегодня");
     expect(previewText).toContain("Компании");

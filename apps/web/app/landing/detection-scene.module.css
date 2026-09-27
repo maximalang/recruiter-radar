@@ -117,7 +117,7 @@
 
 .shotMark { display: grid; width: 1.4rem; height: 1.4rem; place-items: center; border: 0; border-radius: 50%; background: conic-gradient(from 45deg, #5e6ad2, #9d7be8, #4cb782, #f0b429, #5e6ad2); color: #fff; font: 700 .5rem var(--font-mono); }
 
-.shotBody { display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); gap: .5rem; padding: .5rem; }
+.shotBody { display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); gap: .5rem; padding: .5rem; background: radial-gradient(120% 90% at 50% -10%, rgba(94, 106, 210, 0.07), transparent 55%); }
 .shotSide { display: flex; min-width: 0; flex-direction: column; padding: .85rem .6rem .8rem; border-right: 0; background: transparent; }
 .shotSide > p { margin: .85rem .55rem .3rem; color: var(--color-text-tertiary); font: 500 .72rem var(--font-sans); letter-spacing: 0; text-transform: none; }
 .shotSide > p:first-child { margin-top: 0; }
@@ -128,7 +128,8 @@
 .shotSide > div:nth-of-type(3) button:nth-child(1) svg { color: #4cb782; }
 .shotSide > div:nth-of-type(3) button:nth-child(2) svg { color: #e8935e; }
 
-.shotWorkspace { position: relative; min-width: 0; padding: 0; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.055); border-radius: 12px; background: linear-gradient(180deg, #1b1c1f 0%, #191a1c 100%); }
+.shotWorkspace { position: relative; min-width: 0; padding: 0; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.055); border-radius: 12px; background: linear-gradient(180deg, #1b1c1f 0%, #191a1c 100%); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32); }
+.shotWorkspace::before { content: ""; position: absolute; z-index: 3; inset: 0 0 auto 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.09), transparent); pointer-events: none; }
 .shotWorkspaceHeader { display: flex; align-items: center; gap: .6rem; padding: .95rem 1.2rem; border-bottom: 1px solid var(--color-separator-subtle); background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0)); }
 .shotStatus { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--color-signal); box-shadow: 0 0 0 3px var(--color-signal-soft); }
 .shotIssueId { flex: none; color: var(--color-text-tertiary); font: .72rem var(--font-mono); }
@@ -162,7 +163,7 @@
 .workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .stageState { display: grid; width: .9rem; height: .9rem; flex: none; place-items: center; border-radius: 50%; }
 .stageState[data-state="todo"] { border: 1.5px solid #4a4b4e; }
-.stageState[data-state="active"] { border: 1.5px solid #f0b429; background: conic-gradient(from -90deg, #f0b429 0 50%, rgba(240, 180, 41, 0.12) 50% 100%); }
+.stageState[data-state="active"] { border: 1.5px solid #f0b429; background: conic-gradient(from -90deg, #f0b429 0 50%, rgba(240, 180, 41, 0.12) 50% 100%); box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.1); }
 .stageState[data-state="done"] { background: #5e6ad2; }
 .stageState[data-state="done"]::after { content: "✓"; color: #fff; font-size: .55rem; font-weight: 700; line-height: 1; }
 .workflowTabs span { min-width: 0; }
@@ -196,8 +197,9 @@
 .rowIco[data-i="0"] { background: rgba(94, 106, 210, 0.16); color: #7b86e8; }
 .rowIco[data-i="1"] { background: rgba(76, 183, 130, 0.16); color: #4cb782; }
 .rowIco[data-i="2"] { background: rgba(157, 123, 232, 0.16); color: #9d7be8; }
-.rowTime { display: inline; margin-left: .55rem; color: var(--color-text-disabled); font-size: .74rem; }
-.rowTime::before { content: "·"; margin-right: .45rem; }
+@media (hover: hover) {
+  .shotNav button:hover, .workflowTabs > button:hover { background: rgba(255, 255, 255, 0.035); }
+}
 .rowLabel { display: inline-block; padding: .16rem .6rem; border-radius: 999px; margin-right: .55rem; background: rgba(76, 183, 130, 0.16); color: #4cb782; font-size: .72rem; font-weight: 600; }
 .rowAv { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; margin-right: .65rem; background: #5e6ad2; color: #fff; font: 700 .5rem var(--font-mono); vertical-align: -.45em; }
 .workflowRows div:nth-child(2) dd::before { content: none; margin-right: 0; }
