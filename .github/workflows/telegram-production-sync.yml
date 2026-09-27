@@ -1,0 +1,101 @@
+name: Telegram Production Secret Sync
+
+on:
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-production-secret-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Validate Telegram runtime configurator
+        run: bash -n scripts/deploy/configure-telegram-runtime.sh
+
+      - name: Detect optional Telegram secrets
+        id: secret
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+        run: |
+          if [ -n "${TELEGRAM_API_ID:-}" ] && [ -n "${TELEGRAM_API_HASH:-}" ] && [ -n "${TELEGRAM_SESSION:-}" ]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+            echo 'Telegram production secrets are configured.'
+          else
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo 'Telegram production secrets are not configured; source remains credential-gated.'
+          fi
+
+      - name: Setup SSH
+        if: steps.secret.outputs.configured == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Stage Telegram secrets and configurator
+        if: steps.secret.outputs.configured == 'true'
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key_file="/tmp/telegram-env-${DEPLOY_SHA}.b64"
+          {
+            printf 'TELEGRAM_API_ID=%s\n' "$TELEGRAM_API_ID"
+            printf 'TELEGRAM_API_HASH=%s\n' "$TELEGRAM_API_HASH"
+            printf 'TELEGRAM_SESSION=%s\n' "$TELEGRAM_SESSION"
+          } | base64 -w0 > "$key_file"
+          unset TELEGRAM_API_ID TELEGRAM_API_HASH TELEGRAM_SESSION
+
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            "$key_file" \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/.telegram-env-${DEPLOY_SHA}.b64
+          rm -f "$key_file"
+
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/configure-telegram-runtime.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-telegram-runtime.${DEPLOY_SHA}.sh
+
+      - name: Configure and live-verify Telegram production runtime
+        if: steps.secret.outputs.configured == 'true'
+        run: |
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" <<'SSH_EOF'
+          set -euo pipefail
+          staged_configurator="/opt/recruiter-radar/configure-telegram-runtime.${DEPLOY_SHA}.sh"
+          staged_key="/opt/recruiter-radar/.telegram-env-${DEPLOY_SHA}.b64"
+
+          cleanup() { rm -f "$staged_configurator" "$staged_key"; }
+          trap cleanup EXIT
+
+          test -f "$staged_configurator" || { echo 'Staged Telegram configurator is missing.' >&2; exit 1; }
+          test -f "$staged_key" || { echo 'Staged Telegram env file is missing.' >&2; exit 1; }
+          chmod 700 "$staged_configurator"
+          "$staged_configurator" --key-file "$staged_key"
+          install -m 700 "$staged_configurator" /opt/recruiter-radar/scripts/deploy/configure-telegram-runtime.sh
+          SSH_EOF
