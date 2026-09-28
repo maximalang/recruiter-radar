@@ -174,7 +174,7 @@ export default async function PilotOnboardingPage({
   const previewUnavailableMessage = "Не удалось обновить текущий радар. Попробуйте позже.";
 
   return (
-    <PageFrame maxWidth="860px">
+    <PageFrame maxWidth="860px" productWorkspace>
       <Link href="/" className={ppStyles.backLink}>
         На главную
       </Link>
