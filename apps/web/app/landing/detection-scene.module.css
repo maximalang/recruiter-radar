@@ -208,6 +208,7 @@
 }
 .rowLabel { display: inline-block; padding: .16rem .6rem; border-radius: 999px; margin-right: .55rem; background: rgba(255, 255, 255, 0.07); color: var(--color-text-secondary); font-size: .72rem; font-weight: 560; }
 .rowAv { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; margin-right: .65rem; background: #5e6ad2; color: #fff; font: 700 .5rem var(--font-mono); vertical-align: -.45em; }
+.rowAv[data-actor="you"] { background: #3a3b3f; }
 .workflowRows div:nth-child(2) dd::before { content: none; margin-right: 0; }
 .propsStatus { display: flex; align-items: center; gap: .5rem; margin: 0; color: var(--color-text-primary); font-size: .88rem; font-weight: 600; }
 .statusDot { width: .55rem; height: .55rem; flex: none; border-radius: 50%; background: #f0b429; }
@@ -251,9 +252,9 @@
 .infoPage dl div { display: block; padding: .55rem 0; }
 .infoPage i { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; margin-right: .65rem; vertical-align: -.45em; background: rgba(94, 106, 210, 0.16); color: #7b86e8; font-size: 0; }
 .infoPage i::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #7b86e8; }
-.infoPage dt { display: inline; color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); font-size: .86rem; font-weight: 560; }
+.infoPage dt { display: none; }
 .infoPage dd { display: inline; margin: 0; color: color-mix(in srgb, var(--color-text-primary) 74%, transparent); font-size: .86rem; line-height: 1.5; }
-.infoPage dd::before { content: "—"; margin-right: .4rem; color: var(--color-text-disabled); }
+.infoPage dd::before { content: none; margin-right: 0; }
 .infoPage button { width: auto; padding-inline: 1rem; }
 
 @media (hover: hover) and (pointer: fine) {
