@@ -252,6 +252,9 @@ export default function HeroProductPreview() {
         <div className={sceneStyles.shotWorkspace}>
           <header className={sceneStyles.shotWorkspaceHeader}>
             <span className={sceneStyles.shotBack} aria-hidden="true"><Ico name="back" /></span>
+            <span className={sceneStyles.shotCrumb} aria-hidden="true">Радар</span>
+            <span className={sceneStyles.shotCrumbSep} aria-hidden="true">/</span>
+            <span className={sceneStyles.shotCrumb} aria-hidden="true">Пилот</span>
             <span className={sceneStyles.shotStatus} aria-hidden="true" />
             <span className={sceneStyles.shotIssueId}>RR-1042</span>
             <strong>{page === "today" ? "Приоритетные компании и поводы" : PAGE_CONTENT[page].title}</strong>
@@ -289,7 +292,7 @@ export default function HeroProductPreview() {
                   <span className={sceneStyles.workflowEyebrow}>{currentStage.eyebrow}</span>
                   <h2>{currentStage.title}</h2>
                   <p className={sceneStyles.workflowIntro}>{currentStage.intro}</p>
-                  <p className={sceneStyles.activityHead}>Активность</p>
+                  <p className={sceneStyles.activityHead}>Активность<span className={sceneStyles.activityCount} aria-hidden="true">{currentStage.rows.length + 1}</span></p>
                   <dl className={sceneStyles.workflowRows}>
                     {currentStage.rows.map(([label, copy], index) => (
                       <div key={label}>
@@ -308,12 +311,18 @@ export default function HeroProductPreview() {
                       <p>Следующий этап включится сам — ручные действия не нужны.</p>
                     </div>
                   </div>
+                  <p className={sceneStyles.cmtGhost} aria-hidden="true">Оставьте комментарий…</p>
                 </div>
                 <aside className={sceneStyles.shotProps} aria-label="Сводка этапа">
                   <div className={sceneStyles.propsCard}>
                     <h3>Сводка</h3>
                     <p className={sceneStyles.propsStatus}><span className={sceneStyles.statusDot} aria-hidden="true" />Этап {stage} из 4</p>
-                    <p className={sceneStyles.propsMeta}>Пилот · 7 дней · 4 этапа</p>
+                    <dl className={sceneStyles.propList}>
+                      <div><dt>Пилот</dt><dd>7 дней</dd></div>
+                      <div><dt>Профиль</dt><dd>Инженерный подбор</dd></div>
+                      <div><dt>Источники</dt><dd>42 подключены</dd></div>
+                      <div><dt>Отправка</dt><dd>Только вручную</dd></div>
+                    </dl>
                   </div>
                   <div className={sceneStyles.aiFloat} aria-hidden="true">
                     <div className={sceneStyles.aiFloatHead}>
