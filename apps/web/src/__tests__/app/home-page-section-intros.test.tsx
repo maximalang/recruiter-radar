@@ -186,7 +186,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).not.toContain('id="scene-timeline"');
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
-    expect(html).toContain("Один профиль вместо десятков сохранённых поисков");
+    expect(html).toContain("Профиль рынка — Инженерный подбор");
     expect(footerSource).toContain('href="/legal"');
     expect(footerSource).toContain('href="/terms"');
     expect(footerSource).toContain('href="/payment-and-refund"');

@@ -23,7 +23,7 @@ describe("landing hero advertising workflow", () => {
 
     expect(container.querySelector('[data-hero-product-preview="workflow"]')).not.toBeNull();
     expect(screen.getByRole("tab", { name: /Ваш рынок/i })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Один профиль вместо десятков сохранённых поисков")).toBeInTheDocument();
+    expect(screen.getAllByText("Профиль рынка — Инженерный подбор").length).toBeGreaterThanOrEqual(2);
     expect(container).not.toHaveTextContent(/Промет|Демо|12 мая/i);
   });
 
