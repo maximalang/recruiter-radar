@@ -39,7 +39,7 @@ const STAGES: ReadonlyArray<{
     label: "Ваш рынок",
     eyebrow: "Шаг 1 · Настройка",
     title: "Профиль рынка — Инженерный подбор",
-    intro: "Один профиль вместо десятков сохранённых поисков.",
+    intro: "Профиль заменяет десятки сохранённых поисков — радар следит за рынком сам.",
     rows: [
       ["Профиль", "Радар создал профиль «Инженерный подбор»: ниша, роли, география"],
       ["Критерии", "Вы добавили признаки спроса — профиль собирает компании"],
@@ -92,22 +92,22 @@ const PAGE_CONTENT: Record<Exclude<PageKey, "today">, {
 }> = {
   companies: {
     eyebrow: "Компании",
-    title: "Вся история — в одном месте",
-    intro: "Сигналы, проверки и ваши решения — в единой хронологии по каждой компании.",
+    title: "История каждой компании",
+    intro: "Сигналы, проверки и ваши решения — в единой хронологии.",
     rows: [
-      ["Решения", "Отметки, черновики и отправки рядом"],
-      ["Связи", "Динамика компании, а не разрозненные новости"],
-      ["Следующий шаг", "Причина вернуться и безопасное действие"],
+      ["Хронология", "Все события и решения собраны рядом"],
+      ["Связи", "Динамика компании, а не отдельные новости"],
+      ["Шаг", "Понятно, что делать дальше"],
     ],
   },
   radar: {
     eyebrow: "Результат",
-    title: "Что вы получаете за неделю пилота",
+    title: "Результаты недели",
     intro: "Приоритетные компании вашего рынка — с поводом, фактами и черновиком.",
     rows: [
-      ["10 компаний", "Приоритет строго под профиль"],
-      ["Повод и факты", "Источник и дата у каждого"],
-      ["Черновик", "Готовое первое сообщение"],
+      ["Компании", "10 приоритетов строго под профиль"],
+      ["Поводы", "Источник у каждого"],
+      ["Черновики", "Готовое первое сообщение"],
     ],
   },
   engineering: {
@@ -115,9 +115,9 @@ const PAGE_CONTENT: Record<Exclude<PageKey, "today">, {
     title: "Инженерный подбор",
     intro: "Рынки, где спрос видно раньше остальных.",
     rows: [
-      ["Вакансии", "Рост команд, редкие роли"],
-      ["Публикации", "Расширение, новые площадки"],
-      ["СМИ", "Поводы раньше общих новостей"],
+      ["Вакансии", "Рост команд и редкие роли в нише"],
+      ["Публикации", "Компании объявляют расширение и новые площадки"],
+      ["СМИ", "Поводы видны раньше общих новостей"],
     ],
   },
   finance: {
@@ -125,7 +125,7 @@ const PAGE_CONTENT: Record<Exclude<PageKey, "today">, {
     title: "Финансовый софт",
     intro: "Компании, где момент создают запуски, сделки и рост найма.",
     rows: [
-      ["Вакансии", "Продажи, внедрение, разработка, ИБ"],
+      ["Вакансии", "Растут продажи, внедрение, разработка и ИБ"],
       ["Продукт", "Новые решения и интеграции"],
       ["Сделки", "Финансирование и партнёрства"],
     ],
@@ -296,10 +296,12 @@ export default function HeroProductPreview() {
                   <dl className={sceneStyles.workflowRows}>
                     {currentStage.rows.map(([label, copy], index) => (
                       <div key={label}>
-                        {index % 3 === 0 && <span className={sceneStyles.rowIco} data-i={index % 3} aria-hidden="true"><Ico name={["search", "chart", "target"][index % 3]} /></span>}
-                        {index % 3 === 1 && <span className={sceneStyles.rowLabel}>{label}</span>}
-                        {index % 3 === 2 && <span className={sceneStyles.rowAv} aria-hidden="true">RR</span>}
-                        {index % 3 !== 1 && <dt>{label}</dt>}
+                        {copy.startsWith("Вы ") ? (
+                          <span className={sceneStyles.rowAv} data-actor="you" aria-hidden="true">Вы</span>
+                        ) : (
+                          <span className={sceneStyles.rowAv} aria-hidden="true">RR</span>
+                        )}
+                        <dt>{label}</dt>
                         <dd>{copy}</dd>
                                               </div>
                     ))}
@@ -307,7 +309,7 @@ export default function HeroProductPreview() {
                   <div className={sceneStyles.cmtCard}>
                     <span className={sceneStyles.cmtAv} aria-hidden="true">RR</span>
                     <div className={sceneStyles.cmtBody}>
-                      <p className={sceneStyles.cmtHead}><strong>Радар</strong><span>автоматически</span></p>
+                      <p className={sceneStyles.cmtHead}><strong>Радар</strong><span>AI-агент</span></p>
                       <p>Этап 2 начнётся автоматически: проверю найденные поводы по источникам.</p>
                     </div>
                   </div>
