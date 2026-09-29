@@ -2174,6 +2174,19 @@ try {
     AUTH_V2_E2E_DIST_DIR: e2eDistName,
     AUTH_V2_E2E_TSCONFIG: e2eTsconfigName,
     NODE_EXTRA_CA_CERTS: httpsCertPath,
+    // Next 16.3.x fetches server-action redirect targets server-side
+    // ("Improve redirection handling", vercel/next.js#62561). That internal
+    // fetch does not honor NODE_EXTRA_CA_CERTS for the harness-generated
+    // self-signed localhost certificate (fails with
+    // DEPTH_ZERO_SELF_SIGNED_CERT), which breaks redirect-dependent e2e
+    // flows. This dev server is ephemeral, bound to 127.0.0.1, and makes no
+    // external TLS calls (email transport=test, plaintext local postgres),
+    // so the spawned server adopts the same TLS posture the harness readiness
+    // probe already uses ({ rejectUnauthorized: false } below). Verified on
+    // node 22: plain fetch rejects the self-signed cert, NODE_EXTRA_CA_CERTS
+    // covers core fetch, and NODE_TLS_REJECT_UNAUTHORIZED=0 covers the
+    // Next-internal fetch path.
+    NODE_TLS_REJECT_UNAUTHORIZED: '0',
     OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
     OPPORTUNITY_OUTCOMES_ENABLED: 'true',
     OPPORTUNITY_OUTCOMES_UI_ENABLED: 'true',
