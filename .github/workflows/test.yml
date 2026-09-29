@@ -55,6 +55,7 @@ jobs:
         run: |
           bash -n scripts/deploy/configure-notification-encryption.sh
           bash -n scripts/deploy/configure-caddy-real-ip.sh
+          bash -n scripts/deploy/configure-telegram-runtime.sh
           bash -n scripts/deploy/rollback-guard.sh
           bash -n scripts/deploy/recover-deployment.sh
           bash -n scripts/deploy/run-commercial-signal-production-canary.sh
@@ -64,6 +65,8 @@ jobs:
           bash -n scripts/test/configure-caddy-production.sh
           bash -n scripts/test/deploy-rollback-guard.sh
           bash -n scripts/test/configure-notification-encryption.sh
+          bash -n scripts/test/configure-telegram-runtime.sh
+          bash -n scripts/test/configure-telegram-runtime-prodshape.sh
           bash -n scripts/test/commercial-signal-canary-host-runner.sh
           bash -n scripts/test/docker-entrypoint-reconciliation.sh
           bash -n scripts/test/landing-events-caddy-smoke.sh
@@ -74,6 +77,8 @@ jobs:
         run: |
           bash scripts/test/deploy-rollback-guard.sh
           bash scripts/test/configure-notification-encryption.sh
+          bash scripts/test/configure-telegram-runtime.sh
+          timeout 900 bash scripts/test/configure-telegram-runtime-prodshape.sh
           bash scripts/test/commercial-signal-canary-host-runner.sh
           bash scripts/test/configure-caddy-production.sh
           bash scripts/test/docker-entrypoint-reconciliation.sh
