@@ -78,8 +78,8 @@
   flex: none;
   padding: .22rem .65rem;
   border: 1px solid var(--evidence-line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-pill);
+  background: var(--color-demo-veil-03);
 }
 
 .sourceCell,
@@ -134,8 +134,8 @@
   min-width: 0;
   padding: 1.05rem 1.15rem;
   border: 1px solid var(--evidence-line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.015);
+  border-radius: var(--radius-overlay);
+  background: var(--color-demo-veil-015);
 }
 
 .confidenceBlock,
