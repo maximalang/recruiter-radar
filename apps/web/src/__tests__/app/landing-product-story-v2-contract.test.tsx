@@ -173,7 +173,7 @@ describe("landing product story v2", () => {
     expect(evidenceCss).toMatch(/--evidence-accent:\s*var\(--color-signal\)/);
     expect(evidenceCss).not.toMatch(/gradient\(|box-shadow:/);
     expect(evidenceCss).toMatch(
-      /\.sourceCell\s*\{[^}]*border-radius:\s*999px/,
+      /\.sourceCell\s*\{[^}]*border-radius:\s*var\(--radius-pill\)/,
     );
     expect(evidenceCss).toMatch(
       /\.resolution\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0,1fr\)\)/,
