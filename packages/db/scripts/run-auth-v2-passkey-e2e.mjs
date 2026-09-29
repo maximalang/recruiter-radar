@@ -426,11 +426,6 @@ try {
     AUTH_V2_E2E_DIST_DIR: e2eDistName,
     AUTH_V2_E2E_TSCONFIG: e2eTsconfigName,
     NODE_EXTRA_CA_CERTS: httpsCertPath,
-    // Next 16.3.x server-side redirect fetch does not honor
-    // NODE_EXTRA_CA_CERTS for the harness's self-signed localhost cert; see
-    // the matching note in run-auth-v2-account-team-e2e.mjs. Ephemeral
-    // localhost-only dev server, same posture as the harness readiness probe.
-    NODE_TLS_REJECT_UNAUTHORIZED: '0',
   }
   await run(process.execPath, [iconGenerationScript], environment)
   await run(process.execPath, [migrateScript], environment)
