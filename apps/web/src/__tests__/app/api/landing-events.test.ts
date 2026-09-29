@@ -65,14 +65,14 @@ describe("POST /api/landing-events", () => {
   it("persists an allowlisted, privacy-bounded event and returns 204", async () => {
     const response = await POST(request(JSON.stringify({
       name: "preview_started",
-      context: "form",
+      context: "preview",
       timestamp: Date.now(),
     })));
 
     expect(response.status).toBe(204);
     expect(mockTryRecordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventName: "preview_started",
-      metadata: { context: "form" },
+      metadata: { context: "preview" },
     }));
   });
 

@@ -11,6 +11,8 @@ import { promisify } from 'node:util'
 import pg from 'pg'
 import { chromium } from 'playwright'
 
+import { restoreGeneratedNextEnvReferences } from './lib/next-env-generated-references.mjs'
+
 const { Client } = pg
 const execFileAsync = promisify(execFile)
 const databaseUrl = process.env.DATABASE_URL
@@ -287,18 +289,12 @@ async function restoreNextEnv() {
   if (originalNextEnv === null) return
   const current = await readFile(nextEnvPath, 'utf8')
   if (current === originalNextEnv) return
-  const generated = `import "./${e2eDistName}/dev/types/routes.d.ts";`
-  const original = originalNextEnv.match(
-    /^import ".+\/types\/routes\.d\.ts";$/m,
-  )?.[0]
-  assert(original, 'Original next-env route import was not recognized.')
-  const sanitized = current.replace(generated, original)
-  assert(
-    sanitized.replaceAll('\r\n', '\n')
-      === originalNextEnv.replaceAll('\r\n', '\n'),
-    'next-env.d.ts changed outside the generated route import.',
-  )
-  await writeFile(nextEnvPath, originalNextEnv, 'utf8')
+  const restored = restoreGeneratedNextEnvReferences({
+    current,
+    original: originalNextEnv,
+    generatedDistName: e2eDistName,
+  })
+  await writeFile(nextEnvPath, restored, 'utf8')
 }
 
 function observePage(page) {

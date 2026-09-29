@@ -6,14 +6,11 @@ import DeliveryScene from "./delivery-scene";
 import DetectionScene from "./detection-scene";
 import EvidenceScene from "./evidence-scene";
 import frameStyles from "./landing-frame.module.css";
-import LandingHashNavigation from "./landing-hash-navigation";
 import LandingHeader from "./landing-header";
 import LandingMotion from "./landing-motion";
 import motionStyles from "./landing-motion.module.css";
 import styles from "./landing.module.css";
 import visualStyles from "./landing-visual-system.module.css";
-import SignalTimeline from "./signal-timeline";
-import WorkspaceScene from "./workspace-scene";
 
 export function LandingSkipLink() {
   return <a href="#main-content" className={styles.skipLink}>Перейти к содержанию</a>;
@@ -29,25 +26,19 @@ export default function LandingPage(props: {
   return (
     <div
       className={`${styles.landingPage} ${frameStyles.frame} ${visualStyles.visualSystem} ${motionStyles.motionRoot}`}
+      data-theme="inverse"
       data-landing-experience="signal-lock"
       data-landing-analytics={isYandexMetrikaConfigured() ? "enabled" : "disabled"}
     >
       <LandingMotion />
-      <LandingHashNavigation />
-      <LandingHeader previewHref="#preview-configurator" />
+      <LandingHeader />
       <noscript>
         <div className={styles.noScriptNotice} data-noscript-disclosure role="note">
-          Интерактивная настройка примера требует JavaScript. Основная информация о продукте, тарифах и условиях остаётся доступна без него.
+          Интерактивный пример в первом экране требует JavaScript; рассказ, тарифы и условия доступны без него.
         </div>
       </noscript>
       <main id="main-content">
-        <DetectionScene previewHref="#preview-configurator" paymentConfigured={props.paymentConfigured} />
-        <SignalTimeline />
-        <WorkspaceScene
-          previewInput={props.previewInput}
-          hasPreview={props.hasPreview}
-          checkoutHref={props.checkoutHref}
-        />
+        <DetectionScene paymentConfigured={props.paymentConfigured} />
         <EvidenceScene />
         <DeliveryScene />
         <ConversionPanel

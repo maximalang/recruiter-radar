@@ -1,5 +1,6 @@
 /** @jest-environment jsdom */
 
+import { StrictMode } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
 import { PendingAuthActionView } from "@/app/auth/pending-auth-action-view";
@@ -50,6 +51,45 @@ describe("auth v2 fragment action view", () => {
       name: "Принять приглашение",
     })).toBeInTheDocument();
     expect(document.body.textContent).not.toContain("a".repeat(64));
+  });
+
+  test("survives StrictMode effect replay after clearing the fragment", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      `/auth/change-email#${"b".repeat(64)}`,
+    );
+    let resolvePrepare: ((response: Response) => void) | undefined;
+    const prepare = new Promise<Response>((resolve) => {
+      resolvePrepare = resolve;
+    });
+    jest.mocked(global.fetch).mockReturnValue(prepare);
+
+    render(
+      <StrictMode>
+        <PendingAuthActionView
+          kind="email_change"
+          authenticated
+          hasPending={false}
+        />
+      </StrictMode>,
+    );
+
+    await act(async () => {
+      resolvePrepare?.({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response);
+      await prepare;
+    });
+
+    expect(window.location.hash).toBe("");
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("button", {
+      name: "Подтвердить смену email",
+    })).toBeInTheDocument();
+    expect(screen.queryByText(/Ссылка недействительна/)).not.toBeInTheDocument();
   });
 
   test("rejects a malformed fragment locally without sending it", async () => {

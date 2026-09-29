@@ -246,7 +246,7 @@ export default async function CheckoutPage(props: {
           </div>
         </ContentCard>
 
-        <InternalBackLink href={previewHref}>Изменить параметры радара</InternalBackLink>
+        <InternalBackLink href={previewHref}>Вернуться к примеру</InternalBackLink>
       </div>
     </InternalPageFrame>
   );

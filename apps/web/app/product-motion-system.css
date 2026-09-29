@@ -14,6 +14,19 @@
   --motion-ease-exit: cubic-bezier(.4, 0, 1, 1);
   --motion-ease-signal: cubic-bezier(.2, .8, .2, 1);
   --motion-distance-short: 4px;
+  /* Landing reveal choreography: one canonical stagger ladder so scene
+   * components never carry local animation-delay literals. Values preserve
+   * the approved landing timings exactly. */
+  --motion-delay-1: 80ms;
+  --motion-delay-2: 120ms;
+  --motion-delay-3: 140ms;
+  --motion-delay-4: 200ms;
+  --motion-delay-5: 220ms;
+  --motion-delay-6: 260ms;
+  --motion-delay-7: 280ms;
+  --motion-delay-8: 300ms;
+  --motion-delay-9: 320ms;
+  --motion-delay-10: 380ms;
 }
 
 [data-motion-interactive] {

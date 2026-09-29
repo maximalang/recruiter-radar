@@ -10,26 +10,22 @@ function source(path: string) {
 }
 
 describe("landing visual regression contract", () => {
-  it("keeps the ambient radar hero and transparent header on readable tone contracts", () => {
+  it("keeps the inverse hero and transparent header on readable tone contracts", () => {
     const hero = source("app/landing/detection-scene.tsx");
-    const timeline = source("app/landing/signal-timeline.tsx");
 
     expect(hero).toContain('data-theme="inverse"');
-    expect(hero).toContain('data-header-tone="dark"');
-    expect(hero).toContain('data-hero-layout="morning-list"');
-    expect(hero).not.toContain('data-header-tone="light"');
+    expect(hero).toContain('data-header-tone="light"');
+    expect(hero).toContain('data-hero-layout="interactive-workflow"');
+    expect(hero).not.toContain('data-header-tone="dark"');
 
-    expect(timeline).toContain('data-header-tone="light"');
-    expect(timeline).toContain('id="scene-signal-timeline"');
-    expect(timeline).toContain("ПОВОД СОБРАН");
+    expect(source("app/landing/landing-page.tsx")).not.toContain("<SignalTimeline");
   });
 
-  it("keeps the live product preview on the canonical scene stylesheet", () => {
-    const workspace = source("app/landing/workspace-scene.tsx");
+  it("keeps the hero demo as the single interactive example on the landing", () => {
+    const landing = source("app/landing/landing-page.tsx");
 
-    expect(workspace).toContain('className={sceneStyles.productFrame}');
-    expect(workspace).toContain('className={sceneStyles.checkout}');
-    expect(workspace).not.toContain("styles.workspaceProductFrame");
-    expect(workspace).not.toContain("styles.workspaceCheckout");
+    expect(landing).not.toContain("WorkspaceScene");
+    expect(landing).not.toContain("<HeroProductPreview");
+    expect(source("app/landing/detection-scene.tsx")).toContain("<HeroProductPreview />");
   });
 });

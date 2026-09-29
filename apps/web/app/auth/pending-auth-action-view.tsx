@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import styles from "./pending-auth-action.module.css";
 
@@ -52,41 +52,76 @@ export function PendingAuthActionView(props: {
   );
   const [destination, setDestination] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const prepareRequestRef = useRef<{
+    prepareUrl: string;
+    token: string;
+    promise: Promise<void>;
+  } | null>(null);
+  const preparedUrlRef = useRef<string | null>(
+    props.hasPending ? copy.prepareUrl : null,
+  );
 
   useEffect(() => {
-    const fragment = window.location.hash.slice(1);
+    const locationFragment = window.location.hash.slice(1);
+    const cachedRequest = prepareRequestRef.current;
+    const fragment = locationFragment || (
+      cachedRequest?.prepareUrl === copy.prepareUrl
+        ? cachedRequest.token
+        : ""
+    );
     if (!fragment) {
-      if (!props.hasPending) {
+      if (
+        !props.hasPending
+        && preparedUrlRef.current !== copy.prepareUrl
+      ) {
         setErrorCode("invalid");
         setPhase("error");
       }
       return;
     }
 
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${window.location.pathname}${window.location.search}`,
-    );
+    if (locationFragment) {
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+    }
     if (!TOKEN_PATTERN.test(fragment)) {
+      prepareRequestRef.current = null;
       setErrorCode("invalid");
       setPhase("error");
       return;
     }
 
     let active = true;
-    void fetch(copy.prepareUrl, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: fragment }),
-    })
-      .then((response) => {
+    let request = prepareRequestRef.current;
+    if (
+      request?.prepareUrl !== copy.prepareUrl
+      || request.token !== fragment
+    ) {
+      const promise = fetch(copy.prepareUrl, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: fragment }),
+      }).then((response) => {
         if (!response.ok) throw new Error("prepare_failed");
-        if (active) setPhase("ready");
+      });
+      request = { prepareUrl: copy.prepareUrl, token: fragment, promise };
+      prepareRequestRef.current = request;
+    }
+    void request.promise
+      .then(() => {
+        if (active) {
+          preparedUrlRef.current = copy.prepareUrl;
+          prepareRequestRef.current = null;
+          setPhase("ready");
+        }
       })
       .catch(() => {
         if (active) {
+          prepareRequestRef.current = null;
           setErrorCode("invalid");
           setPhase("error");
         }

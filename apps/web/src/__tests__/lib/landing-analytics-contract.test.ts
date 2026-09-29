@@ -22,11 +22,13 @@ describe("landing analytics contract", () => {
     expect(LANDING_ANALYTICS_CONTEXT.heroPrimary).toBe("hero_primary");
     expect(LANDING_ANALYTICS_CONTEXT.heroSecondary).toBe("hero_secondary");
     expect(LANDING_ANALYTICS_CONTEXT.pricingPilot).toBe("pricing_pilot");
-    expect(LANDING_ANALYTICS_CONTEXT.form).toBe("form");
+    expect(LANDING_ANALYTICS_CONTEXT.preview).toBe("preview");
     expect(LANDING_ANALYTICS_CONTEXT.landing).toBe("landing");
     expect(LANDING_ANALYTICS_CONTEXT.monthly).toBe("monthly");
     expect(LANDING_ANALYTICS_CONTEXT.quarterly).toBe("quarterly");
     expect(isLandingAnalyticsContext("raw_form_value")).toBe(false);
+    expect(isLandingAnalyticsContext("form")).toBe(false);
+    expect(isLandingAnalyticsContext("preset")).toBe(false);
   });
 
   it("does not duplicate shared landing event names in product telemetry", () => {

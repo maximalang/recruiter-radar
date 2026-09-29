@@ -1414,7 +1414,9 @@ describe('opportunity background jobs', () => {
             hiringEpisodeId: '20',
             status: 'snoozed',
             supersededAt: null,
-            validUntil: '2026-08-30T09:00:00.000Z',
+            // Must stay in the future relative to resumeNow (Date.now()-60s):
+            // the opportunity is treated as expired once now passes validUntil.
+            validUntil: '2099-01-01T00:00:00.000Z',
             scoringVersion: 'opportunity-v1',
             confidenceGate: 'A',
             opportunityScore: 0.8,

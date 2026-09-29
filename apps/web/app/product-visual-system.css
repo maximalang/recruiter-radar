@@ -28,20 +28,47 @@ body {
   --color-separator-subtle: rgba(243, 240, 232, .08);
   --color-separator: rgba(243, 240, 232, .12);
   --color-separator-strong: rgba(243, 240, 232, .22);
-  --color-signal: #8fc7b8;
-  --color-signal-hover: #a6d5c9;
-  --color-signal-soft: rgba(143, 199, 184, .12);
+  /* Inverse accent family per design spec §2.2: champagne gold, no green. */
+  --color-signal: #C9A96A;
+  --color-signal-hover: #D2B377;
+  --color-signal-soft: rgba(201, 169, 106, .12);
   --color-copper: #c18c6f;
-  --color-positive: #7fb996;
+  --color-positive: #A9C79A;
   --color-warning: #d2a365;
   --color-destructive: #e08b84;
   --color-information: #86b2c4;
-  --color-confidence-high: #7fb996;
+  --color-confidence-high: #A9C79A;
   --color-confidence-medium: #d2a365;
   --color-confidence-low: #919c95;
-  --color-focus: #a6d5c9;
-  --color-selection: rgba(143, 199, 184, .20);
+  --color-focus: #D8BC82;
+  --color-selection: rgba(201, 169, 106, .20);
   --color-overlay: rgba(0, 0, 0, .64);
+}
+
+/* Landing single-canvas dark palette (approved Pass 5, refs: linear.app +
+ * accio.com/work): neutral near-black canvas, Linear-grade grayscale,
+ * champagne kept as the single restrained accent. Scoped to the landing
+ * root ONLY via data-landing-experience; the product inverse theme above
+ * is untouched. */
+[data-theme="inverse"][data-landing-experience] {
+  --color-canvas: #08090a;
+  --color-surface-primary: #101112;
+  --color-surface-secondary: #161718;
+  --color-surface-selected: #1c1d1f;
+  --color-surface-elevated: #222325;
+  --color-text-primary: #f7f8f8;
+  --color-text-secondary: #b4b7bc;
+  --color-text-tertiary: #8c8f94;
+  --color-text-disabled: #5e6065;
+  --color-text-inverse: #0b0c0d;
+  --color-separator-subtle: rgba(247, 248, 248, .06);
+  --color-separator: rgba(247, 248, 248, .10);
+  --color-separator-strong: rgba(247, 248, 248, .18);
+  --color-signal: #C9A96A;
+  --color-signal-hover: #D8BC82;
+  --color-signal-soft: rgba(201, 169, 106, .10);
+  --color-focus: #D8BC82;
+  --color-selection: rgba(201, 169, 106, .18);
 }
 
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea) {

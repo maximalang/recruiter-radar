@@ -216,6 +216,17 @@ try {
           }
           return false;
         };
+        // The hero product shot is a miniature, deliberately right-edge-clipped
+        // product illustration (Accio-style teaser) above 900px. Its inner controls
+        // belong to the illustration, not the page chrome, so the desktop 44px and
+        // viewport-bounds rules don't apply to them. At <=900px the shot renders
+        // full-width in flow and its controls DO meet the 44px touch contract
+        // (enforced by detection-scene.module.css mobile rules and asserted by the
+        // mobile-320 rows of this audit), so the exemption is width-gated.
+        const insideHeroTeaser = (element) => (
+          window.innerWidth > 900
+          && Boolean(element.closest('#scene-detection [data-hero-visual]'))
+        );
 
         const interactive = Array.from(document.querySelectorAll(
           'a[href], button, [role="button"], [role="link"], input:not([type="hidden"]), select, textarea, summary',
@@ -223,6 +234,7 @@ try {
 
         const undersized = interactive
           .filter(needsTouchTarget)
+          .filter((element) => !insideHeroTeaser(element))
           .map((element) => {
             const rect = effectiveRect(element);
             return {
@@ -272,7 +284,7 @@ try {
           .map(([id, count]) => ({ id, count }));
 
         const clippedControls = interactive
-          .filter((element) => !insideHorizontalScroller(element))
+          .filter((element) => !insideHorizontalScroller(element) && !insideHeroTeaser(element))
           .map((element) => {
             const rect = element.getBoundingClientRect();
             return {
