@@ -118,8 +118,8 @@
 
 .shotMark { display: grid; width: 1.4rem; height: 1.4rem; place-items: center; border: 0; border-radius: 50%; background: conic-gradient(from 45deg, var(--color-demo-indigo), var(--color-demo-violet), var(--color-demo-green), var(--color-demo-gold), var(--color-demo-indigo)); color: var(--color-demo-white); font: 700 .5rem var(--font-mono); }
 
-.shotBody { display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); gap: .5rem; padding: .5rem; background: radial-gradient(130% 100% at 50% -15%, var(--color-demo-glow-indigo), transparent 60%); }
-.shotSide { display: flex; min-width: 0; flex-direction: column; padding: .85rem .6rem .8rem; border-right: 0; background: transparent; }
+.shotBody { display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); gap: .5rem; padding: .5rem; background: radial-gradient(130% 100% at 50% -15%, var(--color-demo-glow-indigo), transparent 60%), linear-gradient(180deg, transparent 30%, var(--color-demo-shade)); }
+.shotSide { display: flex; min-width: 0; flex-direction: column; padding: .85rem .6rem .8rem; border-right: 0; background: transparent; animation: sideIn var(--motion-duration-scan) var(--motion-ease-enter) both; animation-delay: calc(var(--motion-duration-scan) + var(--motion-duration-instant)); }
 .shotSide > p { margin: .85rem .55rem .3rem; color: var(--color-text-tertiary); font: 500 .72rem var(--font-sans); letter-spacing: 0; text-transform: none; }
 .shotSide > p:first-child { margin-top: 0; }
 .shotNav { display: grid; gap: .12rem; }
@@ -129,7 +129,7 @@
 .shotSide > div:nth-of-type(3) button:nth-child(1) svg { color: var(--color-demo-green); }
 .shotSide > div:nth-of-type(3) button:nth-child(2) svg { color: var(--color-demo-orange); }
 
-.shotWorkspace { position: relative; min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--color-demo-veil-09); border-radius: var(--radius-overlay); background: linear-gradient(168deg, var(--color-demo-panel-top) 0%, var(--color-demo-panel-mid) 52%, var(--color-demo-panel-end) 100%); box-shadow: var(--shadow-demo-panel); }
+.shotWorkspace { position: relative; min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--color-demo-veil-09); border-radius: var(--radius-overlay); background: linear-gradient(168deg, var(--color-demo-panel-top) 0%, var(--color-demo-panel-mid) 52%, var(--color-demo-panel-end) 100%); box-shadow: var(--shadow-demo-panel); animation: panelIn var(--motion-duration-scan) var(--motion-ease-enter) both; animation-delay: calc(var(--motion-duration-scan) + var(--motion-duration-instant)); }
 .shotWorkspace::before { content: ""; position: absolute; z-index: 3; inset: 0 0 auto 0; height: 1px; background: linear-gradient(90deg, transparent, var(--color-demo-veil-12), transparent); background-size: 200% 100%; animation: sheenSweep var(--motion-duration-scan) var(--motion-ease-standard) both; pointer-events: none; }
 @keyframes sheenSweep { 0% { background-position: 200% 0; } 60%, 100% { background-position: -200% 0; } }
 .shotWorkspaceHeader { display: flex; align-items: center; gap: .6rem; padding: .95rem 1.2rem; border-bottom: 1px solid var(--color-separator-subtle); background-image: linear-gradient(180deg, var(--color-demo-veil-022), var(--color-demo-clear)); }
@@ -380,7 +380,9 @@
 }
 
 /* Pass 4 (owner verdict 25.09): professional entrance + stage transitions */
-@keyframes heroShotEnter { from { opacity: 0; transform: translate3d(0, 14px, 0); } to { opacity: 1; transform: none; } }
+@keyframes heroShotEnter { from { opacity: 0; transform: translate3d(0, 90px, 0) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes sideIn { from { opacity: 0; transform: translate3d(0, 26px, 0); } to { opacity: 1; transform: none; } }
+@keyframes panelIn { from { opacity: 0; transform: translate3d(0, 44px, 0); } to { opacity: 1; transform: none; } }
 @keyframes heroStageIn { from { opacity: 0; transform: translate3d(0, 6px, 0); } to { opacity: 1; transform: none; } }
 .copy { animation: heroShotEnter var(--motion-duration-signal) var(--motion-ease-enter) both; }
 .productShot { animation: heroShotEnter var(--motion-duration-scan) var(--motion-delay-2) var(--motion-ease-enter) both; }
