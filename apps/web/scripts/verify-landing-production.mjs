@@ -458,6 +458,18 @@ async function assertHashNavigation(browser, spec) {
   const { page, assertCleanConsole } = await preparePage(context, spec.name, `${baseUrl}/#${spec.hash}`);
   const target = page.locator(spec.target).first();
   await target.waitFor({ state: "attached" });
+  // Measure settled layout: entrance animations (fill:both) must finish first.
+  await page.waitForTimeout(400);
+  await target.evaluate(() => {
+    const all = typeof document.getAnimations === "function" ? document.getAnimations() : [];
+    return Promise.race([
+      Promise.all(all.map((a) => a.finished.catch(() => undefined))),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
+  });
+  await page.waitForTimeout(160);
+  // Re-anchor after entrance animations settle: scroll offset must reflect final layout.
+  await target.evaluate((element) => element.scrollIntoView());
   await page.waitForTimeout(160);
   const firstPosition = await target.evaluate((element) => {
     const header = document.querySelector("header");
