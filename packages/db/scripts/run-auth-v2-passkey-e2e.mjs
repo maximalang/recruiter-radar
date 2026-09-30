@@ -426,10 +426,10 @@ try {
     AUTH_V2_E2E_DIST_DIR: e2eDistName,
     AUTH_V2_E2E_TSCONFIG: e2eTsconfigName,
     NODE_EXTRA_CA_CERTS: httpsCertPath,
-    // See run-auth-v2-account-team-e2e.mjs: next 16.3's internal redirect
-    // fetch (vercel/next.js#62561) ignores NODE_EXTRA_CA_CERTS and rejects
-    // the loopback self-signed certificate. Scoped to the spawned 127.0.0.1
-    // e2e server child process only.
+    // See run-auth-v2-account-team-e2e.mjs: the internal redirect request
+    // added in next 16.3, vercel/next.js issue 62561, ignores
+    // NODE_EXTRA_CA_CERTS and rejects the loopback self-signed certificate.
+    // Scoped to the spawned 127.0.0.1 e2e server child process only.
     NODE_TLS_REJECT_UNAUTHORIZED: '0',
   }
   await run(process.execPath, [iconGenerationScript], environment)
