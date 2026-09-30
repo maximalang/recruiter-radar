@@ -40,10 +40,10 @@ function ChannelRoute({ channel }: { channel: DeliveryChannel }) {
 
 export default function DeliveryScene() {
   return (
-    <section id="scene-delivery" className={sceneStyles.section} style={{ scrollMarginTop: "calc(72px + 32px)" }} aria-labelledby="delivery-title" data-header-tone="light" data-motion-reveal="section" data-delivery-summary="telegram-workflow">
+    <section id="scene-delivery" className={sceneStyles.section} aria-labelledby="delivery-title" data-header-tone="light" data-motion-reveal="section" data-delivery-summary="telegram-workflow">
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.intro}>
-          <p>Доставка</p>
+          <p className={sceneStyles.introLabel}>Доставка</p>
           <h2 id="delivery-title">Результаты приходят туда, где вы работаете</h2>
           <p className={sceneStyles.introSub}>Короткий сигнал — чтобы решить. Полная карточка — чтобы написать.</p>
         </div>

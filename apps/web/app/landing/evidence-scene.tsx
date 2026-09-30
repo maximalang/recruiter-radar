@@ -23,10 +23,9 @@ export default function EvidenceScene() {
     >
       <div className={styles.layout}>
         <header className={styles.intro}>
-          <div>
-            <p className={styles.introLabel}>Разбор карточки · {DEMO_COMPANY.name}</p>
-            <h2>Одна рекомендация — цепочка проверяемых фактов.</h2>
-          </div>
+          <p className={styles.introLabel}>Разбор карточки · {DEMO_COMPANY.name}</p>
+          <h2>Одна рекомендация — цепочка проверяемых фактов.</h2>
+          <p className={styles.introLead}>Демо-сценарий целиком: что нашёл радар, какие источники это подтвердили и каким будет следующий ход.</p>
         </header>
 
         <div className={styles.evidenceChain} data-proof-chain="source-fact-conclusion">
