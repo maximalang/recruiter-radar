@@ -1,0 +1,183 @@
+name: Telegram Production Secret Sync
+
+# Privileged-path hardening (QA t_3ed42af0 F1): neither trigger may check out
+# or ship scripts from an arbitrary ref anymore.
+#   - workflow_run: the Deploy workflow itself only runs after Tests succeeded
+#     on a push to main, so its head_sha is by construction the exact
+#     deployed+tested SHA.
+#   - workflow_dispatch: only accepted from main, and the target SHA is
+#     resolved server-side from the latest successful Deploy run - never from
+#     the dispatched ref's github.sha. A manual re-sync therefore always
+#     ships the configurator that is deployed and tested on main.
+on:
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: telegram-production-secret-sync
+  cancel-in-progress: false
+
+jobs:
+  resolve-deployed-sha:
+    name: Resolve deployed and tested SHA
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      target_sha: ${{ steps.resolve.outputs.target_sha }}
+    steps:
+      - name: Resolve exact deployed+tested SHA
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = 'workflow_run' ]; then
+            trigger_event='${{ github.event.workflow_run.event }}'
+            if [ "$trigger_event" != 'push' ]; then
+              echo "Refusing to sync for a Deploy run triggered by '$trigger_event'; only push deployments are authoritative." >&2
+              exit 1
+            fi
+            target_sha='${{ github.event.workflow_run.head_sha }}'
+            trigger='workflow_run (Deploy success on main)'
+          else
+            if [ "$GITHUB_REF" != 'refs/heads/main' ]; then
+              echo "Manual Telegram sync may only be dispatched from the main branch (got: $GITHUB_REF)." >&2
+              exit 1
+            fi
+            trigger='workflow_dispatch (main)'
+            target_sha="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow deploy.yml \
+              --branch main \
+              --status success \
+              --limit 1 \
+              --json headSha \
+              --jq '.[0].headSha')"
+            if ! printf '%s' "$target_sha" | grep -Eq '^[0-9a-f]{40}$'; then
+              echo 'No successful main Deploy run found; refusing manual Telegram secret sync.' >&2
+              exit 1
+            fi
+          fi
+          if ! printf '%s' "$target_sha" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Resolved SHA '$target_sha' is not a full commit SHA; refusing to continue." >&2
+            exit 1
+          fi
+          echo "Resolved $trigger -> deployed+tested SHA $target_sha"
+          echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
+
+  sync:
+    needs: resolve-deployed-sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DEPLOY_SHA: ${{ needs.resolve-deployed-sha.outputs.target_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve-deployed-sha.outputs.target_sha }}
+
+      - name: Validate Telegram runtime configurator
+        run: bash -n scripts/deploy/configure-telegram-runtime.sh
+
+      - name: Detect optional Telegram secrets
+        id: secret
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+        run: |
+          if [ -n "${TELEGRAM_API_ID:-}" ] && [ -n "${TELEGRAM_API_HASH:-}" ] && [ -n "${TELEGRAM_SESSION:-}" ]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+            echo 'Telegram production secrets are configured.'
+          else
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo 'Telegram production secrets are not configured; source remains credential-gated.'
+          fi
+
+      - name: Setup SSH
+        if: steps.secret.outputs.configured == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Stage Telegram secrets and configurator
+        if: steps.secret.outputs.configured == 'true'
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key_file="/tmp/telegram-env-${DEPLOY_SHA}.b64"
+          # QA F2: the locally encoded credential bundle is wiped on every
+          # exit path (error or cancel signal), not only after a successful
+          # first scp.
+          staged_local_cleanup() { rm -f -- "$key_file"; }
+          trap staged_local_cleanup EXIT INT TERM
+
+          {
+            printf 'TELEGRAM_API_ID=%s\n' "$TELEGRAM_API_ID"
+            printf 'TELEGRAM_API_HASH=%s\n' "$TELEGRAM_API_HASH"
+            printf 'TELEGRAM_SESSION=%s\n' "$TELEGRAM_SESSION"
+          } | base64 -w0 > "$key_file"
+          unset TELEGRAM_API_ID TELEGRAM_API_HASH TELEGRAM_SESSION
+
+          # QA F2: ship the configurator first and the credential bundle last,
+          # so the bundle's remote lifetime starts seconds before the
+          # configure step consumes and deletes it.
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/configure-telegram-runtime.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-telegram-runtime.${DEPLOY_SHA}.sh
+
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            "$key_file" \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/.telegram-env-${DEPLOY_SHA}.b64
+          rm -f -- "$key_file"
+          trap - EXIT INT TERM
+
+      - name: Configure and live-verify Telegram production runtime
+        if: steps.secret.outputs.configured == 'true'
+        run: |
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" <<'SSH_EOF'
+          set -euo pipefail
+          staged_configurator="/opt/recruiter-radar/configure-telegram-runtime.${DEPLOY_SHA}.sh"
+          staged_key="/opt/recruiter-radar/.telegram-env-${DEPLOY_SHA}.b64"
+
+          cleanup() { rm -f "$staged_configurator" "$staged_key"; }
+          trap cleanup EXIT
+
+          test -f "$staged_configurator" || { echo 'Staged Telegram configurator is missing.' >&2; exit 1; }
+          test -f "$staged_key" || { echo 'Staged Telegram secret bundle is missing.' >&2; exit 1; }
+          chmod 700 "$staged_configurator"
+          "$staged_configurator" --key-file "$staged_key"
+          install -m 700 "$staged_configurator" /opt/recruiter-radar/scripts/deploy/configure-telegram-runtime.sh
+          SSH_EOF
+
+      - name: Wipe staged Telegram material on the server
+        if: always() && steps.secret.outputs.configured == 'true'
+        run: |
+          # QA F2: best-effort remote wipe covering every path where the
+          # configure step's own trap never ran (SSH/setup succeeded, staging
+          # landed, then a later scp/SSH failed or the job was cancelled).
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o BatchMode=yes -o ConnectTimeout=15 -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" <<'SSH_EOF' || echo 'Remote staged-material wipe was best-effort and did not complete.'
+          set -euo pipefail
+          rm -f -- "/opt/recruiter-radar/.telegram-env-${DEPLOY_SHA}.b64"
+          rm -f -- "/opt/recruiter-radar/configure-telegram-runtime.${DEPLOY_SHA}.sh"
+          SSH_EOF
