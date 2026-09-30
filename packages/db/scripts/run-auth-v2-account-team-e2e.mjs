@@ -2174,6 +2174,16 @@ try {
     AUTH_V2_E2E_DIST_DIR: e2eDistName,
     AUTH_V2_E2E_TSCONFIG: e2eTsconfigName,
     NODE_EXTRA_CA_CERTS: httpsCertPath,
+    // next 16.3 resolves RSC redirects through an internal server-side fetch
+    // (vercel/next.js#62561) executed by the compiled next-server runtime.
+    // Its bundled dispatcher does not consult NODE_EXTRA_CA_CERTS, so that
+    // fetch rejects this harness's loopback self-signed certificate
+    // (DEPTH_ZERO_SELF_SIGNED_CERT) and pending-action redirects never
+    // complete. Scoped strictly to the spawned 127.0.0.1 e2e server child
+    // process; the production-image guard
+    // (verify-government-ca-trust.test.mjs) still forbids this variable in
+    // apps/web/Dockerfile.
+    NODE_TLS_REJECT_UNAUTHORIZED: '0',
     OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
     OPPORTUNITY_OUTCOMES_ENABLED: 'true',
     OPPORTUNITY_OUTCOMES_UI_ENABLED: 'true',
