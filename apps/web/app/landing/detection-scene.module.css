@@ -136,7 +136,7 @@
 .shotStatus { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--color-signal); box-shadow: var(--shadow-demo-status); }
 .shotIssueId { flex: none; color: var(--color-text-tertiary); font: .72rem var(--font-mono); }
 .shotCrumb { flex: none; color: var(--color-text-tertiary); font-size: .74rem; }
-.shotCrumbSep { flex: none; margin: 0 .35rem; color: var(--color-text-disabled); font-size: .74rem; }
+.shotCrumbSep { flex: none; margin: 0 .35rem; color: var(--color-text-tertiary); font-size: .74rem; }
 .shotWorkspaceHeader strong { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .95rem; font-weight: 590; letter-spacing: -.015em; }
 .shotHeaderTools { display: flex; flex: none; align-items: center; gap: .5rem; color: var(--color-text-tertiary); }
 .shotHeaderTools svg { width: 14px; height: 14px; }
@@ -146,7 +146,7 @@
 .shotCounter button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .shotCounter svg { width: 12px; height: 12px; }
 .shotToolRow { display: flex; align-items: center; gap: .4rem; padding: .6rem 1rem 0; }
-.shotToolCaption { margin-left: auto; color: var(--color-text-disabled); font: .56rem var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+.shotToolCaption { margin-left: auto; color: var(--color-text-tertiary); font: .56rem var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
 .shotToolIco { display: grid; width: 1.9rem; height: 1.9rem; place-items: center; border: 1px solid var(--color-separator-subtle); border-radius: 50%; color: var(--color-text-tertiary); }
 .shotToolIco svg { width: 13px; height: 13px; }
 .workflowArea { padding-top: .35rem; }
@@ -188,8 +188,8 @@
 .shotProps > .aiFloat { display: block; padding: .85rem .95rem; color: var(--color-text-primary); }
 .propsCard svg { width: 14px; height: 14px; flex: none; color: var(--color-demo-indigo); }
 .activityHead { margin: 1.35rem 0 0; color: color-mix(in srgb, var(--color-text-primary) 84%, transparent); font-size: .95rem; font-weight: 590; letter-spacing: -.01em; }
-.activityCount { margin-left: .5rem; color: var(--color-text-disabled); font-size: .74rem; font-weight: 500; vertical-align: .1rem; }
-.cmtGhost { margin: .9rem 0 0 2.25rem; padding: .6rem .95rem; border: 1px dashed var(--color-demo-veil-10); border-radius: var(--radius-surface); color: var(--color-text-disabled); font-size: .8rem; }
+.activityCount { margin-left: .5rem; color: var(--color-text-tertiary); font-size: .74rem; font-weight: 500; vertical-align: .1rem; }
+.cmtGhost { margin: .9rem 0 0 2.25rem; padding: .6rem .95rem; border: 1px dashed var(--color-demo-veil-10); border-radius: var(--radius-surface); color: var(--color-text-tertiary); font-size: .8rem; }
 .workflowEyebrow,.infoPage > span { color: var(--color-text-tertiary); font: .58rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
 .workflowMain h2,.infoPage h2 { max-width: 32ch; margin: .5rem 0 0; font-size: 1.24rem; font-weight: 590; letter-spacing: -.02em; line-height: 1.3; }
 .workflowIntro,.infoPage > p { max-width: 62ch; margin: .45rem 0 0; color: var(--color-text-secondary); font-size: .86rem; line-height: 1.55; }
@@ -224,7 +224,7 @@
 .cmtBody { min-width: 0; }
 .cmtHead { display: flex; align-items: baseline; gap: .45rem; margin: 0; }
 .cmtHead strong { font-size: .82rem; font-weight: 590; }
-.cmtHead span { color: var(--color-text-disabled); font-size: .72rem; }
+.cmtHead span { color: var(--color-text-tertiary); font-size: .72rem; }
 .cmtBody > p:last-child { margin: .3rem 0 0; color: var(--color-text-secondary); font-size: .84rem; line-height: 1.55; }
 .workflowRows > div { animation: rowIn var(--motion-duration-signal) var(--motion-ease-enter) both; }
 .workflowRows > div:nth-child(2) { animation-delay: var(--motion-duration-instant); }

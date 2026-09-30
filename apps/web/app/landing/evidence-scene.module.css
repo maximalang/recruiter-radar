@@ -175,18 +175,22 @@
   letter-spacing: 0;
 }
 
+/* Review D4 (dd233623): the 1px hairline with a 1px tick read as page
+ * furniture, not as a gauge. Render the score as a legible 4px track
+ * filled to var(--score) in the same accent as the score value. */
 .scoreScale {
   position: relative;
-  height: 1px;
+  height: 4px;
+  border-radius: var(--radius-pill);
   background: var(--evidence-line);
+  overflow: hidden;
 }
 
 .scoreScale i {
-  position: absolute;
-  top: -.19rem;
-  left: calc(var(--score, 0) * .87% + 6.5%);
-  width: 1px;
-  height: .39rem;
+  display: block;
+  height: 100%;
+  width: calc(var(--score, 0) * 1%);
+  border-radius: var(--radius-pill);
   background: var(--evidence-accent);
 }
 

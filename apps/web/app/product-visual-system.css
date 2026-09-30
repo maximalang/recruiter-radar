@@ -48,9 +48,14 @@ body {
 /* Landing single-canvas dark palette (approved Pass 5, refs: linear.app +
  * accio.com/work): neutral near-black canvas, Linear-grade grayscale,
  * champagne kept as the single restrained accent. Scoped to the landing
- * root ONLY via data-landing-experience; the product inverse theme above
- * is untouched. */
-[data-theme="inverse"][data-landing-experience] {
+ * subtree via data-landing-experience; the product inverse theme above is
+ * untouched. The descendant arm keeps any nested section that re-declares
+ * data-theme="inverse" (the hero) on this neutral palette instead of
+ * letting the greenish product-inverse block above win by proximity
+ * (UX review of dd233623: the hero rendered on the inverse canvas with
+ * inverse ink — a visible palette fault line against the neutral demo). */
+[data-theme="inverse"][data-landing-experience],
+[data-landing-experience] [data-theme="inverse"] {
   --color-canvas: #08090a;
   --color-surface-primary: #101112;
   --color-surface-secondary: #161718;
