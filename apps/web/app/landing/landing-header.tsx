@@ -27,6 +27,7 @@ export default function LandingHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
 
   const closeMenu = useCallback((restoreFocus = true) => {
     if (restoreFocus) menuButtonRef.current?.focus({ preventScroll: true });
@@ -108,6 +109,24 @@ export default function LandingHeader() {
     document.body.style.overflow = "hidden";
     if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
 
+    // Review D3: an aria-modal dialog must own the page while open — mark
+    // everything outside the header subtree inert (no hit-testing, no tab
+    // stops, hidden from assistive tech) and restore it on close.
+    const backgroundRoots: HTMLElement[] = [];
+    for (
+      let node: HTMLElement | null = headerRef.current;
+      node && node !== document.body;
+      node = node.parentElement
+    ) {
+      const parent = node.parentElement;
+      if (!parent) break;
+      for (const sibling of Array.from(parent.children)) {
+        if (sibling === node || !(sibling instanceof HTMLElement)) continue;
+        sibling.inert = true;
+        backgroundRoots.push(sibling);
+      }
+    }
+
     const panel = menuPanelRef.current;
     const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [])
       .filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
@@ -155,6 +174,7 @@ export default function LandingHeader() {
     return () => {
       document.body.style.overflow = previousOverflow;
       document.body.style.paddingRight = previousPaddingRight;
+      for (const element of backgroundRoots) element.inert = false;
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("pointerdown", handlePointerDown);
     };
@@ -177,6 +197,7 @@ export default function LandingHeader() {
 
   return (
     <header
+      ref={headerRef}
       className={headerStyles.header}
       data-brand-header="recruiter-radar"
       data-scrolled={scrolled || undefined}

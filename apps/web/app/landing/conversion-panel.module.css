@@ -100,7 +100,11 @@
   text-decoration: none;
 }
 
-.pilotOffer > small { color: color-mix(in srgb, var(--color-text-inverse) 52%, transparent); font-size: .74rem; }
+/* Review D1 (dd233623): the consent line mixed 52% of the dark inverse ink
+ * over the dark offer surface (1.02:1). Legal copy must stay readable —
+ * tertiary ink keeps the small print quieter than the list while passing
+ * AA on the elevated surface. */
+.pilotOffer > small { color: var(--color-text-tertiary); font-size: .74rem; }
 
 .secondaryOffers {
   display: grid;
