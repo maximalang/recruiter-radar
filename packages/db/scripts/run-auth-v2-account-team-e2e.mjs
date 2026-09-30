@@ -2063,6 +2063,19 @@ async function runCoreAuthFlows(fixtures) {
     )
     await openMagicLogin(switchPage, switchToken)
     const switchNotice = switchPage.locator('[role="note"]')
+    // next 16.3 changed RSC redirect/navigation timing (vercel/next.js#62561):
+    // the confirmation surface can settle after the magic-login navigation
+    // resolves. Wait (bounded) for the exact same predicate the assertion
+    // below checks; the assertion itself is unchanged and remains strict
+    // (exactly one note, containing the currently signed-in account email).
+    await switchPage.waitForFunction(
+      (email) => {
+        const notes = Array.from(document.querySelectorAll('[role="note"]'))
+        return notes.length === 1 && (notes[0].textContent || '').includes(email)
+      },
+      fixtures.switcher.email,
+      { timeout: 30000 },
+    )
     assert(
       await switchNotice.count() === 1
         && (await switchNotice.innerText()).includes(fixtures.switcher.email),
