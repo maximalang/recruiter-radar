@@ -40,7 +40,7 @@ describe("landing product story v2", () => {
     expect(previewText).toContain("Инженерный подбор");
     expect(previewText).toContain("Финансовый софт");
     expect(previewText).toContain("Ваш рынок");
-    expect(previewText).toContain("42 источника");
+    expect(previewText).toContain("27 источников");
     expect(previewText).toContain("10 компаний");
     expect(previewText).toContain("Готовый черновик");
     expect(previewText).not.toMatch(/Промет|Северные системы|Техноформ|Демо · 12 мая/);
@@ -105,7 +105,7 @@ describe("landing product story v2", () => {
 
     const hierarchy = [
       "Ваш рынок",
-      "42 источника",
+      "27 источников",
       "10 компаний",
       "Готовый черновик",
     ];
