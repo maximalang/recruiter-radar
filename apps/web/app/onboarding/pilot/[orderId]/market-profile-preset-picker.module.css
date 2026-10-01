@@ -44,16 +44,14 @@
   border-radius: var(--radius-control);
   background-color: var(--color-surface-primary);
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-
-.option:hover {
-  border-color: var(--color-separator-strong);
+  transition:
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    background-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .option:has(input:checked) {
   border-color: var(--color-signal);
-  box-shadow: 0 0 0 1px var(--color-signal);
+  background-color: var(--color-surface-selected);
 }
 
 .option input[type="radio"] {
@@ -90,9 +88,19 @@
 .chip {
   padding: 2px 8px;
   border: 1px solid var(--color-separator);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   background-color: var(--color-surface-secondary);
   font-size: 0.72rem;
   line-height: 1.5;
   color: var(--color-text-secondary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .option:hover {
+    border-color: var(--color-separator-strong);
+  }
+
+  .option:has(input:checked):hover {
+    border-color: var(--color-signal);
+  }
 }
