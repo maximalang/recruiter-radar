@@ -8,6 +8,7 @@
 import { getPool } from "./db";
 import { formatReason, type ScoringReason } from "./scoring/scoring-reasons";
 import { parseStoredEnrichment, type StoredAiEnrichment } from "./ai/enrichment/enrichmentStore";
+import { parseStoredOpenerDraft, type StoredOpenerDraft } from "./ai/opener/openerDraftStore";
 import { hasCompanyHiringSource } from "./sources/company-hiring-sources";
 
 // ─── Reason parsing ──────────────────────────────────────────────
@@ -348,6 +349,13 @@ export interface LeadDetail extends LeadItem {
    * explicitly-labelled "AI-подсказка" block.
    */
   aiEnrichment: StoredAiEnrichment | null;
+  /**
+   * D3 AI opener draft — a SEPARATE, attributed editable draft layer. NULL until
+   * an operator explicitly generates one on the lead detail page. Never feeds
+   * score/gate/evidence; confirm only unlocks a manual clipboard copy (nothing
+   * is ever sent by the product). See lib/ai/opener/openerDraftStore.ts.
+   */
+  aiOpenerDraft: StoredOpenerDraft | null;
 }
 
 // ─── Row Mapping ─────────────────────────────────────────────────
@@ -819,6 +827,7 @@ export async function getLeadDetail(input: {
     candidate_source_keys: unknown;
     payload: unknown;
     ai_enrichment: unknown;
+    ai_opener_draft: unknown;
   }>(`
     SELECT
       dc.id::TEXT AS id,
@@ -850,6 +859,7 @@ export async function getLeadDetail(input: {
       ) AS candidate_source_keys,
       dc.payload,
       dc.ai_enrichment,
+      dc.ai_opener_draft,
       dc.review_status::TEXT AS review_status
     FROM digest_candidates dc
     JOIN client_profiles cp
@@ -886,6 +896,7 @@ export async function getLeadDetail(input: {
     candidateSourceKeys: toStringArray(row.candidate_source_keys),
     payload: (typeof row.payload === 'object' && row.payload !== null && !Array.isArray(row.payload)) ? row.payload as Record<string, unknown> : {},
     aiEnrichment,
+    aiOpenerDraft: parseStoredOpenerDraft(row.ai_opener_draft),
   };
 }
 

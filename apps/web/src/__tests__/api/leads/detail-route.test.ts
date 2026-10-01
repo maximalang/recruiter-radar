@@ -78,6 +78,7 @@ function makeDetail(overrides: Partial<LeadDetail> = {}): LeadDetail {
       sourceUrl: 'https://romashka.ru/careers',
       enrichedAt: '2026-06-30T00:00:00Z',
     } as never,
+    aiOpenerDraft: null,
     ...overrides,
   };
 }

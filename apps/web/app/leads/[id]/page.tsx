@@ -13,6 +13,7 @@ import { formatVacanciesCount, pluralForm } from '@/lib/format/plural';
 import { formatScorePoints } from '@/lib/scoring/score-display';
 import FeedbackButtons from './feedback-buttons';
 import AiEnrichmentBlock from './ai-enrichment-block';
+import OpenerDraftBlock from './opener-draft-block';
 import NextStepsBlock from './next-steps-block';
 import { deriveCompanyBriefDecision, type CompanyBriefPrimaryAction } from './company-brief-decision';
 import {
@@ -376,6 +377,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             ) : null}
 
             <AiEnrichmentBlock enrichment={lead.aiEnrichment} />
+
+            <OpenerDraftBlock candidateId={lead.id} initialDraft={lead.aiOpenerDraft} />
 
             {lead.negativeSignals.length > 0 ? (
               <section className={styles.section}>

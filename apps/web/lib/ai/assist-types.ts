@@ -156,11 +156,16 @@ export type WeakSignalExtractHook = (
 
 /**
  * Draft an editable opener. Deliberately LAST and minimal — copywriting is not
- * the priority of the AI roadmap. Openers are no longer surfaced to the user
- * (outreach was removed; the digest is an executive brief, not a send tool);
- * this hook only exists so a model could later propose an alternative the user
- * edits and confirms if outreach is ever reintroduced. Must respect
- * contactPolicy and never auto-send.
+ * the priority of the AI roadmap. Must respect contactPolicy and never
+ * auto-send.
+ *
+ * STATUS (owner directive 2026-10-01, feature D3): the draft-only opener is
+ * LIVE on the lead detail page — generate → edit → explicit human confirm →
+ * manual clipboard copy (lib/ai/opener/* + app/leads/[id]/opener-*). The
+ * product still never sends anything by itself (`auto-send` remains
+ * prohibited), and the deterministic digest opener (lib/digest.ts buildOpener)
+ * is untouched. (History: between dd2a70f1 and D3 this hook was deliberately
+ * not surfaced; the contract below is unchanged since then.)
  */
 export interface OpenerDraftInput {
   orgName: string;
