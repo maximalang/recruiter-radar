@@ -1,0 +1,88 @@
+{
+  "domain": "vercel.com",
+  "url": "https://vercel.com/",
+  "http_status": 200,
+  "scanned_at": "2026-09-27T10:40:21+00:00",
+  "elapsed_ms": 1183,
+  "tool_count": 6,
+  "tools": [
+    {
+      "name": "Amazon S3",
+      "confidence": 100.0,
+      "version": null,
+      "sources": [
+        "headers"
+      ],
+      "categories": [
+        "CDN"
+      ]
+    },
+    {
+      "name": "HSTS",
+      "confidence": 100.0,
+      "version": null,
+      "sources": [
+        "headers"
+      ],
+      "categories": [
+        "Security"
+      ]
+    },
+    {
+      "name": "Linkedin Insight Tag",
+      "confidence": 100.0,
+      "version": null,
+      "sources": [
+        "headers"
+      ],
+      "categories": [
+        "Analytics"
+      ]
+    },
+    {
+      "name": "Next.js",
+      "confidence": 100.0,
+      "version": null,
+      "sources": [
+        "headers"
+      ],
+      "categories": [
+        "JavaScript frameworks",
+        "Web frameworks",
+        "Web servers",
+        "Static site generator"
+      ]
+    },
+    {
+      "name": "React",
+      "confidence": 100.0,
+      "version": null,
+      "sources": [
+        "html"
+      ],
+      "categories": [
+        "JavaScript frameworks"
+      ]
+    },
+    {
+      "name": "Vercel",
+      "confidence": 100.0,
+      "version": null,
+      "sources": [
+        "headers"
+      ],
+      "categories": [
+        "PaaS"
+      ]
+    }
+  ],
+  "fetch_error": null,
+  "engine": "enthec/webappanalyzer@local",
+  "unsupported_classes": [
+    "js",
+    "dom",
+    "dns"
+  ],
+  "db_load_s": 0.12,
+  "skipped_bad_patterns": 0
+}
