@@ -118,7 +118,7 @@ describe("auth v2 fragment action view", () => {
   });
 
   // next 16.3 router re-renders replay mount effects after cleanup
-  // (vercel/next.js#62561). Fragment consumption must stay idempotent:
+  // (vercel/next.js issue 62561). Fragment consumption must stay idempotent:
   // a replay observes an already-cleared hash and must not downgrade a
   // successful prepare to a fail-closed error.
   test("keeps a valid email-change fragment ready across effect cleanup/replay", async () => {

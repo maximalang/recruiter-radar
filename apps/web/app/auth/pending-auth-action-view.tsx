@@ -53,11 +53,11 @@ export function PendingAuthActionView(props: {
   const [destination, setDestination] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   // Fragment consumption must be idempotent: next 16.3 router re-renders
-  // replay mount effects after cleanup (vercel/next.js#62561), and a replay
-  // observes the already-cleared hash. The captured token and the prepare
-  // outcome live in per-mount refs only — never in storage, logs, analytics
-  // or the URL after consumption — so a replay reuses them instead of
-  // downgrading a successful prepare to a fail-closed error.
+  // replay mount effects after cleanup (vercel/next.js issue 62561), and a
+  // replay observes the already-cleared hash. The captured token and the
+  // prepare outcome live in per-mount refs only — never in storage, logs,
+  // analytics or the URL after consumption — so a replay reuses them instead
+  // of downgrading a successful prepare to a fail-closed error.
   const tokenRef = useRef<string | null>(null);
   const prepareRef = useRef<"idle" | "sent" | "ready" | "failed">("idle");
 
