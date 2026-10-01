@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import styles from "./pending-auth-action.module.css";
 
@@ -52,10 +52,27 @@ export function PendingAuthActionView(props: {
   );
   const [destination, setDestination] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  // Fragment consumption must be idempotent: next 16.3 router re-renders
+  // replay mount effects after cleanup (vercel/next.js#62561), and a replay
+  // observes the already-cleared hash. The captured token and the prepare
+  // outcome live in per-mount refs only — never in storage, logs, analytics
+  // or the URL after consumption — so a replay reuses them instead of
+  // downgrading a successful prepare to a fail-closed error.
+  const tokenRef = useRef<string | null>(null);
+  const prepareRef = useRef<"idle" | "sent" | "ready" | "failed">("idle");
 
   useEffect(() => {
     const fragment = window.location.hash.slice(1);
-    if (!fragment) {
+    if (fragment) {
+      tokenRef.current = fragment;
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+    }
+    const token = tokenRef.current;
+    if (!token) {
       if (!props.hasPending) {
         setErrorCode("invalid");
         setPhase("error");
@@ -63,37 +80,48 @@ export function PendingAuthActionView(props: {
       return;
     }
 
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${window.location.pathname}${window.location.search}`,
-    );
-    if (!TOKEN_PATTERN.test(fragment)) {
+    if (!TOKEN_PATTERN.test(token)) {
       setErrorCode("invalid");
       setPhase("error");
       return;
     }
 
-    let active = true;
+    if (prepareRef.current === "ready") {
+      setPhase("ready");
+      return;
+    }
+    if (prepareRef.current === "failed") {
+      setErrorCode("invalid");
+      setPhase("error");
+      return;
+    }
+    if (prepareRef.current === "sent") {
+      // Prepare is in flight; its handlers below are authoritative for the
+      // phase, so the replay simply keeps the current "checking" state.
+      return;
+    }
+
+    prepareRef.current = "sent";
     void fetch(copy.prepareUrl, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: fragment }),
+      body: JSON.stringify({ token }),
     })
       .then((response) => {
         if (!response.ok) throw new Error("prepare_failed");
-        if (active) setPhase("ready");
+        prepareRef.current = "ready";
+        setPhase("ready");
       })
       .catch(() => {
-        if (active) {
-          setErrorCode("invalid");
-          setPhase("error");
-        }
+        prepareRef.current = "failed";
+        setErrorCode("invalid");
+        setPhase("error");
       });
-    return () => {
-      active = false;
-    };
+    // Intentionally no cleanup invalidation: the prepare result must survive
+    // effect cleanup/replay on the same mount. Fail-closed is preserved —
+    // missing, malformed or server-rejected tokens still render the error
+    // phase, and a fresh mount starts from empty refs.
   }, [copy.prepareUrl, props.hasPending]);
 
   async function confirm() {
