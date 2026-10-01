@@ -118,8 +118,8 @@
 
 .shotMark { display: grid; width: 1.4rem; height: 1.4rem; place-items: center; border: 0; border-radius: 50%; background: conic-gradient(from 45deg, var(--color-demo-indigo), var(--color-demo-violet), var(--color-demo-green), var(--color-demo-gold), var(--color-demo-indigo)); color: var(--color-demo-white); font: 700 .5rem var(--font-mono); }
 
-/* Owner 30.09: marketing scrim over the ENTIRE demo (text and icons included), Linear/Accio-style fade */
-.productShot::after { content: ""; position: absolute; z-index: 5; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 42%, var(--color-demo-scrim-bottom) 100%), linear-gradient(90deg, transparent 62%, var(--color-demo-scrim-side) 100%); }
+/* Owner 30.09: marketing scrim over the ENTIRE demo (text and icons included), diagonal top-left → bottom-right */
+.productShot::after { content: ""; position: absolute; z-index: 5; inset: 0; pointer-events: none; background: linear-gradient(to bottom right, transparent 38%, var(--color-demo-scrim-bottom) 100%); }
 
 .shotBody { display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); gap: .5rem; padding: .5rem; background: radial-gradient(130% 100% at 50% -15%, var(--color-demo-glow-indigo), transparent 60%), linear-gradient(180deg, transparent 30%, var(--color-demo-shade)); }
 .shotSide { display: flex; min-width: 0; flex-direction: column; padding: .85rem .6rem .8rem; border-right: 0; background: transparent; }
