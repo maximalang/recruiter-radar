@@ -97,10 +97,12 @@ describe('Evidence Radar v1 contracts', () => {
     const event = evidenceEvent('e1', 'funding_or_investment', 'investments', 'same-hash')
     expect(dedupeEvents([event, { ...event, id: 'e2' }])).toHaveLength(1)
 
+    // Explicit now inside the fixtures' validity window: the default
+    // wall-clock now would expire the fixed-date signals (precedent 5b255f92).
     const matches = correlateSignals([
       signal('funding', 'funding_received', 'investments'),
       signal('hiring', 'hiring_growth', 'career-page'),
-    ])
+    ], new Date('2026-08-15T00:00:00Z'))
     expect(matches).toEqual([
       expect.objectContaining({ ruleId: 'funding-hiring-recruiter' }),
     ])

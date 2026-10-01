@@ -434,6 +434,44 @@ registerRunnableScriptSource({
   scriptPath: telegramCompanyChannelsScriptPath, absoluteScriptPath: telegramCompanyChannelsAbsoluteScriptPath,
 });
 
+// --- 2026-10 public source expansion: 16 Class A free-public sources -------
+// Job boards stay confidence-gated and blocked-from-digest (policy JSON);
+// context/registry sources are context-only or enrichment-only and never
+// lead-originating. All run through the shared expansion runtime in
+// adapters/public-source-expansion.mjs (centralized transport, bounded
+// pages/records, reviewed-file mode via *_INPUT_FILE).
+const publicExpansionSources = [
+  ['themuse', 'job-board', 'primary-platform', 'medium-signal', 0.64, 'The Muse public jobs API listings with company attribution; confidence-gated and blocked from digest until gates pass.'],
+  ['landingjobs', 'job-board', 'primary-platform', 'medium-signal', 0.6, 'Landing Jobs public API tech listings with organization attribution from listing URLs; confidence-gated and blocked from digest until gates pass.'],
+  ['arbeitnow', 'job-board', 'primary-platform', 'medium-signal', 0.6, 'Arbeitnow public job board API (EU/remote listings); confidence-gated and blocked from digest until gates pass.'],
+  ['remoteok', 'job-board', 'primary-platform', 'medium-signal', 0.62, 'RemoteOK public API; adapter preserves the required follow backlink to the listing URL and board credit; confidence-gated and blocked from digest until gates pass.'],
+  ['jobicy', 'job-board', 'primary-platform', 'medium-signal', 0.6, 'Jobicy public API v2 remote listings; adapter preserves the required credit and original listing link; confidence-gated and blocked from digest until gates pass.'],
+  ['himalayas', 'job-board', 'primary-platform', 'medium-signal', 0.6, 'Himalayas public jobs API remote listings with company attribution; confidence-gated and blocked from digest until gates pass.'],
+  ['remotive', 'job-board', 'primary-platform', 'medium-signal', 0.62, 'Remotive public API remote listings; confidence-gated and blocked from digest until gates pass.'],
+  ['weworkremotely', 'job-board', 'primary-platform', 'medium-signal', 0.62, 'We Work Remotely public category RSS feeds with company parsed from item titles; confidence-gated and blocked from digest until gates pass.'],
+  ['hackernews-jobs', 'job-board', 'primary-platform', 'medium-signal', 0.6, 'Hacker News Firebase job stories (YC direct-employer posts); posting URLs never used for org identity; confidence-gated and blocked from digest until gates pass.'],
+  ['hn-algolia', 'business-signal', 'market-signal', 'context-only', 0.45, 'Hacker News Algolia search stories attributed to configured organization-name queries on title/URL phrase match; context-only, never lead-originating.'],
+  ['devto', 'business-signal', 'market-signal', 'context-only', 0.42, 'DEV Community articles carrying an organization attribution; context-only, never lead-originating.'],
+  ['gdelt-context', 'business-signal', 'market-signal', 'context-only', 0.5, 'GDELT DOC API hiring-context articles through the shared throttled client with a dedicated cache; context-only, never lead-originating.'],
+  ['openalex', 'business-signal', 'market-signal', 'context-only', 0.45, 'OpenAlex research works attributed to author institutions for configured search terms; context-only, never lead-originating.'],
+  ['ror', 'company-registry', 'registry-reference', 'high-signal', 0.62, 'ROR (ror.org) organization identity references: canonical name, website domain, aliases, country; enrichment-only, never lead-originating.'],
+  ['cbr-fx-daily', 'business-signal', 'market-signal', 'context-only', 0.6, 'Bank of Russia daily FX reference-rate snapshot from the official endpoint or the documented public mirror; market context only, never lead-originating.'],
+  ['trudvsem-opendata-datasets', 'company-registry', 'registry-reference', 'context-only', 0.6, 'Official opendata.trudvsem.ru list.xml dataset catalog (RF open data 3.0, publisher Rostrud INN 7710538364); context-only, never lead-originating.'],
+];
+for (const [id, kind, sourceClass, evidenceTier, defaultConfidence, description] of publicExpansionSources) {
+  registerRunnableScriptSource({
+    id,
+    kind,
+    sourceClass,
+    evidenceTier,
+    defaultConfidence,
+    fetchModes: ['file', 'live-public'],
+    description,
+    scriptPath: `packages/db/scripts/source-${id}.mjs`,
+    absoluteScriptPath: resolve(scriptDir, `source-${id}.mjs`),
+  });
+}
+
 export function listSources() {
   return [...registry.values()];
 }
