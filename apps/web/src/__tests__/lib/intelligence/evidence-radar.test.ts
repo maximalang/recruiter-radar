@@ -97,10 +97,13 @@ describe('Evidence Radar v1 contracts', () => {
     const event = evidenceEvent('e1', 'funding_or_investment', 'investments', 'same-hash')
     expect(dedupeEvents([event, { ...event, id: 'e2' }])).toHaveLength(1)
 
+    // Pin `now` inside the fixture validity window: correlateSignals defaults
+    // to the wall clock, which turned this assertion into a time bomb once
+    // real time passed the fixtures' validUntil (2026-10-01T00:00:00Z).
     const matches = correlateSignals([
       signal('funding', 'funding_received', 'investments'),
       signal('hiring', 'hiring_growth', 'career-page'),
-    ])
+    ], new Date('2026-08-05T00:00:00Z'))
     expect(matches).toEqual([
       expect.objectContaining({ ruleId: 'funding-hiring-recruiter' }),
     ])
