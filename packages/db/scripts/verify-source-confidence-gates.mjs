@@ -198,8 +198,24 @@ async function runConfidenceTests() {
 
     const fixturePath = resolve(scriptDir, './confidence-fixtures', `${source.id}-confidence-fixture.json`);
 
+    let content;
     try {
-      const content = readFileSync(fixturePath, 'utf8');
+      content = readFileSync(fixturePath, 'utf8');
+    } catch {
+      if (source.promotionStatus === 'blocked-from-digest-pending-confidence-tests') {
+        // Registered sources awaiting their confidence-gate battery: digest
+        // promotion stays blocked by policy, so the gate is recorded as pending
+        // instead of failing. Any other promotion state must ship a fixture.
+        console.log(`⏳ No confidence fixture yet for ${source.id} — gate pending, digest promotion stays blocked`);
+        results[source.id] = { overall: 'PENDING' };
+      } else {
+        console.log(`❌ No fixture found for ${source.id}`);
+        results[source.id] = { error: 'No fixture', overall: 'FAILED' };
+      }
+      continue;
+    }
+
+    try {
       const records = JSON.parse(content);
       const testResults = {};
 
@@ -218,9 +234,8 @@ async function runConfidenceTests() {
 
       console.log(`\n📊 ${source.id} Confidence Test: ${allTestsPassed ? '✅ PASSED' : '❌ FAILED'}`);
     } catch (error) {
-      console.log(`❌ No fixture found for ${source.id}`);
-      results[source.id] = { error: 'No fixture' };
-      continue;
+      console.log(`❌ Confidence fixture check failed for ${source.id}: ${error.message}`);
+      results[source.id] = { error: error.message, overall: 'FAILED' };
     }
   }
 
@@ -229,26 +244,34 @@ async function runConfidenceTests() {
   console.log('=' .repeat(50));
 
   let passedCount = 0;
-  let totalCount = Object.keys(results).length;
+  let pendingCount = 0;
+  let failedCount = 0;
+  const totalCount = Object.keys(results).length;
 
   for (const [sourceId, result] of Object.entries(results)) {
-    const status = result.overall === 'PASSED' ? '✅' : '❌';
-    console.log(`${status} ${sourceId}: ${result.overall}`);
-
     if (result.overall === 'PASSED') {
       passedCount++;
+      console.log(`✅ ${sourceId}: PASSED`);
+    } else if (result.overall === 'PENDING') {
+      pendingCount++;
+      console.log(`⏳ ${sourceId}: PENDING (no confidence fixture; digest promotion blocked)`);
+    } else {
+      failedCount++;
+      console.log(`❌ ${sourceId}: ${result.overall ?? 'FAILED'}`);
     }
   }
 
-  console.log(`\nOverall: ${passedCount}/${totalCount} sources passed confidence gates`);
+  console.log(`\nOverall: ${passedCount} passed, ${pendingCount} pending, ${failedCount} failed of ${totalCount} P2 confidence-gated sources`);
 
-  if (passedCount === totalCount) {
-    console.log('🎉 All P2 fixture confidence checks passed; live, legal, and readiness gates remain independent.');
-    process.exit(0);
-  } else {
+  if (failedCount > 0) {
     console.log('⚠️  Some sources need improvements before digest promotion');
     process.exit(1);
   }
+  if (pendingCount > 0) {
+    console.log('⏳ Pending sources keep promotionStatus blocked-from-digest-pending-confidence-tests until their confidence fixtures land.');
+  }
+  console.log('🎉 All fixture-backed P2 confidence checks passed; live, legal, and readiness gates remain independent.');
+  process.exit(0);
 }
 
 // For external use (not exported as it's a script)
