@@ -167,6 +167,8 @@
     "verify:hh:oauth": "node packages/db/scripts/verify-hh-oauth-smoke.mjs",
     "verify:hh:live-pipeline": "node packages/db/scripts/verify-hh-live-pipeline.mjs",
     "verify:rf-source-expansion:smoke": "node packages/db/scripts/verify-rf-source-expansion-smoke.mjs",
+    "verify:public-source-expansion:smoke": "node packages/db/scripts/verify-public-source-expansion-smoke.mjs",
+    "verify:public-source-expansion:live": "node packages/db/scripts/verify-public-source-expansion-live.mjs",
     "verify:government-open-data:smoke": "node packages/db/scripts/verify-government-open-data-smoke.mjs",
     "verify:government-ca:live": "node packages/db/scripts/verify-government-ca-trust.mjs",
     "verify:fns-open-data:sync": "node packages/db/scripts/verify-fns-open-data-sync-smoke.mjs",
