@@ -2268,6 +2268,12 @@ async function restoreNextEnv() {
   if (current === originalNextEnv) return
   const generatedRouteReference =
     `import "./${e2eDistName}/dev/types/routes.d.ts";`
+  // next 16.3 emits a second generated import (root-params.d.ts) beside the
+  // route types. The checked-in next-env.d.ts predates it, so map the
+  // generated line to its original counterpart when one exists and drop it
+  // otherwise; any other mutation still fails the guard below.
+  const generatedRootParamsReference =
+    `import "./${e2eDistName}/dev/types/root-params.d.ts";`
   const originalRouteReference = originalNextEnv.match(
     /^import ".+\/types\/routes\.d\.ts";$/m,
   )?.[0]
@@ -2275,10 +2281,25 @@ async function restoreNextEnv() {
     originalRouteReference,
     'Original next-env.d.ts route reference was not recognized.',
   )
-  const sanitized = current.replace(
+  const originalRootParamsReference = originalNextEnv.match(
+    /^import ".+\/types\/root-params\.d\.ts";$/m,
+  )?.[0] ?? null
+  let sanitized = current.replace(
     generatedRouteReference,
     originalRouteReference,
   )
+  if (originalRootParamsReference) {
+    sanitized = sanitized.replace(
+      generatedRootParamsReference,
+      originalRootParamsReference,
+    )
+  } else {
+    sanitized = sanitized
+      .replaceAll('\r\n', '\n')
+      .split('\n')
+      .filter((line) => line !== generatedRootParamsReference)
+      .join('\n')
+  }
   assert(
     sanitized.replaceAll('\r\n', '\n')
       === originalNextEnv.replaceAll('\r\n', '\n'),

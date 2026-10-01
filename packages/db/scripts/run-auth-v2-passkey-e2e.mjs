@@ -423,11 +423,29 @@ async function restoreNextEnv() {
   const current = await readFile(nextEnvPath, 'utf8')
   if (current === originalNextEnv) return
   const generated = `import "./${e2eDistName}/dev/types/routes.d.ts";`
+  // next 16.3 emits a second generated import (root-params.d.ts) beside the
+  // route types. The checked-in next-env.d.ts predates it, so map the
+  // generated line to its original counterpart when one exists and drop it
+  // otherwise; any other mutation still fails the guard below.
+  const generatedRootParams =
+    `import "./${e2eDistName}/dev/types/root-params.d.ts";`
   const original = originalNextEnv.match(
     /^import ".+\/types\/routes\.d\.ts";$/m,
   )?.[0]
   assert(original, 'Original next-env route import was not recognized.')
-  const sanitized = current.replace(generated, original)
+  const originalRootParams = originalNextEnv.match(
+    /^import ".+\/types\/root-params\.d\.ts";$/m,
+  )?.[0] ?? null
+  let sanitized = current.replace(generated, original)
+  if (originalRootParams) {
+    sanitized = sanitized.replace(generatedRootParams, originalRootParams)
+  } else {
+    sanitized = sanitized
+      .replaceAll('\r\n', '\n')
+      .split('\n')
+      .filter((line) => line !== generatedRootParams)
+      .join('\n')
+  }
   assert(
     sanitized.replaceAll('\r\n', '\n')
       === originalNextEnv.replaceAll('\r\n', '\n'),
