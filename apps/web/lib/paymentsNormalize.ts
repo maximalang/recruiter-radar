@@ -6,6 +6,7 @@ import {
   type ClientProfile
 } from "./clientProfiles";
 import { getPublicPlanByCode, isPublicPlanCode, normalizeLegacyPlanCode, type PublicPlan } from "./publicProduct";
+import { resolveMarketProfilePresetId } from "./marketProfilePresets";
 import { CUSTOMER_CHECKOUT_COPY } from "./copy/customer";
 import {
   CHECKOUT_ORDER_ONBOARDING_STATUSES,
@@ -52,6 +53,7 @@ function normalizeCheckoutOrderPayload(
   return {
     planName: normalizeOptionalText(readString(payload.planName)) ?? plan.name,
     planCadence: normalizeOptionalText(readString(payload.planCadence)) ?? plan.cadence,
+    marketProfilePreset: resolveMarketProfilePresetId(readString(payload.marketProfilePreset)),
     specialization: normalizeOptionalText(readString(payload.specialization)),
     city: normalizeOptionalText(readString(payload.city)),
     includeKeywords: normalizeKeywordList(payload.includeKeywords),

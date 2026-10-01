@@ -1,0 +1,98 @@
+/* Market-profile preset picker (D2) — radio cards inside the confirm-profile
+ * form. Calm product surfaces: secondary background cards, separator borders,
+ * signal accent on the checked option. Chips are read-only criteria summaries
+ * (ниша / роли / география / признаки спроса). */
+
+.picker {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-overlay);
+  background-color: var(--color-surface-secondary);
+}
+
+.title {
+  padding: 0 6px;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface-primary);
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.option:hover {
+  border-color: var(--color-separator-strong);
+}
+
+.option:has(input:checked) {
+  border-color: var(--color-signal);
+  box-shadow: 0 0 0 1px var(--color-signal);
+}
+
+.option input[type="radio"] {
+  margin-top: 3px;
+  accent-color: var(--color-signal);
+}
+
+.optionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.optionLabel {
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.optionDescription {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.criteria {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.chip {
+  padding: 2px 8px;
+  border: 1px solid var(--color-separator);
+  border-radius: 999px;
+  background-color: var(--color-surface-secondary);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}

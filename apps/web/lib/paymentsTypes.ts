@@ -54,6 +54,12 @@ export type CheckoutOrderPayload = {
   payerType?: CheckoutPayerType;
   buyerInn?: string | null;
   legalAcceptance?: CheckoutLegalAcceptance | null;
+  /**
+   * Canonical market-profile preset id that seeded this order's profile
+   * (registry: lib/marketProfilePresets.ts). Optional while legacy orders
+   * without a preset choice are still readable.
+   */
+  marketProfilePreset?: string | null;
   specialization: string | null;
   city: string | null;
   includeKeywords: string[];

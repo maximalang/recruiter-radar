@@ -6,6 +6,11 @@ import {
   sendPilotOrderTestDigest
 } from "../../../../lib/payments";
 import { VALID_INDUSTRIES, VALID_COMPANY_SIZES, VALID_ROLES } from "../../../../lib/clientProfiles";
+import {
+  buildMarketProfileDraftFromPreset,
+  getMarketProfilePresetById,
+  resolveMarketProfilePresetId
+} from "../../../../lib/marketProfilePresets";
 import { getSession } from "../../../../lib/auth-v2/authorization";
 
 function readRequiredText(formData: FormData, key: string): string {
@@ -77,21 +82,42 @@ export async function confirmPilotProfileAction(expectedOrderId: string, formDat
 
   const access = await requireBillingAccess();
 
+  // D2 market-profile preset: the picker submits its canonical id as a radio
+  // value. Resolve + validate against the registry (unknown/"custom" → null),
+  // then use the preset criteria ONLY as fallbacks for fields the submission
+  // left empty — user-entered values always win («критерии можно изменить в
+  // любой момент»). remoteFriendly stays pure form truth: an unchecked box is
+  // indistinguishable from a deliberate uncheck, so no preset fallback there.
+  const marketProfilePreset = resolveMarketProfilePresetId(
+    readOptionalText(formData, "marketProfilePreset")
+  );
+  const preset = marketProfilePreset ? getMarketProfilePresetById(marketProfilePreset) : null;
+  const presetDraft = preset ? buildMarketProfileDraftFromPreset(preset) : null;
+
+  const specialization =
+    readOptionalText(formData, "specialization") ?? presetDraft?.specialization ?? null;
+  const includeKeywords = readOptionalStringList(formData, "includeKeywords");
+  const roles = readCheckboxGroup(formData, "roles", VALID_ROLES);
+  const industries = readCheckboxGroup(formData, "industries", VALID_INDUSTRIES);
+
   await confirmPilotOrderProfile({
     orderId: expectedOrderId,
     agencyName: readRequiredText(formData, "agencyName"),
     targetCity: readOptionalText(formData, "targetCity"),
-    specialization: readOptionalText(formData, "specialization"),
-    includeKeywords: readOptionalStringList(formData, "includeKeywords"),
+    specialization,
+    includeKeywords: includeKeywords.length > 0
+      ? includeKeywords
+      : presetDraft?.includeKeywords ?? [],
     excludeKeywords: readOptionalStringList(formData, "excludeKeywords"),
-    industries: readCheckboxGroup(formData, "industries", VALID_INDUSTRIES),
+    industries: industries.length > 0 ? industries : presetDraft?.industries ?? [],
     companySizes: readCheckboxGroup(formData, "companySizes", VALID_COMPANY_SIZES),
     dailyDigestLimit: readOptionalNumber(formData, "dailyDigestLimit"),
     contactPolicy: readOptionalText(formData, "contactPolicy") as 'corporate_only' | 'no_personal' | 'unrestricted' | null,
-    roles: readCheckboxGroup(formData, "roles", VALID_ROLES),
+    roles: roles.length > 0 ? roles : presetDraft?.roles ?? [],
     excludedIndustries: readCheckboxGroup(formData, "excludedIndustries", VALID_INDUSTRIES),
     excludedLocations: readOptionalStringList(formData, "excludedLocations"),
     remoteFriendly: formData.get("remoteFriendly") === "on",
+    marketProfilePreset,
     ...access,
   });
 }

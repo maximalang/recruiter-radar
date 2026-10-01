@@ -20,6 +20,7 @@ import {
   CUSTOMER_CHECKOUT_COPY,
   humanizeCustomerDeliveryIssue
 } from "./copy/customer";
+import { resolveMarketProfilePresetId } from "./marketProfilePresets";
 import { getTelegramBotToken, sendTelegramTextMessage } from "./telegram";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { recordClientProfileDigestShownOutcomes } from "./clientProfileSignalOutcomes";
@@ -280,6 +281,8 @@ export async function confirmPilotOrderProfile(input: {
   agencyName: string;
   targetCity?: string | null;
   specialization?: string | null;
+  /** Canonical market-profile preset id (validated against the registry). */
+  marketProfilePreset?: string | null;
   includeKeywords?: readonly string[] | null;
   excludeKeywords?: readonly string[] | null;
   industries?: readonly string[] | null;
@@ -326,6 +329,7 @@ export async function confirmPilotOrderProfile(input: {
   order = await updateCheckoutOrder(order.id, {
     payloadPatch: {
       clientProfileId: savedProfile.id,
+      marketProfilePreset: resolveMarketProfilePresetId(input.marketProfilePreset),
       specialization: savedProfile.specialization,
       city: savedProfile.targetCity,
       includeKeywords: savedProfile.includeKeywords,
