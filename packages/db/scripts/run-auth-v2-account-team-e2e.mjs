@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { get as httpsGet } from 'node:https'
+import { createServer as createHttpsServer, get as httpsGet } from 'node:https'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
@@ -52,6 +52,12 @@ const outboxDirectory = await mkdtemp(
 const outboxPath = join(outboxDirectory, 'outbox.json')
 const httpsKeyPath = join(outboxDirectory, 'localhost-key.pem')
 const httpsCertPath = join(outboxDirectory, 'localhost-cert.pem')
+const caKeyPath = join(outboxDirectory, 'e2e-ca-key.pem')
+const caCertPath = join(outboxDirectory, 'e2e-ca-cert.pem')
+const leafCsrPath = join(outboxDirectory, 'leaf.csr')
+const leafExtPath = join(outboxDirectory, 'leaf-ext.cnf')
+const untrustedKeyPath = join(outboxDirectory, 'untrusted-key.pem')
+const untrustedCertPath = join(outboxDirectory, 'untrusted-cert.pem')
 const admin = new Client({ connectionString: databaseUrl })
 let database = null
 let databaseCreated = false
@@ -141,7 +147,7 @@ async function run(command, args, environment) {
   if (result.stderr) process.stderr.write(result.stderr)
 }
 
-async function createHttpsCertificate() {
+async function resolveOpenssl() {
   const configured = process.env.OPENSSL_PATH?.trim()
   const candidates = [
     configured || null,
@@ -156,29 +162,11 @@ async function createHttpsCertificate() {
   let lastError = null
   for (const candidate of candidates) {
     try {
-      await execFileAsync(
-        candidate,
-        [
-          'req',
-          '-x509',
-          '-newkey',
-          'rsa:2048',
-          '-sha256',
-          '-nodes',
-          '-keyout',
-          httpsKeyPath,
-          '-out',
-          httpsCertPath,
-          '-days',
-          '1',
-          '-subj',
-          '/CN=127.0.0.1',
-          '-addext',
-          'subjectAltName=IP:127.0.0.1,DNS:localhost',
-        ],
-        { windowsHide: true, maxBuffer: 1024 * 1024 },
-      )
-      return
+      await execFileAsync(candidate, ['version'], {
+        windowsHide: true,
+        maxBuffer: 1024 * 1024,
+      })
+      return candidate
     } catch (error) {
       lastError = error
     }
@@ -188,6 +176,146 @@ async function createHttpsCertificate() {
       lastError instanceof Error ? lastError.message : 'not found'
     }`,
   )
+}
+
+async function createHttpsCertificate() {
+  const openssl = await resolveOpenssl()
+  const options = { windowsHide: true, maxBuffer: 1024 * 1024 }
+  // Test-only CA (CA:TRUE anchor) signing the loopback leaf, so the e2e
+  // child processes verify a real certificate chain via NODE_EXTRA_CA_CERTS
+  // instead of a blanket NODE_TLS_REJECT_UNAUTHORIZED bypass. The internal
+  // redirect fetch added in next 16.3 (vercel/next.js#62561) rejected the
+  // former self-signed-leaf anchor with DEPTH_ZERO_SELF_SIGNED_CERT.
+  await execFileAsync(openssl, [
+    'req',
+    '-x509',
+    '-newkey',
+    'rsa:2048',
+    '-sha256',
+    '-nodes',
+    '-keyout',
+    caKeyPath,
+    '-out',
+    caCertPath,
+    '-days',
+    '1',
+    '-subj',
+    '/CN=RR Auth V2 E2E Test CA',
+    '-addext',
+    'basicConstraints=critical,CA:TRUE',
+    '-addext',
+    'keyUsage=critical,keyCertSign,cRLSign',
+  ], options)
+  await writeFile(
+    leafExtPath,
+    'basicConstraints=critical,CA:FALSE\n'
+    + 'keyUsage=critical,digitalSignature,keyEncipherment\n'
+    + 'extendedKeyUsage=serverAuth\n'
+    + 'subjectAltName=IP:127.0.0.1,DNS:localhost\n',
+    'utf8',
+  )
+  await execFileAsync(openssl, [
+    'req',
+    '-new',
+    '-newkey',
+    'rsa:2048',
+    '-nodes',
+    '-keyout',
+    httpsKeyPath,
+    '-out',
+    leafCsrPath,
+    '-subj',
+    '/CN=127.0.0.1',
+  ], options)
+  await execFileAsync(openssl, [
+    'x509',
+    '-req',
+    '-in',
+    leafCsrPath,
+    '-CA',
+    caCertPath,
+    '-CAkey',
+    caKeyPath,
+    '-CAcreateserial',
+    '-out',
+    httpsCertPath,
+    '-days',
+    '1',
+    '-sha256',
+    '-extfile',
+    leafExtPath,
+  ], options)
+  // Control certificate outside the test CA, used by
+  // assertUntrustedCertificatesRejected to prove the e2e child environment
+  // still enforces TLS verification.
+  await execFileAsync(openssl, [
+    'req',
+    '-x509',
+    '-newkey',
+    'rsa:2048',
+    '-sha256',
+    '-nodes',
+    '-keyout',
+    untrustedKeyPath,
+    '-out',
+    untrustedCertPath,
+    '-days',
+    '1',
+    '-subj',
+    '/CN=127.0.0.1',
+    '-addext',
+    'subjectAltName=IP:127.0.0.1,DNS:localhost',
+  ], options)
+}
+
+async function assertUntrustedCertificatesRejected(environment) {
+  const untrustedServer = createHttpsServer(
+    {
+      key: await readFile(untrustedKeyPath),
+      cert: await readFile(untrustedCertPath),
+    },
+    (_request, response) => response.end('ok'),
+  )
+  await new Promise((resolve, reject) => {
+    untrustedServer.once('error', reject)
+    untrustedServer.listen(0, '127.0.0.1', resolve)
+  })
+  const untrustedPort = untrustedServer.address().port
+  const proofScript = [
+    'const port = process.argv[1];',
+    "fetch('https://127.0.0.1:' + port + '/').then(",
+    '  () => {',
+    "    console.error('tls-trust-proof FAIL: untrusted certificate accepted; verification is bypassed');",
+    '    process.exit(1);',
+    '  },',
+    '  (error) => {',
+    '    const code = (error && error.cause && error.cause.code) || \'\';',
+    '    const expected = [',
+    "      'DEPTH_ZERO_SELF_SIGNED_CERT',",
+    "      'UNABLE_TO_VERIFY_LEAF_SIGNATURE',",
+    "      'SELF_SIGNED_CERT_IN_CHAIN',",
+    "      'ERR_TLS_CERT_ALTNAME_INVALID',",
+    '    ];',
+    '    if (expected.includes(code)) {',
+    "      console.log('tls-trust-proof: untrusted certificate rejected (' + code + ')');",
+    '      process.exit(0);',
+    '    }',
+    "    console.error('tls-trust-proof FAIL: unexpected error instead of certificate rejection: '",
+    "      + ((error && error.cause && error.cause.message) || (error && error.message)));",
+    '    process.exit(1);',
+    '  },',
+    ');',
+  ].join('\n')
+  try {
+    await run(
+      process.execPath,
+      ['-e', proofScript, String(untrustedPort)],
+      environment,
+    )
+  } finally {
+    untrustedServer.closeAllConnections?.()
+    await new Promise((resolve) => untrustedServer.close(resolve))
+  }
 }
 
 async function createUser(prefix) {
@@ -2186,17 +2314,17 @@ try {
     AUTH_EMAIL_TEST_OUTBOX_PATH: outboxPath,
     AUTH_V2_E2E_DIST_DIR: e2eDistName,
     AUTH_V2_E2E_TSCONFIG: e2eTsconfigName,
-    NODE_EXTRA_CA_CERTS: httpsCertPath,
-    // next 16.3 resolves RSC redirects through an internal server-side fetch
-    // (vercel/next.js#62561) executed by the compiled next-server runtime.
-    // Its bundled dispatcher does not consult NODE_EXTRA_CA_CERTS, so that
-    // fetch rejects this harness's loopback self-signed certificate
-    // (DEPTH_ZERO_SELF_SIGNED_CERT) and pending-action redirects never
-    // complete. Scoped strictly to the spawned 127.0.0.1 e2e server child
-    // process; the production-image guard
-    // (verify-government-ca-trust.test.mjs) still forbids this variable in
+    NODE_EXTRA_CA_CERTS: caCertPath,
+    // No NODE_TLS_REJECT_UNAUTHORIZED here: the harness serves a leaf signed
+    // by its own test-only CA (see createHttpsCertificate), which children
+    // verify through NODE_EXTRA_CA_CERTS, including the next 16.3 internal
+    // redirect fetch (vercel/next.js#62561) that rejected the former
+    // self-signed-leaf anchor with DEPTH_ZERO_SELF_SIGNED_CERT.
+    // assertUntrustedCertificatesRejected below proves certificates outside
+    // this CA are still rejected by a child spawned with exactly this
+    // environment; the production-image guard
+    // (verify-government-ca-trust.test.mjs) still forbids trust overrides in
     // apps/web/Dockerfile.
-    NODE_TLS_REJECT_UNAUTHORIZED: '0',
     OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
     OPPORTUNITY_OUTCOMES_ENABLED: 'true',
     OPPORTUNITY_OUTCOMES_UI_ENABLED: 'true',
@@ -2213,6 +2341,7 @@ try {
     EVIDENCE_RADAR_V1_ENABLED: 'true',
   }
   await writeFile(outboxPath, '[]\n', 'utf8')
+  await assertUntrustedCertificatesRejected(testEnvironment)
   await run(process.execPath, [iconGenerationScript], testEnvironment)
   await run(process.execPath, [migrateScript], testEnvironment)
 
