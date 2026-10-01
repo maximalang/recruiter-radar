@@ -47,7 +47,7 @@ describe("landing hero advertising workflow", () => {
     act(() => jest.advanceTimersByTime(7_999));
     expect(screen.getByRole("tab", { name: /Ваш рынок/i })).toHaveAttribute("aria-selected", "true");
     act(() => jest.advanceTimersByTime(1));
-    expect(screen.getByRole("tab", { name: /42 источника/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /27 источников/i })).toHaveAttribute("aria-selected", "true");
 
     fireEvent.click(screen.getByRole("tab", { name: /10 компаний/i }));
     act(() => jest.advanceTimersByTime(8_000));

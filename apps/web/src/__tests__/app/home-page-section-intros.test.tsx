@@ -203,7 +203,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(markup).toContain('role="tablist"');
     expect(markup.match(/role="tab"/g)).toHaveLength(4);
     expect(markup).toContain("Ваш рынок");
-    expect(markup).toContain("42 источника");
+    expect(markup).toContain("27 источников");
     expect(markup).toContain("10 компаний");
     expect(markup).toContain("Готовый черновик");
     expect(markup).not.toContain("data-lead-row");
