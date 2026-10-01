@@ -100,7 +100,7 @@ describe('Evidence Radar v1 contracts', () => {
     const matches = correlateSignals([
       signal('funding', 'funding_received', 'investments'),
       signal('hiring', 'hiring_growth', 'career-page'),
-    ])
+    ], new Date('2026-08-05T00:00:00Z'))
     expect(matches).toEqual([
       expect.objectContaining({ ruleId: 'funding-hiring-recruiter' }),
     ])
