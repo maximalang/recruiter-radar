@@ -93,7 +93,7 @@
   margin: 0;
   overflow: hidden;
   border: 1px solid var(--color-separator);
-  border-radius: var(--radius-overlay);
+  border-radius: var(--radius-overlay) var(--radius-overlay) 0 0;
   background: linear-gradient(145deg, var(--color-surface-secondary) 0%, var(--color-surface-primary) 70%);
   box-shadow: var(--shadow-hero-panel);
 
@@ -118,8 +118,8 @@
 
 .shotMark { display: grid; width: 1.4rem; height: 1.4rem; place-items: center; border: 0; border-radius: 50%; background: conic-gradient(from 45deg, var(--color-demo-indigo), var(--color-demo-violet), var(--color-demo-green), var(--color-demo-gold), var(--color-demo-indigo)); color: var(--color-demo-white); font: 700 .5rem var(--font-mono); }
 
-.shotBody { display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); gap: .5rem; padding: .5rem; background: radial-gradient(130% 100% at 50% -15%, var(--color-demo-glow-indigo), transparent 60%), linear-gradient(180deg, transparent 30%, var(--color-demo-shade)); }
-.shotSide { display: flex; min-width: 0; flex-direction: column; padding: .85rem .6rem .8rem; border-right: 0; background: transparent; animation: sideIn var(--motion-duration-scan) var(--motion-ease-enter) both; animation-delay: calc(var(--motion-duration-scan) + var(--motion-duration-instant)); }
+.shotBody { display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); gap: .5rem; padding: .5rem .5rem 0; background: radial-gradient(130% 100% at 50% -15%, var(--color-demo-glow-indigo), transparent 60%), linear-gradient(180deg, transparent 30%, var(--color-demo-shade)); }
+.shotSide { display: flex; min-width: 0; flex-direction: column; padding: .85rem .6rem .8rem; border-right: 0; background: transparent; }
 .shotSide > p { margin: .85rem .55rem .3rem; color: var(--color-text-tertiary); font: 500 .72rem var(--font-sans); letter-spacing: 0; text-transform: none; }
 .shotSide > p:first-child { margin-top: 0; }
 .shotNav { display: grid; gap: .12rem; }
@@ -129,7 +129,7 @@
 .shotSide > div:nth-of-type(3) button:nth-child(1) svg { color: var(--color-demo-green); }
 .shotSide > div:nth-of-type(3) button:nth-child(2) svg { color: var(--color-demo-orange); }
 
-.shotWorkspace { position: relative; min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--color-demo-veil-09); border-radius: var(--radius-overlay); background: linear-gradient(168deg, var(--color-demo-panel-top) 0%, var(--color-demo-panel-mid) 52%, var(--color-demo-panel-end) 100%); box-shadow: var(--shadow-demo-panel); animation: panelIn var(--motion-duration-scan) var(--motion-ease-enter) both; animation-delay: calc(var(--motion-duration-scan) + var(--motion-duration-instant)); }
+.shotWorkspace { position: relative; min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--color-demo-separator); border-radius: var(--radius-surface) var(--radius-surface) 0 0; background: linear-gradient(168deg, var(--color-demo-panel-top) 0%, var(--color-demo-panel-mid) 52%, var(--color-demo-panel-end) 100%); box-shadow: var(--shadow-demo-panel); }
 .shotWorkspace::before { content: ""; position: absolute; z-index: 3; inset: 0 0 auto 0; height: 1px; background: linear-gradient(90deg, transparent, var(--color-demo-veil-12), transparent); background-size: 200% 100%; animation: sheenSweep var(--motion-duration-scan) var(--motion-ease-standard) both; pointer-events: none; }
 @keyframes sheenSweep { 0% { background-position: 200% 0; } 60%, 100% { background-position: -200% 0; } }
 .shotWorkspaceHeader { display: flex; align-items: center; gap: .6rem; padding: .95rem 1.2rem; border-bottom: 1px solid var(--color-separator-subtle); background-image: linear-gradient(180deg, var(--color-demo-veil-022), var(--color-demo-clear)); }
@@ -380,12 +380,16 @@
 }
 
 /* Pass 4 (owner verdict 25.09): professional entrance + stage transitions */
-@keyframes heroShotEnter { from { opacity: 0; transform: translate3d(0, 90px, 0) scale(0.97); } to { opacity: 1; transform: none; } }
-@keyframes sideIn { from { opacity: 0; transform: translate3d(0, 26px, 0); } to { opacity: 1; transform: none; } }
-@keyframes panelIn { from { opacity: 0; transform: translate3d(0, 44px, 0); } to { opacity: 1; transform: none; } }
+@keyframes heroShotEnter { from { opacity: 0; transform: translate3d(84px, 0, 0) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes blockIn { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
 @keyframes heroStageIn { from { opacity: 0; transform: translate3d(0, 6px, 0); } to { opacity: 1; transform: none; } }
-.copy { animation: heroShotEnter var(--motion-duration-signal) var(--motion-ease-enter) both; }
+.copy { animation: heroStageIn var(--motion-duration-signal) var(--motion-ease-enter) both; }
 .productShot { animation: heroShotEnter var(--motion-duration-scan) var(--motion-delay-2) var(--motion-ease-enter) both; }
+/* Accio-style sim-block cascade: demo content blocks fade+rise in sequence */
+.cmtCard { animation: blockIn var(--motion-duration-signal) var(--motion-ease-enter) both; animation-delay: var(--motion-duration-scan); }
+.cmtGhost { animation: blockIn var(--motion-duration-signal) var(--motion-ease-enter) both; animation-delay: calc(var(--motion-duration-scan) + var(--motion-duration-instant)); }
+.propsCard { animation: blockIn var(--motion-duration-signal) var(--motion-ease-enter) both; animation-delay: var(--motion-duration-scan); }
+.shotProps > .aiFloat { animation: blockIn var(--motion-duration-signal) var(--motion-ease-enter) both; animation-delay: calc(var(--motion-duration-scan) + var(--motion-duration-control)); }
 .workflowMain { animation: heroStageIn var(--motion-duration-emphasis) var(--motion-ease-enter) both; }
 .infoPage { animation: heroStageIn var(--motion-duration-emphasis) var(--motion-ease-enter) both; }
 .workflowTabs > button { transition: color var(--motion-duration-fast) var(--motion-ease-standard); }

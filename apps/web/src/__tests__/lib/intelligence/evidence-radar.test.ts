@@ -123,7 +123,14 @@ describe('Evidence Radar v1 contracts', () => {
     expect(decaySignalStrength(1, '2026-07-01T00:00:00Z', 30, new Date('2026-07-31T00:00:00Z')))
       .toBeCloseTo(.5, 5)
 
-    const fresh = signal('fresh', 'hiring_growth', 'career-page')
+    // Explicit evaluation dates below require fixed anchor dates (no time bomb:
+    // this block never compares against real NOW).
+    const fresh: NormalizedSignal = {
+      ...signal('fresh', 'hiring_growth', 'career-page'),
+      startedAt: '2026-08-01T00:00:00Z',
+      lastSeenAt: '2026-08-02T00:00:00Z',
+      validUntil: '2026-10-01T00:00:00Z',
+    }
     expect(signalRecheckDecision(fresh, new Date('2026-08-05T00:00:00Z')))
       .toMatchObject({ status: 'fresh', reason: 'within_recheck_window' })
     expect(signalRecheckDecision(fresh, new Date('2026-08-20T00:00:00Z')))
@@ -158,20 +165,28 @@ describe('Evidence Radar v1 contracts', () => {
   })
 })
 
+// Time-bomb fix (same class as PR198 jobs.test): anchor demo dates to NOW so
+// fixed calendar dates never expire out of correlation windows (windowDays: 60).
+const EVIDENCE_TEST_NOW = Date.now()
+const EVIDENCE_OCCURRED = new Date(EVIDENCE_TEST_NOW - 2 * 86400000).toISOString()
+const EVIDENCE_DETECTED = new Date(EVIDENCE_TEST_NOW - 2 * 86400000 + 3600000).toISOString()
+const EVIDENCE_LAST_SEEN = new Date(EVIDENCE_TEST_NOW - 86400000).toISOString()
+const EVIDENCE_VALID_UNTIL = new Date(EVIDENCE_TEST_NOW + 45 * 86400000).toISOString()
+
 function evidenceEvent(id: string, eventType: string, sourceFamily: string, contentFingerprint: string): EvidenceEvent {
   return {
     id, organizationId: '1', eventType, sourceRegistryId: 'official-company-news', sourceFamily,
-    occurredAt: '2026-08-01T00:00:00Z', detectedAt: '2026-08-01T01:00:00Z',
+    occurredAt: EVIDENCE_OCCURRED, detectedAt: EVIDENCE_DETECTED,
     canonicalUrl: 'https://example.invalid/event', facts: { eventType }, confidence: .9,
-    independentConfirmations: 1, validUntil: '2026-10-01T00:00:00Z', polarity: 'positive',
+    independentConfirmations: 1, validUntil: EVIDENCE_VALID_UNTIL, polarity: 'positive',
     verificationStatus: 'verified', contentFingerprint,
   }
 }
 
 function signal(id: string, type: NormalizedSignal['type'], source: string): NormalizedSignal {
   return {
-    id, organizationId: '1', type, startedAt: '2026-08-01T00:00:00Z',
-    lastSeenAt: '2026-08-02T00:00:00Z', validUntil: '2026-10-01T00:00:00Z',
+    id, organizationId: '1', type, startedAt: EVIDENCE_OCCURRED,
+    lastSeenAt: EVIDENCE_LAST_SEEN, validUntil: EVIDENCE_VALID_UNTIL,
     confidence: .8, strength: .8, eventIds: [`${id}:event`], sourceFamilies: [source],
     affectedFunctions: ['engineering'],
   }
