@@ -9,6 +9,7 @@ import { StaticEmptyState } from "../ui/static-empty-state";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { getClientProfileByOwnerId, resolveHiringMode } from "../../lib/clientProfiles";
 import { getDeliveryPreferencesByOwnerId } from "../../lib/deliveryPreferences";
+import { getWebPushPublicKey, isWebPushConfigured } from "../../lib/webPush";
 import { countMatchingCandidatesForProfile } from "../../lib/digest";
 import { listNotificationConnectionsByOwnerId } from "../../lib/notifications";
 import { computeProfileCompletion } from "../../lib/profileCompletion";
@@ -56,6 +57,8 @@ export default async function ProfilePage() {
     ? await countMatchingCandidatesForProfile(profile).catch(() => null)
     : null;
   const resolvedHiringMode = profile ? resolveHiringMode(profile) : "specialist";
+  const webPushConfigured = isWebPushConfigured();
+  const webPushPublicKey = getWebPushPublicKey();
   const agencyDnaEnabled = Boolean(
     profile &&
     session?.workspaceId &&
@@ -149,7 +152,10 @@ export default async function ProfilePage() {
               <h2>Расписание</h2>
               <p>Частота и местное время доставки. Резервные каналы продолжают использовать существующие настройки.</p>
             </div>
-            <DeliveryForm preferences={deliveryPreferences} />
+            <DeliveryForm
+              preferences={deliveryPreferences}
+              webPush={{ configured: webPushConfigured, publicKey: webPushPublicKey }}
+            />
           </section>
         ) : null}
       </div>
