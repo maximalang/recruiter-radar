@@ -114,6 +114,7 @@
   --color-demo-glow-indigo-strong: rgba(94, 106, 210, 0.16);
   --color-demo-shade: rgba(0, 0, 0, 0.3);
   --color-demo-scrim-bottom: rgba(5, 6, 8, 0.62);
+  --color-demo-scrim-corner: rgba(5, 6, 8, 0.55);
   --color-demo-scrim-side: rgba(5, 6, 8, 0.28);
   --color-demo-gold-ring: rgba(240, 180, 41, 0.1);
   --color-demo-gold-fill: rgba(240, 180, 41, 0.12);
