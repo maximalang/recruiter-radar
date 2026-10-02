@@ -9,10 +9,13 @@
  * that the resolver round-trips a persisted profile back to its preset.
  */
 import {
+  MARKET_PROFILE_CUSTOM_CHOICE,
   MARKET_PROFILE_PRESETS,
   buildMarketProfileDraftFromPreset,
   getMarketProfilePresetById,
+  normalizeMarketProfilePresetChoice,
   resolveMarketProfilePresetId,
+  selectMarketProfilePresetId,
   type MarketProfilePreset,
 } from '@/lib/marketProfilePresets';
 import { VALID_INDUSTRIES, VALID_ROLES } from '@/lib/clientProfiles';
@@ -94,6 +97,46 @@ describe('resolveMarketProfilePresetId', () => {
     expect(resolveMarketProfilePresetId('')).toBeNull();
     expect(resolveMarketProfilePresetId(null)).toBeNull();
     expect(resolveMarketProfilePresetId(undefined)).toBeNull();
+  });
+});
+
+describe('normalizeMarketProfilePresetChoice', () => {
+  it('keeps canonical preset ids (by id or by persisted label)', () => {
+    expect(normalizeMarketProfilePresetChoice('engineering-hiring')).toBe('engineering-hiring');
+    expect(normalizeMarketProfilePresetChoice('Инженерный подбор')).toBe('engineering-hiring');
+    expect(normalizeMarketProfilePresetChoice('Финансовый софт')).toBe('finance-software');
+  });
+
+  it('records the explicit custom choice as the distinguishable sentinel', () => {
+    expect(normalizeMarketProfilePresetChoice('custom')).toBe(MARKET_PROFILE_CUSTOM_CHOICE);
+    expect(normalizeMarketProfilePresetChoice('  CUSTOM ')).toBe(MARKET_PROFILE_CUSTOM_CHOICE);
+    expect(MARKET_PROFILE_CUSTOM_CHOICE).toBe('custom');
+  });
+
+  it('maps absence/empty/unknown garbage to null (no recorded choice)', () => {
+    expect(normalizeMarketProfilePresetChoice(null)).toBeNull();
+    expect(normalizeMarketProfilePresetChoice(undefined)).toBeNull();
+    expect(normalizeMarketProfilePresetChoice('')).toBeNull();
+    expect(normalizeMarketProfilePresetChoice('mass-outreach-preset')).toBeNull();
+  });
+});
+
+describe('selectMarketProfilePresetId (F-1: custom vs legacy)', () => {
+  it('an explicitly recorded custom choice stays custom even when the specialization matches a preset label', () => {
+    expect(selectMarketProfilePresetId('custom', 'Инженерный подбор')).toBeNull();
+    expect(selectMarketProfilePresetId('custom', 'Финансовый софт')).toBeNull();
+  });
+
+  it('a recorded preset id wins over the specialization label', () => {
+    expect(selectMarketProfilePresetId('finance-software', 'Инженерный подбор')).toBe('finance-software');
+    expect(selectMarketProfilePresetId('engineering-hiring', null)).toBe('engineering-hiring');
+  });
+
+  it('with no recorded choice (legacy) the specialization label still resolves back to its preset', () => {
+    expect(selectMarketProfilePresetId(null, 'Инженерный подбор')).toBe('engineering-hiring');
+    expect(selectMarketProfilePresetId(undefined, 'Финансовый софт')).toBe('finance-software');
+    expect(selectMarketProfilePresetId(null, 'Промышленный подбор')).toBeNull();
+    expect(selectMarketProfilePresetId(null, null)).toBeNull();
   });
 });
 

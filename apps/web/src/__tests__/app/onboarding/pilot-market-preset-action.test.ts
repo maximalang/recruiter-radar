@@ -2,13 +2,16 @@
  * D2 market-profile preset — pilot onboarding server action contract.
  *
  * confirmPilotProfileAction must:
- * - validate the submitted `marketProfilePreset` radio value against the
- *   registry (unknown/"custom" → null, never persisted garbage);
+ * - normalize the submitted `marketProfilePreset` radio value against the
+ *   registry to the recorded tri-state (canonical preset id | the explicit
+ *   "custom" sentinel | null for no recorded choice — unknown/forged values
+ *   never persist garbage);
  * - use preset criteria ONLY as fallbacks for fields the submission left
  *   empty — user-entered values always win («критерии можно изменить в
  *   любой момент»);
- * - pass the canonical preset id to confirmPilotOrderProfile so it persists
- *   on the order payload.
+ * - pass the recorded choice to confirmPilotOrderProfile so it persists on
+ *   the order payload — the explicit custom choice as the "custom" sentinel,
+ *   distinguishable from a legacy absence (F-1, PR260 QA run959).
  */
 jest.mock('@/lib/payments', () => ({
   confirmPilotOrderProfile: jest.fn(),
@@ -90,7 +93,7 @@ describe('confirmPilotProfileAction — market-profile preset (D2)', () => {
     );
   });
 
-  it('the explicit custom choice persists no preset and applies no fallbacks', async () => {
+  it('the explicit custom choice persists the "custom" sentinel and applies no fallbacks', async () => {
     const formData = baseFormData();
     formData.set('marketProfilePreset', 'custom');
 
@@ -101,7 +104,8 @@ describe('confirmPilotProfileAction — market-profile preset (D2)', () => {
         specialization: null,
         roles: [],
         includeKeywords: [],
-        marketProfilePreset: null,
+        // Distinguishable recorded choice — NOT the legacy null (F-1).
+        marketProfilePreset: 'custom',
       }),
     );
   });
@@ -115,6 +119,8 @@ describe('confirmPilotProfileAction — market-profile preset (D2)', () => {
     expect(mockConfirm).toHaveBeenCalledWith(
       expect.objectContaining({
         specialization: null,
+        // Forged garbage is not a recorded choice — it must never persist as
+        // the custom sentinel nor as a preset id.
         marketProfilePreset: null,
       }),
     );

@@ -9,7 +9,7 @@ import { VALID_INDUSTRIES, VALID_COMPANY_SIZES, VALID_ROLES } from "../../../../
 import {
   buildMarketProfileDraftFromPreset,
   getMarketProfilePresetById,
-  resolveMarketProfilePresetId
+  normalizeMarketProfilePresetChoice
 } from "../../../../lib/marketProfilePresets";
 import { getSession } from "../../../../lib/auth-v2/authorization";
 
@@ -83,15 +83,19 @@ export async function confirmPilotProfileAction(expectedOrderId: string, formDat
   const access = await requireBillingAccess();
 
   // D2 market-profile preset: the picker submits its canonical id as a radio
-  // value. Resolve + validate against the registry (unknown/"custom" → null),
-  // then use the preset criteria ONLY as fallbacks for fields the submission
-  // left empty — user-entered values always win («критерии можно изменить в
-  // любой момент»). remoteFriendly stays pure form truth: an unchecked box is
+  // value ("custom" = the explicit «Свой профиль» choice). Normalize against
+  // the registry to the recorded tri-state (preset id | "custom" | null for
+  // no recorded choice — unknown/forged values never persist garbage), then
+  // use the preset criteria ONLY as fallbacks for fields the submission left
+  // empty — user-entered values always win («критерии можно изменить в любой
+  // момент»). The explicit custom choice persists as the "custom" sentinel so
+  // a reload never re-resolves it through the specialization label (F-1).
+  // remoteFriendly stays pure form truth: an unchecked box is
   // indistinguishable from a deliberate uncheck, so no preset fallback there.
-  const marketProfilePreset = resolveMarketProfilePresetId(
+  const marketProfilePreset = normalizeMarketProfilePresetChoice(
     readOptionalText(formData, "marketProfilePreset")
   );
-  const preset = marketProfilePreset ? getMarketProfilePresetById(marketProfilePreset) : null;
+  const preset = getMarketProfilePresetById(marketProfilePreset);
   const presetDraft = preset ? buildMarketProfileDraftFromPreset(preset) : null;
 
   const specialization =

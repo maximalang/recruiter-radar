@@ -50,7 +50,7 @@ import { TelegramStepAutoRefresh } from "./telegram-step-auto-refresh";
 import { MarketProfilePresetPicker } from "./market-profile-preset-picker";
 import {
   MARKET_PROFILE_PRESETS,
-  resolveMarketProfilePresetId
+  selectMarketProfilePresetId
 } from "../../../../lib/marketProfilePresets";
 import { formatVacanciesCount } from "../../../../lib/format/plural";
 import { getGatePresentation } from "../../../../lib/scoring/gate-labels";
@@ -300,10 +300,9 @@ export default async function PilotOnboardingPage({
 
                   <MarketProfilePresetPicker
                     presets={MARKET_PROFILE_PRESETS}
-                    selectedPresetId={resolveMarketProfilePresetId(
-                      order.payload.marketProfilePreset
-                        ?? profile?.specialization
-                        ?? order.payload.specialization
+                    selectedPresetId={selectMarketProfilePresetId(
+                      order.payload.marketProfilePreset,
+                      profile?.specialization ?? order.payload.specialization
                     )}
                   />
 

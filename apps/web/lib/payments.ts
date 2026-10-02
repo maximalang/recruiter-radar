@@ -20,7 +20,7 @@ import {
   CUSTOMER_CHECKOUT_COPY,
   humanizeCustomerDeliveryIssue
 } from "./copy/customer";
-import { resolveMarketProfilePresetId } from "./marketProfilePresets";
+import { normalizeMarketProfilePresetChoice } from "./marketProfilePresets";
 import { getTelegramBotToken, sendTelegramTextMessage } from "./telegram";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { recordClientProfileDigestShownOutcomes } from "./clientProfileSignalOutcomes";
@@ -281,7 +281,11 @@ export async function confirmPilotOrderProfile(input: {
   agencyName: string;
   targetCity?: string | null;
   specialization?: string | null;
-  /** Canonical market-profile preset id (validated against the registry). */
+  /**
+   * Recorded market-profile choice: a canonical preset id, the explicit
+   * "custom" sentinel («Свой профиль»), or null/absent for no recorded
+   * choice. Normalized against the registry before it reaches the payload.
+   */
   marketProfilePreset?: string | null;
   includeKeywords?: readonly string[] | null;
   excludeKeywords?: readonly string[] | null;
@@ -329,7 +333,7 @@ export async function confirmPilotOrderProfile(input: {
   order = await updateCheckoutOrder(order.id, {
     payloadPatch: {
       clientProfileId: savedProfile.id,
-      marketProfilePreset: resolveMarketProfilePresetId(input.marketProfilePreset),
+      marketProfilePreset: normalizeMarketProfilePresetChoice(input.marketProfilePreset),
       specialization: savedProfile.specialization,
       city: savedProfile.targetCity,
       includeKeywords: savedProfile.includeKeywords,

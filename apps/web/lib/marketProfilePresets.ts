@@ -112,6 +112,23 @@ export function getMarketProfilePresetById(
 }
 
 /**
+ * The picker's explicit «Свой профиль» radio value. Persisted as-is on the
+ * order payload so a deliberate custom choice stays distinguishable from a
+ * legacy payload that never recorded any choice (absent/null). It is NOT a
+ * preset id and never resolves to one.
+ */
+export const MARKET_PROFILE_CUSTOM_CHOICE = "custom";
+
+/**
+ * A recorded market-profile choice on the order payload: either a canonical
+ * preset id or the explicit custom sentinel. null means "no choice recorded"
+ * (legacy orders predating the D2 picker).
+ */
+export type MarketProfilePresetChoice =
+  | MarketProfilePresetId
+  | typeof MARKET_PROFILE_CUSTOM_CHOICE;
+
+/**
  * Resolve a persisted/submitted preset reference to a canonical id.
  * Accepts the preset id ("engineering-hiring") or its human label
  * («Инженерный подбор» — the specialization text a preset persists, so an
@@ -128,6 +145,50 @@ export function resolveMarketProfilePresetId(
   if (byId) return byId.id;
   const byLabel = PRESET_BY_LABEL.get(value.toLowerCase());
   return byLabel ? byLabel.id : null;
+}
+
+/**
+ * Normalize a submitted/persisted market-profile choice reference to the
+ * canonical tri-state recorded on the order payload:
+ * - a preset id or its human label → the canonical preset id;
+ * - the explicit «Свой профиль» sentinel ("custom") → MARKET_PROFILE_CUSTOM_CHOICE;
+ * - anything else (absent, empty, null, unknown/forged garbage) → null, i.e.
+ *   NO recorded choice — the value a legacy payload normalizes to.
+ */
+export function normalizeMarketProfilePresetChoice(
+  raw: string | null | undefined,
+): MarketProfilePresetChoice | null {
+  const resolved = resolveMarketProfilePresetId(raw);
+  if (resolved) return resolved;
+  if (
+    typeof raw === "string" &&
+    raw.trim().toLowerCase() === MARKET_PROFILE_CUSTOM_CHOICE
+  ) {
+    return MARKET_PROFILE_CUSTOM_CHOICE;
+  }
+  return null;
+}
+
+/**
+ * The preset id the onboarding picker must show as selected for a persisted
+ * order (null = «Свой профиль» checked):
+ * - a recorded canonical preset id wins;
+ * - a recorded explicit custom choice stays custom and is NEVER re-resolved
+ *   through the specialization label — otherwise a custom profile that kept a
+ *   preset-like specialization text («Инженерный подбор») would silently
+ *   re-select the preset, and the next save would refill emptied criteria
+ *   from it (PR260 QA run959, defect F-1);
+ * - only when no choice was ever recorded (legacy orders) may the
+ *   specialization label still resolve back to its preset.
+ */
+export function selectMarketProfilePresetId(
+  recordedChoice: string | null | undefined,
+  legacySpecialization: string | null | undefined,
+): MarketProfilePresetId | null {
+  const normalized = normalizeMarketProfilePresetChoice(recordedChoice);
+  if (normalized === MARKET_PROFILE_CUSTOM_CHOICE) return null;
+  if (normalized) return normalized;
+  return resolveMarketProfilePresetId(legacySpecialization);
 }
 
 /**
