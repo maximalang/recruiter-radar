@@ -72,17 +72,16 @@ export default function LandingHeader() {
       if (nextTone === "dark" || nextTone === "light") setTone(nextTone);
     };
 
-    const toneObserver = new IntersectionObserver((entries) => {
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((left, right) => Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top));
-      const nearest = visible[0]?.target as HTMLElement | undefined;
-      if (!nearest) {
-        resolveToneByGeometry();
-        return;
-      }
-      const nextTone = nearest?.dataset.headerTone;
-      if (nextTone === "dark" || nextTone === "light") setTone(nextTone);
+    // IntersectionObserver deliveries are batch-order dependent: a partial
+    // batch carrying a single threshold crossing (e.g. the light section
+    // above re-entering the decision band while the dark section still
+    // covers most of it) would override the layout and lock a tone that
+    // contradicts resolveToneByGeometry, so the resting tone would depend on
+    // scroll history and frame batching instead of geometry. Use the observer
+    // purely as a change signal and always resolve the tone geometrically,
+    // mirroring updateActiveSection so tone and active nav never disagree.
+    const toneObserver = new IntersectionObserver(() => {
+      resolveToneByGeometry();
     }, { rootMargin: "-4% 0px -88% 0px", threshold: [0, 0.01] });
 
     toneElements.forEach((element) => toneObserver.observe(element));
