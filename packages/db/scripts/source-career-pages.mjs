@@ -2932,13 +2932,18 @@ export function buildNormalizedInput({ records, inputMode, inputFilePath, target
     });
   }
 
+  const resolvedTargetsTotal = targetsTotal ?? targetResults.length;
+  const zeroReason = records.length === 0 && resolvedTargetsTotal === 0
+    ? 'no-eligible-company-targets'
+    : undefined;
+
   return {
     inputMode,
     inputFilePath,
     targetsFilePath,
     fetchOutputPath,
     targetsProcessed: targetResults.length,
-    targetsTotal: targetsTotal ?? targetResults.length,
+    targetsTotal: resolvedTargetsTotal,
     budgetExhausted,
     targetResults,
     discoverySummary: discoverySummary ?? null,
@@ -2949,6 +2954,7 @@ export function buildNormalizedInput({ records, inputMode, inputFilePath, target
     normalizedRecords: dedupeResult.records,
     skippedRecords,
     sensitiveFieldsDropped,
+    zeroReason,
   };
 }
 
