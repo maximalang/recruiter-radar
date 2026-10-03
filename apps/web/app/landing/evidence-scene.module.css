@@ -2,12 +2,13 @@
   --evidence-paper: var(--color-canvas);
   --evidence-ink: var(--color-text-primary);
   --evidence-muted: var(--color-text-secondary);
-  --evidence-accent: var(--color-signal);
+  --evidence-accent: var(--color-signal-on-dark);
   --evidence-line: var(--color-separator);
   box-sizing: border-box;
   background: var(--evidence-paper);
   color: var(--evidence-ink);
-  padding: clamp(6rem, 9vw, 9rem) var(--scene-pad);
+  /* D-2 (v3): section rhythm — 64px desktop / 48px 821-1024 / 40px ≤820. */
+  padding: 64px var(--scene-pad);
 }
 
 .layout {
@@ -26,9 +27,9 @@
   margin: 0 0 .75rem;
   color: var(--evidence-accent);
   font-family: var(--font-mono);
-  font-size: .7rem;
+  font-size: .8125rem;
   font-weight: 700;
-  letter-spacing: .14em;
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 
@@ -46,7 +47,7 @@
   max-width: 31rem;
   margin: 0;
   color: var(--evidence-muted);
-  font-size: .92rem;
+  font-size: .9375rem;
   line-height: 1.55;
 }
 
@@ -87,7 +88,7 @@
   min-width: 0;
   color: var(--evidence-muted);
   font-family: var(--font-mono);
-  font-size: .68rem;
+  font-size: .8125rem;
   letter-spacing: .04em;
 }
 
@@ -149,9 +150,9 @@
   display: block;
   color: var(--evidence-muted);
   font-family: var(--font-mono);
-  font-size: .64rem;
+  font-size: .8125rem;
   font-weight: 700;
-  letter-spacing: .13em;
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 
@@ -203,7 +204,7 @@
 
 .confidenceBlock small {
   color: var(--evidence-muted);
-  font-size: .72rem;
+  font-size: .8125rem;
   line-height: 1.4;
 }
 
@@ -215,8 +216,12 @@
   overflow-wrap: anywhere;
 }
 
+@media (max-width: 1024px) {
+  .section { padding-block: 48px; }
+}
+
 @media (max-width: 820px) {
-  .section { padding: 3.25rem 1rem; }
+  .section { padding: 40px 1rem; }
   .intro { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
   .intro h2 { max-width: 15ch; font-size: clamp(2rem, 8vw, 2.7rem); }
   .intro > p { max-width: 36rem; }
@@ -234,7 +239,7 @@
 }
 
 @media (max-width: 520px) {
-  .section { padding: 2.75rem max(.875rem, env(safe-area-inset-right)) 2.75rem max(.875rem, env(safe-area-inset-left)); }
+  .section { padding: 40px max(.875rem, env(safe-area-inset-right)) 40px max(.875rem, env(safe-area-inset-left)); }
   .intro h2 { font-size: clamp(1.85rem, 9vw, 2.25rem); }
   .timeline li { padding: 1rem 0; column-gap: .65rem; }
   .sourceCell,

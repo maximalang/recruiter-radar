@@ -37,7 +37,7 @@ export default function LandingPage(props: {
           Интерактивный пример в первом экране требует JavaScript; рассказ, тарифы и условия доступны без него.
         </div>
       </noscript>
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
         <DetectionScene paymentConfigured={props.paymentConfigured} />
         <EvidenceScene />
         <DeliveryScene />

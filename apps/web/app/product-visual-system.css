@@ -45,35 +45,98 @@ body {
   --color-overlay: rgba(0, 0, 0, .64);
 }
 
-/* Landing single-canvas dark palette (approved Pass 5, refs: linear.app +
- * accio.com/work): neutral near-black canvas, Linear-grade grayscale,
- * champagne kept as the single restrained accent. Scoped to the landing
- * subtree via data-landing-experience; the product inverse theme above is
- * untouched. The descendant arm keeps any nested section that re-declares
- * data-theme="inverse" (the hero) on this neutral palette instead of
- * letting the greenish product-inverse block above win by proximity
- * (UX review of dd233623: the hero rendered on the inverse canvas with
- * inverse ink — a visible palette fault line against the neutral demo). */
+/* Landing v3 brand system (D1 output spec, 2026-10-03): graphite canvas +
+ * Recruiter Radar blue/cyan accent, refs linear.app/clair.co/pleo.io.
+ * Canonical landing-scope overrides of tables A (21 semantic names),
+ * B (42 consumed product-demo names) and G (selection + shadow system).
+ * Scoped to the landing subtree via data-landing-experience; the product
+ * workspace (cabinet/dashboard) keeps the champagne inverse theme and the
+ * original graphite demo tokens in globals.css. #RRGGBBAA values are exact
+ * alpha per the D1 equality contract; unconsumed demo siblings
+ * (veil-05/055/08/16, gold-ring, scrim-side) are intentionally NOT
+ * redeclared. The descendant arm keeps any nested section that re-declares
+ * data-theme="inverse" (the hero) on this palette. */
 [data-theme="inverse"][data-landing-experience],
 [data-landing-experience] [data-theme="inverse"] {
-  --color-canvas: #08090a;
-  --color-surface-primary: #101112;
-  --color-surface-secondary: #161718;
-  --color-surface-selected: #1c1d1f;
-  --color-surface-elevated: #222325;
-  --color-text-primary: #f7f8f8;
-  --color-text-secondary: #b4b7bc;
-  --color-text-tertiary: #8c8f94;
-  --color-text-disabled: #5e6065;
-  --color-text-inverse: #0b0c0d;
-  --color-separator-subtle: rgba(247, 248, 248, .06);
-  --color-separator: rgba(247, 248, 248, .10);
-  --color-separator-strong: rgba(247, 248, 248, .18);
-  --color-signal: #C9A96A;
-  --color-signal-hover: #D8BC82;
-  --color-signal-soft: rgba(201, 169, 106, .10);
-  --color-focus: #D8BC82;
-  --color-selection: rgba(201, 169, 106, .18);
+  /* A. Semantic core (21 names). */
+  --color-canvas: #0a0b0c;
+  --color-surface-primary: #1b1c1f;
+  --color-surface-secondary: #202124;
+  --color-surface-selected: #232428;
+  --color-surface-elevated: #26272b;
+  --color-text-primary: #f5f7fb;
+  --color-text-secondary: #b8bec9;
+  --color-text-tertiary: #a4aab6;
+  --color-text-disabled: #9299a5;
+  --color-text-inverse: #0a0b0c;
+  --color-separator-subtle: #303640;
+  --color-separator: #444b5a;
+  --color-separator-strong: #778297;
+  --color-signal: #087ff4;
+  --color-signal-hover: #05c9ef;
+  --color-signal-soft: #087ff424;
+  --color-signal-on-dark: #05c9ef;
+  --color-copper: #b8a7ff;
+  --color-information: #93a8ff;
+  --color-focus: #05c9ef;
+  --color-overlay: #050608b8;
+  /* Spec §1 rule 5: dark UA scheme confined to the landing subtree. */
+  color-scheme: dark;
+
+  /* B. Product demo shot (42 consumed names; graphite base kept, accents
+   * recolored to brand blue/cyan/indigo per D1 §1B). */
+  --color-demo-base-0: #0b0c0f;
+  --color-demo-base-1: #131419;
+  --color-demo-elevated: #1e1f21;
+  --color-demo-selected: #202123;
+  --color-demo-separator: #444b5a;
+  --color-demo-separator-subtle: #303640;
+  --color-demo-panel-top: #24252c;
+  --color-demo-panel-mid: #1a1b20;
+  --color-demo-panel-end: #16171b;
+  --color-demo-panel-flat: #191a1c;
+  --color-demo-panel-alt: #17181a;
+  --color-demo-card: #1b1c1e;
+  --color-demo-indigo: #3725f3;
+  --color-demo-indigo-bright: #93a8ff;
+  --color-demo-violet: #b8a7ff;
+  --color-demo-green: #4cb782;
+  --color-demo-gold: #087ff4;
+  --color-demo-orange: #93a8ff;
+  --color-demo-avatar-you: #3a3b3f;
+  --color-demo-stage-todo: #778297;
+  --color-demo-white: #ffffff;
+  --color-demo-text-bright: #dcdddf;
+  --color-demo-text-soft: #b8bec9;
+  --color-demo-text-muted: #a4aab6;
+  --color-demo-text-faint: #9299a5;
+  --color-demo-clear: #ffffff00;
+  --color-demo-veil-015: #ffffff04;
+  --color-demo-veil-022: #ffffff06;
+  --color-demo-veil-03: #ffffff08;
+  --color-demo-veil-035: #ffffff09;
+  --color-demo-veil-06: #ffffff0f;
+  --color-demo-veil-07: #ffffff12;
+  --color-demo-veil-09: #ffffff17;
+  --color-demo-veil-10: #ffffff1a;
+  --color-demo-veil-12: #ffffff1f;
+  --color-demo-glow-indigo: #087ff41f;
+  --color-demo-glow-indigo-strong: #3725f329;
+  --color-demo-shade: #0000004d;
+  --color-demo-scrim-bottom: #05060829;
+  --color-demo-scrim-corner: #0506081f;
+  --color-demo-gold-fill: #087ff41f;
+  --color-demo-gold-soft: #087ff424;
+
+  /* G. Existing auxiliary properties (6 names) — landing scope only; the
+   * graphite demo shadows in globals.css stay untouched for the product.
+   * Compound values verbatim from the D1 G table (not new color tokens). */
+  --color-selection: #3725f352;
+  --shadow-hero-panel: 0 20px 56px #00000073, 0 2px 8px #00000033;
+  --shadow-demo-panel: 0 1px 2px #0000004d, 0 18px 44px #00000052, inset 0 1px 0 #ffffff14;
+  --shadow-demo-status: 0 0 0 3px #087ff41f;
+  --shadow-demo-stage: 0 0 0 3px #087ff41a;
+  --shadow-overlay: 0 24px 64px #00000099, 0 6px 18px #00000066;
 }
 
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea) {

@@ -28,7 +28,8 @@ describe("landing responsive motion defects", () => {
     expect(landingCss).toMatch(
       /\.skipLink\s*\{[\s\S]*?transform:\s*translateY\(calc\(-100% - 1rem\)\);/,
     );
-    expect(landingCss).toMatch(/\.skipLink:focus\s*\{[\s\S]*?transform:\s*translateY\(0\);/);
+    // v3 (D1 D-1): the skip link reveals on keyboard :focus-visible only.
+    expect(landingCss).toMatch(/\.skipLink:focus-visible\s*\{[\s\S]*?transform:\s*translateY\(0\);/);
     expect(landingCss).not.toMatch(/\.skipLink\s*\{[^}]*top:\s*-5rem/);
   });
 

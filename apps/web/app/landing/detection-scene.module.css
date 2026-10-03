@@ -4,7 +4,8 @@
   width: 100%;
   max-width: calc(var(--content-max) + 2 * var(--scene-pad));
   margin-inline: auto;
-  padding: 5.5rem var(--scene-pad) 4.5rem;
+  /* D-2 (v3): 88px top = 72px fixed header + 16px; 48px bottom desktop. */
+  padding: 88px var(--scene-pad) 48px;
   overflow: hidden;
   background: var(--color-canvas);
   color: var(--color-text-primary);
@@ -18,8 +19,8 @@
 
 .serviceLabel {
   margin: 0 0 1rem;
-  color: color-mix(in srgb, var(--color-signal-on-dark) 92%, transparent);
-  font-size: .76rem;
+  color: var(--color-signal-on-dark);
+  font-size: .8125rem;
   font-weight: 600;
 }
 
@@ -64,15 +65,16 @@
   font-size: .875rem;
   font-weight: 650;
   text-decoration: none;
-  transition: background-color var(--motion-duration-control) var(--motion-ease-standard), transform var(--motion-duration-control) var(--motion-ease-standard);
+  transition: background-color var(--motion-duration-control) var(--motion-ease-standard), border-color var(--motion-duration-control) var(--motion-ease-standard), transform var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .primaryButton:focus-visible,
-.loginLink:focus-visible { outline: 2px solid var(--color-signal-on-dark); outline-offset: 3px; }
+.loginLink:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.loginLink:focus-visible { color: var(--color-text-primary); text-decoration: underline; }
 .primaryButton :global(svg) { flex: none; }
-.actionHint { max-width: 15rem; color: color-mix(in srgb, var(--color-text-primary) 56%, transparent); font-size: .75rem; line-height: 1.45; }
-.loginLink { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; margin-top: .25rem; color: color-mix(in srgb, var(--color-text-primary) 68%, transparent); font-size: .75rem; text-underline-offset: 3px; }
-.microcopy { max-width: 31rem; margin: .5rem 0 0; color: color-mix(in srgb, var(--color-text-primary) 55%, transparent); font-size: .7rem; line-height: 1.45; }
+.actionHint { max-width: 15rem; color: var(--color-text-secondary); font-size: .8125rem; line-height: 1.45; }
+.loginLink { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; margin-top: .25rem; color: var(--color-text-secondary); font-size: .8125rem; text-underline-offset: 3px; }
+.microcopy { max-width: 31rem; margin: .5rem 0 0; color: var(--color-text-tertiary); font-size: .8125rem; line-height: 1.45; }
 
 /* Fitted product shot: the workflow mock sits fully inside its hero column —
  * no clipped right edge, no hover/focus expansion (owner verdict 23.09:
@@ -100,7 +102,7 @@
   color: var(--color-text-primary);
   text-align: left;
 
-  /* Linear-demo exact palette (owner 26.09): neutral graphite, no green cast */
+  /* v3 (D1 table F): demo graphite + brand blue/cyan accents; structure unchanged */
   --color-surface-primary: var(--color-demo-base-0);
   --color-surface-secondary: var(--color-demo-base-1);
   --color-surface-elevated: var(--color-demo-elevated);
@@ -112,22 +114,24 @@
   --color-text-tertiary: var(--color-demo-text-muted);
   --color-text-disabled: var(--color-demo-text-faint);
   --color-signal: var(--color-demo-gold);
-  --color-signal-on-dark: var(--color-demo-gold);
+  --color-signal-on-dark: var(--color-signal-hover);
   --color-signal-soft: var(--color-demo-gold-soft);
 }
 
-.shotMark { display: grid; width: 1.4rem; height: 1.4rem; place-items: center; border: 0; border-radius: 50%; background: conic-gradient(from 45deg, var(--color-demo-indigo), var(--color-demo-violet), var(--color-demo-green), var(--color-demo-gold), var(--color-demo-indigo)); color: var(--color-demo-white); font: 700 .5rem var(--font-mono); }
+.shotMark { display: block; width: 2rem; height: 2rem; object-fit: contain; border-radius: 50%; }
 
-/* Owner 30.09: marketing scrim over the ENTIRE demo (text and icons included), diagonal top-left → bottom-right; right rail floats above it (Linear-style accent cards) */
-.productShot::after { content: ""; position: absolute; z-index: 5; inset: 0; pointer-events: none; background: radial-gradient(130% 130% at 100% 100%, var(--color-demo-scrim-corner) 0%, transparent 60%), linear-gradient(to bottom right, transparent 30%, var(--color-demo-scrim-bottom) 100%); }
+/* v3 D-3: the full-figure scrim stays a background layer — demo text and
+ * controls (.shotBody) are raised above it, so no readable surface sits under
+ * the darkening gradient. */
+.productShot::after { content: ""; position: absolute; z-index: 0; inset: 0; pointer-events: none; background: radial-gradient(130% 130% at 100% 100%, var(--color-demo-scrim-corner) 0%, transparent 60%), linear-gradient(to bottom right, transparent 30%, var(--color-demo-scrim-bottom) 100%); }
 
-.shotBody { display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); gap: .5rem; padding: .5rem; background: radial-gradient(130% 100% at 50% -15%, var(--color-demo-glow-indigo), transparent 60%), linear-gradient(180deg, transparent 30%, var(--color-demo-shade)); }
+.shotBody { position: relative; z-index: 1; display: grid; min-height: 36rem; grid-template-columns: 15rem minmax(0,1fr); gap: .5rem; padding: .5rem; background: radial-gradient(130% 100% at 50% -15%, var(--color-demo-glow-indigo), transparent 60%), linear-gradient(180deg, transparent 30%, var(--color-demo-shade)); }
 .shotSide { display: flex; min-width: 0; flex-direction: column; padding: .85rem .6rem .8rem; border-right: 0; background: transparent; }
-.shotSide > p { margin: .85rem .55rem .3rem; color: var(--color-text-tertiary); font: 500 .72rem var(--font-sans); letter-spacing: 0; text-transform: none; }
+.shotSide > p { margin: .85rem .55rem .3rem; color: var(--color-text-secondary); font: 500 .8125rem var(--font-sans); letter-spacing: 0; text-transform: none; }
 .shotSide > p:first-child { margin-top: 0; }
 .shotNav { display: grid; gap: .12rem; }
-.shotNav button { min-height: 1.95rem; padding: 0 .55rem; border: 0; border-radius: var(--radius-control); background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); font: 500 .78rem var(--font-sans); text-align: left; cursor: pointer; transition: background-color var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-disclosure) var(--motion-ease-standard); }
-.shotNav button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.shotNav button { min-height: 2.75rem; padding: 0 .55rem; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text-secondary); font: 500 .8125rem var(--font-sans); text-align: left; cursor: pointer; transition: background-color var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-disclosure) var(--motion-ease-standard); }
+.shotNav button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .shotNav .shotNavActive { background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-selected)); color: var(--color-text-primary); }
 .shotSide > div:nth-of-type(3) button:nth-child(1) svg { color: var(--color-demo-green); }
 .shotSide > div:nth-of-type(3) button:nth-child(2) svg { color: var(--color-demo-orange); }
@@ -137,19 +141,19 @@
 @keyframes sheenSweep { 0% { background-position: 200% 0; } 60%, 100% { background-position: -200% 0; } }
 .shotWorkspaceHeader { display: flex; align-items: center; gap: .6rem; padding: .95rem 1.2rem; border-bottom: 1px solid var(--color-separator-subtle); background-image: linear-gradient(180deg, var(--color-demo-veil-022), var(--color-demo-clear)); }
 .shotStatus { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--color-signal); box-shadow: var(--shadow-demo-status); }
-.shotIssueId { flex: none; color: var(--color-text-tertiary); font: .72rem var(--font-mono); }
-.shotCrumb { flex: none; color: var(--color-text-tertiary); font-size: .74rem; }
-.shotCrumbSep { flex: none; margin: 0 .35rem; color: var(--color-text-tertiary); font-size: .74rem; }
+.shotIssueId { flex: none; color: var(--color-text-tertiary); font: .8125rem var(--font-mono); }
+.shotCrumb { flex: none; color: var(--color-text-tertiary); font-size: .8125rem; }
+.shotCrumbSep { flex: none; margin: 0 .35rem; color: var(--color-text-tertiary); font-size: .8125rem; }
 .shotWorkspaceHeader strong { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .95rem; font-weight: 590; letter-spacing: -.015em; }
 .shotHeaderTools { display: flex; flex: none; align-items: center; gap: .5rem; color: var(--color-text-tertiary); }
 .shotHeaderTools svg { width: 14px; height: 14px; }
 .shotCounter { display: flex; flex: none; align-items: center; gap: .3rem; margin-left: auto; color: var(--color-text-tertiary); }
-.shotCounter b { font: 500 .72rem var(--font-mono); }
-.shotCounter button { display: grid; width: 1.7rem; height: 1.7rem; place-items: center; border: 1px solid var(--color-separator); border-radius: var(--radius-control); background: transparent; color: var(--color-text-secondary); cursor: pointer; transition: background-color var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-disclosure) var(--motion-ease-standard); }
-.shotCounter button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.shotCounter b { font: 500 .8125rem var(--font-mono); }
+.shotCounter button { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; border: 1px solid var(--color-separator); border-radius: var(--radius-control); background: transparent; color: var(--color-text-secondary); cursor: pointer; transition: background-color var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-disclosure) var(--motion-ease-standard); }
+.shotCounter button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .shotCounter svg { width: 12px; height: 12px; }
 .shotToolRow { display: flex; align-items: center; gap: .4rem; padding: .6rem 1rem 0; }
-.shotToolCaption { margin-left: auto; color: var(--color-text-tertiary); font: .56rem var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+.shotToolCaption { margin-left: auto; color: var(--color-text-tertiary); font: .8125rem var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
 .shotToolIco { display: grid; width: 1.9rem; height: 1.9rem; place-items: center; border: 1px solid var(--color-separator-subtle); border-radius: 50%; color: var(--color-text-tertiary); }
 .shotToolIco svg { width: 13px; height: 13px; }
 .workflowArea { padding-top: .35rem; }
@@ -161,13 +165,13 @@
 .sideGroup svg { width: 10px; height: 10px; color: var(--color-text-disabled); }
 .sideUser { display: flex; align-items: center; gap: .5rem; margin: auto .25rem 0; padding-top: .7rem; }
 .sideUser > span { display: grid; width: 1.4rem; height: 1.4rem; flex: none; place-items: center; border-radius: 50%; background: var(--color-surface-elevated); color: var(--color-text-secondary); font: 600 .55rem var(--font-mono); }
-.sideUser small { color: var(--color-text-tertiary); font-size: .72rem; }
+.sideUser small { color: var(--color-text-tertiary); font-size: .8125rem; }
 .shotNav button { display: flex; align-items: center; gap: .5rem; }
 .shotNav button svg { width: 15px; height: 15px; flex: none; color: var(--color-text-tertiary); }
 .shotNav .shotNavActive svg { color: var(--color-text-primary); }
 .workflowTabs { display: grid; grid-template-columns: minmax(0,1fr); gap: .12rem; }
-.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 1.95rem; align-items: center; gap: .5rem; padding: 0 .55rem; border: 0; border-radius: var(--radius-control); background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); text-align: left; cursor: pointer; transition: background-color var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-disclosure) var(--motion-ease-standard); }
-.workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 2.75rem; align-items: center; gap: .5rem; padding: 0 .55rem; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text-secondary); text-align: left; cursor: pointer; transition: background-color var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-disclosure) var(--motion-ease-standard); }
+.workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .stageState { display: grid; width: .9rem; height: .9rem; flex: none; place-items: center; border-radius: 50%; }
 .stageState[data-state="todo"] { border: 1.5px solid var(--color-demo-stage-todo); }
 .stageState[data-state="active"] { border: 1.5px solid var(--color-demo-gold); background: conic-gradient(from -90deg, var(--color-demo-gold) 0 50%, var(--color-demo-gold-fill) 50% 100%); box-shadow: var(--shadow-demo-stage); }
@@ -175,7 +179,7 @@
 .stageState[data-state="done"]::after { content: "✓"; color: var(--color-demo-white); font-size: .55rem; font-weight: 700; line-height: 1; }
 .workflowTabs span { min-width: 0; }
 .workflowTabs b,.workflowTabs small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workflowTabs b { color: inherit; font-size: .78rem; font-weight: 550; letter-spacing: -.005em; }
+.workflowTabs b { color: inherit; font-size: .8125rem; font-weight: 550; letter-spacing: -.005em; }
 @media (min-width: 701px) {
   .workflowTabs b,.workflowTabs small { overflow: visible; white-space: normal; text-overflow: clip; line-height: 1.2; }
 }
@@ -186,16 +190,16 @@
 .workflowMain { padding: 1.7rem 1.35rem 1.3rem; }
 .shotProps { display: grid; align-self: start; gap: .6rem; padding: 2.4rem .9rem 1.2rem .55rem; }
 .propsCard { padding: .95rem 1.05rem; border: 1px solid var(--color-separator-subtle); border-radius: var(--radius-overlay); background: var(--color-demo-elevated); }
-.propsCard h3 { margin: 0 0 .55rem; color: var(--color-text-tertiary); font-size: .7rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-.propsCard > div { display: flex; align-items: center; gap: .45rem; padding: .3rem 0; color: color-mix(in srgb, var(--color-text-primary) 82%, transparent); font-size: .78rem; }
+.propsCard h3 { margin: 0 0 .55rem; color: var(--color-text-tertiary); font-size: .8125rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.propsCard > div { display: flex; align-items: center; gap: .45rem; padding: .3rem 0; color: var(--color-text-secondary); font-size: .875rem; }
 .shotProps > .aiFloat { display: block; padding: .85rem .95rem; color: var(--color-text-primary); }
-.propsCard svg { width: 14px; height: 14px; flex: none; color: var(--color-demo-indigo); }
-.activityHead { margin: 1.35rem 0 0; color: color-mix(in srgb, var(--color-text-primary) 84%, transparent); font-size: .95rem; font-weight: 590; letter-spacing: -.01em; }
-.activityCount { margin-left: .5rem; color: var(--color-text-tertiary); font-size: .74rem; font-weight: 500; vertical-align: .1rem; }
-.cmtGhost { margin: .9rem 0 0 2.25rem; padding: .6rem .95rem; border: 1px dashed var(--color-demo-veil-10); border-radius: var(--radius-surface); color: var(--color-text-tertiary); font-size: .8rem; }
-.workflowEyebrow,.infoPage > span { color: var(--color-text-tertiary); font: .58rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
+.propsCard svg { width: 14px; height: 14px; flex: none; color: var(--color-demo-indigo-bright); }
+.activityHead { margin: 1.35rem 0 0; color: var(--color-text-primary); font-size: .95rem; font-weight: 590; letter-spacing: -.01em; }
+.activityCount { margin-left: .5rem; color: var(--color-text-tertiary); font-size: .8125rem; font-weight: 500; vertical-align: .1rem; }
+.cmtGhost { margin: .9rem 0 0 2.25rem; padding: .6rem .95rem; border: 1px dashed var(--color-demo-veil-10); border-radius: var(--radius-surface); color: var(--color-text-tertiary); font-size: .875rem; }
+.workflowEyebrow,.infoPage > span { color: var(--color-text-tertiary); font: .8125rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
 .workflowMain h2,.infoPage h2 { max-width: 32ch; margin: .5rem 0 0; font-size: 1.24rem; font-weight: 590; letter-spacing: -.02em; line-height: 1.3; }
-.workflowIntro,.infoPage > p { max-width: 62ch; margin: .45rem 0 0; color: var(--color-text-secondary); font-size: .86rem; line-height: 1.55; }
+.workflowIntro,.infoPage > p { max-width: 62ch; margin: .45rem 0 0; color: var(--color-text-secondary); font-size: .875rem; line-height: 1.55; }
 .workflowRows { margin: .85rem 0 0; }
 .workflowRows div { display: block; padding: .44rem 0; }
 .workflowRows dt { display: none; }
@@ -209,7 +213,7 @@
 @media (hover: hover) {
   .shotNav button:hover, .workflowTabs > button:hover { background: var(--color-demo-veil-035); }
 }
-.rowLabel { display: inline-block; padding: .16rem .6rem; border-radius: var(--radius-pill); margin-right: .55rem; background: var(--color-demo-veil-07); color: var(--color-text-secondary); font-size: .72rem; font-weight: 560; }
+.rowLabel { display: inline-block; padding: .16rem .6rem; border-radius: var(--radius-pill); margin-right: .55rem; background: var(--color-demo-veil-07); color: var(--color-text-secondary); font-size: .8125rem; font-weight: 560; }
 .rowAv { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; margin-right: .65rem; background: var(--color-demo-indigo); color: var(--color-demo-white); font: 700 .5rem var(--font-mono); vertical-align: -.45em; }
 .rowAv[data-actor="you"] { background: var(--color-demo-avatar-you); }
 .workflowRows div:nth-child(2) dd::before { content: none; margin-right: 0; }
@@ -218,17 +222,17 @@
 .propList { margin: .85rem 0 0; }
 .propList div { margin-top: .6rem; }
 .propList div:first-child { margin-top: 0; }
-.propList dt { color: var(--color-text-tertiary); font-size: .6rem; letter-spacing: .05em; text-transform: uppercase; }
-.propList dd { margin: .12rem 0 0; color: var(--color-text-primary); font-size: .8rem; font-weight: 500; line-height: 1.4; }
-.workflowRows dd { display: inline; margin: 0; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); font-size: .84rem; line-height: 1.5; }
+.propList dt { color: var(--color-text-tertiary); font-size: .8125rem; letter-spacing: .05em; text-transform: uppercase; }
+.propList dd { margin: .12rem 0 0; color: var(--color-text-primary); font-size: .875rem; font-weight: 500; line-height: 1.45; }
+.workflowRows dd { display: inline; margin: 0; color: var(--color-text-primary); font-size: .875rem; line-height: 1.5; }
 .workflowRows dd::before { content: none; margin-right: 0; }
 .cmtCard { display: flex; gap: .65rem; margin-top: 1.1rem; padding: .85rem .95rem; border: 1px solid var(--color-separator-subtle); border-radius: var(--radius-surface); background: linear-gradient(160deg, var(--color-demo-card), var(--color-demo-panel-flat) 80%); }
 .cmtAv { display: grid; width: 1.7rem; height: 1.7rem; flex: none; place-items: center; border-radius: 50%; background: var(--color-demo-indigo); color: var(--color-demo-white); font: 600 .58rem var(--font-mono); }
 .cmtBody { min-width: 0; }
 .cmtHead { display: flex; align-items: baseline; gap: .45rem; margin: 0; }
 .cmtHead strong { font-size: .82rem; font-weight: 590; }
-.cmtHead span { color: var(--color-text-tertiary); font-size: .72rem; }
-.cmtBody > p:last-child { margin: .3rem 0 0; color: var(--color-text-secondary); font-size: .84rem; line-height: 1.55; }
+.cmtHead span { color: var(--color-text-tertiary); font-size: .8125rem; }
+.cmtBody > p:last-child { margin: .3rem 0 0; color: var(--color-text-secondary); font-size: .875rem; line-height: 1.55; }
 .workflowRows > div { animation: rowIn var(--motion-duration-signal) var(--motion-ease-enter) both; }
 .workflowRows > div:nth-child(2) { animation-delay: var(--motion-duration-instant); }
 .workflowRows > div:nth-child(3) { animation-delay: var(--motion-duration-control); }
@@ -236,17 +240,17 @@
 .aiFloat { margin-top: 0; padding: .95rem 1.05rem; border-radius: var(--radius-surface); background: linear-gradient(160deg, var(--color-demo-card), var(--color-demo-panel-alt) 75%); box-shadow: none; }
 .aiFloatHead { display: flex; align-items: center; gap: .45rem; }
 .aiFloatHead strong { font-size: .82rem; font-weight: 590; }
-.aiFloatHead em { padding: .08rem .4rem; border: 1px solid var(--color-separator); border-radius: var(--radius-pill); color: var(--color-text-tertiary); font-size: .56rem; font-style: normal; font-weight: 600; letter-spacing: .06em; }
+.aiFloatHead em { padding: .08rem .4rem; border: 1px solid var(--color-separator); border-radius: var(--radius-pill); color: var(--color-text-tertiary); font-size: .8125rem; font-style: normal; font-weight: 600; letter-spacing: .06em; }
 .aiFloatCaret { margin-left: auto; color: var(--color-text-tertiary); }
 .aiFloatCaret svg { width: 13px; height: 13px; }
-.aiFloatCard { margin: .6rem 0 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: color-mix(in srgb, var(--color-text-primary) 86%, transparent); font-size: .84rem; line-height: 1.5; }
-.aiFloatCtx { margin: .45rem 0 0; color: var(--color-text-secondary); font-size: .72rem; }
-.aiFloatState { display: flex; align-items: center; gap: .4rem; margin: .55rem 0 0; color: var(--color-text-secondary); font-size: .76rem; }
+.aiFloatCard { margin: .6rem 0 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--color-text-primary); font-size: .875rem; line-height: 1.5; }
+.aiFloatCtx { margin: .45rem 0 0; color: var(--color-text-secondary); font-size: .8125rem; }
+.aiFloatState { display: flex; align-items: center; gap: .4rem; margin: .55rem 0 0; color: var(--color-text-secondary); font-size: .8125rem; }
 .aiFloatState span { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--color-signal);  }
 
 
-.infoPage button { min-height: 2.3rem; margin-top: 1rem; padding: 0 1rem; border: 0; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .72rem; font-weight: 640; cursor: pointer; }
-.infoPage button:focus-visible { outline: 2px solid var(--color-text-primary); outline-offset: 2px; }
+.infoPage button { min-height: 2.75rem; margin-top: 1rem; padding: 0 1rem; border: 0; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .8125rem; font-weight: 640; cursor: pointer; }
+.infoPage button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 
 .infoPage { padding: 1.3rem 1.1rem 0; }
 .infoPage h2 { max-width: 32ch; font-size: 1.45rem; }
@@ -256,15 +260,15 @@
 .infoPage i { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; margin-right: .65rem; vertical-align: -.45em; background: var(--color-demo-glow-indigo-strong); color: var(--color-demo-indigo-bright); font-size: 0; }
 .infoPage i::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-demo-indigo-bright); }
 .infoPage dt { display: none; }
-.infoPage dd { display: inline; margin: 0; color: color-mix(in srgb, var(--color-text-primary) 74%, transparent); font-size: .86rem; line-height: 1.5; }
+.infoPage dd { display: inline; margin: 0; color: var(--color-text-secondary); font-size: .875rem; line-height: 1.5; }
 .infoPage dd::before { content: none; margin-right: 0; }
 .infoPage button { width: auto; padding-inline: 1rem; }
 
 @media (hover: hover) and (pointer: fine) {
-  .primaryButton:hover { background: var(--color-signal-hover); transform: translateY(-1px); }
-  .loginLink:hover { color: color-mix(in srgb, var(--color-text-primary) 92%, transparent); }
+  .primaryButton:hover { border-color: var(--color-signal-hover); background: var(--color-signal-hover); transform: translateY(-1px); }
+  .loginLink:hover { color: var(--color-text-primary); text-decoration: underline; }
   .shotNav button:hover { background: var(--color-surface-selected); color: var(--color-text-primary); }
-  .workflowTabs > button:hover { background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); color: var(--color-text-primary); }
+  .workflowTabs > button:hover { background: var(--color-demo-veil-035); color: var(--color-text-primary); }
   .shotCounter button:hover { background: var(--color-surface-selected); color: var(--color-text-primary); }
   .infoPage button:hover { background: var(--color-signal-hover); }
 }
@@ -275,7 +279,7 @@
 }
 
 @media (max-width: 900px) {
-  .section { display: block; min-height: auto; padding: 6rem var(--page-gutter) 3.5rem; overflow: visible; }
+  .section { display: block; min-height: auto; padding: 88px var(--page-gutter) 48px; overflow: visible; }
   .copy { width: min(100%,42rem); }
   .fieldFigure { width: 100%; min-width: 0; margin-top: 2rem; }
 }
@@ -284,14 +288,14 @@
   .shotProps { display: none; }
   .shotBody { grid-template-columns: 11rem minmax(0,1fr); min-height: 0; gap: .4rem; padding: .4rem; }
   .shotSide { padding: .8rem .5rem; }
-  .shotNav button { min-height: 1.85rem; font-size: .72rem; }
-  .workflowTabs > button { min-height: 1.85rem; }
-  .workflowTabs b { font-size: .72rem; }
-  .sideWorkspace strong { font-size: .74rem; }
+  .shotNav button { min-height: 2.75rem; font-size: .8125rem; }
+  .workflowTabs > button { min-height: 2.75rem; }
+  .workflowTabs b { font-size: .8125rem; }
+  .sideWorkspace strong { font-size: .8125rem; }
   .shotWorkspaceHeader { padding: .8rem .9rem; }
   .workflowMain { padding: 1.6rem 1rem 1.1rem; }
   .workflowMain h2,.infoPage h2 { font-size: 1.2rem; }
-  .workflowIntro,.infoPage > p { font-size: .8rem; }
+  .workflowIntro,.infoPage > p { font-size: .875rem; }
 }
 
 @media (max-width: 900px) {
@@ -306,7 +310,7 @@
   .shotSide { display: block; padding: .55rem; border-right: 0; border-bottom: 1px solid var(--color-separator-subtle); }
   .shotSide > p { display: none; }
   .shotNav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; }
-  .shotNav button { min-height: 44px; padding: 0 .7rem; font-size: .72rem; }
+  .shotNav button { min-height: 44px; padding: 0 .7rem; font-size: .8125rem; }
   .shotWorkspace { padding: 0; }
   .shotWorkspaceHeader { padding: .75rem .9rem; }
   .shotWorkspaceHeader small { display: none; }
@@ -318,56 +322,59 @@
   .workflowPanel { display: block; min-height: 0; }
   .workflowMain { padding: 1.1rem .9rem; }
   .workflowMain h2,.infoPage h2 { font-size: 1.25rem; }
-  .workflowIntro,.infoPage > p { font-size: .77rem; }
+  .workflowIntro,.infoPage > p { font-size: .875rem; }
   .workflowRows div { flex-wrap: wrap; gap: .35rem; }
-  .workflowRows dt,.workflowRows dd { font-size: .72rem; }
-  .infoPage button { min-height: 44px; font-size: .75rem; }
+  .workflowRows dt,.workflowRows dd { font-size: .875rem; }
+  .infoPage button { min-height: 44px; font-size: .8125rem; }
   .infoPage dl div { flex-wrap: wrap; gap: .35rem; }
-  .infoPage dd { grid-column: 2; font-size: .72rem; }
+  .infoPage dd { grid-column: 2; font-size: .875rem; }
   .infoPage dt { font-size: .74rem; }
 }
 
 @media (max-width: 900px) {
   .shotBody { display: grid; grid-template-columns: 7.5rem minmax(0,1fr); min-height: 0; gap: .3rem; padding: .3rem; }
   .shotSide { display: flex; padding: .7rem .45rem; border-right: 0; border-bottom: 0; background: transparent; }
-  .shotSide > p { display: block; margin: .7rem .35rem .25rem; font-size: .62rem; }
+  .shotSide > p { display: block; margin: .7rem .35rem .25rem; font-size: .8125rem; }
   .sideWorkspace { gap: .4rem; }
   .sideWorkspace strong { display: none; }
   .sideWorkspaceTools { display: none; }
   .shotNav { display: grid; grid-template-columns: minmax(0,1fr); gap: .1rem; }
-  .shotNav button { min-height: 2.75rem; padding: 0 .45rem; font-size: .68rem; overflow: hidden; }
+  .shotNav button { min-height: 2.75rem; padding: 0 .45rem; font-size: .8125rem; overflow: hidden; }
   .workflowTabs { grid-template-columns: minmax(0,1fr); }
   .workflowTabs > button { min-height: 2.75rem; padding: 0 .45rem; border-bottom: 0; }
   .shotCounter button { display: none; }
-  .workflowTabs b { font-size: .68rem; }
+  .workflowTabs b { font-size: .8125rem; }
   .shotWorkspaceHeader { padding: .7rem .75rem; }
   .shotWorkspaceHeader strong { font-size: .84rem; }
-  .shotIssueId { font-size: .64rem; }
+  .shotIssueId { font-size: .8125rem; }
   .shotHeaderTools { display: none; }
   .shotCrumb, .shotCrumbSep { display: none; }
-  .cmtGhost { margin-left: 0; font-size: .74rem; }
+  .cmtGhost { margin-left: 0; font-size: .875rem; }
   .shotToolIco { display: none; }
   .shotToolRow { padding: .45rem .75rem 0; }
-  .shotCounter b { font-size: .62rem; }
-  .shotCounter button { width: 1.3rem; height: 1.3rem; }
+  .shotCounter b { font-size: .8125rem; }
   .workflowMain { padding: 1.2rem .75rem 1rem; }
-  .workflowMain h2,.infoPage h2 { font-size: 1.05rem; }
-  .workflowIntro,.infoPage > p { font-size: .74rem; }
-  .workflowRows dt,.workflowRows dd { font-size: .74rem; }
+  .workflowMain h2,.infoPage h2 { font-size: 1.125rem; }
+  .workflowIntro,.infoPage > p { font-size: .875rem; }
+  .workflowRows dt,.workflowRows dd { font-size: .875rem; }
   .activityHead { margin-top: 1.3rem; font-size: .92rem; }
   .rowIco,.rowAv,.infoPage i { width: 1.15rem; height: 1.15rem; margin-right: .45rem; }
   .cmtCard { padding: .7rem .8rem; }
 }
 
 @media (max-width: 430px) {
-  .section { padding-top: 5.4rem; }
   .shotWorkspaceHeader { gap: .4rem; padding: .6rem .65rem; }
-  .shotWorkspaceHeader strong { font-size: .8rem; }
+  .shotWorkspaceHeader strong { font-size: .8125rem; }
   .shotIssueId { display: none; }
   .shotCounter button { display: none; }
-  .shotToolCaption { letter-spacing: .02em; font-size: .54rem; }
+  .shotToolCaption { letter-spacing: .02em; font-size: .8125rem; }
   .stageState { width: 1rem; height: 1rem; }
   .workflowTabs > button { padding-inline: .48rem; }
+}
+
+/* D-2 (v3): hero bottom rhythm at <=820. */
+@media (max-width: 820px) {
+  .section { padding-bottom: 32px; }
 }
 
 .visuallyHidden {

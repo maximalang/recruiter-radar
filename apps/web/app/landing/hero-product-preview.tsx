@@ -201,7 +201,7 @@ export default function HeroProductPreview() {
       <div className={sceneStyles.shotBody}>
         <aside className={sceneStyles.shotSide} aria-label="Разделы workflow">
           <div className={sceneStyles.sideWorkspace}>
-            <span className={sceneStyles.shotMark} aria-hidden="true">RR</span>
+            <img className={sceneStyles.shotMark} src="/brand/recruiter-radar-mark-brand15.svg" width={32} height={32} alt="" aria-hidden="true" draggable={false} />
             <strong>Recruiter Radar</strong>
             <span className={sceneStyles.sideWorkspaceTools} aria-hidden="true">
               <Ico name="caret" />
@@ -328,7 +328,7 @@ export default function HeroProductPreview() {
                   </div>
                   <div className={sceneStyles.aiFloat} aria-hidden="true">
                     <div className={sceneStyles.aiFloatHead}>
-                      <span className={sceneStyles.shotMark}>RR</span>
+                      <img className={sceneStyles.shotMark} src="/brand/recruiter-radar-mark-brand15.svg" width={32} height={32} alt="" aria-hidden="true" draggable={false} />
                       <strong>Радар</strong>
                       <em>AI</em>
                       <span className={sceneStyles.aiFloatCaret}><Ico name="caret" /></span>

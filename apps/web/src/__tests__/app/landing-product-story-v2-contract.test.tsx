@@ -61,9 +61,11 @@ describe("landing product story v2", () => {
     expect(visualCss).toMatch(/--page-gutter:\s*clamp\(1rem,\s*2\.35vw,\s*2rem\)/);
     expect(landing).toContain('data-theme="inverse"');
     expect(visualCss).toMatch(/--landing-canvas:\s*var\(--color-canvas\)/);
-    expect(visualCss).toMatch(/--landing-paper:\s*var\(--color-text-primary\)/);
-    expect(visualCss).toMatch(/--landing-ink:\s*var\(--color-text-inverse\)/);
-    expect(visualCss).toMatch(/--landing-accent:\s*color-mix\(/);
+    // v3 (D1 table C): paper = surface-primary #1b1c1f (dark card), ink = text-primary #f5f7fb,
+    // accent = signal-on-dark #05c9ef — aliases resolve unambiguously to the spec HEX values.
+    expect(visualCss).toMatch(/--landing-paper:\s*var\(--color-surface-primary\)/);
+    expect(visualCss).toMatch(/--landing-ink:\s*var\(--color-text-primary\)/);
+    expect(visualCss).toMatch(/--landing-accent:\s*var\(--color-signal-on-dark\)/);
     expect(heroCss).toMatch(/\.section\s*\{[^}]*display:\s*block/);
     expect(heroCss).toMatch(/\.copy\s*\{[^}]*width:\s*min\(100%,\s*46rem\)/);
     expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.section\s*\{[^}]*display:\s*block/);
@@ -82,11 +84,15 @@ describe("landing product story v2", () => {
     expect(headerCss).toMatch(
       /\.header\[data-tone="light"\]:not\(\[data-scrolled\]\):not\(\[data-menu-open\]\)\s*\{[^}]*color:\s*var\(--color-text-primary\)/,
     );
+    // v3 (D1 §1E): on the single dark canvas BOTH top-tone branches render light primary ink;
+    // data-tone stays as the geometry contract only.
     expect(headerCss).toMatch(
-      /\.header\[data-tone="dark"\]:not\(\[data-scrolled\]\):not\(\[data-menu-open\]\)\s*\{[^}]*color:\s*var\(--color-text-inverse\)/,
+      /\.header\[data-tone="dark"\]:not\(\[data-scrolled\]\):not\(\[data-menu-open\]\)\s*\{[^}]*color:\s*var\(--color-text-primary\)/,
     );
+    // v3 (D1 D-1/E): scrolled/menu-open header is a SOLID canvas surface with a separator
+    // hairline — no translucent blur film over the content below.
     expect(headerCss).toMatch(
-      /\.header\[data-scrolled\],[\s\S]*?\.header\[data-menu-open\]\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--color-canvas\) 92%, transparent\)[^}]*color:\s*var\(--color-text-primary\)/,
+      /\.header\[data-scrolled\],[\s\S]*?\.header\[data-menu-open\]\s*\{[^}]*background:\s*var\(--color-canvas\)[^}]*color:\s*var\(--color-text-primary\)/,
     );
 
     // owner directive 26.09: subtle linear gradients approved (Linear-demo premium look); heavy decor still banned below
@@ -170,7 +176,8 @@ describe("landing product story v2", () => {
 
     expect(evidenceCss).toMatch(/--evidence-paper:\s*var\(--color-canvas\)/);
     expect(evidenceCss).toMatch(/--evidence-ink:\s*var\(--color-text-primary\)/);
-    expect(evidenceCss).toMatch(/--evidence-accent:\s*var\(--color-signal\)/);
+    // v3 (D1 table D): evidence accent is cyan #05c9ef (signal-on-dark), not the blue signal.
+    expect(evidenceCss).toMatch(/--evidence-accent:\s*var\(--color-signal-on-dark\)/);
     expect(evidenceCss).not.toMatch(/gradient\(|box-shadow:/);
     expect(evidenceCss).toMatch(
       /\.sourceCell\s*\{[^}]*border-radius:\s*var\(--radius-pill\)/,
