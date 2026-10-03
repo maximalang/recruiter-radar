@@ -5,6 +5,13 @@ import path from "node:path";
 
 import { chromium } from "playwright";
 
+import { closeQuietly, installScriptWatchdog, settleLandingPage } from "./landing-settle.mjs";
+
+// D-8: a hung browser/teardown must fail this step deterministically instead
+// of burning the CI job budget until cancellation (run 36965532936 hung here
+// for 19+ minutes with a live chrome process and no exception).
+installScriptWatchdog("landing review captures", 360_000);
+
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
 const auditScreenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), "recruiter-radar-landing", "screenshots");
@@ -124,7 +131,17 @@ async function preparePage(context, targetUrl = baseUrl) {
     undefined,
     { timeout: 30_000 },
   );
-  await page.waitForTimeout(160);
+  // D-8 (v3): bounded deterministic settle — fonts loaded, entrance/reveal
+  // animations finished, hero geometry stable across two consecutive rAF
+  // frames — then pin stage 1 through the existing manual control so no
+  // capture can race the 8s auto-advance (cadence unchanged; these contexts
+  // run with prefers-reduced-motion: reduce).
+  await settleLandingPage(page, { label: "review capture" });
+  await page.waitForFunction(
+    () => document.querySelector("#hero-workflow")?.getAttribute("data-active-stage") === "1",
+    undefined,
+    { timeout: 5_000 },
+  );
 
   const consent = page.getByRole("button", { name: "Разрешить", exact: true });
   if (await consent.isVisible()) {
@@ -412,11 +429,11 @@ try {
     }
     } finally {
       recordConsoleMessages(viewport.name, page);
-      await context.close();
+      await closeQuietly(context, "review-capture context");
     }
   }
 } finally {
-  await browser.close();
+  await closeQuietly(browser, "review-capture browser");
 }
 
 // Fail-closed: browser errors captured during any viewport invalidate the

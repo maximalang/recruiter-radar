@@ -4,6 +4,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
+import { installScriptWatchdog } from '../apps/web/scripts/landing-settle.mjs';
+
+// D-8: fail deterministically instead of hanging the landing-playwright job.
+installScriptWatchdog('responsive surfaces audit', 900_000);
+
 const baseUrl = (process.env.RESPONSIVE_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/+$/, '');
 const outputDir = path.resolve(process.env.RESPONSIVE_ARTIFACT_DIR ?? '/tmp/recruiter-radar-responsive');
 const captureAll = process.env.RESPONSIVE_CAPTURE_ALL === 'true';

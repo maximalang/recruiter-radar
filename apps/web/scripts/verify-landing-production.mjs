@@ -5,6 +5,16 @@ import path from "node:path";
 
 import { chromium } from "playwright";
 
+import {
+  MOTION_SETTLE_TIMEOUT_MS,
+  closeQuietly,
+  installScriptWatchdog,
+  settleLandingPage,
+} from "./landing-settle.mjs";
+
+// D-8: fail deterministically instead of hanging until the CI job timeout.
+installScriptWatchdog("landing production audit", 900_000);
+
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
 const screenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), `recruiter-radar-final-unified-landing-${process.pid}`);
@@ -112,6 +122,10 @@ async function waitForLanding(page) {
     { timeout: PAGE_SETTLE_TIMEOUT_MS },
   );
   await page.waitForTimeout(HYDRATION_SETTLE_DELAY_MS);
+  // D-8 (v3): bounded deterministic settle (fonts, finished CSS animations,
+  // two stable hero frames) before assertions — no fixed-sleep races with
+  // the hero entrance animation.
+  await settleLandingPage(page, { label: "production audit" });
 }
 
 async function resolveAnalyticsConsent(page) {
@@ -137,6 +151,15 @@ async function preparePage(context, label, url = baseUrl) {
   }));
   await page.goto(url, { waitUntil: "load", timeout: PAGE_SETTLE_TIMEOUT_MS });
   await waitForLanding(page);
+  // D-8: the "starts at stage 1 without user input" contract is asserted
+  // immediately after hydration, before the 8s auto-advance cadence can
+  // elapse on a slow runner (the re-selection inside
+  // assertHeroWorkflowContract is determinism, not the contract itself).
+  assert.equal(
+    await page.locator("#hero-workflow").getAttribute("data-active-stage"),
+    "1",
+    "hero workflow must start at stage 1 without user input",
+  );
   await resolveAnalyticsConsent(page);
   return { page, assertCleanConsole };
 }
@@ -351,7 +374,18 @@ async function assertHeroGeometry(page, label) {
 async function assertHeroWorkflowContract(page, label, viewport) {
   const workflow = page.locator("#hero-workflow");
   await workflow.waitFor({ state: "attached" });
-  assert.equal(await workflow.getAttribute("data-active-stage"), "1", `${label}: hero workflow must start at stage 1 without user input`);
+  // D-8: the auto-advance cadence (8s, unchanged) may legitimately have
+  // advanced the demo before this assert runs on a slow runner; the initial
+  // state contract ("starts at stage 1 without user input") is asserted in
+  // preparePage right after hydration. Here we deterministically re-select
+  // stage 1 through the existing manual control before the panel assertions.
+  await page.locator("#hero-workflow-tab-1").click();
+  await page.waitForFunction(
+    () => document.querySelector("#hero-workflow")?.getAttribute("data-active-stage") === "1",
+    undefined,
+    { timeout: MOTION_SETTLE_TIMEOUT_MS },
+  );
+  assert.equal(await workflow.getAttribute("data-active-stage"), "1", `${label}: hero workflow must return to stage 1 via its manual tab control`);
   for (const stageId of ["1", "2", "3", "4"]) {
     await page.locator(`#hero-workflow-tab-${stageId}`).waitFor({ state: "attached" });
   }
@@ -450,7 +484,7 @@ async function assertResponsiveSurface(browser, viewport) {
   }
 
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertHashNavigation(browser, spec) {
@@ -482,7 +516,7 @@ async function assertHashNavigation(browser, spec) {
   const secondTop = await target.evaluate((element) => element.getBoundingClientRect().top);
   assert.ok(Math.abs(secondTop - firstPosition.top) <= 3, `${spec.name}: position jumped ${firstPosition.top} -> ${secondTop}`);
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertHistoryNavigation(browser) {
@@ -503,7 +537,7 @@ async function assertHistoryNavigation(browser) {
   ]);
   assert.match(page.url(), /#scene-delivery$/);
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertMobileKeyboardNavigation(browser) {
@@ -527,7 +561,7 @@ async function assertMobileKeyboardNavigation(browser) {
   await dialog.waitFor({ state: "hidden" });
   assert.notEqual(await page.evaluate(() => document.body.style.overflow), "hidden");
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertKeyboardSkipLink(browser) {
@@ -548,7 +582,7 @@ async function assertKeyboardSkipLink(browser) {
   await page.keyboard.press("Enter");
   assert.equal(new URL(page.url()).hash, "#main-content");
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertActiveNavigationAndTone(browser) {
@@ -603,7 +637,7 @@ async function assertActiveNavigationAndTone(browser) {
   await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light");
   assert.equal(await brandHeader.getAttribute("data-tone"), "light");
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 function waitForLandingEvent(page, name, context) {
@@ -711,7 +745,7 @@ async function assertInteractionContracts(browser) {
   }
 
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertNoJs(browser) {
@@ -746,7 +780,7 @@ async function assertNoJs(browser) {
   assert.equal(followsHero, true, "no-JS page ended at the hero workflow skeleton");
   await assertNoHorizontalOverflow(page, "no-js-mobile-390x844");
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertReducedMotion(browser) {
@@ -766,7 +800,7 @@ async function assertReducedMotion(browser) {
   });
   assert.deepEqual(violations, [], `reduced-motion effects remain: ${JSON.stringify(violations)}`);
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function verifyScreenshotArtifact() {
@@ -840,5 +874,5 @@ try {
     },
   }, null, 2)}\n`);
 } finally {
-  await browser.close();
+  await closeQuietly(browser, "production audit browser");
 }
