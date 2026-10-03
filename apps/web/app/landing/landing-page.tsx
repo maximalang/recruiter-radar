@@ -13,7 +13,7 @@ import styles from "./landing.module.css";
 import visualStyles from "./landing-visual-system.module.css";
 
 export function LandingSkipLink() {
-  return <a href="#main-content" className={styles.skipLink}>Перейти к содержанию</a>;
+  return <a href="#main-content" className={styles.skipLink} data-landing-skip-link>Перейти к содержанию</a>;
 }
 
 export default function LandingPage(props: {

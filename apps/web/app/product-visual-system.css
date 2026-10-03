@@ -139,6 +139,17 @@ body {
   --shadow-overlay: 0 24px 64px #00000099, 0 6px 18px #00000066;
 }
 
+/* D-1 (v3): the landing skip link renders as a SIBLING of the landing root
+ * (home-page-content.tsx), so the scoped landing palette above never reaches
+ * it. Its exact v3 values live here, in the canonical token source, because
+ * the semantic-visual-contract CI check forbids raw color literals inside
+ * component modules; the .skipLink module rule consumes them via var(). */
+[data-landing-skip-link] {
+  --color-signal: #087ff4;
+  --color-text-inverse: #0a0b0c;
+  --color-focus: #05c9ef;
+}
+
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea) {
   min-height: 44px;
   border: 1px solid var(--color-separator-strong);

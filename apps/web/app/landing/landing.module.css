@@ -30,13 +30,11 @@
   min-height: 44px;
   padding: .8rem 1rem;
   border-radius: var(--radius-control);
-  /* D-1 (v3): the skip link renders as a SIBLING of the landing root
-   * (home-page-content.tsx), so the scoped landing palette never reaches it —
-   * carry the exact v3 values locally: blue fill, dark ink label (5.02:1),
-   * cyan focus ring (9.95:1 vs canvas). */
-  --color-signal: #087ff4;
-  --color-text-inverse: #0a0b0c;
-  --color-focus: #05c9ef;
+  /* D-1 (v3): the skip link renders as a SIBLING of the landing root, so the
+   * scoped landing palette never reaches it. Its exact v3 values live in the
+   * canonical token source (product-visual-system.css, [data-landing-skip-link])
+   * because the semantic-visual-contract forbids raw literals in component
+   * modules: blue fill, dark ink label (5.02:1), cyan focus ring (9.95:1). */
   background: var(--color-signal);
   color: var(--color-text-inverse);
   font-size: .82rem;
