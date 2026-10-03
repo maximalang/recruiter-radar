@@ -5,6 +5,11 @@ import path from "node:path";
 
 import { chromium } from "playwright";
 
+import { closeQuietly, installScriptWatchdog, settleLandingPage } from "./landing-settle.mjs";
+
+// D-8: fail deterministically instead of hanging until the CI job timeout.
+installScriptWatchdog("landing accessibility audit", 480_000);
+
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
 const screenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), "recruiter-radar-landing", "screenshots");
@@ -60,7 +65,10 @@ async function preparePage(context, label, url = baseUrl) {
     undefined,
     { timeout: 30_000 },
   );
-  await page.waitForTimeout(160);
+  // D-8 (v3): bounded deterministic settle (fonts, finished CSS animations,
+  // two stable hero frames) before any contrast/tone assertion — the hero
+  // entrance animation previously raced assertHeaderTone/contrast reads.
+  await settleLandingPage(page, { label: "accessibility audit" });
 
   const consent = page.getByRole("button", { name: "Разрешить", exact: true });
   if (await consent.isVisible()) {
@@ -271,7 +279,7 @@ async function auditHeader(browser, viewport) {
   await assertHeaderTone(page, `${viewport.name} Hero restored`, "light");
 
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "accessibility context");
 }
 
 async function auditHeaderHashes(browser) {
@@ -285,7 +293,7 @@ async function auditHeaderHashes(browser) {
     const { page, assertCleanConsole } = await preparePage(context, `header-hash-${spec.hash}`, `${baseUrl}/#${spec.hash}`);
     await assertHeaderTone(page, `hash #${spec.hash}`, spec.tone);
     assertCleanConsole();
-    await context.close();
+    await closeQuietly(context, "accessibility context");
   }
 }
 
@@ -329,7 +337,7 @@ async function auditContrast(browser) {
   await assertContrast(final.getByRole("link", { name: "Сначала посмотреть пример", exact: true }), "Final secondary link");
 
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "accessibility context");
 }
 
 async function auditDelivery(browser, viewport) {
@@ -401,7 +409,7 @@ async function auditDelivery(browser, viewport) {
 
   results.delivery.push({ viewport: viewport.name, closedHeight, openHeight, addedHeight: openHeight - closedHeight, geometry });
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "accessibility context");
 }
 
 await mkdir(reportDirectory, { recursive: true });
@@ -417,7 +425,7 @@ try {
   await auditHeaderHashes(browser);
   for (const viewport of deliveryMatrix) await auditDelivery(browser, viewport);
 } finally {
-  await browser.close();
+  await closeQuietly(browser, "accessibility browser");
 }
 
 await writeFile(reportPath, JSON.stringify(results, null, 2));

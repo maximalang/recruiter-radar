@@ -5,13 +5,14 @@
   min-height: 72px;
   border-bottom: 1px solid transparent;
   background: transparent;
-  color: var(--color-text-inverse);
+  /* v3 (D-1/D-7): single dark canvas — light primary ink in every state;
+   * data-tone stays as the geometry contract only. */
+  color: var(--color-text-primary);
   --header-focus: var(--color-focus-on-light);
   transition:
     color var(--motion-duration-control) var(--motion-ease-standard),
     background-color var(--motion-duration-control) var(--motion-ease-standard),
-    border-color var(--motion-duration-control) var(--motion-ease-standard),
-    backdrop-filter var(--motion-duration-control) var(--motion-ease-standard);
+    border-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
 .header[data-tone="light"]:not([data-scrolled]):not([data-menu-open]) {
@@ -21,17 +22,19 @@
 
 .header[data-tone="dark"]:not([data-scrolled]):not([data-menu-open]) {
   --header-focus: var(--color-focus-on-light);
-  color: var(--color-text-inverse);
+  /* v3 (E): both top-tone branches render light primary ink on the dark
+   * canvas; data-tone remains the geometry/audit contract. */
+  color: var(--color-text-primary);
 }
 
-/* Scrolled: quiet surface — slightly translucent, no heavy shadow. */
+/* Scrolled/menu (v3 D-1/E): solid dark canvas surface + separator hairline —
+ * no translucent blur film over the content that scrolls below. */
 .header[data-scrolled],
 .header[data-menu-open] {
-  border-bottom-color: color-mix(in srgb, var(--color-separator) 82%, transparent);
-  background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+  border-bottom-color: var(--color-separator);
+  background: var(--color-canvas);
   color: var(--color-text-primary);
   --header-focus: var(--color-focus);
-  backdrop-filter: blur(10px);
 }
 
 .inner {
@@ -67,8 +70,8 @@
   align-items: center;
   justify-content: center;
   padding-inline: .55rem;
-  color: color-mix(in srgb, currentColor 68%, transparent);
-  font-size: clamp(.77rem, .7vw, .84rem);
+  color: var(--color-text-secondary);
+  font-size: clamp(.8125rem, .82vw, .9rem);
   font-weight: 560;
   text-decoration: none;
   white-space: nowrap;
@@ -92,7 +95,7 @@
 }
 
 .navLink[data-active] {
-  color: currentColor;
+  color: var(--color-text-primary);
 }
 
 .navLink[data-active]::after {
@@ -117,8 +120,8 @@
   justify-content: center;
   text-decoration: none;
   padding-inline: .45rem;
-  color: color-mix(in srgb, currentColor 72%, transparent);
-  font-size: .8rem;
+  color: var(--color-text-secondary);
+  font-size: .8125rem;
   transition: color var(--motion-duration-control) var(--motion-ease-standard);
 }
 
@@ -127,6 +130,7 @@
 .login:focus-visible,
 .menuButton:focus-visible,
 .mobileActions a:focus-visible {
+  color: var(--color-text-primary);
   outline: 2px solid var(--header-focus);
   outline-offset: 3px;
 }
@@ -136,7 +140,7 @@
   display: none;
   width: 44px;
   height: 44px;
-  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border: 1px solid var(--color-separator-strong);
   border-radius: var(--radius-control);
   background: transparent;
   color: currentColor;
@@ -209,7 +213,7 @@
   padding: 1.25rem 1.25rem .75rem;
   color: var(--color-text-tertiary);
   font-family: var(--font-sans);
-  font-size: .72rem;
+  font-size: .8125rem;
   font-weight: 550;
   letter-spacing: 0;
   text-transform: none;
@@ -264,7 +268,7 @@
 @media (hover: hover) and (pointer: fine) {
   .navLink:hover,
   .login:hover {
-    color: currentColor;
+    color: var(--color-text-primary);
   }
 
   .mobileActions a:last-child:hover {

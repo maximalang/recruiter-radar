@@ -13,7 +13,7 @@ import styles from "./landing.module.css";
 import visualStyles from "./landing-visual-system.module.css";
 
 export function LandingSkipLink() {
-  return <a href="#main-content" className={styles.skipLink}>Перейти к содержанию</a>;
+  return <a href="#main-content" className={styles.skipLink} data-landing-skip-link>Перейти к содержанию</a>;
 }
 
 export default function LandingPage(props: {
@@ -37,7 +37,7 @@ export default function LandingPage(props: {
           Интерактивный пример в первом экране требует JavaScript; рассказ, тарифы и условия доступны без него.
         </div>
       </noscript>
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
         <DetectionScene paymentConfigured={props.paymentConfigured} />
         <EvidenceScene />
         <DeliveryScene />

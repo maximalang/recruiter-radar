@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 
 import { chromium } from "playwright";
 
+import { closeQuietly, installScriptWatchdog, settleLandingPage } from "./landing-settle.mjs";
+
+// D-8: fail deterministically instead of hanging until the CI job timeout.
+installScriptWatchdog("landing keyboard audit", 300_000);
+
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
 
 async function preparePage(context) {
@@ -34,7 +39,8 @@ async function preparePage(context) {
     undefined,
     { timeout: 30_000 },
   );
-  await page.waitForTimeout(160);
+  // D-8 (v3): bounded deterministic settle instead of a fixed sleep.
+  await settleLandingPage(page, { label: "keyboard audit (pre-consent)" });
 
   const consent = page.getByRole("button", { name: "Разрешить", exact: true });
   if (await consent.isVisible()) {
@@ -51,7 +57,8 @@ async function preparePage(context) {
     undefined,
     { timeout: 30_000 },
   );
-  await page.waitForTimeout(160);
+  // D-8 (v3): bounded deterministic settle after the reload as well.
+  await settleLandingPage(page, { label: "keyboard audit (post-reload)" });
   await page.locator('[data-landing-experience="signal-lock"]').waitFor({ state: "attached" });
   await page.locator("#scene-detection").waitFor({ state: "visible" });
   return { page, assertCleanConsole: () => assert.deepEqual(consoleMessages, []) };
@@ -210,7 +217,7 @@ try {
     reachedCookieSettings,
     deliveryDisclosureToggled,
   })}\n`);
-  await context.close();
+  await closeQuietly(context, "keyboard context");
 } finally {
-  await browser.close();
+  await closeQuietly(browser, "keyboard browser");
 }

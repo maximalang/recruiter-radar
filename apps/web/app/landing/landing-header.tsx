@@ -192,7 +192,9 @@ export default function LandingHeader() {
     </a>
   );
 
-  const logoTone = scrolled || menuOpen ? "light" : tone;
+  // D-7 (v3): on the single dark canvas the header wordmark always presents
+  // light; data-tone on the header element remains the geometry contract.
+  const logoTone = "light" as const;
 
   return (
     <header
