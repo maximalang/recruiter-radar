@@ -46,9 +46,10 @@ describe("landing product story v2", () => {
     expect(previewText).not.toMatch(/Промет|Северные системы|Техноформ|Демо · 12 мая/);
     expect(heroCss).toMatch(/\.title\s*\{[^}]*animation:\s*none/);
 
-    expect(heroCss).toMatch(/\.section\s*\{[\s\S]*?overflow:\s*hidden/);
-    // Fitted shot (owner verdict 23.09): no clipped-edge expansion at any width.
-    expect(heroCss).not.toMatch(/translateX/);
+    expect(heroCss).toMatch(/\.section\s*\{[\s\S]*?overflow-x:\s*clip/);
+    // v3.1 R11: the slide wrapper is the single peek↔full transform author
+    // (exactly 50% of the frame plus the gutter behind the clip edge).
+    expect(heroCss).toContain("translateX(var(--v31-peek-x))");
     expect(heroCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.fieldFigure\s*\{[^}]*width:\s*100%/);
   });
 
@@ -57,7 +58,8 @@ describe("landing product story v2", () => {
     const heroCss = source("app/landing/detection-scene.module.css");
     const landing = source("app/landing/landing-page.tsx");
 
-    expect(visualCss).toMatch(/--content-max:\s*76\.25rem/);
+    // v3.1 R5: the shared content column is 1280px.
+    expect(visualCss).toMatch(/--content-max:\s*80rem/);
     expect(visualCss).toMatch(/--page-gutter:\s*clamp\(1rem,\s*2\.35vw,\s*2rem\)/);
     expect(landing).toContain('data-theme="inverse"');
     expect(visualCss).toMatch(/--landing-canvas:\s*var\(--color-canvas\)/);
@@ -100,7 +102,7 @@ describe("landing product story v2", () => {
     expect(heroCss).not.toContain(".section::before");
     expect(heroCss).not.toContain(".section::after");
     expect(heroCss).toMatch(
-      /\.title\s*\{[^}]*font-size:\s*clamp\(3\.2rem, 5\.2vw, 4\.7rem\)[^}]*font-weight:\s*620[^}]*line-height:\s*1;/,
+      /\.title\s*\{[^}]*font-size:\s*clamp\(2\.25rem, 9\.2vw, 2\.75rem\)[^}]*font-weight:\s*680[^}]*line-height:\s*1\.08;/,
     );
     expect(heroCss).toMatch(
       /\.primaryButton\s*\{[^}]*min-height:\s*48px[^}]*background:\s*var\(--color-signal\)[^}]*color:\s*var\(--color-text-inverse\)/,
@@ -169,7 +171,7 @@ describe("landing product story v2", () => {
     expect(evidence.indexOf('data-proof-event="true"')).toBeLessThan(
       evidence.indexOf('data-proof-brief="true"'),
     );
-    expect(evidenceText).toContain("Одна рекомендация — цепочка проверяемых фактов.");
+    expect(evidenceText).toContain("Рекомендация на проверяемых фактах");
     expect(evidenceText).toContain("Оценка возможности");
     expect(evidenceText).toContain("Уверенность");
     expect(evidenceText).toContain("Следующий ход");
@@ -214,7 +216,8 @@ describe("landing product story v2", () => {
     expect(source("app/landing/hero-product-preview.tsx")).toContain('id="hero-workflow"');
     expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.workflowTabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)/);
     expect(detectionCss).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.workflowTabs > button\s*\{[^}]*min-height:\s*64px/);
-    expect(detectionCss).not.toMatch(/translateX/);
+    // v3.1 R11: peek travel is transform-driven on the slide wrapper only.
+    expect(detectionCss).toContain("translateX(var(--v31-peek-x))");
     expect(deliveryCss).toMatch(/@media \(max-width: 520px\)[\s\S]*?\.deliveryRoutes\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
     expect(deliveryCss).toMatch(/\.deliveryRoutes \.channelRoute p\s*\{\s*display:\s*none/);
   });

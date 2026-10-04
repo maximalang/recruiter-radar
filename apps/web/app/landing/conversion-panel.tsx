@@ -9,7 +9,8 @@ import {
   buildCheckoutHref,
   type PublicPreviewInput,
 } from "../../lib/publicProduct";
-import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
+import { ArrowGlyph } from "./brand-glyphs";
+import LandingFaqList from "./landing-faq-list";
 import panelStyles from "./conversion-panel.module.css";
 
 const PILOT_BULLETS = [
@@ -36,18 +37,21 @@ export default function ConversionPanel(props: {
         data-pricing-layout="pilot-decision"
         data-pricing-path="pilot-first"
         data-motion-reveal="section"
+        data-v31-zone="pricing"
+        data-variant="v1"
       >
-        <div className={panelStyles.pricingIntro} data-pricing-intro>
-          <span>Попробуйте на своей нише</span>
-          <h2>Попробовать 7 дней — {pilotPlan.price}</h2>
-          <p>Полноценная неделя работы: 10 приоритетных компаний вашей ниши с поводом, фактами и источниками.</p>
+        {/* v3.1 R8: the «Попробуйте на своей нише» overline is removed with
+            its grid slot — the h2 leads the zone. */}
+        <div className={panelStyles.pricingIntro} data-pricing-intro data-v31-content>
+          <h2 data-v31-reveal="h2">7 дней с радаром — {pilotPlan.price}</h2>
+          <p data-v31-reveal="desc">Полноценная неделя работы: 10 приоритетных компаний вашей ниши с поводом, фактами и источниками.</p>
         </div>
-
-        <div className={panelStyles.pricingDecision}>
+        <div className={panelStyles.pricingDecision} data-v31-content>
           <div
             className={panelStyles.pilotOffer}
             data-pricing-primary="true"
             data-pilot-entry="primary"
+            data-v31-reveal="offer"
           >
             <div className={panelStyles.pilotTopline}>
               <div className={panelStyles.pilotMeta}>
@@ -78,7 +82,7 @@ export default function ConversionPanel(props: {
             {secondaryPlans.map((plan) => {
               const quarterly = plan.code === "quarterly";
               return (
-                <article key={plan.code} data-plan-code={plan.code}>
+                <article key={plan.code} data-plan-code={plan.code} data-v31-reveal="offer-row">
                   <div>
                     <span>{plan.name}</span>
                     <small>{plan.cadence}</small>
@@ -106,19 +110,18 @@ export default function ConversionPanel(props: {
         data-faq-surface="true"
         data-faq-layout="centered"
         data-motion-reveal="section"
+        data-v31-zone="faq"
+        data-variant="v1"
+        aria-labelledby="faq-title"
       >
-        <div className={panelStyles.faqHeading} data-faq-heading>
-          <span>FAQ · Коротко о главном</span>
-          <h2>Что важно знать перед запуском.</h2>
+        {/* v3.1 R8/R9: the big «Что важно знать перед запуском.» h2 is
+            removed with its slot; the frozen «FAQ · Коротко о главном»
+            label is preserved pixel-for-pixel and only gains heading
+            semantics for assistive technology. */}
+        <div className={panelStyles.faqHeading} data-faq-heading data-v31-content>
+          <span id="faq-title" role="heading" aria-level={2}>FAQ · Коротко о главном</span>
         </div>
-        <div className={panelStyles.faqList} data-faq-list>
-          {props.faqItems.map((item, index) => (
-            <details key={item.question} open={index === 0} data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened} data-faq-item>
-              <summary><span>{String(index + 1).padStart(2, "0")}</span>{item.question}<i aria-hidden="true"><PlusGlyph /></i></summary>
-              <p>{item.answer}</p>
-            </details>
-          ))}
-        </div>
+        <LandingFaqList items={props.faqItems} />
       </div>
 
       <div
@@ -126,14 +129,15 @@ export default function ConversionPanel(props: {
         className={panelStyles.final}
         data-header-tone="dark"
         data-motion-reveal="section"
+        data-v31-zone="final"
+        data-variant="v2"
       >
-        <div className={panelStyles.finalCopy} data-final-proof="manual-outreach">
-
+        <div className={panelStyles.finalCopy} data-final-proof="manual-outreach" data-v31-content>
           <span className={panelStyles.finalEyebrow}>7 дней / своя ниша</span>
-          <h2>Посмотрите, кому стоит написать сейчас.</h2>
-          <p>Что изменилось, чем подтверждено и с чего начать разговор — по каждой компании.</p>
+          <h2 data-v31-reveal="h2">Найдите, кому написать сейчас</h2>
+          <p data-v31-reveal="desc">Что изменилось, чем подтверждено и с чего начать разговор — по каждой компании.</p>
         </div>
-        <div className={panelStyles.finalDecision}>
+        <div className={panelStyles.finalDecision} data-v31-content data-v31-reveal="cta">
           <ul className={panelStyles.finalTrust} aria-label="Условия запуска">
             <li>{pilotPlan.price} / 7 дней</li>
             <li>Без автопродления</li>

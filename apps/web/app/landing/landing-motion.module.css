@@ -1,1 +1,5 @@
-.motionRoot[data-motion-ready="true"] [data-motion-reveal="section"][data-motion-state="pending"]{opacity:0;transform:translate3d(0,4px,0)}.motionRoot[data-motion-ready="true"] [data-motion-reveal="section"][data-motion-state="visible"]{opacity:1;transform:translate3d(0,0,0);transition:opacity var(--motion-duration-navigation) var(--motion-ease-enter),transform var(--motion-duration-navigation) var(--motion-ease-enter)}@media(prefers-reduced-motion:reduce){.motionRoot [data-motion-reveal="section"]{opacity:1!important;transform:none!important;transition:none!important}}
+/* v3.1 R7: the legacy [data-motion-reveal] sections keep their state
+ * contract for the production audit, but no parent opacity/translate is
+ * animated — child reveals belong to the canonical [data-v31-reveal]
+ * choreography in the token source (one transform author per level). */
+.motionRoot[data-motion-ready="true"] [data-motion-reveal="section"]{opacity:1;transform:none}@media(prefers-reduced-motion:reduce){.motionRoot [data-motion-reveal="section"]{opacity:1!important;transform:none!important;transition:none!important}}

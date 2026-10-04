@@ -20,19 +20,20 @@ export default function EvidenceScene() {
       data-header-tone="dark"
       data-proof-story="why-now"
       data-motion-reveal="section"
+      data-v31-zone="evidence"
+      data-variant="v1"
     >
-      <div className={styles.layout}>
+      <div className={styles.layout} data-v31-content>
         <header className={styles.intro}>
           <div>
-            <p className={styles.introLabel}>Разбор карточки · {DEMO_COMPANY.name}</p>
-            <h2>Одна рекомендация — цепочка проверяемых фактов.</h2>
+            <h2 data-v31-reveal="h2">Рекомендация на проверяемых фактах</h2>
           </div>
         </header>
 
         <div className={styles.evidenceChain} data-proof-chain="source-fact-conclusion">
           <ol className={styles.timeline} aria-label="Последовательность подтверждающих фактов">
             {DEMO_EVIDENCE_SOURCES.map((event, index) => (
-              <li key={event.source} data-proof-event>
+              <li key={event.source} data-proof-event data-v31-reveal="item">
                 <span className={styles.sourceCell}>
                   {String(index + 1).padStart(2, "0")} · {event.source}
                 </span>

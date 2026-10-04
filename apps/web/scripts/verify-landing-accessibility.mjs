@@ -240,7 +240,7 @@ async function auditHeader(browser, viewport) {
   await page.waitForFunction(() => !document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
   assert.equal(await header.getAttribute("data-scrolled"), null, `${viewport.name}: header must stay transparent at page top`);
 
-  const brand = header.locator('[role="img"][aria-label="Recruiter Radar"]');
+  const brand = header.locator("[data-brand-lockup]");
   await assertContrast(brand, `${viewport.name} Header BrandLogo`, 4.5, heroBackground);
 
   if (viewport.width >= 960) {

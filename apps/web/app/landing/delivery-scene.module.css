@@ -6,8 +6,8 @@
   --delivery-accent: var(--landing-accent);
   background: var(--color-canvas);
   color: var(--color-text-primary);
-  /* D-2 (v3): section rhythm — 64px desktop / 48px 821-1024 / 40px ≤820. */
-  padding: 64px var(--scene-pad);
+  /* v3.1 R5 zone rhythm: 96px ≥1200 / 72px 768–1199 / 56px ≤767. */
+  padding: 96px var(--scene-pad);
 }
 
 .layout {
@@ -17,35 +17,28 @@
 
 .intro {
   display: grid;
-  grid-template-columns: minmax(11rem, .35fr) minmax(0, 1.65fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: baseline;
-  gap: 1.5rem 3rem;
+  gap: .55rem;
 }
 
-.intro > p {
-  margin: 0;
-  color: var(--color-signal-hover);
-  font-size: .8125rem;
-  font-weight: 650;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
+/* v3.1 R10 section h2: 48px ≥1200 / 36px 768–1199 / 28px ≤767, weight 640,
+ * line-height 1.14, tracking -.035em, capped at 560px. */
 .intro h2 {
   margin: 0;
-  max-width: 22ch;
-  font-size: clamp(2.4rem, 3.6vw, 3.3rem);
-  font-weight: 600;
-  letter-spacing: -.04em;
-  line-height: 1.08;
+  max-width: min(35rem, 100%);
+  font-size: 3rem;
+  font-weight: 640;
+  letter-spacing: -.035em;
+  line-height: 1.14;
+  text-wrap: balance;
 }
 
 .introSub {
-  grid-column: 2;
   max-width: 34rem;
-  margin: .55rem 0 0;
+  margin: 0;
   color: var(--color-text-secondary);
-  font-size: .9375rem;
+  font-size: 1rem;
   line-height: 1.55;
 }
 
@@ -69,9 +62,9 @@
   gap: 1rem;
   align-items: start;
   padding: 1.05rem 1.15rem;
-  border: 1px solid var(--color-separator);
-  border-radius: var(--radius-overlay);
-  background: var(--color-demo-veil-015);
+  border: var(--v31-hairline-width) solid var(--color-border-default);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-primary);
 }
 
 .channelIcon {
@@ -79,8 +72,14 @@
   width: 2.4rem;
   height: 2.4rem;
   place-items: center;
-  color: var(--color-signal);
+  color: var(--v31-blue);
 }
+
+/* v3.1 §1.3 channel accent map — cyan only as the readable cyan-ink role. */
+.channelRoute[data-channel="vk"] .channelIcon { color: var(--v31-indigo); }
+.channelRoute[data-channel="email"] .channelIcon { color: var(--v31-violet); }
+.channelRoute[data-channel="push"] .channelIcon { color: var(--v31-cyan-ink); }
+.channelRoute[data-channel="webhook"] .channelIcon { color: var(--v31-indigo); }
 
 .channelIcon svg { width: 1.2rem; height: 1.2rem; }
 
@@ -116,9 +115,9 @@
   gap: .8rem;
   align-items: start;
   padding: 1rem 1.1rem;
-  border: 1px solid var(--color-separator);
-  border-radius: var(--radius-overlay);
-  background: var(--color-demo-veil-015);
+  border: var(--v31-hairline-width) solid var(--color-border-default);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-primary);
 }
 
 .channelRoute strong { font-size: .98rem; }
@@ -130,7 +129,7 @@
   gap: 1.25rem;
   margin-top: .15rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--color-separator);
+  border-top: var(--v31-hairline-width) solid var(--color-border-subtle);
 }
 
 .manualBoundary {
@@ -139,8 +138,14 @@
   gap: .75rem 1rem;
 }
 
+/* v3.1 §1.3: the manual-control badge reads blue-ink on blue-tint. */
 .manualBoundary span {
-  color: var(--color-text-tertiary);
+  display: inline-flex;
+  padding: 4px 8px;
+  border: var(--v31-hairline-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--v31-blue-tint);
+  color: var(--v31-blue-ink);
   font-size: .8125rem;
   font-weight: 650;
 }
@@ -156,13 +161,18 @@
   min-height: 44px;
   display: flex;
   align-items: center;
-  color: var(--color-text-tertiary);
+  padding: 0 .9rem;
+  border: var(--v31-hairline-width) solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-primary);
+  color: var(--v31-blue-ink);
   cursor: pointer;
   list-style: none;
   font-size: .8125rem;
+  transition: color var(--motion-duration-control) var(--motion-ease-standard), border-color var(--motion-duration-control) var(--motion-ease-standard);
 }
 .moreRoutes summary::-webkit-details-marker { display: none; }
-.moreRoutes summary::after { content: "+"; margin-left: .5rem; color: var(--color-signal-hover); font-size: 1rem; }
+.moreRoutes summary::after { content: "+"; margin-left: .5rem; color: currentColor; font-size: 1rem; }
 .moreRoutes[open] summary::after { transform: rotate(45deg); }
 
 .extraRoutes {
@@ -181,18 +191,21 @@
   .capabilityBand { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 1024px) {
-  .section { padding-block: 48px; }
+@media (max-width: 1199px) {
+  .section { padding-block: 72px; }
+  .intro h2 { font-size: 2.25rem; }
 }
 
 @media (max-width: 820px) {
-  .section { padding: 40px 1rem; }
-  .intro { grid-template-columns: 1fr; gap: .55rem; }
-  .intro h2 { max-width: 24ch; font-size: clamp(1.75rem, 7.8vw, 2.2rem); }
-  .introSub { grid-column: auto; max-width: none; }
+  .intro { gap: .55rem; }
   .capabilityBand { margin-top: 1.75rem; }
   .boundaryRow { align-items: flex-start; flex-direction: column; }
-  .manualBoundary { align-items: flex-start; flex-direction: column; gap: .25rem; }
+  .manualBoundary { align-items: flex-start; flex-direction: column; gap: .5rem; }
+}
+
+@media (max-width: 767px) {
+  .section { padding-block: 56px; }
+  .intro h2 { font-size: 1.75rem; }
 }
 
 @media (max-width: 520px) {
@@ -206,12 +219,14 @@
   .messageActions span { font-size: .56rem; }
 }
 
-/* Pass 4 (owner verdict 25.09): staggered scroll reveal via motion tokens */
-@keyframes deliveryRise { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
-.section[data-motion-state="visible"] .cabinet { animation: deliveryRise var(--motion-duration-emphasis) var(--motion-delay-3) var(--motion-ease-enter) both; }
-.section[data-motion-state="visible"] .deliveryRoutes .channelRoute:nth-child(1) { animation: deliveryRise var(--motion-duration-emphasis) var(--motion-delay-5) var(--motion-ease-enter) both; }
-.section[data-motion-state="visible"] .deliveryRoutes .channelRoute:nth-child(2) { animation: deliveryRise var(--motion-duration-emphasis) var(--motion-delay-8) var(--motion-ease-enter) both; }
-.section[data-motion-state="visible"] .boundaryRow { animation: deliveryRise var(--motion-duration-emphasis) var(--motion-delay-10) var(--motion-ease-enter) both; }
+/* v3.1 R7: the delivery band reveal is driven by the canonical
+ * [data-v31-reveal="band"] choreography in the token source; the old
+ * data-motion-state cascade is retired so the section never animates a
+ * parent and its children at the same time. */
+
+@media (hover: hover) and (pointer: fine) {
+  .moreRoutes summary:hover { border-color: var(--v31-indigo); color: var(--v31-indigo); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .section * { transition: none !important; animation: none !important; }

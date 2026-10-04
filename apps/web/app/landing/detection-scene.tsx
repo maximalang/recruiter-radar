@@ -17,17 +17,19 @@ export default function DetectionScene(props: { paymentConfigured: boolean }) {
       data-theme="inverse"
       data-header-tone="light"
       data-hero-layout="interactive-workflow"
+      data-v31-zone="hero"
+      data-variant="v2"
       data-payment-offer={props.paymentConfigured ? "7 дней · 990 ₽" : "7 дней · заявка без списания"}
     >
       <div className={sceneStyles.copy} data-hero-copy>
         <p className={sceneStyles.serviceLabel}>Для рекрутинговых агентств</p>
-        <h1 id="detection-title" className={sceneStyles.title} data-hero-title>
+        <h1 id="detection-title" className={sceneStyles.title} data-hero-title data-v31-reveal="hero-title">
           От сигнала до сообщения
         </h1>
-        <p className={sceneStyles.description} data-hero-description>
+        <p className={sceneStyles.description} data-hero-description data-v31-reveal="hero-desc">
           Не холодная рассылка, а точные обращения. Радар находит компании, где найм только начался, и по каждой даёт повод, факты и черновик сообщения. Отправляете только вы.
         </p>
-        <div className={sceneStyles.actions} data-hero-actions>
+        <div className={sceneStyles.actions} data-hero-actions data-v31-reveal="hero-actions">
           <a
             href="#hero-workflow"
             className={sceneStyles.primaryButton}

@@ -1,6 +1,7 @@
 .visualSystem {
   --page-gutter: clamp(1rem, 2.35vw, 2rem);
-  --content-max: 76.25rem;
+  /* v3.1 R5: общая ширина контента 1280px. */
+  --content-max: 80rem;
   --scene-pad: var(--page-gutter);
   --content: var(--content-max);
   /* Pass 5 palette tokens (refs: linear.app + accio.com/work) live in the

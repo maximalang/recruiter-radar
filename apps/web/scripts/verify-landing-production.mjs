@@ -186,7 +186,7 @@ async function assertRequiredSurface(page, label) {
   assert.match(pricingText, /2 990 ₽/);
   assert.match(pricingText, /6 990 ₽/);
   assert.match(await page.locator("#faq").innerText(), /Коротко о главном/i);
-  await page.getByRole("heading", { name: /Посмотрите, кому стоит написать сейчас/ }).waitFor();
+  await page.getByRole("heading", { name: /Найдите, кому написать сейчас/ }).waitFor();
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor();
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor();
 }
@@ -257,12 +257,14 @@ async function assertNoOverlapOrClipping(page, label) {
     return selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)).flatMap((element) => {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
-      const clipped = ["hidden", "clip"].includes(style.overflow)
-        && (element.scrollHeight > element.clientHeight + 2 || element.scrollWidth > element.clientWidth + 2);
-      // The hero product shot intentionally bleeds past the right viewport edge
-      // (Accio-style collapsed teaser); the section clips it, and the document-level
-      // scrollWidth assertion still guards against real horizontal overflow.
+      // The hero product shot is the v3.1 R11 peek window: it intentionally
+      // bleeds exactly half a frame past the right hero clip edge and keeps
+      // a fixed window height over taller demo content. The section clips
+      // it, and the document-level scrollWidth assertion still guards
+      // against real horizontal overflow.
       const heroTeaser = Boolean(element.closest("#scene-detection [data-hero-visual]"));
+      const clipped = !heroTeaser && ["hidden", "clip"].includes(style.overflow)
+        && (element.scrollHeight > element.clientHeight + 2 || element.scrollWidth > element.clientWidth + 2);
       const outside = !heroTeaser && (rect.left < -2 || rect.right > document.documentElement.clientWidth + 2);
       return clipped || outside ? [{ selector, clipped, outside, rect: rect.toJSON() }] : [];
     }));
@@ -374,6 +376,18 @@ async function assertHeroGeometry(page, label) {
 async function assertHeroWorkflowContract(page, label, viewport) {
   const workflow = page.locator("#hero-workflow");
   await workflow.waitFor({ state: "attached" });
+  // v3.1 R11: the demo waits as the 50% peek until explicit input. Open it
+  // through the external handle (the touch/keyboard parity path) so the
+  // stage controls receive real clicks, and wait for the settled full state.
+  const peekDock = page.locator("[data-demo-peek]");
+  if (await peekDock.getAttribute("data-peek-state")) {
+    await page.locator("[data-peek-handle]").click();
+    await page.waitForFunction(
+      () => document.querySelector("[data-demo-peek]")?.getAttribute("data-peek-state") === "full",
+      undefined,
+      { timeout: MOTION_SETTLE_TIMEOUT_MS },
+    );
+  }
   // D-8: the auto-advance cadence (8s, unchanged) may legitimately have
   // advanced the demo before this assert runs on a slow runner; the initial
   // state contract ("starts at stage 1 without user input") is asserted in
@@ -769,7 +783,7 @@ async function assertNoJs(browser) {
   assert.match(noJsPricingText, /Полноценная неделя работы/i);
   assert.match(noJsPricingText, /990 ₽/);
   assert.ok(await page.locator("#faq summary").count() >= 1, "no-JS FAQ question missing");
-  await page.getByRole("heading", { name: /Посмотрите, кому стоит написать сейчас/ }).waitFor({ state: "attached" });
+  await page.getByRole("heading", { name: /Найдите, кому написать сейчас/ }).waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor({ state: "attached" });
   const followsHero = await page.evaluate(() => {

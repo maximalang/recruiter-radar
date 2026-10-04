@@ -1,6 +1,7 @@
 .landingPage {
   --scene-pad: clamp(1rem, 3.2vw, 4rem);
-  --content: 84rem;
+  /* v3.1 R5: content column is 1280px across the landing zones. */
+  --content: 80rem;
   min-height: 100vh;
   margin: -32px -20px -72px;
   overflow-x: clip;
@@ -16,8 +17,10 @@
 .landingPage :where([id]) { scroll-margin-top: 5.5rem; }
 
 .landingPage :is(a, button, input, summary):focus-visible {
+  /* v3.1 R5 focus contract: 2px blue ring + 2px white outer offset. */
   outline: 2px solid var(--color-focus);
-  outline-offset: 4px;
+  outline-offset: 2px;
+  box-shadow: var(--shadow-focus-outer);
 }
 
 .landingPage a { color: inherit; }

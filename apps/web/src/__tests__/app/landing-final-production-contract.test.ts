@@ -27,7 +27,7 @@ describe("landing final production contract", () => {
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).not.toContain("HeroRadar");
     expect(hero).not.toContain("HIGH");
-    expect(heroCss).toMatch(/\.title\s*\{[^}]*font-size:\s*clamp\(3\.2rem,\s*5\.2vw,\s*4\.7rem\);[^}]*font-weight:\s*620;[^}]*line-height:\s*1;/);
+    expect(heroCss).toMatch(/\.title\s*\{[^}]*font-size:\s*clamp\(2\.25rem, 9\.2vw, 2\.75rem\);[^}]*font-weight:\s*680;[^}]*line-height:\s*1\.08;/);
   });
 
   test("uses one Pilot decision, centered FAQ, and compact closing CTA", () => {
@@ -40,7 +40,7 @@ describe("landing final production contract", () => {
     expect(conversion).toContain('data-conversion-scenes="continuous"');
     expect(conversion).toContain('data-pricing-layout="pilot-decision"');
     expect(conversion).toContain('data-faq-layout="centered"');
-    expect(conversion).toContain("Попробовать 7 дней —");
+    expect(conversion).toContain("7 дней с радаром —");
     expect(conversion).toContain("Полноценная неделя работы");
     expect(browserAudit).toContain("Полноценная неделя работы");
     expect(conversion).toContain("Запустить на 7 дней");
@@ -80,7 +80,7 @@ describe("landing final production contract", () => {
     expect(page).not.toContain("SignalTimelineScene");
     expect(page).not.toContain("<RadarScene");
     expect(page.indexOf("<EvidenceScene")).toBeLessThan(page.indexOf("<DeliveryScene"));
-    expect(delivery).toContain("Результаты приходят туда, где вы работаете");
+    expect(delivery).toContain("Результаты там, где вы работаете");
     expect(delivery).toContain("Сообщения компаниям не отправляются автоматически.");
     expect(delivery).toContain('data-delivery-routes="connected"');
     expect(delivery).toContain("PRIMARY_ROUTES.map");

@@ -45,46 +45,85 @@ body {
   --color-overlay: rgba(0, 0, 0, .64);
 }
 
-/* Landing v3 brand system (D1 output spec, 2026-10-03): graphite canvas +
- * Recruiter Radar blue/cyan accent, refs linear.app/clair.co/pleo.io.
- * Canonical landing-scope overrides of tables A (21 semantic names),
- * B (42 consumed product-demo names) and G (selection + shadow system).
- * Scoped to the landing subtree via data-landing-experience; the product
- * workspace (cabinet/dashboard) keeps the champagne inverse theme and the
- * original graphite demo tokens in globals.css. #RRGGBBAA values are exact
- * alpha per the D1 equality contract; unconsumed demo siblings
- * (veil-05/055/08/16, gold-ring, scrim-side) are intentionally NOT
- * redeclared. The descendant arm keeps any nested section that re-declares
- * data-theme="inverse" (the hero) on this palette. */
+/* Landing v3.1 base (master verdict 2026-10-04, D2 output contract):
+ * approved LIGHT paper canvas + brand blue/cyan accents for the landing
+ * subtree only. This block supersedes the dark D1 landing scope; the
+ * product workspace keeps the champagne inverse theme above, and the hero
+ * demo keeps its own dark scope via the demo tokens below.
+ * R2: the hero scrim tokens (--color-demo-shade / -scrim-bottom /
+ * -scrim-corner) are intentionally NOT redeclared here — the exact pass34
+ * values from globals.css (rgba(0,0,0,.3) / rgba(5,6,8,.62) /
+ * rgba(5,6,8,.55); scrim-side rgba(5,6,8,.28)) are the accepted computed
+ * state, and the former weakened overrides (.16/.12) are removed.
+ * Scoped to the landing subtree via data-landing-experience; the descendant
+ * arm keeps any nested section that re-declares data-theme="inverse"
+ * (the hero) on this palette. */
 [data-theme="inverse"][data-landing-experience],
 [data-landing-experience] [data-theme="inverse"] {
-  /* A. Semantic core (21 names). */
-  --color-canvas: #0a0b0c;
-  --color-surface-primary: #1b1c1f;
-  --color-surface-secondary: #202124;
-  --color-surface-selected: #232428;
-  --color-surface-elevated: #26272b;
-  --color-text-primary: #f5f7fb;
-  --color-text-secondary: #b8bec9;
-  --color-text-tertiary: #a4aab6;
-  --color-text-disabled: #9299a5;
+  /* A. Semantic core — light paper palette (R1, D2 §1.1). */
+  --color-canvas: #f8f6f0;
+  --color-canvas-secondary: #f1eee6;
+  --color-canvas-selected: #ece9e1;
+  --color-surface-primary: #ffffff;
+  --color-surface-secondary: #f1eee6;
+  --color-surface-selected: #ece9e1;
+  --color-surface-elevated: #ffffff;
+  --color-text-primary: #1b1c1f;
+  --color-text-secondary: #4b515c;
+  --color-text-tertiary: #63666e;
+  --color-text-disabled: #63666e;
   --color-text-inverse: #0a0b0c;
-  --color-separator-subtle: #303640;
-  --color-separator: #444b5a;
-  --color-separator-strong: #778297;
+  --color-separator-subtle: #c9c6be;
+  --color-separator: #b8b4ab;
+  --color-separator-strong: #817c72;
+  --color-border-subtle: #c9c6be;
+  --color-border-default: #b8b4ab;
+  --color-border-strong: #817c72;
   --color-signal: #087ff4;
   --color-signal-hover: #05c9ef;
   --color-signal-soft: #087ff424;
-  --color-signal-on-dark: #05c9ef;
-  --color-copper: #b8a7ff;
-  --color-information: #93a8ff;
-  --color-focus: #05c9ef;
+  --color-signal-muted: #0666c5;
+  --color-signal-on-dark: #0666c5;
+  --color-copper: #7200d8;
+  --color-information: #3725f3;
+  --color-focus: #087ff4;
+  --color-focus-outer: #ffffff;
   --color-overlay: #050608b8;
-  /* Spec §1 rule 5: dark UA scheme confined to the landing subtree. */
-  color-scheme: dark;
+  --color-header-glass-light: rgba(248, 246, 240, .96);
+  --color-header-glass-dark: rgba(248, 246, 240, .96);
+  color-scheme: light;
 
-  /* B. Product demo shot (42 consumed names; graphite base kept, accents
-   * recolored to brand blue/cyan/indigo per D1 §1B). */
+  /* v3.1 local accent roles (D2 §1.1/§1.3) — new names, they do not replace
+   * the core system. Consumed via var() only; component modules never carry
+   * raw literals (semantic-visual-contract). */
+  --v31-violet: #7200d8;
+  --v31-indigo: #3725f3;
+  --v31-blue: #087ff4;
+  --v31-cyan: #05c9ef;
+  --v31-blue-ink: #0666c5;
+  --v31-cyan-ink: #036879;
+  --v31-violet-tint: #f6eeff;
+  --v31-indigo-tint: #eeecff;
+  --v31-blue-tint: #eaf4ff;
+  --v31-cyan-tint: #e6faff;
+  --v31-paper: #f8f6f0;
+  --v31-paper-soft: #f1eee6;
+  --v31-paper-selected: #ece9e1;
+  --v31-white: #ffffff;
+  --v31-ink: #1b1c1f;
+  --v31-ink-secondary: #4b515c;
+  --v31-ink-tertiary: #63666e;
+  --v31-hairline: #b8b4ab;
+  --v31-hairline-soft: #c9c6be;
+  --v31-hairline-width: 1px;
+  --v31-gradient-brand: linear-gradient(135deg, #7200d8 0%, #3725f3 37%, #087ff4 70%, #05c9ef 100%);
+  --v31-gradient-functional: linear-gradient(135deg, #7200d8 0%, #3725f3 52%, #087ff4 100%);
+  --v31-wordmark-ink: #1b1c1f;
+  --v31-demo-window-border: rgba(220, 221, 223, .22);
+
+  /* B. Product demo shot — the hero window keeps the dark graphite demo
+   * scope (master R1: demo tokens are not lightened). Values unchanged from
+   * the accepted v3 D1 table except the three R2 scrim tokens above. */
   --color-demo-base-0: #0b0c0f;
   --color-demo-base-1: #131419;
   --color-demo-elevated: #1e1f21;
@@ -122,24 +161,32 @@ body {
   --color-demo-veil-12: #ffffff1f;
   --color-demo-glow-indigo: #087ff41f;
   --color-demo-glow-indigo-strong: #3725f329;
-  --color-demo-shade: #0000004d;
-  --color-demo-scrim-bottom: #05060829;
-  --color-demo-scrim-corner: #0506081f;
   --color-demo-gold-fill: #087ff41f;
   --color-demo-gold-soft: #087ff424;
 
-  /* G. Existing auxiliary properties (6 names) — landing scope only; the
-   * graphite demo shadows in globals.css stay untouched for the product.
-   * Compound values verbatim from the D1 G table (not new color tokens). */
-  --color-selection: #3725f352;
-  --shadow-hero-panel: 0 20px 56px #00000073, 0 2px 8px #00000033;
+  /* G. Auxiliary properties — landing scope only. R5: the window lift on
+   * the light page is the soft graphite shadow; card hover and CTA inset
+   * states get dedicated tokens; demo-internal shadows stay dark. */
+  --color-selection: #cce6ff;
+  --color-selection-text: #1b1c1f;
+  --shadow-hero-panel: 0 12px 32px rgba(27, 28, 31, .12);
+  --shadow-card-hover: 0 6px 16px rgba(27, 28, 31, .06);
+  --shadow-cta-hover-inset: inset 0 0 0 1px rgba(10, 11, 12, .16);
+  --shadow-focus-outer: 0 0 0 2px #ffffff;
   --shadow-demo-panel: 0 1px 2px #0000004d, 0 18px 44px #00000052, inset 0 1px 0 #ffffff14;
   --shadow-demo-status: 0 0 0 3px #087ff41f;
   --shadow-demo-stage: 0 0 0 3px #087ff41a;
   --shadow-overlay: 0 24px 64px #00000099, 0 6px 18px #00000066;
 }
 
-/* D-1 (v3): the landing skip link renders as a SIBLING of the landing root
+@media (min-resolution: 2dppx) {
+  [data-theme="inverse"][data-landing-experience],
+  [data-landing-experience] [data-theme="inverse"] {
+    --v31-hairline-width: .5px;
+  }
+}
+
+/* D-1 (v3, focus updated by v3.1 R5): the landing skip link renders as a SIBLING of the landing root
  * (home-page-content.tsx), so the scoped landing palette above never reaches
  * it. Its exact v3 values live here, in the canonical token source, because
  * the semantic-visual-contract CI check forbids raw color literals inside
@@ -147,7 +194,7 @@ body {
 [data-landing-skip-link] {
   --color-signal: #087ff4;
   --color-text-inverse: #0a0b0c;
-  --color-focus: #05c9ef;
+  --color-focus: #087ff4;
 }
 
 :is([data-ui-system="recruiter-radar"], [data-product-workspace="true"]) :where(input, select, textarea) {
@@ -334,4 +381,339 @@ body {
   [data-product-workspace="true"] * {
     scroll-behavior: auto;
   }
+}
+
+/* Landing v3.1 R6 — zone paint mechanism (D2 background contract §0.2):
+ * one mechanism, five custom properties per recipe, decorative ::before
+ * layer only. No blend modes, no external assets, no random. The ::before
+ * also carries the bounded §5.4 parallax transform when JS enables it. */
+[data-landing-experience] [data-v31-zone] {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--v31-bg-base);
+  background-image: none;
+  color: var(--v31-ink);
+}
+
+[data-landing-experience] [data-v31-zone]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: transparent;
+  background-image: var(--v31-bg-image);
+  background-size: var(--v31-bg-size);
+  background-position: var(--v31-bg-position);
+  background-repeat: var(--v31-bg-repeat);
+  background-attachment: scroll;
+  opacity: 1;
+  transform: none;
+}
+
+[data-landing-experience] [data-v31-zone] > [data-v31-content] {
+  position: relative;
+  z-index: 1;
+}
+
+/* §5.4 bounded parallax: hero wash ×2px + scroll clamp ±4px, final wash
+ * ×1px + clamp ±2px; 220ms smoothing, 520ms reset on pointerleave. The
+ * driver (landing-motion) enables data-parallax only for fine pointers,
+ * width > 1024, intersecting zones and no reduced-motion. */
+[data-landing-experience] [data-v31-zone][data-parallax="on"]::before {
+  transform: translate3d(var(--v31-par-x, 0px), var(--v31-par-y, 0px), 0);
+  transition: transform var(--motion-duration-context) var(--motion-ease-standard);
+}
+
+[data-landing-experience] [data-v31-zone][data-parallax="reset"]::before {
+  transform: translate3d(0px, 0px, 0);
+  transition: transform var(--motion-duration-signal) var(--motion-ease-standard);
+}
+
+/* 18 reproducible zone recipes (D2 background contract §0.3/§1-§6).
+ * Switching a zone background is data-variant only — no nth-child binding,
+ * no code change, no screenshot retouch. */
+[data-v31-zone="hero"][data-variant="v1"] {
+  --v31-bg-base: #f8f6f0;
+  --v31-bg-image: none;
+  --v31-bg-size: auto;
+  --v31-bg-position: center;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="hero"][data-variant="v2"] {
+  --v31-bg-base: #f8f6f0;
+  --v31-bg-image:
+    radial-gradient(ellipse 58% 76% at 100% 8%,
+      #eeecff 0%, rgba(238,236,255,0) 68%),
+    linear-gradient(180deg,#f8f6f0 0%,#ffffff 100%);
+  --v31-bg-size: 100% 100%, 100% 100%;
+  --v31-bg-position: center, center;
+  --v31-bg-repeat: no-repeat, no-repeat;
+}
+
+[data-v31-zone="hero"][data-variant="v3"] {
+  --v31-bg-base: #ffffff;
+  --v31-bg-image:
+    repeating-linear-gradient(90deg,
+      #ece9e1 0px,#ece9e1 1px,transparent 1px,transparent 96px),
+    repeating-linear-gradient(180deg,
+      #ece9e1 0px,#ece9e1 1px,transparent 1px,transparent 96px),
+    radial-gradient(ellipse 70% 88% at 100% 72%,
+      #e6faff 0%,rgba(230,250,255,0) 70%);
+  --v31-bg-size: 100% 100%, 100% 100%, 100% 100%;
+  --v31-bg-position: left top, left top, center;
+  --v31-bg-repeat: no-repeat, no-repeat, no-repeat;
+}
+
+[data-v31-zone="evidence"][data-variant="v1"] {
+  --v31-bg-base: #ffffff;
+  --v31-bg-image: none;
+  --v31-bg-size: auto;
+  --v31-bg-position: center;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="evidence"][data-variant="v2"] {
+  --v31-bg-base: #ffffff;
+  --v31-bg-image:
+    linear-gradient(90deg,
+      #f6eeff 0%,#f6eeff 6%,#ffffff 6%,#ffffff 100%);
+  --v31-bg-size: 100% 100%;
+  --v31-bg-position: left top;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="evidence"][data-variant="v3"] {
+  --v31-bg-base: #f8f6f0;
+  --v31-bg-image:
+    repeating-linear-gradient(180deg,
+      #ece9e1 0px,#ece9e1 1px,transparent 1px,transparent 80px),
+    radial-gradient(ellipse 54% 80% at 0% 50%,
+      #eeecff 0%,rgba(238,236,255,0) 76%);
+  --v31-bg-size: 100% 100%, 100% 100%;
+  --v31-bg-position: left top, center;
+  --v31-bg-repeat: no-repeat, no-repeat;
+}
+
+[data-v31-zone="delivery"][data-variant="v1"] {
+  --v31-bg-base: #f1eee6;
+  --v31-bg-image: none;
+  --v31-bg-size: auto;
+  --v31-bg-position: center;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="delivery"][data-variant="v2"] {
+  --v31-bg-base: #f8f6f0;
+  --v31-bg-image:
+    radial-gradient(ellipse 66% 92% at 100% 50%,
+      #eaf4ff 0%,rgba(234,244,255,0) 78%),
+    linear-gradient(90deg,#ffffff 0%,#f8f6f0 100%);
+  --v31-bg-size: 100% 100%, 100% 100%;
+  --v31-bg-position: center, center;
+  --v31-bg-repeat: no-repeat, no-repeat;
+}
+
+[data-v31-zone="delivery"][data-variant="v3"] {
+  --v31-bg-base: #ffffff;
+  --v31-bg-image:
+    linear-gradient(90deg,
+      #f8f6f0 0%,#f8f6f0 25%,
+      #eeecff 25%,#eeecff 50%,
+      #eaf4ff 50%,#eaf4ff 75%,
+      #e6faff 75%,#e6faff 100%);
+  --v31-bg-size: 100% 100%;
+  --v31-bg-position: center;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="pricing"][data-variant="v1"] {
+  --v31-bg-base: #f8f6f0;
+  --v31-bg-image: none;
+  --v31-bg-size: auto;
+  --v31-bg-position: center;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="pricing"][data-variant="v2"] {
+  --v31-bg-base: #f1eee6;
+  --v31-bg-image:
+    linear-gradient(180deg,#f1eee6 0%,#ece9e1 100%);
+  --v31-bg-size: 100% 100%;
+  --v31-bg-position: center;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="pricing"][data-variant="v3"] {
+  --v31-bg-base: #ffffff;
+  --v31-bg-image:
+    linear-gradient(90deg,
+      #ffffff 0%,#ffffff 76%,#eaf4ff 76%,#eaf4ff 100%);
+  --v31-bg-size: 100% 100%;
+  --v31-bg-position: center;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="faq"][data-variant="v1"] {
+  --v31-bg-base: #ffffff;
+  --v31-bg-image: none;
+  --v31-bg-size: auto;
+  --v31-bg-position: center;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="faq"][data-variant="v2"] {
+  --v31-bg-base: #f8f6f0;
+  --v31-bg-image:
+    linear-gradient(180deg,#ffffff 0%,#f8f6f0 100%);
+  --v31-bg-size: 100% 100%;
+  --v31-bg-position: center;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="faq"][data-variant="v3"] {
+  --v31-bg-base: #f8f6f0;
+  --v31-bg-image:
+    linear-gradient(90deg,
+      #ece9e1 0%,#ece9e1 18%,#f8f6f0 18%,#f8f6f0 100%);
+  --v31-bg-size: 100% 100%;
+  --v31-bg-position: left top;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="final"][data-variant="v1"] {
+  --v31-bg-base: #ffffff;
+  --v31-bg-image: none;
+  --v31-bg-size: auto;
+  --v31-bg-position: center;
+  --v31-bg-repeat: no-repeat;
+}
+
+[data-v31-zone="final"][data-variant="v2"] {
+  --v31-bg-base: #f8f6f0;
+  --v31-bg-image:
+    radial-gradient(ellipse 84% 110% at 50% 100%,
+      #eaf4ff 0%,rgba(234,244,255,0) 70%),
+    linear-gradient(180deg,#ffffff 0%,#f8f6f0 100%);
+  --v31-bg-size: 100% 100%, 100% 100%;
+  --v31-bg-position: center, center;
+  --v31-bg-repeat: no-repeat, no-repeat;
+}
+
+[data-v31-zone="final"][data-variant="v3"] {
+  --v31-bg-base: #f8f6f0;
+  --v31-bg-image:
+    linear-gradient(90deg,
+      #7200d8 0%,#3725f3 37%,#087ff4 70%,#05c9ef 100%);
+  --v31-bg-size: 100% 2px;
+  --v31-bg-position: left top;
+  --v31-bg-repeat: no-repeat;
+}
+
+/* Landing v3.1 R7 — reveal choreography (D2 §5.3). One canonical ladder,
+ * no duplicated local timings. Zones get a 1px top sentinel; JS flips
+ * data-v31-state pending → visible → shown. "shown" removes the fill-both
+ * animation so hover transforms own the card afterwards. No JS: no state
+ * attribute, everything visible. */
+@keyframes v31-rise-y6 { from { opacity: 0.01; transform: translate3d(0, 6px, 0); } to { opacity: 1; transform: none; } }
+@keyframes v31-rise-y8 { from { opacity: 0.01; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+@keyframes v31-rise-y12 { from { opacity: 0.01; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: none; } }
+@keyframes v31-rise-y14 { from { opacity: 0.01; transform: translate3d(0, 14px, 0); } to { opacity: 1; transform: none; } }
+@keyframes v31-rise-y16 { from { opacity: 0.01; transform: translate3d(0, 16px, 0); } to { opacity: 1; transform: none; } }
+@keyframes v31-rise-x16 { from { opacity: 0.01; transform: translate3d(16px, 0, 0); } to { opacity: 1; transform: none; } }
+
+[data-landing-experience] [data-v31-zone][data-v31-state="pending"] [data-v31-reveal] { opacity: 0.01; }
+[data-landing-experience] [data-v31-zone][data-v31-state="pending"] [data-v31-reveal="h2"] { transform: translate3d(0, 14px, 0); }
+[data-landing-experience] [data-v31-zone][data-v31-state="pending"] [data-v31-reveal="desc"] { transform: translate3d(0, 8px, 0); }
+[data-landing-experience] [data-v31-zone][data-v31-state="pending"] [data-v31-reveal="item"] { transform: translate3d(16px, 0, 0); }
+[data-landing-experience] [data-v31-zone][data-v31-state="pending"] [data-v31-reveal="band"],
+[data-landing-experience] [data-v31-zone][data-v31-state="pending"] [data-v31-reveal="offer"] { transform: translate3d(0, 16px, 0); }
+[data-landing-experience] [data-v31-zone][data-v31-state="pending"] [data-v31-reveal="offer-row"] { transform: translate3d(0, 8px, 0); }
+[data-landing-experience] [data-v31-zone][data-v31-state="pending"] [data-v31-reveal="faq-item"] { transform: translate3d(0, 6px, 0); }
+[data-landing-experience] [data-v31-zone][data-v31-state="pending"] [data-v31-reveal="cta"] { transform: translate3d(0, 8px, 0); }
+
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="h2"] { animation: v31-rise-y14 var(--motion-duration-signal) var(--motion-ease-enter) both; }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="desc"] { animation: v31-rise-y8 var(--motion-duration-emphasis) var(--motion-delay-1) var(--motion-ease-standard) both; }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="item"] { animation: v31-rise-x16 var(--motion-duration-signal) var(--motion-delay-3) var(--motion-ease-enter) both; }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="item"]:nth-child(2) { animation-delay: var(--motion-delay-4); }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="item"]:nth-child(3) { animation-delay: var(--motion-delay-6); }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="item"]:nth-child(n+4) { animation-delay: var(--motion-delay-9); }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="band"] { animation: v31-rise-y16 var(--motion-duration-signal) var(--motion-delay-3) var(--motion-ease-enter) both; }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="offer"] { animation: v31-rise-y16 var(--motion-duration-signal) var(--motion-delay-3) var(--motion-ease-enter) both; }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="offer-row"] { animation: v31-rise-y8 var(--motion-duration-emphasis) var(--motion-delay-4) var(--motion-ease-enter) both; }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="offer-row"]:nth-of-type(2) { animation-delay: var(--motion-delay-6); }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="faq-item"] { animation: v31-rise-y6 var(--motion-duration-emphasis) var(--motion-ease-standard) both; }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="faq-item"]:nth-child(2) { animation-delay: var(--motion-delay-1); }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="faq-item"]:nth-child(3) { animation-delay: var(--motion-delay-3); }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="faq-item"]:nth-child(4) { animation-delay: var(--motion-delay-4); }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="faq-item"]:nth-child(5) { animation-delay: var(--motion-delay-6); }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="faq-item"]:nth-child(n+6) { animation-delay: var(--motion-delay-9); }
+[data-landing-experience] [data-v31-zone][data-v31-state="visible"] [data-v31-reveal="cta"] { animation: v31-rise-y8 var(--motion-duration-emphasis) var(--motion-delay-3) var(--motion-ease-enter) both; }
+
+/* Hero entrance — pure CSS, starts before first paint; JS never re-hides
+ * already-visible hero elements. Delays per the §5.3 table. */
+[data-landing-experience] [data-v31-reveal="hero-title"] { animation: v31-rise-y12 var(--motion-duration-signal) var(--motion-ease-enter) both; }
+[data-landing-experience] [data-v31-reveal="hero-desc"] { animation: v31-rise-y8 var(--motion-duration-emphasis) var(--motion-delay-3) var(--motion-ease-standard) both; }
+[data-landing-experience] [data-v31-reveal="hero-actions"] { animation: v31-rise-y8 var(--motion-duration-emphasis) var(--motion-delay-4) var(--motion-ease-enter) both; }
+[data-landing-experience] [data-v31-reveal="hero-demo"] { animation: v31-rise-y16 var(--motion-duration-scan) var(--motion-delay-3) var(--motion-ease-enter) both; }
+
+/* R5 — interactive card hover: lift + accent edge + soft shadow, only for
+ * the pilot offer and the continuation rows (data hooks, no class
+ * selectors in the canonical source). */
+[data-landing-experience] [data-pilot-entry="primary"],
+[data-landing-experience] [data-pricing-secondary="true"] > article {
+  transition:
+    transform var(--motion-duration-context) var(--motion-ease-enter),
+    border-color var(--motion-duration-control) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-context) var(--motion-ease-enter);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-landing-experience] [data-pilot-entry="primary"]:hover,
+  [data-landing-experience] [data-pricing-secondary="true"] > article:hover {
+    transform: translateY(-3px);
+    border-color: var(--v31-indigo);
+    box-shadow: var(--shadow-card-hover);
+  }
+}
+
+[data-landing-experience] [data-pilot-entry="primary"]:focus-within,
+[data-landing-experience] [data-pricing-secondary="true"] > article:focus-within {
+  transform: translateY(-3px);
+  border-color: var(--v31-indigo);
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* R5/§5.2 — conversion primary CTAs keep the blue fill; hover/press differ
+ * by motion and the inset edge, never by a cyan refill. The hero CTA owns
+ * the same contract inside its scene module. */
+[data-landing-experience] [data-analytics-context="pricing_pilot"],
+[data-landing-experience] [data-analytics-context="closing"] {
+  transition:
+    transform var(--motion-duration-control) var(--motion-ease-enter),
+    box-shadow var(--motion-duration-control) var(--motion-ease-enter);
+}
+
+[data-landing-experience] [data-analytics-context="pricing_pilot"] svg,
+[data-landing-experience] [data-analytics-context="closing"] svg {
+  transition: transform var(--motion-duration-control) var(--motion-ease-enter);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-landing-experience] [data-analytics-context="pricing_pilot"]:hover,
+  [data-landing-experience] [data-analytics-context="closing"]:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-cta-hover-inset);
+  }
+
+  [data-landing-experience] [data-analytics-context="pricing_pilot"]:hover svg,
+  [data-landing-experience] [data-analytics-context="closing"]:hover svg {
+    transform: translate3d(3px, 0, 0);
+  }
+}
+
+[data-landing-experience] [data-analytics-context="pricing_pilot"]:active,
+[data-landing-experience] [data-analytics-context="closing"]:active {
+  transform: scale(.985);
 }

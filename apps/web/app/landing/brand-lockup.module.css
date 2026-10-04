@@ -1,0 +1,11 @@
+/* v3.1 R12 lockup sizing: intrinsic 124×40 (A) / 124×36 (B); mobile ≤480
+ * renders the .9 scale. Clear space around the lockup is kept by the header
+ * layout; the wordmark reads graphite through currentColor. */
+.lockup { display: block; color: var(--v31-wordmark-ink); }
+
+.wordmarkPath { fill: currentColor; }
+
+@media (max-width: 480px) {
+  .lockup[data-lockup="a"] { width: 111.6px; height: 36px; }
+  .lockup[data-lockup="b"] { width: 111.6px; height: 32.4px; }
+}

@@ -23,45 +23,56 @@ describe("landing hero advertising workflow", () => {
 
     expect(container.querySelector('[data-hero-product-preview="workflow"]')).not.toBeNull();
     expect(screen.getByRole("tab", { name: /Ваш рынок/i })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getAllByText("Профиль рынка — Инженерный подбор").length).toBeGreaterThanOrEqual(2);
+    // v3.1 R10 (variant A): the stage-1 title is the concise market name.
+    expect(screen.getAllByText("Инженерный подбор").length).toBeGreaterThanOrEqual(2);
     expect(container).not.toHaveTextContent(/Промет|Демо|12 мая/i);
   });
 
   it("lets the visitor inspect every workflow stage", () => {
+    jest.useFakeTimers();
     render(<HeroProductPreview />);
 
+    // v3.1 §5.3: the outgoing scene exits for 180ms, then the swap is atomic.
     fireEvent.click(screen.getByRole("tab", { name: /10 компаний/i }));
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("10 компаний за 7 дней — каждая с причиной написать");
+    act(() => jest.advanceTimersByTime(200));
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("10 компаний за 7 дней");
 
     fireEvent.click(screen.getByRole("tab", { name: /Готовый черновик/i }));
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("Черновик готов — отправляете только вы");
+    act(() => jest.advanceTimersByTime(200));
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Черновик готов. Отправляете вы.");
   });
 
-  it("advances to the next idea after a comfortable reading interval", () => {
+  it("advances automatically until the first manual choice, then stays put", () => {
     jest.useFakeTimers();
-    const { container } = render(<HeroProductPreview />);
-    const workflow = container.querySelector<HTMLElement>("[data-hero-workflow]");
-    expect(workflow).not.toBeNull();
+    render(<HeroProductPreview />);
 
-    fireEvent.pointerEnter(workflow!);
     act(() => jest.advanceTimersByTime(7_999));
     expect(screen.getByRole("tab", { name: /Ваш рынок/i })).toHaveAttribute("aria-selected", "true");
     act(() => jest.advanceTimersByTime(1));
     expect(screen.getByRole("tab", { name: /27 источников/i })).toHaveAttribute("aria-selected", "true");
 
+    // v3.1 §5.3: a manual tab click stops the cadence until reload; it never
+    // resumes spontaneously after the first interaction.
     fireEvent.click(screen.getByRole("tab", { name: /10 компаний/i }));
-    act(() => jest.advanceTimersByTime(8_000));
-    expect(screen.getByRole("tab", { name: /Готовый черновик/i })).toHaveAttribute("aria-selected", "true");
+    act(() => jest.advanceTimersByTime(200));
+    expect(screen.getByRole("tab", { name: /10 компаний/i })).toHaveAttribute("aria-selected", "true");
+    act(() => jest.advanceTimersByTime(24_000));
+    expect(screen.getByRole("tab", { name: /10 компаний/i })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("keeps the hero product shot fitted inside its column without a clipped edge", () => {
+  it("keeps the hero demo as the v3.1 peek window inside its clip area", () => {
     const css = source("app/landing/detection-scene.module.css");
 
-    expect(css).toMatch(/\.section\s*\{[\s\S]*?overflow:\s*hidden/);
+    // v3.1 R11: the hero section clips horizontally only; the dock slide is
+    // the single transform author for the peek↔full travel (exactly 50% of
+    // the frame plus the gutter waits behind the right clip edge).
+    expect(css).toMatch(/\.section\s*\{[\s\S]*?overflow-x:\s*clip/);
     expect(css).toMatch(/\.fieldFigure\s*\{[^}]*width:\s*100%/);
-    // Owner verdict 23.09: no Accio-style bleed/expansion — the mock is fully
-    // visible at every width, and the hero copy never dims on interaction.
-    expect(css).not.toMatch(/translateX/);
+    expect(css).toContain("--v31-peek-x: calc(50% + var(--v31-demo-gutter));");
+    expect(css).toMatch(/\.peekDock\[data-peek-state="peek"\] \.peekSlide,\s*\r?\n\.peekDock\[data-peek-state="closing"\] \.peekSlide \{ transform: translateX\(var\(--v31-peek-x\)\); \}/);
+    // Owner verdict 23.09 remnants that v3.1 keeps banned: no hover/focus
+    // expansion of the product shot itself, no :has() layout coupling, and
+    // no near-zero opacity literals.
     expect(css).not.toMatch(/\.fieldFigure:hover\s+\.productShot/);
     expect(css).not.toMatch(/\.fieldFigure:focus-within\s+\.productShot/);
     expect(css).not.toMatch(/\.section:has\(/);
