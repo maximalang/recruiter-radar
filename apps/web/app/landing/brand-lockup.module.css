@@ -1,9 +1,19 @@
 /* v3.1 R12 lockup sizing: intrinsic 124×40 (A) / 124×36 (B); mobile ≤480
  * renders the .9 scale. Clear space around the lockup is kept by the header
- * layout; the wordmark reads graphite through currentColor. */
+ * layout. R12-REV (D3): the wordmark paint lives in this module instead of
+ * presentation attributes — solid var(--v31-indigo) by default, solid
+ * var(--v31-indigo-tint) on dark, per-glyph gradient aliases through the
+ * --lockup-word-fill custom property for spectrum/bounded. The color token
+ * remains the currentColor source for the forced-colors fallback. */
 .lockup { display: block; color: var(--v31-wordmark-ink); }
 
-.wordmarkPath { fill: currentColor; }
+.wordmarkPath { fill: var(--lockup-word-fill, var(--v31-indigo)); }
+
+.lockup[data-tone="dark"] .wordmarkPath { fill: var(--v31-indigo-tint); }
+
+@media (forced-colors: active) {
+  .lockup[data-tone] .wordmarkPath { fill: currentColor; }
+}
 
 @media (max-width: 480px) {
   .lockup[data-lockup="a"] { width: 111.6px; height: 36px; }
