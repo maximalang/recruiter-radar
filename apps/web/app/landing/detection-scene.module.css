@@ -141,7 +141,9 @@
 .peekReveal[data-reveal-done="true"] { animation: none; opacity: 1; transform: none; }
 
 /* R11 external handle: 44×44, above the window frame (4px gap), moves with
- * the slide, never inert, always a ≥2px visible focus ring. */
+ * the slide, never inert, always a ≥2px visible focus ring. F-1: at ≥1200px
+ * the handle (y16–60) shares the fixed 72px header strip — the transparent
+ * header passes pointer events through (landing-header.module.css). */
 .peekHandle {
   position: absolute;
   left: 12px;

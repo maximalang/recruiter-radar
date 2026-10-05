@@ -314,3 +314,26 @@
     transition: none;
   }
 }
+
+/* v3.1 F-1 (peek-handle clickability): at ≥1200px the hero dock is anchored
+ * at top:64px, so the external 44×44 handle (y16–60) shares the fixed 72px
+ * strip below this header. The handle's z-index:5 is capped inside the hero
+ * section's stacking context (isolation:isolate + container-type), so no
+ * z-order under the header's z90 can ever surface it — and dropping the
+ * header below z5 would put it under the page instead. While the header is
+ * transparent (page top, menu closed) its empty strip therefore opts out of
+ * pointer events and lets the hero receive them; the real controls keep
+ * their own events, and a scrolled or menu-open header reclaims the strip.
+ * Paint order (z90), the R2 scrim and the R11 peek geometry stay untouched. */
+@media (min-width: 1200px) {
+  .header:not([data-scrolled]):not([data-menu-open]) {
+    pointer-events: none;
+  }
+
+  .header:not([data-scrolled]):not([data-menu-open]) .brand,
+  .header:not([data-scrolled]):not([data-menu-open]) .navLink,
+  .header:not([data-scrolled]):not([data-menu-open]) .login,
+  .header:not([data-scrolled]):not([data-menu-open]) .menuButton {
+    pointer-events: auto;
+  }
+}

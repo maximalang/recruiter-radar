@@ -59,7 +59,11 @@ export default function LandingMotion() {
       sentinel.style.width = "1px";
       sentinel.style.height = "1px";
       sentinel.style.pointerEvents = "none";
-      zone.prepend(sentinel);
+      // Append (not prepend): the absolutely positioned 1px sentinel must not
+      // become the zone's :first-child. Audit scripts and authored CSS key off
+      // the real first content child (F-1c: the "Final CTA eyebrow" locator
+      // `#conversion-final > div:first-child > span` matched the sentinel).
+      zone.append(sentinel);
       sentinels.push(sentinel);
     });
     root.dataset.v31Motion = "ready";

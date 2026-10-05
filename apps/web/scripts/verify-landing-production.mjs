@@ -138,6 +138,13 @@ async function resolveAnalyticsConsent(page) {
   await dialog.getByRole("button", { name: "Разрешить", exact: true }).click();
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "Настройки cookies" }).waitFor({ state: "visible" });
+  // Determinism: on short desktop viewports (e.g. 1366×768, 1280×800) the
+  // fixed bottom-right consent dialog sits over the hero dock, so the
+  // resolving click would leave the pointer parked on the dock and hover-open
+  // the demo before the hero contracts run. Park the pointer at the neutral
+  // top-left corner (header strip / hero background — never the dock),
+  // mirroring capture-landing-review's movePointerToNeutral.
+  await page.mouse.move(1, 1);
 }
 
 async function preparePage(context, label, url = baseUrl) {
@@ -381,7 +388,42 @@ async function assertHeroWorkflowContract(page, label, viewport) {
   // stage controls receive real clicks, and wait for the settled full state.
   const peekDock = page.locator("[data-demo-peek]");
   if (await peekDock.getAttribute("data-peek-state")) {
-    await page.locator("[data-peek-handle]").click();
+    const peekHandle = page.locator("[data-peek-handle]");
+    await peekHandle.waitFor({ state: "visible" });
+    // Never probe or click a slide that is still travelling the peek ladder;
+    // the settled state after the consent pointer park is "peek".
+    await page.waitForFunction(
+      () => ["peek", "full"].includes(document.querySelector("[data-demo-peek]")?.getAttribute("data-peek-state") ?? ""),
+      undefined,
+      { timeout: MOTION_SETTLE_TIMEOUT_MS },
+    );
+    // F-1 regression: at ≥1200px the peek-state handle (y16–60) sits under the
+    // fixed header strip, so a header that forgets its transparent-state
+    // pointer pass-through silently kills the click (bare 30s timeout). Assert
+    // the hit-test target for a diagnosable failure. Scoped to the settled
+    // peek state (the D2 start scenario); off-screen centers are skipped
+    // because click() would scroll them into view before dispatch.
+    if ((await peekDock.getAttribute("data-peek-state")) === "peek") {
+      const handleHit = await peekHandle.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        if (centerX < 0 || centerY < 0 || centerX >= window.innerWidth || centerY >= window.innerHeight) return null;
+        const hit = document.elementFromPoint(centerX, centerY);
+        return {
+          insideHandle: Boolean(hit && hit.closest('[data-peek-handle]')),
+          interceptor: hit ? `${hit.tagName.toLowerCase()}.${typeof hit.className === "string" ? hit.className : ""}` : null,
+        };
+      });
+      if (handleHit !== null) {
+        assert.equal(
+          handleHit.insideHandle,
+          true,
+          `${label}: [data-peek-handle] center is intercepted by ${handleHit.interceptor} — the transparent header strip must stay click-through over the peek handle`,
+        );
+      }
+    }
+    await peekHandle.click();
     await page.waitForFunction(
       () => document.querySelector("[data-demo-peek]")?.getAttribute("data-peek-state") === "full",
       undefined,
@@ -523,9 +565,19 @@ async function assertHashNavigation(browser, spec) {
     const header = document.querySelector("header");
     const rect = element.getBoundingClientRect();
     const headerBottom = header?.getBoundingClientRect().bottom ?? 0;
-    return { gap: rect.top - headerBottom, top: rect.top };
+    return {
+      gap: rect.top - headerBottom,
+      top: rect.top,
+      // v3.1 R11: the hero dock is anchored at top:64px, so #hero-workflow at
+      // the page top can never clear the 73px header band (negative scroll is
+      // clamped). The band is transparent and click-through there (F-1), so
+      // the documented 9px frame overlap is the approved resting state — but
+      // only while the header is genuinely transparent at the page top.
+      transparentTop: window.scrollY <= 12 && !(header?.hasAttribute("data-scrolled") ?? false),
+    };
   });
-  assert.ok(firstPosition.gap >= 8 && firstPosition.gap <= 48, `${spec.name}: invalid header gap ${firstPosition.gap}`);
+  const minimumGap = firstPosition.transparentTop ? -10 : 8;
+  assert.ok(firstPosition.gap >= minimumGap && firstPosition.gap <= 48, `${spec.name}: invalid header gap ${firstPosition.gap}`);
   await page.waitForTimeout(500);
   const secondTop = await target.evaluate((element) => element.getBoundingClientRect().top);
   assert.ok(Math.abs(secondTop - firstPosition.top) <= 3, `${spec.name}: position jumped ${firstPosition.top} -> ${secondTop}`);
