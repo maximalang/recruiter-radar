@@ -458,6 +458,356 @@ async function assertHeroWorkflowContract(page, label, viewport) {
   }
 }
 
+// R13c (owner verdict R2, defect F-1): effective demo palette contract.
+// The approved reference is the detection-scene palette of reference head
+// 9eaa919b (graphite + gold), while the landing-scope B table intentionally
+// re-values --color-demo-* onto the brand ramp for page chrome. Source
+// string checks cannot see which cascade layer wins, so this contract
+// measures the EFFECTIVE state on the live DOM: computed custom properties
+// on the demo root, computed colors of every painted element inside the
+// demo across all four stages, and the page-level brand tokens OUTSIDE the
+// demo (proving the scoped fix is not a global revert). Chrome normalizes
+// computed custom-property colors (rgba() → hex8), so every comparison is
+// tuple-normalized instead of string-literal.
+const COLOR_LITERAL_PATTERN = /#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g;
+
+function parseColorTuple(value) {
+  const text = String(value).trim();
+  const hex = /^#([0-9a-fA-F]{3,8})$/.exec(text);
+  if (hex) {
+    const digits = hex[1];
+    const byte = (pair) => Number.parseInt(pair, 16);
+    if (digits.length === 3 || digits.length === 4) {
+      const channels = [...digits].map((channel) => byte(channel + channel));
+      const alpha = channels.length === 4 ? channels.pop() / 255 : 1;
+      return [...channels, alpha];
+    }
+    if (digits.length === 6 || digits.length === 8) {
+      const channels = [byte(digits.slice(0, 2)), byte(digits.slice(2, 4)), byte(digits.slice(4, 6))];
+      const alpha = digits.length === 8 ? byte(digits.slice(6, 8)) / 255 : 1;
+      return [...channels, alpha];
+    }
+    return null;
+  }
+  const fn = /^rgba?\(([^)]+)\)$/.exec(text);
+  if (fn) {
+    const parts = fn[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    if (parts.length < 3 || parts.some(Number.isNaN)) return null;
+    return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
+  }
+  return null;
+}
+
+function requireColorTuple(value, context) {
+  const tuple = parseColorTuple(value);
+  assert.ok(tuple, `${context}: unparsable color ${JSON.stringify(value)}`);
+  return tuple;
+}
+
+function colorsInside(value) {
+  return [...String(value).matchAll(COLOR_LITERAL_PATTERN)].map((match) => match[0]);
+}
+
+function assertColorTuple(actualValue, expectedTuple, context) {
+  const actual = requireColorTuple(actualValue, context);
+  const alphaClose = Math.abs(actual[3] - expectedTuple[3]) <= 0.005;
+  assert.ok(
+    actual[0] === expectedTuple[0] && actual[1] === expectedTuple[1] && actual[2] === expectedTuple[2] && alphaClose,
+    `${context}: color ${JSON.stringify(actualValue)} → [${actual}] does not match reference [${expectedTuple}]`,
+  );
+}
+
+// Reference palette literals, verbatim from the approved detection-scene
+// reference head 9eaa919b (globals.css :root demo block + the .productShot
+// signal remaps in detection-scene.module.css).
+const DEMO_TOKEN_REFERENCE = {
+  "--color-demo-base-0": [11, 12, 15, 1],
+  "--color-demo-base-1": [19, 20, 25, 1],
+  "--color-demo-elevated": [30, 31, 33, 1],
+  "--color-demo-selected": [32, 33, 35, 1],
+  "--color-demo-separator": [42, 43, 46, 1],
+  "--color-demo-separator-subtle": [34, 35, 37, 1],
+  "--color-demo-panel-top": [36, 37, 44, 1],
+  "--color-demo-panel-mid": [26, 27, 32, 1],
+  "--color-demo-panel-end": [22, 23, 27, 1],
+  "--color-demo-panel-flat": [25, 26, 28, 1],
+  "--color-demo-panel-alt": [23, 24, 26, 1],
+  "--color-demo-card": [27, 28, 30, 1],
+  "--color-demo-indigo": [94, 106, 210, 1],
+  "--color-demo-indigo-bright": [123, 134, 232, 1],
+  "--color-demo-violet": [157, 123, 232, 1],
+  "--color-demo-green": [76, 183, 130, 1],
+  "--color-demo-gold": [240, 180, 41, 1],
+  "--color-demo-orange": [232, 147, 94, 1],
+  "--color-demo-avatar-you": [58, 59, 63, 1],
+  "--color-demo-stage-todo": [74, 75, 78, 1],
+  "--color-demo-white": [255, 255, 255, 1],
+  "--color-demo-text-bright": [220, 221, 223, 1],
+  "--color-demo-text-soft": [168, 169, 172, 1],
+  "--color-demo-text-muted": [137, 139, 142, 1],
+  "--color-demo-text-faint": [105, 107, 112, 1],
+  "--color-demo-clear": [255, 255, 255, 0],
+  "--color-demo-veil-015": [255, 255, 255, 0.015],
+  "--color-demo-veil-022": [255, 255, 255, 0.022],
+  "--color-demo-veil-03": [255, 255, 255, 0.03],
+  "--color-demo-veil-035": [255, 255, 255, 0.035],
+  "--color-demo-veil-05": [255, 255, 255, 0.05],
+  "--color-demo-veil-055": [255, 255, 255, 0.055],
+  "--color-demo-veil-06": [255, 255, 255, 0.06],
+  "--color-demo-veil-07": [255, 255, 255, 0.07],
+  "--color-demo-veil-08": [255, 255, 255, 0.08],
+  "--color-demo-veil-09": [255, 255, 255, 0.09],
+  "--color-demo-veil-10": [255, 255, 255, 0.1],
+  "--color-demo-veil-12": [255, 255, 255, 0.12],
+  "--color-demo-veil-16": [255, 255, 255, 0.16],
+  "--color-demo-glow-indigo": [94, 106, 210, 0.12],
+  "--color-demo-glow-indigo-strong": [94, 106, 210, 0.16],
+  "--color-demo-gold-ring": [240, 180, 41, 0.1],
+  "--color-demo-gold-fill": [240, 180, 41, 0.12],
+  "--color-demo-gold-soft": [240, 180, 41, 0.14],
+  // pass34 scrims: inherited from globals.css, never re-valued by the B table.
+  "--color-demo-shade": [0, 0, 0, 0.3],
+  "--color-demo-scrim-bottom": [5, 6, 8, 0.62],
+  "--color-demo-scrim-corner": [5, 6, 8, 0.55],
+  "--color-demo-scrim-side": [5, 6, 8, 0.28],
+  // .productShot remaps: inside the demo the signal roles are the demo gold.
+  "--color-signal": [240, 180, 41, 1],
+  "--color-signal-on-dark": [240, 180, 41, 1],
+  "--color-signal-soft": [240, 180, 41, 0.14],
+};
+
+// B-table brand ramp values that must never paint anything INSIDE the demo
+// (defect F-1 signature: #3725f3 / #087ff4 / #05c9ef and their tints).
+const DEMO_FORBIDDEN_TRIPLES = [
+  { triple: [55, 37, 243], name: "v31-indigo #3725f3" },
+  { triple: [8, 127, 244], name: "v31-blue #087ff4" },
+  { triple: [147, 168, 255], name: "indigo-tint #93a8ff" },
+  { triple: [184, 167, 255], name: "v31-violet #b8a7ff" },
+  { triple: [5, 201, 239], name: "v31-cyan #05c9ef" },
+  { triple: [119, 130, 151], name: "B stage-todo #778297" },
+  { triple: [184, 190, 201], name: "B text-soft #b8bec9" },
+  { triple: [164, 170, 182], name: "B text-muted #a4aab6" },
+  { triple: [146, 153, 165], name: "B text-faint #9299a5" },
+  { triple: [68, 75, 90], name: "B separator #444b5a" },
+  { triple: [48, 54, 64], name: "B separator-subtle #303640" },
+];
+
+// Every opaque/visible RGB triple painted inside the demo must belong to the
+// reference palette (accents + graphite surfaces + scrim/shadow neutrals).
+const DEMO_ALLOWED_TRIPLES = [
+  [94, 106, 210], [123, 134, 232], [157, 123, 232], [76, 183, 130],
+  [240, 180, 41], [232, 147, 94], [58, 59, 63], [74, 75, 78],
+  [255, 255, 255], [220, 221, 223], [168, 169, 172], [137, 139, 142], [105, 107, 112],
+  [11, 12, 15], [19, 20, 25], [30, 31, 33], [32, 33, 35],
+  [36, 37, 44], [26, 27, 32], [22, 23, 27], [25, 26, 28], [23, 24, 26], [27, 28, 30],
+  [42, 43, 46], [34, 35, 37],
+  [0, 0, 0], [5, 6, 8], [14, 16, 24], [12, 14, 22],
+];
+
+// Page-level brand tokens OUTSIDE the demo must keep the accepted v3.1
+// B-table values — the palette fix is demo-scoped, never a global revert.
+const PAGE_BRAND_REFERENCE = {
+  "--color-signal": [8, 127, 244, 1],
+  "--color-signal-on-dark": [5, 201, 239, 1],
+  "--color-demo-indigo": [55, 37, 243, 1],
+  "--color-demo-gold": [8, 127, 244, 1],
+};
+
+async function collectDemoPaletteState(page) {
+  return page.evaluate((tokenNames) => {
+    const demo = document.querySelector("[data-hero-workflow]");
+    if (!demo) return { error: "demo root [data-hero-workflow] is missing" };
+    const demoStyle = getComputedStyle(demo);
+    const tokens = {};
+    for (const name of tokenNames) tokens[name] = demoStyle.getPropertyValue(name).trim();
+
+    const painted = [];
+    for (const element of [demo, ...demo.querySelectorAll("*")]) {
+      const style = getComputedStyle(element);
+      const entry = {
+        id: element.id || null,
+        tag: element.tagName.toLowerCase(),
+        state: element.getAttribute("data-state"),
+        actor: element.getAttribute("data-actor"),
+        values: [style.color, style.backgroundColor, style.borderTopColor],
+      };
+      if (element.namespaceURI === "http://www.w3.org/2000/svg") {
+        entry.values.push(style.fill, style.stroke);
+      }
+      for (const composite of [style.backgroundImage, style.boxShadow]) {
+        if (composite && composite !== "none") entry.values.push(composite);
+      }
+      painted.push(entry);
+    }
+
+    const tupleSource = (element) => {
+      const style = getComputedStyle(element);
+      return { color: style.color, backgroundColor: style.backgroundColor, borderColor: style.borderTopColor, backgroundImage: style.backgroundImage, boxShadow: style.boxShadow };
+    };
+    const statusParagraph = [...demo.querySelectorAll("#hero-workflow-panel p, article p")]
+      .find((paragraph) => /Этап \d+ из 4/.test(paragraph.textContent ?? ""));
+    return {
+      tokens,
+      painted,
+      roles: {
+        active: [...demo.querySelectorAll('[data-state="active"]')].map(tupleSource),
+        todo: [...demo.querySelectorAll('[data-state="todo"]')].map(tupleSource),
+        done: [...demo.querySelectorAll('[data-state="done"]')].map(tupleSource),
+        you: [...demo.querySelectorAll('[data-actor="you"]')].map(tupleSource),
+        statusDot: statusParagraph ? [tupleSource(statusParagraph.querySelector('span[aria-hidden="true"]') ?? statusParagraph)] : [],
+        svgColors: [...demo.querySelectorAll("svg")].map((svg) => getComputedStyle(svg).color),
+      },
+    };
+  }, Object.keys(DEMO_TOKEN_REFERENCE));
+}
+
+function assertDemoPaletteState(state, stageLabel) {
+  assert.ok(!state.error, `${stageLabel}: ${state.error}`);
+
+  for (const [token, expected] of Object.entries(DEMO_TOKEN_REFERENCE)) {
+    assert.ok(state.tokens[token], `${stageLabel}: token ${token} resolved to an empty value`);
+    assertColorTuple(state.tokens[token], expected, `${stageLabel}: effective token ${token}`);
+  }
+
+  const forbiddenHits = [];
+  const unknownHits = [];
+  for (const element of state.painted) {
+    const where = `${element.tag}${element.id ? `#${element.id}` : ""}${element.state ? `[data-state=${element.state}]` : ""}`;
+    for (const value of element.values) {
+      for (const literal of colorsInside(value)) {
+        const tuple = parseColorTuple(literal);
+        if (!tuple) continue;
+        const triple = tuple.slice(0, 3);
+        const forbidden = DEMO_FORBIDDEN_TRIPLES.find((entry) => entry.triple.every((channel, index) => channel === triple[index]));
+        if (forbidden && tuple[3] > 0) {
+          forbiddenHits.push(`${where}: ${literal} (${forbidden.name})`);
+          continue;
+        }
+        if (tuple[3] > 0.01 && !DEMO_ALLOWED_TRIPLES.some((allowed) => allowed.every((channel, index) => channel === triple[index]))) {
+          unknownHits.push(`${where}: ${literal}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(forbiddenHits, [], `${stageLabel}: brand-ramp colors leaked into the demo (defect F-1 regression)`);
+  assert.deepEqual(unknownHits, [], `${stageLabel}: colors outside the approved reference demo palette`);
+
+  assert.ok(state.roles.active.length >= 1, `${stageLabel}: no active stage state rendered`);
+  for (const active of state.roles.active) {
+    assertColorTuple(active.borderColor, DEMO_TOKEN_REFERENCE["--color-demo-gold"], `${stageLabel}: active stage border`);
+    const backgroundTuples = colorsInside(active.backgroundImage).map((literal) => requireColorTuple(literal, stageLabel));
+    assert.ok(
+      backgroundTuples.some((tuple) => tuple.slice(0, 3).join() === "240,180,41" && tuple[3] === 1),
+      `${stageLabel}: active stage conic fill lost the reference gold`,
+    );
+    assert.ok(
+      colorsInside(active.boxShadow).every((literal) => {
+        const tuple = requireColorTuple(literal, stageLabel);
+        return tuple.slice(0, 3).join() === "240,180,41";
+      }),
+      `${stageLabel}: active stage glow is not the reference gold tint`,
+    );
+  }
+  for (const todo of state.roles.todo) {
+    assertColorTuple(todo.borderColor, DEMO_TOKEN_REFERENCE["--color-demo-stage-todo"], `${stageLabel}: todo stage border`);
+  }
+  for (const done of state.roles.done) {
+    assertColorTuple(done.backgroundColor, DEMO_TOKEN_REFERENCE["--color-demo-indigo"], `${stageLabel}: done stage fill`);
+  }
+  for (const you of state.roles.you) {
+    assertColorTuple(you.backgroundColor, DEMO_TOKEN_REFERENCE["--color-demo-avatar-you"], `${stageLabel}: visitor avatar fill`);
+  }
+  assert.ok(state.roles.statusDot.length >= 1, `${stageLabel}: stage summary status dot is missing`);
+  for (const dot of state.roles.statusDot) {
+    assertColorTuple(dot.backgroundColor, DEMO_TOKEN_REFERENCE["--color-demo-gold"], `${stageLabel}: status dot fill`);
+    assert.ok(
+      colorsInside(dot.boxShadow).every((literal) => requireColorTuple(literal, stageLabel).slice(0, 3).join() === "240,180,41"),
+      `${stageLabel}: status dot glow is not the reference gold tint`,
+    );
+  }
+  return state.roles.svgColors.map((color) => requireColorTuple(color, `${stageLabel}: demo svg icon`).slice(0, 3).join());
+}
+
+async function waitForDemoMotionRest(page, label) {
+  // Bounded motion rest for the demo subtree only: stage swaps run scene-exit
+  // animations and the tabs/stage states transition their colors
+  // (motion-duration-fast/disclosure). Sweeping computed colors
+  // mid-transition would observe blended values, so wait until every
+  // animation inside the demo has finished. Infinite decorative loops (none
+  // inside the demo today) are excluded instead of hanging the settle.
+  await page.waitForFunction(
+    () => {
+      const demo = document.querySelector("[data-hero-workflow]");
+      if (!demo || typeof document.getAnimations !== "function") return false;
+      return document.getAnimations().every((animation) => {
+        const effect = animation.effect;
+        const target = effect && effect.target;
+        if (!(target instanceof Element) || !demo.contains(target)) return true;
+        if (animation.playState === "finished" || animation.playState === "idle") return true;
+        try {
+          return effect.getTiming().iterations === Infinity;
+        } catch {
+          return true;
+        }
+      });
+    },
+    undefined,
+    { timeout: MOTION_SETTLE_TIMEOUT_MS },
+  ).catch((error) => {
+    throw new Error(`${label}: demo motion did not rest — ${error?.message ?? error}`);
+  });
+}
+
+async function assertHeroDemoPalette(page, label) {
+  const svgTriplesSeen = new Set();
+  for (const stage of [1, 2, 3, 4]) {
+    await page.locator(`#hero-workflow-tab-${stage}`).click();
+    await page.waitForFunction(
+      (expected) => document.querySelector("[data-hero-workflow]")?.getAttribute("data-active-stage") === expected,
+      String(stage),
+      { timeout: MOTION_SETTLE_TIMEOUT_MS },
+    );
+    await waitForDemoMotionRest(page, `${label} demo stage ${stage}`);
+    const state = await collectDemoPaletteState(page);
+    for (const triple of assertDemoPaletteState(state, `${label} demo stage ${stage}`)) {
+      svgTriplesSeen.add(triple);
+    }
+  }
+  // Reference icon roles that must actually appear in the demo DOM: the
+  // green/orange watch-nav glyphs painted by the detection-scene module.
+  assert.ok(svgTriplesSeen.has("76,183,130"), `${label}: reference green icon role (#4cb782) is missing from the demo`);
+  assert.ok(svgTriplesSeen.has("232,147,94"), `${label}: reference orange icon role (#e8935e) is missing from the demo`);
+
+  await page.locator("#hero-workflow-tab-1").click();
+  await page.waitForFunction(
+    () => document.querySelector("[data-hero-workflow]")?.getAttribute("data-active-stage") === "1",
+    undefined,
+    { timeout: MOTION_SETTLE_TIMEOUT_MS },
+  );
+
+  // Outside the demo the page keeps the accepted v3.1 brand ramp: the fix is
+  // scoped to [data-hero-workflow] and is not a global palette revert.
+  const pageTokens = await page.evaluate((tokenNames) => {
+    const landing = document.querySelector("[data-landing-experience]");
+    const footer = document.querySelector("footer");
+    const read = (element) => {
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      const values = {};
+      for (const name of tokenNames) values[name] = style.getPropertyValue(name).trim();
+      return values;
+    };
+    return { landing: read(landing), footer: read(footer) };
+  }, Object.keys(PAGE_BRAND_REFERENCE));
+  assert.ok(pageTokens.landing, `${label}: landing root [data-landing-experience] is missing`);
+  for (const [token, expected] of Object.entries(PAGE_BRAND_REFERENCE)) {
+    assertColorTuple(pageTokens.landing[token], expected, `${label}: page-level ${token} was globally reverted`);
+    if (pageTokens.footer) {
+      assertColorTuple(pageTokens.footer[token], expected, `${label}: frozen footer scope ${token} changed`);
+    }
+  }
+}
+
 async function measurePageHeight(page, viewport) {
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   assert.ok(height >= viewport.height, `${viewport.name}: invalid full-page height ${height}px`);
@@ -519,6 +869,7 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertHeaderLayout(page, viewport);
   await assertHeroGeometry(page, viewport.name);
   await assertHeroWorkflowContract(page, viewport.name, viewport);
+  await assertHeroDemoPalette(page, viewport.name);
   await revealAllMotionSections(page, viewport.name);
 
   await assertNoHorizontalOverflow(page, viewport.name);

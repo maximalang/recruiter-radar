@@ -194,6 +194,72 @@ body {
   }
 }
 
+/* R13c (owner verdict R2, defect F-1): the hero demo restores its approved
+ * reference palette — the detection-scene component/module palette from
+ * reference head 9eaa919b, byte-identical to the globals.css :root demo
+ * block. The landing-scope B table above intentionally re-values
+ * --color-demo-* onto the brand ramp for page chrome (site-footer mark,
+ * evidence veils); those page-level brand values must NOT be reverted
+ * globally. The fix is scoped to the demo root ([data-hero-workflow], the
+ * .productShot figure): declarations on the element itself win over every
+ * inherited landing-scope override for all demo icon roles (props/status
+ * dots, stage states, avatars, nav glyphs, glows, gold tints, demo
+ * shadows). The pass34 scrim tokens (--color-demo-shade,
+ * --color-demo-scrim-*) are deliberately NOT redeclared: the B table does
+ * not override them, so the demo inherits the accepted globals.css values.
+ * --shadow-demo-status keeps the reference var() form; inside the demo the
+ * .productShot remap resolves --color-signal-soft to the gold tint, exactly
+ * like the reference cascade. */
+[data-hero-workflow] {
+  --color-demo-base-0: #0b0c0f;
+  --color-demo-base-1: #131419;
+  --color-demo-elevated: #1e1f21;
+  --color-demo-selected: #202123;
+  --color-demo-separator: #2a2b2e;
+  --color-demo-separator-subtle: #222325;
+  --color-demo-panel-top: #24252c;
+  --color-demo-panel-mid: #1a1b20;
+  --color-demo-panel-end: #16171b;
+  --color-demo-panel-flat: #191a1c;
+  --color-demo-panel-alt: #17181a;
+  --color-demo-card: #1b1c1e;
+  --color-demo-indigo: #5e6ad2;
+  --color-demo-indigo-bright: #7b86e8;
+  --color-demo-violet: #9d7be8;
+  --color-demo-green: #4cb782;
+  --color-demo-gold: #f0b429;
+  --color-demo-orange: #e8935e;
+  --color-demo-avatar-you: #3a3b3f;
+  --color-demo-stage-todo: #4a4b4e;
+  --color-demo-white: #ffffff;
+  --color-demo-text-bright: #dcdddf;
+  --color-demo-text-soft: #a8a9ac;
+  --color-demo-text-muted: #898b8e;
+  --color-demo-text-faint: #696b70;
+  --color-demo-clear: rgba(255, 255, 255, 0);
+  --color-demo-veil-015: rgba(255, 255, 255, 0.015);
+  --color-demo-veil-022: rgba(255, 255, 255, 0.022);
+  --color-demo-veil-03: rgba(255, 255, 255, 0.03);
+  --color-demo-veil-035: rgba(255, 255, 255, 0.035);
+  --color-demo-veil-05: rgba(255, 255, 255, 0.05);
+  --color-demo-veil-055: rgba(255, 255, 255, 0.055);
+  --color-demo-veil-06: rgba(255, 255, 255, 0.06);
+  --color-demo-veil-07: rgba(255, 255, 255, 0.07);
+  --color-demo-veil-08: rgba(255, 255, 255, 0.08);
+  --color-demo-veil-09: rgba(255, 255, 255, 0.09);
+  --color-demo-veil-10: rgba(255, 255, 255, 0.1);
+  --color-demo-veil-12: rgba(255, 255, 255, 0.12);
+  --color-demo-veil-16: rgba(255, 255, 255, 0.16);
+  --color-demo-glow-indigo: rgba(94, 106, 210, 0.12);
+  --color-demo-glow-indigo-strong: rgba(94, 106, 210, 0.16);
+  --color-demo-gold-ring: rgba(240, 180, 41, 0.1);
+  --color-demo-gold-fill: rgba(240, 180, 41, 0.12);
+  --color-demo-gold-soft: rgba(240, 180, 41, 0.14);
+  --shadow-demo-panel: 0 1px 2px rgba(14, 16, 24, 0.3), 0 18px 44px rgba(12, 14, 22, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-demo-status: 0 0 0 3px var(--color-signal-soft);
+  --shadow-demo-stage: 0 0 0 3px rgba(240, 180, 41, 0.1);
+}
+
 /* D-1 (v3, focus updated by v3.1 R5): the landing skip link renders as a SIBLING of the landing root
  * (home-page-content.tsx), so the scoped landing palette above never reaches
  * it. Its exact v3 values live here, in the canonical token source, because
