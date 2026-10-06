@@ -8,13 +8,15 @@ import { PlusGlyph } from "./brand-glyphs";
 import panelStyles from "./conversion-panel.module.css";
 
 /* v3.1 R4 (D2 §4): accordion with exactly one open item in every rendered
- * frame. Two-phase animation: measured height H→0 in 180ms while the old
- * item stays the only open one, atomic swap in a single commit, then 0→H
- * in 220ms. Rapid commands cancel the previous animation and the last
- * intent wins; opening is user-input-only. Without JS the native details
- * plus the shared name attribute give "at most one open". */
-const CLOSE_MS = 180;
-const OPEN_MS = 220;
+ * frame. Two-phase animation, R13d-smoothed: measured height H→0 in 340ms
+ * while the old item stays the only open one, atomic swap in a single
+ * commit, then 0→H in 340ms (height+opacity on the canonical easings —
+ * --motion-duration-disclosure-slow mirrors these constants). Rapid commands
+ * cancel the previous animation and the last intent wins; opening is
+ * user-input-only. Without JS the native details plus the shared name
+ * attribute give "at most one open". */
+const CLOSE_MS = 340;
+const OPEN_MS = 340;
 
 function prefersReducedMotion(): boolean {
   return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);

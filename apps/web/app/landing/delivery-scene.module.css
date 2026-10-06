@@ -75,11 +75,13 @@
   color: var(--v31-blue);
 }
 
-/* v3.1 §1.3 channel accent map — cyan only as the readable cyan-ink role. */
-.channelRoute[data-channel="vk"] .channelIcon { color: var(--v31-indigo); }
-.channelRoute[data-channel="email"] .channelIcon { color: var(--v31-violet); }
-.channelRoute[data-channel="push"] .channelIcon { color: var(--v31-cyan-ink); }
-.channelRoute[data-channel="webhook"] .channelIcon { color: var(--v31-indigo); }
+/* v3.1 §1.3 channel accent map, R13a dark-canvas roles — the ramp hues stay
+ * recognizable through the readable on-dark equivalents (information,
+ * copper, cyan, blue). */
+.channelRoute[data-channel="vk"] .channelIcon { color: var(--color-information); }
+.channelRoute[data-channel="email"] .channelIcon { color: var(--color-copper); }
+.channelRoute[data-channel="push"] .channelIcon { color: var(--v31-cyan); }
+.channelRoute[data-channel="webhook"] .channelIcon { color: var(--color-information); }
 
 .channelIcon svg { width: 1.2rem; height: 1.2rem; }
 
@@ -165,7 +167,7 @@
   border: var(--v31-hairline-width) solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface-primary);
-  color: var(--v31-blue-ink);
+  color: var(--color-signal-on-dark);
   cursor: pointer;
   list-style: none;
   font-size: .8125rem;
@@ -225,7 +227,7 @@
  * parent and its children at the same time. */
 
 @media (hover: hover) and (pointer: fine) {
-  .moreRoutes summary:hover { border-color: var(--v31-indigo); color: var(--v31-indigo); }
+  .moreRoutes summary:hover { border-color: var(--color-information); color: var(--color-information); }
 }
 
 @media (prefers-reduced-motion: reduce) {

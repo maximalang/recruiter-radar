@@ -20,7 +20,7 @@
   color: var(--color-text-primary);
   /* R11 geometry tokens — consumed by the dock/slide and their descendants;
    * cqw resolves against this section (no other query container between). */
-  --v31-demo-width: clamp(640px, 52cqw, 880px);
+  --v31-demo-width: clamp(640px, 62cqw, 1180px);
   --v31-demo-gutter: 16px;
   --v31-demo-height: 500px;
   --v31-caption-slot: 88px;
@@ -94,7 +94,9 @@
 .loginLink:focus-visible { color: var(--color-text-primary); text-decoration: underline; }
 .primaryButton :global(svg) { flex: none; }
 .actionHint { max-width: 15rem; color: var(--color-text-secondary); font-size: .8125rem; line-height: 1.45; }
-.loginLink { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; margin-top: .25rem; color: var(--v31-blue-ink); font-size: .8125rem; text-decoration: underline; text-underline-offset: 3px; }
+/* R13a: link accents return to the dark-canvas roles — cyan on-dark signal
+ * at rest, light indigo (information) on hover. */
+.loginLink { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; margin-top: .25rem; color: var(--color-signal-on-dark); font-size: .8125rem; text-decoration: underline; text-underline-offset: 3px; }
 .microcopy { max-width: 31rem; margin: .5rem 0 0; color: var(--color-text-tertiary); font-size: .8125rem; line-height: 1.45; }
 
 /* R11 dock shell: absolutely anchored at ≥1200 (top 64, right 0, z4 — the
@@ -124,6 +126,10 @@
   width: calc(100% - 2 * var(--v31-demo-gutter));
   margin-left: var(--v31-demo-gutter);
   transform: translateX(0);
+  /* R13c: the slide is the demo-window query container — the interior
+   * 3-column composition collapses by WINDOW width (not viewport), so the
+   * docked demo keeps the reference proportions at every dock size. */
+  container-type: inline-size;
 }
 
 .peekDock[data-peek-state="peek"] .peekSlide,
@@ -143,7 +149,10 @@
 /* R11 external handle: 44×44, above the window frame (4px gap), moves with
  * the slide, never inert, always a ≥2px visible focus ring. F-1: at ≥1200px
  * the handle (y16–60) shares the fixed 72px header strip — the transparent
- * header passes pointer events through (landing-header.module.css). */
+ * header passes pointer events through (landing-header.module.css).
+ * R13c: the owner removed the visible chevron — the handle is now an
+ * invisible hit area (transparent, borderless, no icon); hover/tap/keyboard
+ * parity and the focus ring stay exactly as R11/F-1 require. */
 .peekHandle {
   position: absolute;
   left: 12px;
@@ -153,18 +162,13 @@
   width: 44px;
   height: 44px;
   place-items: center;
-  border: 1px solid var(--color-border-strong);
+  border: 0;
   border-radius: var(--radius-control);
-  background: var(--color-surface-primary);
-  color: var(--color-text-primary);
+  background: transparent;
   cursor: pointer;
 }
 
 .peekDock[data-peek-js="true"] .peekHandle { display: grid; }
-.peekHandle svg { width: 16px; height: 16px; transition: transform var(--motion-duration-control) var(--motion-ease-standard); }
-
-.peekDock[data-peek-state="opening"] .peekHandle svg,
-.peekDock[data-peek-state="full"] .peekHandle svg { transform: scaleX(-1); }
 
 .peekHandle:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; box-shadow: var(--shadow-focus-outer); }
 
@@ -205,7 +209,9 @@
   --color-text-tertiary: var(--color-demo-text-muted);
   --color-text-disabled: var(--color-demo-text-faint);
   --color-signal: var(--color-demo-gold);
-  --color-signal-on-dark: var(--color-signal-hover);
+  /* R13c: reference 9eaa919b remap restored — inside the demo the on-dark
+   * signal role is the demo blue, not the page cyan. */
+  --color-signal-on-dark: var(--color-demo-gold);
   --color-signal-soft: var(--color-demo-gold-soft);
 }
 
@@ -289,7 +295,9 @@
 .propsCard h3 { margin: 0 0 .55rem; color: var(--color-text-tertiary); font-size: .8125rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .propsCard > div { display: flex; align-items: center; gap: .45rem; padding: .3rem 0; color: var(--color-text-secondary); font-size: .875rem; }
 .shotProps > .aiFloat { display: block; padding: .85rem .95rem; color: var(--color-text-primary); }
-.propsCard svg { width: 14px; height: 14px; flex: none; color: var(--color-demo-indigo-bright); }
+/* R13c: reference 9eaa919b icon palette — the Svodka/props card icons are
+ * the deep demo indigo, not the brightened v3.1 variant. */
+.propsCard svg { width: 14px; height: 14px; flex: none; color: var(--color-demo-indigo); }
 .activityHead { margin: 1.35rem 0 0; color: var(--color-text-primary); font-size: .95rem; font-weight: 590; letter-spacing: -.01em; }
 .activityCount { margin-left: .5rem; color: var(--color-text-tertiary); font-size: .8125rem; font-weight: 500; vertical-align: .1rem; }
 .cmtGhost { margin: .9rem 0 0 2.25rem; padding: .6rem .95rem; border: 1px dashed var(--color-demo-veil-10); border-radius: var(--radius-surface); color: var(--color-text-tertiary); font-size: .875rem; }
@@ -374,7 +382,7 @@
    * motion + inset edge, never a cyan repaint. */
   .primaryButton:hover { transform: translateY(-2px); box-shadow: var(--shadow-cta-hover-inset); }
   .primaryButton:hover :global(svg) { transform: translate3d(3px, 0, 0); }
-  .loginLink:hover { color: var(--v31-indigo); }
+  .loginLink:hover { color: var(--color-information); }
   .shotNav button:hover { background: var(--color-surface-selected); color: var(--color-text-primary); }
   .workflowTabs > button:hover { background: var(--color-demo-veil-035); color: var(--color-text-primary); }
   .shotCounter button:hover { background: var(--color-surface-selected); color: var(--color-text-primary); }
@@ -417,6 +425,20 @@
     margin-top: 0;
   }
   .peekSlide { width: var(--v31-demo-width); margin-left: 0; }
+}
+
+/* R13c: window-keyed composition collapse (reference 9eaa919b ≤1100
+ * behavior, re-keyed from viewport to the demo WINDOW so the docked demo
+ * never squeezes its three columns). Below a 1100px window the right rail
+ * is hidden and the workflow panel goes single-column — no dead tracks, no
+ * compressed main column. Placed before the viewport bands so the ≤900
+ * mobile layout below still wins the cascade. */
+@container (max-width: 1099px) {
+  .shotProps { display: none; }
+  .workflowPanel { grid-template-columns: minmax(0, 1fr); }
+  .shotBody { grid-template-columns: 11rem minmax(0,1fr); gap: .4rem; padding: .4rem; }
+  .shotSide { padding: .8rem .5rem; }
+  .workflowMain { padding: 1.6rem 1rem 1.1rem; }
 }
 
 @media (max-width: 1100px) {

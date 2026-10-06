@@ -39,7 +39,8 @@
 
 .inner {
   display: grid;
-  grid-template-columns: minmax(10.5rem, auto) 1fr auto;
+  /* R13b: brand clear space tightened for the reduced 102px lockup. */
+  grid-template-columns: minmax(8.5rem, auto) 1fr auto;
   align-items: center;
   gap: clamp(.8rem, 1.6vw, 1.7rem);
   width: 100%;
@@ -280,7 +281,7 @@
 
 @media (max-width: 959px) {
   .inner {
-    grid-template-columns: minmax(10.5rem, 1fr) auto;
+    grid-template-columns: minmax(8.5rem, 1fr) auto;
   }
 
   .desktopNav,

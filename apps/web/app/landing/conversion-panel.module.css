@@ -2,8 +2,8 @@
   display: block;
   background: var(--color-canvas);
   color: var(--color-text-primary);
-  /* v3.1: zones paint their own approved light backgrounds via the R6
-   * mechanism; this stays as the fallback canvas. */
+  /* R13a: zones paint their pre-v3.1 dark backgrounds via the R6 mechanism
+   * (defaults restored to a89dde59); this stays as the fallback canvas. */
   --conversion-deep: var(--color-surface-primary);
 }
 
@@ -102,13 +102,16 @@
   letter-spacing: .08em;
   text-transform: uppercase;
 }
-.pilotMeta strong { color: var(--v31-indigo); font-size: 1rem; font-weight: 600; }
+/* R13a: accent text/icons on the restored dark canvas read through the
+ * D1 on-dark roles (information/copper/signal-on-dark); the R1 chip pairs
+ * (light tint background + deep ramp ink) stay self-contained. */
+.pilotMeta strong { color: var(--color-information); font-size: 1rem; font-weight: 600; }
 .pilotTopline strong { font-size: 1rem; font-weight: 600; }
 .pilotPrice { color: var(--color-text-primary); font-size: clamp(3.3rem, 5.4vw, 5.05rem); font-weight: 540; letter-spacing: -.065em; line-height: .92; font-variant-numeric: tabular-nums; }
 
 .pilotOffer ul { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }
 .pilotOffer li { display: flex; align-items: flex-start; gap: .55rem; color: var(--color-text-secondary); font-size: .9375rem; line-height: 1.45; }
-.pilotOffer li :global(svg) { flex: 0 0 auto; margin-top: .16rem; color: var(--v31-indigo); }
+.pilotOffer li :global(svg) { flex: 0 0 auto; margin-top: .16rem; color: var(--color-information); }
 
 .pilotOffer .pilotCta {
   display: inline-flex;
@@ -162,7 +165,7 @@
 .secondaryOffers article > div span { font-size: .95rem; font-weight: 650; }
 .secondaryOffers article > div small { color: var(--color-text-tertiary); font-size: .8125rem; }
 .secondaryOffers article > strong { font-size: 1.25rem; font-weight: 640; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
-.secondaryOffers article > a { position: relative; display: inline-flex; min-height: 44px; align-items: center; gap: .35rem; color: var(--v31-blue-ink); font-size: .8125rem; font-weight: 650; text-decoration: none; transition: color var(--motion-duration-control) var(--motion-ease-standard); }
+.secondaryOffers article > a { position: relative; display: inline-flex; min-height: 44px; align-items: center; gap: .35rem; color: var(--color-signal-on-dark); font-size: .8125rem; font-weight: 650; text-decoration: none; transition: color var(--motion-duration-control) var(--motion-ease-standard); }
 .secondaryOffers article > a::after { content: ""; position: absolute; right: 0; bottom: 10px; left: 0; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform var(--motion-duration-disclosure) var(--motion-ease-standard); }
 
 .faq {
@@ -184,20 +187,20 @@
 .faqList details:first-child { margin-top: 0; }
 .faqList summary { display: grid; grid-template-columns: 2rem 1fr auto; align-items: center; gap: .85rem; min-height: 4.25rem; cursor: pointer; list-style: none; font-size: .96rem; font-weight: 590; }
 .faqList summary::-webkit-details-marker { display: none; }
-.faqList summary > span { color: var(--v31-indigo); font-size: .8125rem; }
+.faqList summary > span { color: var(--color-information); font-size: .8125rem; }
 .faqList summary i { display: grid; width: 1.6rem; height: 1.6rem; place-items: center; color: var(--color-signal); font-style: normal; transition: transform var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-control) var(--motion-ease-standard); }
 .faqList details[open] summary i { transform: rotate(45deg); }
 .faqList details p { max-width: 48rem; margin: 0; padding: 0 2.8rem 1rem; color: var(--color-text-secondary); font-size: .9375rem; line-height: 1.58; }
 
-/* R4 two-phase disclosure: measured height H→0 (180ms exit, inner 140ms),
- * atomic swap, 0→H (220ms enter, inner 180ms). Height is the single
+/* R4 two-phase disclosure, R13d smoothing: measured height H→0 (340ms exit,
+ * inner fade matched), atomic swap, 0→H (340ms enter). Height is the single
  * justified layout-property exception; JS clears inline height afterwards. */
-.faqAnswer[data-faq-anim="closing"] { overflow: hidden; transition: height var(--motion-duration-disclosure) var(--motion-ease-exit); }
-.faqAnswer[data-faq-anim="closing"] > p { animation: none; opacity: 0.01; transform: translate3d(0, -4px, 0); transition: opacity var(--motion-duration-control) var(--motion-ease-exit), transform var(--motion-duration-control) var(--motion-ease-exit); }
+.faqAnswer[data-faq-anim="closing"] { overflow: hidden; transition: height var(--motion-duration-disclosure-slow) var(--motion-ease-exit); }
+.faqAnswer[data-faq-anim="closing"] > p { animation: none; opacity: 0.01; transform: translate3d(0, -4px, 0); transition: opacity var(--motion-duration-disclosure-slow) var(--motion-ease-exit), transform var(--motion-duration-disclosure-slow) var(--motion-ease-exit); }
 .faqAnswer[data-faq-anim="opening-start"] { height: 0; overflow: hidden; }
 .faqAnswer[data-faq-anim="opening-start"] > p { animation: none; opacity: 0.01; transform: translate3d(0, 6px, 0); }
-.faqAnswer[data-faq-anim="opening"] { overflow: hidden; transition: height var(--motion-duration-context) var(--motion-ease-enter); }
-.faqAnswer[data-faq-anim="opening"] > p { animation: none; opacity: 1; transform: none; transition: opacity var(--motion-duration-disclosure) var(--motion-ease-enter), transform var(--motion-duration-disclosure) var(--motion-ease-enter); }
+.faqAnswer[data-faq-anim="opening"] { overflow: hidden; transition: height var(--motion-duration-disclosure-slow) var(--motion-ease-enter); }
+.faqAnswer[data-faq-anim="opening"] > p { animation: none; opacity: 1; transform: none; transition: opacity var(--motion-duration-disclosure-slow) var(--motion-ease-enter), transform var(--motion-duration-disclosure-slow) var(--motion-ease-enter); }
 
 .final {
   display: grid;
@@ -217,22 +220,22 @@
 .finalDecision { display: grid; gap: .75rem; align-content: center; }
 .finalTrust { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none; }
 .finalTrust li { display: flex; align-items: center; gap: .55rem; color: var(--color-text-secondary); font-size: .9375rem; }
-.finalTrust li:first-child { color: var(--v31-indigo); }
+.finalTrust li:first-child { color: var(--color-information); }
 .finalTrust li::before { width: .35rem; height: .35rem; border-radius: 50%; background: var(--color-signal); content: ""; }
 .final .finalCta { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border: 1px solid transparent; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .88rem; font-weight: 700; text-decoration: none; }
-.finalSecondaryLink { position: relative; display: inline-flex; min-height: 44px; align-items: center; color: var(--v31-blue-ink); font-size: .8125rem; text-decoration: none; transition: color var(--motion-duration-control) var(--motion-ease-standard); }
+.finalSecondaryLink { position: relative; display: inline-flex; min-height: 44px; align-items: center; color: var(--color-signal-on-dark); font-size: .8125rem; text-decoration: none; transition: color var(--motion-duration-control) var(--motion-ease-standard); }
 .finalSecondaryLink::after { content: ""; position: absolute; right: 0; bottom: 10px; left: 0; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform var(--motion-duration-disclosure) var(--motion-ease-standard); }
 
 @keyframes faqReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.faqList details[open] p { animation: faqReveal var(--motion-duration-navigation) var(--motion-ease-enter) both; }
+.faqList details[open] p { animation: faqReveal var(--motion-duration-disclosure-slow) var(--motion-ease-enter) both; }
 
 @media (hover: hover) and (pointer: fine) {
   /* v3.1: CTA fills stay blue in every state (motion + inset edge come from
-   * the canonical data-hook rules); text links shift blue-ink→indigo with
-   * the pseudo underline scaleX 0→1. */
-  .secondaryOffers article > a:hover { color: var(--v31-indigo); }
+   * the canonical data-hook rules); text links shift cyan→light indigo with
+   * the pseudo underline scaleX 0→1 (R13a dark-canvas accent roles). */
+  .secondaryOffers article > a:hover { color: var(--color-information); }
   .secondaryOffers article > a:hover::after { transform: scaleX(1); }
-  .finalSecondaryLink:hover { color: var(--v31-indigo); }
+  .finalSecondaryLink:hover { color: var(--color-information); }
   .finalSecondaryLink:hover::after { transform: scaleX(1); }
 }
 

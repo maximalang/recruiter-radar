@@ -7,6 +7,10 @@
   --motion-duration-context: 220ms;
   --motion-duration-navigation: var(--motion-duration-context);
   --motion-duration-emphasis: 260ms;
+  /* R13d: smooth FAQ disclosure — the owner requires ~300–400ms height +
+   * opacity on the canonical easings; 340ms is the single source for the
+   * accordion JS timers and CSS transitions. */
+  --motion-duration-disclosure-slow: 340ms;
   --motion-duration-signal: 520ms;
   --motion-duration-scan: 760ms;
   --motion-ease-standard: cubic-bezier(.2, .75, .25, 1);

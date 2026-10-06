@@ -173,7 +173,6 @@ const ICON_PATHS: Record<string, string> = {
   up: "M8 11.4V4.6M5.2 7.4 8 4.6l2.8 2.8",
   down: "M8 4.6v6.8M5.2 8.6 8 11.4l2.8-2.8",
   more: "M3.6 8a1.1 1.1 0 1 0 0-.01Zm4.4 0a1.1 1.1 0 1 0 0-.01Zm4.4 0a1.1 1.1 0 1 0 0-.01Z",
-  chevronHandle: "M10 3 5.5 8 10 13",
 };
 
 const NAV_ICONS: Record<PageKey, string> = {
@@ -657,7 +656,8 @@ export default function HeroProductPreview() {
             aria-label={openish ? "Свернуть демо" : "Развернуть демо"}
             onClick={onHandleClick}
           >
-            <Ico name="chevronHandle" />
+            {/* R13c: owner removed the visible chevron — the handle stays as
+              * the invisible 44×44 hit area (hover/tap/keyboard parity). */}
           </button>
           <figure
             id="hero-workflow"
