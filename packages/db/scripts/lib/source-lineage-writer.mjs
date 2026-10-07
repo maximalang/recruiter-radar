@@ -280,7 +280,7 @@ export async function upsertSignalEvidenceLineageBatch(client, inputs) {
         input.organization_resolution_reason, input.persisted_payload
       FROM signal_rows input
       JOIN evidence_rows evidence
-        ON evidence.org_id = input.org_id
+        ON evidence.org_id = input.signal_org_id
         AND evidence.content_hash = input.evidence_hash
       ON CONFLICT (signal_id, evidence_id) DO NOTHING
       RETURNING id
