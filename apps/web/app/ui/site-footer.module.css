@@ -131,15 +131,14 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: .38rem .55rem;
+  gap: .28rem .5rem;
   color: color-mix(in srgb, var(--color-canvas) 56%, transparent);
   font-size: .7rem;
-  line-height: 1.55;
+  line-height: 1.4;
 }
 
 .footerOperatorName {
-  color: color-mix(in srgb, var(--color-canvas) 72%, transparent);
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .footerOperatorSep {
@@ -169,15 +168,18 @@
 }
 
 .siteFooter[data-tone="light"] .footerLine,
-.siteFooter[data-tone="light"] .footerLink,
-.siteFooter[data-tone="light"] .footerOperator,
-.siteFooter[data-tone="light"] .footerOperatorEmail {
+.siteFooter[data-tone="light"] .footerLink {
   color: var(--color-text-secondary);
 }
 
-.siteFooter[data-tone="light"] .footerNav strong,
-.siteFooter[data-tone="light"] .footerOperatorName {
+.siteFooter[data-tone="light"] .footerNav strong {
   color: var(--color-text-primary);
+}
+
+.siteFooter[data-tone="light"] .footerOperator,
+.siteFooter[data-tone="light"] .footerOperatorEmail,
+.siteFooter[data-tone="light"] .footerOperatorName {
+  color: var(--color-text-tertiary);
 }
 
 .siteFooter[data-tone="light"] .footerCopy {
