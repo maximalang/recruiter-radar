@@ -416,6 +416,10 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     requiredEnvVars: [],
     envPrefixes: ['RABOTA_ROSSII_'],
     searchEnvVars: [],
+    // The 12-region iteration against trudvsem's slow open-data endpoint takes
+    // ~70-115s on a healthy day; the default 120s script budget kills
+    // slow-but-successful runs. 7 minutes keeps the watchdog without false kills.
+    timeoutMs: 420_000,
     isPrimary: true,
     category: 'job-board',
   },

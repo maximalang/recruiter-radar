@@ -152,6 +152,7 @@ export function createStandardSourceRuntime(config) {
     let evidenceUpsertCount = 0;
     let evidenceCreatedCount = 0;
     let lineageCreatedCount = 0;
+    let orgAnchorKeeps = 0;
     let organizationResolutionRejects = 0;
 
     await client.connect();
@@ -195,6 +196,7 @@ export function createStandardSourceRuntime(config) {
         evidenceUpsertCount += lineage.evidenceUpsertCount;
         evidenceCreatedCount += lineage.evidenceCreatedCount;
         lineageCreatedCount += lineage.lineageCreatedCount;
+        orgAnchorKeeps += lineage.orgAnchorKeeps ?? 0;
       }
 
       input.organizationResolutionRejects = organizationResolutionRejects;
@@ -211,6 +213,7 @@ export function createStandardSourceRuntime(config) {
         evidenceUpsertCount,
         evidenceCreatedCount,
         lineageCreatedCount,
+        orgAnchorKeeps,
         organizationResolutionRejects,
       };
     } catch (error) {
@@ -307,6 +310,7 @@ export function createStandardSourceRuntime(config) {
       evidenceUpsertsCompleted: stats.evidenceUpsertCount,
       evidenceCreated: stats.evidenceCreatedCount,
       lineageCreated: stats.lineageCreatedCount,
+      orgAnchorKeeps: stats.orgAnchorKeeps ?? 0,
       organizationResolutionRejects: stats.organizationResolutionRejects,
       zeroReason: resolveSuccessfulIngestZeroReason(input, stats),
     };
@@ -331,6 +335,7 @@ export function createStandardSourceRuntime(config) {
       evidenceUpsertsCompleted: stats.evidenceUpsertCount,
       evidenceCreated: stats.evidenceCreatedCount,
       lineageCreated: stats.lineageCreatedCount,
+      orgAnchorKeeps: stats.orgAnchorKeeps ?? 0,
       organizationResolutionRejects: stats.organizationResolutionRejects,
       zeroReason: resolveSuccessfulIngestZeroReason(input, stats),
     };
