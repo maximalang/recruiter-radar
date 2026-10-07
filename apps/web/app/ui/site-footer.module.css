@@ -182,6 +182,13 @@
   color: var(--color-text-tertiary);
 }
 
+/* The landing's .visualSystem footer a rule has higher specificity than
+ * .footerOperatorEmail's plain inherit; restate it under the tone attribute so the
+ * dark operator-line email keeps the line color (>= 4.5:1) on landing pages too. */
+.siteFooter[data-tone="dark"] .footerOperatorEmail {
+  color: inherit;
+}
+
 .siteFooter[data-tone="light"] .footerCopy {
   color: var(--color-text-tertiary);
 }
@@ -208,6 +215,12 @@
   .footerBrand:hover,
   .footerLink:hover,
   .footerOperatorEmail:hover {
+    color: var(--color-signal);
+  }
+
+  /* Match the dark base rule's specificity so hover still wins over the landing's
+   * .visualSystem footer a:hover. */
+  .siteFooter[data-tone="dark"] .footerOperatorEmail:hover {
     color: var(--color-signal);
   }
 }
