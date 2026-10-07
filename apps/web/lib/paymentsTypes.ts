@@ -1,5 +1,6 @@
 import { type Pool, type PoolClient } from "pg";
 
+import type { MarketProfilePresetChoice } from "./marketProfilePresets";
 import type { PublicPlan, PublicPlanCode } from "./publicProduct";
 
 export const CHECKOUT_ORDER_STATUSES = [
@@ -54,6 +55,14 @@ export type CheckoutOrderPayload = {
   payerType?: CheckoutPayerType;
   buyerInn?: string | null;
   legalAcceptance?: CheckoutLegalAcceptance | null;
+  /**
+   * Recorded market-profile choice for this order (registry:
+   * lib/marketProfilePresets.ts): a canonical preset id, or the explicit
+   * "custom" sentinel when the user deliberately chose «Свой профиль».
+   * null/absent means NO choice was ever recorded (legacy orders predating
+   * the D2 picker) — only those may fall back to the specialization label.
+   */
+  marketProfilePreset?: MarketProfilePresetChoice | null;
   specialization: string | null;
   city: string | null;
   includeKeywords: string[];

@@ -269,7 +269,7 @@ POST /api/cron/opportunities/backfill-opportunities?apply=true
 Статические и unit/integration-like проверки:
 
 ```powershell
-npm.cmd run test --workspace @recruiter-radar/web -- --runInBand --testPathPattern=opportunit
+npm.cmd run test --workspace @recruiter-radar/web -- --runInBand --testPathPatterns=opportunit
 npm.cmd run web:check
 npm.cmd run web:build
 npm.cmd run db:validate
