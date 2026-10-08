@@ -1,0 +1,60 @@
+name: Story production audit
+
+on:
+  push:
+    branches: ['codex/**', main]
+    paths:
+      - 'apps/web/app/story/**'
+      - 'apps/web/scripts/verify-story-production.mjs'
+      - '.github/workflows/story.yml'
+  pull_request:
+    branches: [main, 'codex/**']
+    paths:
+      - 'apps/web/app/story/**'
+      - 'apps/web/scripts/verify-story-production.mjs'
+      - '.github/workflows/story.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  story-playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome
+      LANDING_BASE_URL: http://127.0.0.1:3518
+      STORY_ARTIFACT_DIR: apps/web/artifacts/story
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run web:build
+      - run: node apps/web/scripts/prepare-standalone.mjs
+      - name: Start isolated production server
+        env:
+          PORT: '3518'
+          HOSTNAME: 127.0.0.1
+        run: |
+          node apps/web/.next/standalone/apps/web/server.js > story-server.log 2>&1 &
+          for attempt in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:3518/story > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: All-scene truth, geometry, accessibility and crossover audit
+        run: node apps/web/scripts/verify-story-production.mjs
+      - name: Upload exact-head owner preview and audit evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: story-preview-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            apps/web/artifacts/story/
+            story-server.log
+          retention-days: 14

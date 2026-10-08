@@ -1,0 +1,562 @@
+/* Hero scene — v3.1 (master verdict 04.10, D2 output contract).
+ * R11: the section is the hero clip-area and query container; the demo dock
+ * is absolutely anchored at ≥1200 and stacked in flow below. R2: pass34
+ * scrim layering restored (overlay z5 over static content). R7: scene
+ * choreography lives in the canonical motion ladder; the outer reveal
+ * wrapper and the slide wrapper never share one transform author. */
+.section {
+  position: relative;
+  display: block;
+  isolation: isolate;
+  container-type: inline-size;
+  width: 100%;
+  margin-inline: auto;
+  /* Base (≤767): 88px top keeps the fixed 72px header clear; the R5 zone
+   * rhythm below is 56px. */
+  padding: 88px 0 56px;
+  overflow-x: clip;
+  overflow-y: visible;
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
+  /* R11 geometry tokens — consumed by the dock/slide and their descendants;
+   * cqw resolves against this section (no other query container between). */
+  --v31-demo-width: clamp(640px, 62cqw, 1180px);
+  --v31-demo-gutter: 16px;
+  --v31-demo-height: 500px;
+  --v31-caption-slot: 88px;
+  --v31-caption-gap: 12px;
+  --v31-peek-x: calc(50% + var(--v31-demo-gutter));
+}
+
+.copy {
+  position: relative;
+  z-index: 3;
+  width: min(100%, 46rem);
+  margin-inline: 16px;
+}
+
+.serviceLabel {
+  margin: 0 0 1rem;
+  color: var(--color-signal-on-dark);
+  font-size: .8125rem;
+  font-weight: 600;
+}
+
+.title {
+  max-width: 12ch;
+  margin: 0;
+  font-size: clamp(2.25rem, 9.2vw, 2.75rem);
+  font-weight: 680;
+  letter-spacing: -.04em;
+  line-height: 1.08;
+  text-wrap: balance;
+  animation: none;
+}
+
+.description {
+  max-width: 46ch;
+  margin: 1.5rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem 1rem;
+  margin-top: 1.55rem;
+}
+
+.section .primaryButton {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  gap: .7rem;
+  padding: .8rem 1.15rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--color-signal);
+  color: var(--color-text-inverse);
+  font-size: .875rem;
+  font-weight: 650;
+  text-decoration: none;
+  transition: transform var(--motion-duration-control) var(--motion-ease-enter), box-shadow var(--motion-duration-control) var(--motion-ease-enter);
+}
+
+.section .primaryButton svg { transition: transform var(--motion-duration-control) var(--motion-ease-enter); }
+.primaryButton:active { transform: scale(.985); }
+
+.primaryButton:focus-visible,
+.loginLink:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; box-shadow: var(--shadow-focus-outer); }
+.loginLink:focus-visible { color: var(--color-text-primary); text-decoration: underline; }
+.primaryButton :global(svg) { flex: none; }
+.actionHint { max-width: 15rem; color: var(--color-text-secondary); font-size: .8125rem; line-height: 1.45; }
+/* R13a: link accents return to the dark-canvas roles — cyan on-dark signal
+ * at rest, light indigo (information) on hover. */
+.loginLink { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; margin-top: .25rem; color: var(--color-signal-on-dark); font-size: .8125rem; text-decoration: underline; text-underline-offset: 3px; }
+.microcopy { max-width: 31rem; margin: .5rem 0 0; color: var(--color-text-tertiary); font-size: .8125rem; line-height: 1.45; }
+
+/* R11 dock shell: absolutely anchored at ≥1200 (top 64, right 0, z4 — the
+ * capture area reaches the right clip edge), stacked in flow with 64px
+ * headroom for the external handle below that. */
+.fieldFigure {
+  position: relative;
+  z-index: 4;
+  width: 100%;
+  min-width: 0;
+  height: calc(var(--v31-demo-height) + var(--v31-caption-gap) + var(--v31-caption-slot));
+  margin-top: 64px;
+  pointer-events: auto;
+}
+
+/* R7: outer reveal wrapper (its own transform author, distinct from the
+ * R11 slide below and from the zone ::before paint). */
+.peekReveal { position: relative; height: 100%; }
+
+/* R11: stationary dock — pointer/focus handlers live here; the slide child
+ * is the only element that moves. */
+.peekDock { position: relative; height: 100%; }
+
+.peekSlide {
+  position: relative;
+  height: 100%;
+  width: calc(100% - 2 * var(--v31-demo-gutter));
+  margin-left: var(--v31-demo-gutter);
+  transform: translateX(0);
+  /* R13c: the slide is the demo-window query container — the interior
+   * 3-column composition collapses by WINDOW width (not viewport), so the
+   * docked demo keeps the reference proportions at every dock size. */
+  container-type: inline-size;
+}
+
+.peekDock[data-peek-state="peek"] .peekSlide,
+.peekDock[data-peek-state="closing"] .peekSlide { transform: translateX(var(--v31-peek-x)); }
+
+.peekDock[data-peek-state="opening"] .peekSlide,
+.peekDock[data-peek-state="full"] .peekSlide { transition: transform var(--motion-duration-scan) var(--motion-ease-enter); }
+
+.peekDock[data-peek-state="closing"] .peekSlide { transition: transform var(--motion-duration-signal) var(--motion-ease-standard); }
+
+/* First committed state after hydration applies without a visible slide. */
+.peekDock[data-peek-instant="true"] .peekSlide { transition: none; }
+
+/* Early user input finishes the outer reveal instantly (R7 §5.3). */
+.peekReveal[data-reveal-done="true"] { animation: none; opacity: 1; transform: none; }
+
+/* R11 external handle: 44×44, above the window frame (4px gap), moves with
+ * the slide, never inert, always a ≥2px visible focus ring. F-1: at ≥1200px
+ * the handle (y16–60) shares the fixed 72px header strip — the transparent
+ * header passes pointer events through (landing-header.module.css).
+ * R13c: the owner removed the visible chevron — the handle is now an
+ * invisible hit area (transparent, borderless, no icon); hover/tap/keyboard
+ * parity and the focus ring stay exactly as R11/F-1 require. */
+.peekHandle {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 5;
+  display: none;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  cursor: pointer;
+}
+
+.peekDock[data-peek-js="true"] .peekHandle { display: grid; }
+
+.peekHandle:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; box-shadow: var(--shadow-focus-outer); }
+
+/* R11 caption slot: reserved 88px (up to four 13px/18px lines) + 12px gap,
+ * included in the dock height; no negative bottom margin. */
+.shotCaption {
+  height: var(--v31-caption-slot);
+  margin-top: var(--v31-caption-gap);
+  color: var(--color-text-secondary);
+  font-size: .8125rem;
+  line-height: 1.385;
+}
+
+.productShot {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: var(--v31-demo-height);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--v31-demo-window-border);
+  border-radius: var(--radius-overlay);
+  background: linear-gradient(145deg, var(--color-surface-secondary) 0%, var(--color-surface-primary) 70%);
+  box-shadow: var(--shadow-hero-panel);
+
+  color: var(--color-text-primary);
+  text-align: left;
+
+  /* v3 (D1 table F): demo graphite + brand blue/cyan accents; structure unchanged */
+  --color-surface-primary: var(--color-demo-base-0);
+  --color-surface-secondary: var(--color-demo-base-1);
+  --color-surface-elevated: var(--color-demo-elevated);
+  --color-surface-selected: var(--color-demo-selected);
+  --color-separator: var(--color-demo-separator);
+  --color-separator-subtle: var(--color-demo-separator-subtle);
+  --color-text-primary: var(--color-demo-text-bright);
+  --color-text-secondary: var(--color-demo-text-soft);
+  --color-text-tertiary: var(--color-demo-text-muted);
+  --color-text-disabled: var(--color-demo-text-faint);
+  --color-signal: var(--color-demo-gold);
+  /* R13c: reference 9eaa919b remap restored — inside the demo the on-dark
+   * signal role is the demo blue, not the page cyan. */
+  --color-signal-on-dark: var(--color-demo-gold);
+  --color-signal-soft: var(--color-demo-gold-soft);
+}
+
+.shotMark { display: block; width: 2rem; height: 2rem; object-fit: contain; border-radius: 50%; }
+
+/* R2 (v3.1): pass34 layering restored — the full-figure scrim is an
+ * overlay ABOVE the demo content (z5), demo surfaces stay static and are
+ * not lifted over it. The scrim gradient tokens resolve to the exact
+ * pass34 values defined in globals.css (shade 30% black; bottom/corner
+ * scrims at their accepted 62%/55% alpha); the later weakened landing
+ * overrides are removed. Under the scrim only the decorative gradient and
+ * the unreadable 9px mono meta remain; the contract keeps the exact
+ * pass34 computed state. */
+.productShot::after { content: ""; position: absolute; z-index: 5; inset: 0; pointer-events: none; background: radial-gradient(130% 130% at 100% 100%, var(--color-demo-scrim-corner) 0%, transparent 60%), linear-gradient(to bottom right, transparent 30%, var(--color-demo-scrim-bottom) 100%); }
+
+.shotBody { display: grid; height: 100%; min-height: 0; grid-template-columns: 15rem minmax(0,1fr); gap: .5rem; padding: .5rem; background: radial-gradient(130% 100% at 50% -15%, var(--color-demo-glow-indigo), transparent 60%), linear-gradient(180deg, transparent 30%, var(--color-demo-shade)); }
+.shotSide { display: flex; min-width: 0; flex-direction: column; padding: .85rem .6rem .8rem; border-right: 0; background: transparent; }
+.shotSide > p { margin: .85rem .55rem .3rem; color: var(--color-text-secondary); font: 500 .8125rem var(--font-sans); letter-spacing: 0; text-transform: none; }
+.shotSide > p:first-child { margin-top: 0; }
+.shotNav { display: grid; gap: .12rem; }
+.shotNav button { min-height: 2.75rem; padding: 0 .55rem; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text-secondary); font: 500 .8125rem var(--font-sans); text-align: left; cursor: pointer; transition: background-color var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-disclosure) var(--motion-ease-standard); }
+.shotNav button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.shotNav .shotNavActive { background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-selected)); color: var(--color-text-primary); }
+.shotSide > div:nth-of-type(3) button:nth-child(1) svg { color: var(--color-demo-green); }
+.shotSide > div:nth-of-type(3) button:nth-child(2) svg { color: var(--color-demo-orange); }
+
+.shotWorkspace { position: relative; min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--color-demo-veil-09); border-radius: var(--radius-overlay); background: linear-gradient(168deg, var(--color-demo-panel-top) 0%, var(--color-demo-panel-mid) 52%, var(--color-demo-panel-end) 100%); box-shadow: var(--shadow-demo-panel); }
+.shotWorkspace::before { content: ""; position: absolute; z-index: 3; inset: 0 0 auto 0; height: 1px; background: linear-gradient(90deg, transparent, var(--color-demo-veil-12), transparent); background-size: 200% 100%; animation: sheenSweep var(--motion-duration-scan) var(--motion-ease-standard) both; pointer-events: none; }
+@keyframes sheenSweep { 0% { background-position: 200% 0; } 60%, 100% { background-position: -200% 0; } }
+.shotWorkspaceHeader { display: flex; align-items: center; gap: .6rem; padding: .95rem 1.2rem; border-bottom: 1px solid var(--color-separator-subtle); background-image: linear-gradient(180deg, var(--color-demo-veil-022), var(--color-demo-clear)); }
+.shotStatus { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--color-signal); box-shadow: var(--shadow-demo-status); }
+.shotIssueId { flex: none; color: var(--color-text-tertiary); font: .8125rem var(--font-mono); }
+.shotCrumb { flex: none; color: var(--color-text-tertiary); font-size: .8125rem; }
+.shotCrumbSep { flex: none; margin: 0 .35rem; color: var(--color-text-tertiary); font-size: .8125rem; }
+.shotWorkspaceHeader strong { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .95rem; font-weight: 590; letter-spacing: -.015em; }
+.shotHeaderTools { display: flex; flex: none; align-items: center; gap: .5rem; color: var(--color-text-tertiary); }
+.shotHeaderTools svg { width: 14px; height: 14px; }
+.shotCounter { display: flex; flex: none; align-items: center; gap: .3rem; margin-left: auto; color: var(--color-text-tertiary); }
+.shotCounter b { font: 500 .8125rem var(--font-mono); }
+.shotCounter button { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; border: 1px solid var(--color-separator); border-radius: var(--radius-control); background: transparent; color: var(--color-text-secondary); cursor: pointer; transition: background-color var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-disclosure) var(--motion-ease-standard); }
+.shotCounter button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.shotCounter svg { width: 12px; height: 12px; }
+.shotToolRow { display: flex; align-items: center; gap: .4rem; padding: .6rem 1rem 0; }
+.shotToolCaption { margin-left: auto; color: var(--color-text-tertiary); font: .8125rem var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+.shotToolIco { display: grid; width: 1.9rem; height: 1.9rem; place-items: center; border: 1px solid var(--color-separator-subtle); border-radius: 50%; color: var(--color-text-tertiary); }
+.shotToolIco svg { width: 13px; height: 13px; }
+.workflowArea { padding-top: .35rem; }
+.sideWorkspace { display: flex; align-items: center; gap: .5rem; margin: 0 .1rem .55rem; padding: .1rem .35rem; }
+.sideWorkspace strong { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .86rem; font-weight: 590; letter-spacing: -.01em; }
+.sideWorkspaceTools { display: flex; flex: none; align-items: center; gap: .5rem; color: var(--color-text-tertiary); }
+.sideWorkspaceTools svg { width: 13px; height: 13px; }
+.sideGroup { display: flex; align-items: center; gap: .3rem; }
+.sideGroup svg { width: 10px; height: 10px; color: var(--color-text-disabled); }
+.sideUser { display: flex; align-items: center; gap: .5rem; margin: auto .25rem 0; padding-top: .7rem; }
+.sideUser > span { display: grid; width: 1.4rem; height: 1.4rem; flex: none; place-items: center; border-radius: 50%; background: var(--color-surface-elevated); color: var(--color-text-secondary); font: 600 .55rem var(--font-mono); }
+.sideUser small { color: var(--color-text-tertiary); font-size: .8125rem; }
+.shotNav button { display: flex; align-items: center; gap: .5rem; }
+.shotNav button svg { width: 15px; height: 15px; flex: none; color: var(--color-text-tertiary); }
+.shotNav .shotNavActive svg { color: var(--color-text-primary); }
+.workflowTabs { display: grid; grid-template-columns: minmax(0,1fr); gap: .12rem; }
+.workflowTabs > button { position: relative; display: flex; min-width: 0; min-height: 2.75rem; align-items: center; gap: .5rem; padding: 0 .55rem; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text-secondary); text-align: left; cursor: pointer; transition: background-color var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-disclosure) var(--motion-ease-standard); }
+.workflowTabs > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.stageState { display: grid; width: .9rem; height: .9rem; flex: none; place-items: center; border-radius: 50%; }
+.stageState[data-state="todo"] { border: 1.5px solid var(--color-demo-stage-todo); }
+.stageState[data-state="active"] { border: 1.5px solid var(--color-demo-gold); background: conic-gradient(from -90deg, var(--color-demo-gold) 0 50%, var(--color-demo-gold-fill) 50% 100%); box-shadow: var(--shadow-demo-stage); }
+.stageState[data-state="done"] { background: var(--color-demo-indigo); }
+.stageState[data-state="done"]::after { content: "✓"; color: var(--color-demo-white); font-size: .55rem; font-weight: 700; line-height: 1; }
+.workflowTabs span { min-width: 0; }
+.workflowTabs b,.workflowTabs small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workflowTabs b { color: inherit; font-size: .8125rem; font-weight: 550; letter-spacing: -.005em; }
+@media (min-width: 701px) {
+  .workflowTabs b,.workflowTabs small { overflow: visible; white-space: normal; text-overflow: clip; line-height: 1.2; }
+}
+.workflowTabs .workflowTabActive { background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-selected)); color: var(--color-text-primary); }
+.workflowTabActive span b { color: var(--color-text-primary); }
+
+.workflowPanel { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr) 15.5rem; gap: .5rem; margin-top: .2rem; background: transparent; }
+.workflowMain { padding: 1.7rem 1.35rem 1.3rem; }
+.shotProps { display: grid; align-self: start; gap: .6rem; padding: 2.4rem .9rem 1.2rem .55rem; }
+.propsCard { padding: .95rem 1.05rem; border: 1px solid var(--color-separator-subtle); border-radius: var(--radius-overlay); background: var(--color-demo-elevated); }
+.propsCard h3 { margin: 0 0 .55rem; color: var(--color-text-tertiary); font-size: .8125rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.propsCard > div { display: flex; align-items: center; gap: .45rem; padding: .3rem 0; color: var(--color-text-secondary); font-size: .875rem; }
+.shotProps > .aiFloat { display: block; padding: .85rem .95rem; color: var(--color-text-primary); }
+/* R13c: reference 9eaa919b icon palette — the Svodka/props card icons are
+ * the deep demo indigo, not the brightened v3.1 variant. */
+.propsCard svg { width: 14px; height: 14px; flex: none; color: var(--color-demo-indigo); }
+.activityHead { margin: 1.35rem 0 0; color: var(--color-text-primary); font-size: .95rem; font-weight: 590; letter-spacing: -.01em; }
+.activityCount { margin-left: .5rem; color: var(--color-text-tertiary); font-size: .8125rem; font-weight: 500; vertical-align: .1rem; }
+.cmtGhost { margin: .9rem 0 0 2.25rem; padding: .6rem .95rem; border: 1px dashed var(--color-demo-veil-10); border-radius: var(--radius-surface); color: var(--color-text-tertiary); font-size: .875rem; }
+.workflowEyebrow,.infoPage > span { color: var(--color-text-tertiary); font: .8125rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.workflowMain h2,.infoPage h2 { max-width: 32ch; margin: .5rem 0 0; font-size: 1.625rem; font-weight: 640; letter-spacing: -.02em; line-height: 1.22; }
+.workflowIntro,.infoPage > p { max-width: 62ch; margin: .45rem 0 0; color: var(--color-text-secondary); font-size: 1rem; line-height: 1.55; }
+.workflowRows { margin: .85rem 0 0; }
+.workflowRows div { display: block; padding: .44rem 0; }
+.workflowRows dt { display: none; }
+.shotBack { display: grid; width: 1.5rem; height: 1.5rem; flex: none; place-items: center; border-radius: var(--radius-control); color: var(--color-text-tertiary); }
+.shotBack svg { width: 14px; height: 14px; }
+.rowIco { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: var(--radius-control); margin-right: .65rem; vertical-align: -.45em; }
+.rowIco svg { width: 13px; height: 13px; }
+.rowIco[data-i="0"] { background: var(--color-demo-veil-06); color: var(--color-text-tertiary); }
+.rowIco[data-i="1"] { background: var(--color-demo-veil-06); color: var(--color-text-tertiary); }
+.rowIco[data-i="2"] { background: var(--color-demo-veil-06); color: var(--color-text-tertiary); }
+@media (hover: hover) {
+  .shotNav button:hover, .workflowTabs > button:hover { background: var(--color-demo-veil-035); }
+}
+.rowLabel { display: inline-block; padding: .16rem .6rem; border-radius: var(--radius-pill); margin-right: .55rem; background: var(--color-demo-veil-07); color: var(--color-text-secondary); font-size: .8125rem; font-weight: 560; }
+.rowAv { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; margin-right: .65rem; background: var(--color-demo-indigo); color: var(--color-demo-white); font: 700 .5rem var(--font-mono); vertical-align: -.45em; }
+.rowAv[data-actor="you"] { background: var(--color-demo-avatar-you); }
+.workflowRows div:nth-child(2) dd::before { content: none; margin-right: 0; }
+.propsStatus { display: flex; align-items: center; gap: .5rem; margin: 0; color: var(--color-text-primary); font-size: .88rem; font-weight: 600; }
+.statusDot { width: .55rem; height: .55rem; flex: none; border-radius: 50%; background: var(--color-demo-gold); }
+.propList { margin: .85rem 0 0; }
+.propList div { margin-top: .6rem; }
+.propList div:first-child { margin-top: 0; }
+.propList dt { color: var(--color-text-tertiary); font-size: .8125rem; letter-spacing: .05em; text-transform: uppercase; }
+.propList dd { margin: .12rem 0 0; color: var(--color-text-primary); font-size: .875rem; font-weight: 500; line-height: 1.45; }
+.workflowRows dd { display: inline; margin: 0; color: var(--color-text-primary); font-size: .875rem; line-height: 1.5; }
+.workflowRows dd::before { content: none; margin-right: 0; }
+.cmtCard { display: flex; gap: .65rem; margin-top: 1.1rem; padding: .85rem .95rem; border: 1px solid var(--color-separator-subtle); border-radius: var(--radius-surface); background: linear-gradient(160deg, var(--color-demo-card), var(--color-demo-panel-flat) 80%); }
+.cmtAv { display: grid; width: 1.7rem; height: 1.7rem; flex: none; place-items: center; border-radius: 50%; background: var(--color-demo-indigo); color: var(--color-demo-white); font: 600 .58rem var(--font-mono); }
+.cmtBody { min-width: 0; }
+.cmtHead { display: flex; align-items: baseline; gap: .45rem; margin: 0; }
+.cmtHead strong { font-size: .82rem; font-weight: 590; }
+.cmtHead span { color: var(--color-text-tertiary); font-size: .8125rem; }
+.cmtBody > p:last-child { margin: .3rem 0 0; color: var(--color-text-secondary); font-size: .875rem; line-height: 1.55; }
+
+/* R3: progressive typing line — the ghost twin reserves the final geometry
+ * (visibility:hidden), the live span paints graphemes over it; both are
+ * aria-hidden while the accessible full text stays in the visually-hidden
+ * span from the start. No caret exists at any frame. */
+.demoType { position: relative; }
+.typeGhost { visibility: hidden; }
+.typeLive { position: absolute; top: 0; left: 0; }
+
+.workflowRows > div { animation: rowIn var(--motion-duration-emphasis) var(--motion-ease-enter) both; }
+.workflowRows > div:nth-child(1) { animation-delay: var(--motion-delay-1); }
+.workflowRows > div:nth-child(2) { animation-delay: var(--motion-delay-3); }
+.workflowRows > div:nth-child(3) { animation-delay: var(--motion-delay-4); }
+@keyframes rowIn { from { opacity: 0; transform: translate3d(0, 5px, 0); } to { opacity: 1; transform: none; } }
+.aiFloat { margin-top: 0; padding: .95rem 1.05rem; border-radius: var(--radius-surface); background: linear-gradient(160deg, var(--color-demo-card), var(--color-demo-panel-alt) 75%); box-shadow: none; }
+.aiFloatHead { display: flex; align-items: center; gap: .45rem; }
+.aiFloatHead strong { font-size: .82rem; font-weight: 590; }
+.aiFloatHead em { padding: .08rem .4rem; border: 1px solid var(--color-separator); border-radius: var(--radius-pill); color: var(--color-text-tertiary); font-size: .8125rem; font-style: normal; font-weight: 600; letter-spacing: .06em; }
+.aiFloatCaret { margin-left: auto; color: var(--color-text-tertiary); }
+.aiFloatCaret svg { width: 13px; height: 13px; }
+.aiFloatCard { margin: .6rem 0 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--color-text-primary); font-size: .875rem; line-height: 1.5; }
+.aiFloatCtx { margin: .45rem 0 0; color: var(--color-text-secondary); font-size: .8125rem; }
+.aiFloatState { display: flex; align-items: center; gap: .4rem; margin: .55rem 0 0; color: var(--color-text-secondary); font-size: .8125rem; }
+.aiFloatState span { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--color-signal);  }
+
+
+.infoPage button { min-height: 2.75rem; margin-top: 1rem; padding: 0 1rem; border: 0; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .8125rem; font-weight: 640; cursor: pointer; }
+.infoPage button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+.infoPage { padding: 1.3rem 1.1rem 0; }
+.infoPage > p { max-width: 65ch; }
+.infoPage dl { margin: 1.2rem 0 0; }
+.infoPage dl div { display: block; padding: .55rem 0; }
+.infoPage i { display: inline-grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; margin-right: .65rem; vertical-align: -.45em; background: var(--color-demo-glow-indigo-strong); color: var(--color-demo-indigo-bright); font-size: 0; }
+.infoPage i::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-demo-indigo-bright); }
+.infoPage dt { display: none; }
+.infoPage dd { display: inline; margin: 0; color: var(--color-text-secondary); font-size: .875rem; line-height: 1.5; }
+.infoPage dd::before { content: none; margin-right: 0; }
+.infoPage button { width: auto; padding-inline: 1rem; }
+
+@media (hover: hover) and (pointer: fine) {
+  /* R5/§5.2: the primary CTA keeps its blue fill in every state; hover is
+   * motion + inset edge, never a cyan repaint. */
+  .primaryButton:hover { transform: translateY(-2px); box-shadow: var(--shadow-cta-hover-inset); }
+  .primaryButton:hover :global(svg) { transform: translate3d(3px, 0, 0); }
+  .loginLink:hover { color: var(--color-information); }
+  .shotNav button:hover { background: var(--color-surface-selected); color: var(--color-text-primary); }
+  .workflowTabs > button:hover { background: var(--color-demo-veil-035); color: var(--color-text-primary); }
+  .shotCounter button:hover { background: var(--color-surface-selected); color: var(--color-text-primary); }
+  .infoPage button:hover { background: var(--color-signal-hover); }
+}
+
+/* R11/R5 tablet band: the demo window grows to 678px, zone rhythm 72px,
+ * h1 steps to 52px (R10). */
+@media (min-width: 768px) {
+  .section { --v31-demo-height: 678px; padding: 88px 0 72px; }
+  .title { font-size: 3.25rem; }
+}
+
+/* R11 stacked layout (≤1199): copy is capped at 560px with 16px gutters. */
+@media (max-width: 1199px) {
+  .copy { width: min(560px, calc(100cqw - 32px)); }
+}
+
+/* R11 desktop: full-bleed hero, absolutely anchored copy and dock. */
+@media (min-width: 1200px) {
+  .section {
+    --v31-demo-gutter: 32px;
+    --v31-demo-height: 678px;
+    min-height: max(880px, calc(100svh - 84px));
+    padding: 96px 0;
+  }
+  .title { font-size: 4rem; }
+  .copy {
+    position: absolute;
+    top: 96px;
+    left: max(40px, calc((100cqw - 1280px) / 2));
+    width: min(480px, calc(100cqw - var(--v31-demo-width) - 112px));
+    margin-inline: 0;
+  }
+  .fieldFigure {
+    position: absolute;
+    top: 64px;
+    right: 0;
+    width: calc(var(--v31-demo-width) + var(--v31-demo-gutter));
+    margin-top: 0;
+  }
+  .peekSlide { width: var(--v31-demo-width); margin-left: 0; }
+}
+
+/* R13c: window-keyed composition collapse (reference 9eaa919b ≤1100
+ * behavior, re-keyed from viewport to the demo WINDOW so the docked demo
+ * never squeezes its three columns). Below a 1100px window the right rail
+ * is hidden and the workflow panel goes single-column — no dead tracks, no
+ * compressed main column. Placed before the viewport bands so the ≤900
+ * mobile layout below still wins the cascade. */
+@container (max-width: 1099px) {
+  .shotProps { display: none; }
+  .workflowPanel { grid-template-columns: minmax(0, 1fr); }
+  .shotBody { grid-template-columns: 11rem minmax(0,1fr); gap: .4rem; padding: .4rem; }
+  .shotSide { padding: .8rem .5rem; }
+  .workflowMain { padding: 1.6rem 1rem 1.1rem; }
+}
+
+@media (max-width: 1100px) {
+  .aiFloat { display: none; }
+  .shotBody { grid-template-columns: 11rem minmax(0,1fr); min-height: 0; gap: .4rem; padding: .4rem; }
+  .shotSide { padding: .8rem .5rem; }
+  .shotNav button { min-height: 2.75rem; font-size: .8125rem; }
+  .workflowTabs > button { min-height: 2.75rem; }
+  .workflowTabs b { font-size: .8125rem; }
+  .sideWorkspace strong { font-size: .8125rem; }
+  .shotWorkspaceHeader { padding: .8rem .9rem; }
+  .workflowMain { padding: 1.6rem 1rem 1.1rem; }
+}
+
+@media (max-width: 900px) {
+  .section { display: block; min-height: auto; }
+  .fieldFigure { width: 100%; min-width: 0; }
+}
+
+@media (max-width: 900px) {
+  .actions { align-items: flex-start; flex-direction: column; }
+  .actionHint { max-width: 22rem; }
+  .shotToolRow { padding: .5rem .9rem 0; }
+  .shotProps { display: none; }
+  .shotBody { display: block; min-height: 0; }
+  .shotSide { display: block; padding: .55rem; border-right: 0; border-bottom: 1px solid var(--color-separator-subtle); }
+  .shotSide > p { display: none; }
+  .shotNav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; }
+  .shotNav button { min-height: 44px; padding: 0 .7rem; font-size: .8125rem; }
+  .shotWorkspace { padding: 0; }
+  .shotWorkspaceHeader { padding: .75rem .9rem; }
+  .shotWorkspaceHeader small { display: none; }
+  .workflowTabs { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .workflowTabs > button { min-height: 64px; border-bottom: 1px solid var(--color-separator-subtle); }
+  .workflowTabs > button:nth-child(2n) { border-right: 0; }
+  .workflowTabs > button:nth-child(n+3) { border-bottom: 0; }
+  .workflowTabs b,.workflowTabs small { overflow: visible; text-overflow: clip; white-space: normal; line-height: 1.15; }
+  .workflowPanel { display: block; min-height: 0; }
+  .workflowMain { padding: 1.1rem .9rem; }
+  .workflowIntro,.infoPage > p { font-size: .875rem; }
+  .workflowRows div { flex-wrap: wrap; gap: .35rem; }
+  .workflowRows dt,.workflowRows dd { font-size: .875rem; }
+  .infoPage button { min-height: 44px; font-size: .8125rem; }
+  .infoPage dl div { flex-wrap: wrap; gap: .35rem; }
+  .infoPage dd { grid-column: 2; font-size: .875rem; }
+  .infoPage dt { font-size: .74rem; }
+}
+
+@media (max-width: 900px) {
+  .shotBody { display: grid; grid-template-columns: 7.5rem minmax(0,1fr); min-height: 0; gap: .3rem; padding: .3rem; }
+  .shotSide { display: flex; padding: .7rem .45rem; border-right: 0; border-bottom: 0; background: transparent; }
+  .shotSide > p { display: block; margin: .7rem .35rem .25rem; font-size: .8125rem; }
+  .sideWorkspace { gap: .4rem; }
+  .sideWorkspace strong { display: none; }
+  .sideWorkspaceTools { display: none; }
+  .shotNav { display: grid; grid-template-columns: minmax(0,1fr); gap: .1rem; }
+  .shotNav button { min-height: 2.75rem; padding: 0 .45rem; font-size: .8125rem; overflow: hidden; }
+  .workflowTabs { grid-template-columns: minmax(0,1fr); }
+  .workflowTabs > button { min-height: 2.75rem; padding: 0 .45rem; border-bottom: 0; }
+  .shotCounter button { display: none; }
+  .workflowTabs b { font-size: .8125rem; }
+  .shotWorkspaceHeader { padding: .7rem .75rem; }
+  .shotWorkspaceHeader strong { font-size: .84rem; }
+  .shotIssueId { font-size: .8125rem; }
+  .shotHeaderTools { display: none; }
+  .shotCrumb, .shotCrumbSep { display: none; }
+  .cmtGhost { margin-left: 0; font-size: .875rem; }
+  .shotToolIco { display: none; }
+  .shotToolRow { padding: .45rem .75rem 0; }
+  .shotCounter b { font-size: .8125rem; }
+  .workflowMain { padding: 1.2rem .75rem 1rem; }
+  .activityHead { margin-top: 1.3rem; font-size: .92rem; }
+  .rowIco,.rowAv,.infoPage i { width: 1.15rem; height: 1.15rem; margin-right: .45rem; }
+  .cmtCard { padding: .7rem .8rem; }
+}
+
+/* R10: the demo h2 drops to 18px on phones; 26px (1.625rem) above. */
+@media (max-width: 767px) {
+  .workflowMain h2,.infoPage h2 { font-size: 1.125rem; }
+}
+
+@media (max-width: 430px) {
+  .shotWorkspaceHeader { gap: .4rem; padding: .6rem .65rem; }
+  .shotWorkspaceHeader strong { font-size: .8125rem; }
+  .shotIssueId { display: none; }
+  .shotCounter button { display: none; }
+  .shotToolCaption { letter-spacing: .02em; font-size: .8125rem; }
+  .stageState { width: 1rem; height: 1rem; }
+  .workflowTabs > button { padding-inline: .48rem; }
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* v3.1 R7 §5.3 — scene choreography: main exits 180ms, atomic swap, the
+ * new scene enters over 520ms; rows/cmtCard follow the canonical ladder. */
+@keyframes blockIn { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+@keyframes stageMainIn { from { opacity: 0; transform: translate3d(18px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes stageMainOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(-10px, 0, 0); } }
+.workflowMain { animation: stageMainIn var(--motion-duration-signal) var(--motion-ease-enter) both; }
+.workflowMain[data-scene-exit="true"] { animation: stageMainOut var(--motion-duration-disclosure) var(--motion-ease-exit) both; }
+.infoPage { animation: stageMainIn var(--motion-duration-signal) var(--motion-ease-enter) both; }
+.cmtCard { animation: blockIn var(--motion-duration-emphasis) var(--motion-ease-standard) both; animation-delay: var(--motion-delay-6); }
+.cmtGhost { animation: blockIn var(--motion-duration-emphasis) var(--motion-ease-standard) both; animation-delay: calc(var(--motion-delay-6) + var(--motion-duration-instant)); }
+.propsCard { animation: blockIn var(--motion-duration-emphasis) var(--motion-ease-enter) both; animation-delay: var(--motion-delay-6); }
+.shotProps > .aiFloat { animation: blockIn var(--motion-duration-emphasis) var(--motion-ease-enter) both; animation-delay: calc(var(--motion-delay-6) + var(--motion-duration-control)); }
+.workflowTabs > button { transition: color var(--motion-duration-fast) var(--motion-ease-standard); }
+.stageState { transition: border-color var(--motion-duration-fast) var(--motion-ease-standard), background-color var(--motion-duration-fast) var(--motion-ease-standard); }
+
+@media (prefers-reduced-motion: reduce) {
+  .section *, .section *::before, .section *::after { animation: none !important; transition: none !important; }
+}
