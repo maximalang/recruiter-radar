@@ -26,5 +26,5 @@ export default function ScrollDemo() {
     return () => { observer.disconnect(); reduced.removeEventListener("change", onPreference); };
   }, []);
 
-  return <div ref={ref} className={styles.demoScene} data-demo-appearance={armed ? "pending" : active ? "visible" : "static"} onFocusCapture={() => { setActive(true); setArmed(false); }}><HeroProductPreview scrollActive={active} /></div>;
+  return <div ref={ref} className={styles.demoScene} data-theme="inverse" data-demo-appearance={armed ? "pending" : active ? "visible" : "static"} onFocusCapture={() => { setActive(true); setArmed(false); }}><HeroProductPreview scrollActive={active} /></div>;
 }
