@@ -15,7 +15,7 @@ they do not send outreach or expose personal contact data.
 | Ответили | `replied` | `replied` | Record a reply and suppress resurfacing. |
 | Созвон | `meeting` | `meeting` | Record a scheduled/held call and suppress resurfacing. |
 | Клиент | `won` | `won` | Record conversion and suppress resurfacing. |
-| Скрыть | `dismissed` | `dismissed` | Suppress this exact candidate for the bounded period. Look-alike/ER-key suppression across similarly named orgs is not implemented yet and is deferred to a future sprint; the button name makes no look-alike promise. |
+| Скрыть | `dismissed` | `dismissed` | Suppress this exact candidate and every entity-resolution fragment of the same employer for the bounded period, via the canonical corroboration key (see below). Company-name similarity alone never widens a suppression. |
 
 `accepted` is intentionally an alias for the existing `contacted` terminal
 state; it does not invent a separate business state. `meeting` is a first-class
@@ -79,6 +79,33 @@ client profile, organization, digest candidate, feedback status, note, source
 lineage, cooldown, suppression, and timestamps. `webhook_events` retains the
 raw event envelope and processing outcome for audit/replay diagnostics.
 
+## Cross-fragment suppression ("Скрыть")
+
+`dismissed` additionally writes a row into `client_org_suppressions`
+(migration `20260828100000_add_client_org_suppressions.sql`):
+
+- The suppression key is the canonical cross-source corroboration key from
+  `org_corroboration_keys_v1`, shared by digest assembly and feedback handling
+  (`inn:` / `ogrn:` / `domain:`, platform
+  hosts excluded, company-name similarity deliberately excluded; keyless orgs
+  fall back to `org:<id>`, which suppresses exactly one org).
+- Rows are scoped by `client_profile_id`: a dismissal in one agency never
+  affects another agency's candidates.
+- The window is bounded by the same `dismissed` suppression period as
+  `client_digest_org_state` (30 days by default, clamped) and never shrinks
+  on a repeated dismissal (GREATEST on upsert).
+- Digest selection (`getDigestItemsForClientProfile` and
+  `runDigestForClientProfile`) excludes candidates whose org shares an active
+  suppression key inside the candidate SQL before `LIMIT`, so hidden fragments
+  cannot consume the result window. The path fails closed if the suppression
+  schema is unavailable; it never silently resurfaces a hidden employer.
+- The organization-state upsert and ER-suppression upsert use the same database
+  transaction. A failed scope lookup/write rolls the state change back and the
+  callback is not acknowledged as successful.
+- The ER fan-out fires only when the dismissed state transition is actually
+  applied. A stale replay rejected by the compare-and-set never re-arms or
+  extends a suppression.
+
 ## Migration and rollback
 
 `packages/db/migrations/20260825090000_add_meeting_digest_feedback_status.sql`
@@ -87,6 +114,10 @@ normal database container entrypoint/migration runner; it is not a production
 proof or a reason to bypass the snapshot/`pg_dump` gate. The down migration is
 an intentional no-op because PostgreSQL enum values cannot be removed safely
 without rewriting the type and existing rows.
+
+`packages/db/migrations/20260828100000_add_client_org_suppressions.sql`
+adds the canonical ER-key view and suppression ledger. Its down migration drops
+only those additive objects, in dependency-safe order.
 
 All actions remain company-level state only. Lawful contact paths and evidence
 remain separate lead-card fields; these buttons never create personal emails,

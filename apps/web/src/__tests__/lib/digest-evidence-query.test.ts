@@ -32,10 +32,14 @@ describe('digest evidence query mirror', () => {
   })
 
   it('canonicalizes already-prefixed legal identity keys without duplicating the namespace', () => {
-    expect(DIGEST_EVIDENCE_QUERY).toContain("'inn:' || LOWER(REPLACE(ref.source_key, 'inn:', ''))")
-    expect(DIGEST_EVIDENCE_QUERY).toContain("'ogrn:' || LOWER(REPLACE(ref.source_key, 'ogrn:', ''))")
-    expect(DIGEST_EVIDENCE_QUERY).not.toContain("'inn:' || ref.source_key")
-    expect(DIGEST_EVIDENCE_QUERY).not.toContain("'ogrn:' || ref.source_key")
+    const schemaPath = resolve(__dirname, '../../../../../packages/db/schema/init.sql')
+    const schema = readFileSync(schemaPath, 'utf8')
+
+    expect(DIGEST_EVIDENCE_QUERY).toContain('FROM org_corroboration_keys_v1')
+    expect(schema).toContain("'inn:' || LOWER(REPLACE(ref.source_key, 'inn:', ''))")
+    expect(schema).toContain("'ogrn:' || LOWER(REPLACE(ref.source_key, 'ogrn:', ''))")
+    expect(schema).not.toContain("'inn:' || ref.source_key")
+    expect(schema).not.toContain("'ogrn:' || ref.source_key")
   })
 
   // Regression guard for a prod-only HTTP 500 (PostgreSQL 42601 "syntax error at
