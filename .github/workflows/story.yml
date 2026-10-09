@@ -36,6 +36,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Install Playwright video runtime
+        run: npx playwright install ffmpeg
       - run: npm run web:build
       - run: node apps/web/scripts/prepare-standalone.mjs
       - name: Start isolated production server
