@@ -80,7 +80,7 @@ describe("landing restoration narrative", () => {
     expect(hero).toContain('data-hero-product-preview="workflow"');
     expect(hero).toContain('id="hero-workflow"');
     expect(hero).toContain("Интерактивный workflow");
-    expect(hero).toContain("Черновик готов — отправляете только вы");
+    expect(hero).toContain("Черновик готов. Отправляете вы.");
     expect(hero).not.toContain("data-lead-row");
     expect(hero).not.toContain("getStaticDemoDigestItems");
     expect(existsSync(resolve(WEB_ROOT, "app/landing/workspace-scene.tsx"))).toBe(false);
@@ -94,7 +94,7 @@ describe("landing restoration narrative", () => {
     const deliveryCss = source("app/landing/delivery-scene.module.css");
 
     // Delivery headline: results arrive where the user already works.
-    expect(delivery).toContain("Результаты приходят туда, где вы работаете");
+    expect(delivery).toContain("Результаты там, где вы работаете");
 
     // Truthful channel hierarchy: web cabinet is the core surface,
     // connected notification routes come next, secondary routes are

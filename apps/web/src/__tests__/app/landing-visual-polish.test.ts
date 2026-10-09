@@ -85,7 +85,8 @@ describe("polished unified landing visual contract", () => {
     expect(landingIndex).toBeGreaterThan(analyticsIndex);
     expect(cookieSettingsIndex).toBeGreaterThan(landingIndex);
     expect(landingPage).toContain('export function LandingSkipLink()');
-    expect(landingPage).toContain('<main id="main-content">');
+    // v3 (D1 D-1): main is programmatically focusable so the skip link hands focus to it.
+    expect(landingPage).toContain('<main id="main-content" tabIndex={-1}>');
     expect(landingPageBody).not.toContain('<a href="#main-content" className={styles.skipLink}>');
   });
 

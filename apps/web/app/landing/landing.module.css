@@ -1,6 +1,7 @@
 .landingPage {
   --scene-pad: clamp(1rem, 3.2vw, 4rem);
-  --content: 84rem;
+  /* v3.1 R5: content column is 1280px across the landing zones. */
+  --content: 80rem;
   min-height: 100vh;
   margin: -32px -20px -72px;
   overflow-x: clip;
@@ -16,8 +17,10 @@
 .landingPage :where([id]) { scroll-margin-top: 5.5rem; }
 
 .landingPage :is(a, button, input, summary):focus-visible {
+  /* v3.1 R5 focus contract: 2px blue ring + 2px white outer offset. */
   outline: 2px solid var(--color-focus);
-  outline-offset: 4px;
+  outline-offset: 2px;
+  box-shadow: var(--shadow-focus-outer);
 }
 
 .landingPage a { color: inherit; }
@@ -30,8 +33,13 @@
   min-height: 44px;
   padding: .8rem 1rem;
   border-radius: var(--radius-control);
+  /* D-1 (v3): the skip link renders as a SIBLING of the landing root, so the
+   * scoped landing palette never reaches it. Its exact v3 values live in the
+   * canonical token source (product-visual-system.css, [data-landing-skip-link])
+   * because the semantic-visual-contract forbids raw literals in component
+   * modules: blue fill, dark ink label (5.02:1), cyan focus ring (9.95:1). */
   background: var(--color-signal);
-  color: var(--color-text-primary);
+  color: var(--color-text-inverse);
   font-size: .82rem;
   font-weight: 650;
   text-decoration: none;
@@ -42,7 +50,13 @@
   transform: translateY(calc(-100% - 1rem));
 }
 
-.skipLink:focus { transform: translateY(0); }
+/* D-1: reveal on keyboard focus only — a mouse click elsewhere must not
+ * leave the link parked over the hero. */
+.skipLink:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
 
 .headerBrand {
   display: inline-flex;

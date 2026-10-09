@@ -23,45 +23,56 @@ describe("landing hero advertising workflow", () => {
 
     expect(container.querySelector('[data-hero-product-preview="workflow"]')).not.toBeNull();
     expect(screen.getByRole("tab", { name: /Ваш рынок/i })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getAllByText("Профиль рынка — Инженерный подбор").length).toBeGreaterThanOrEqual(2);
+    // v3.1 R10 (variant A): the stage-1 title is the concise market name.
+    expect(screen.getAllByText("Инженерный подбор").length).toBeGreaterThanOrEqual(2);
     expect(container).not.toHaveTextContent(/Промет|Демо|12 мая/i);
   });
 
   it("lets the visitor inspect every workflow stage", () => {
+    jest.useFakeTimers();
     render(<HeroProductPreview />);
 
+    // v3.1 §5.3: the outgoing scene exits for 180ms, then the swap is atomic.
     fireEvent.click(screen.getByRole("tab", { name: /10 компаний/i }));
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("10 компаний за 7 дней — каждая с причиной написать");
+    act(() => jest.advanceTimersByTime(200));
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("10 компаний за 7 дней");
 
     fireEvent.click(screen.getByRole("tab", { name: /Готовый черновик/i }));
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("Черновик готов — отправляете только вы");
+    act(() => jest.advanceTimersByTime(200));
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Черновик готов. Отправляете вы.");
   });
 
-  it("advances to the next idea after a comfortable reading interval", () => {
+  it("advances automatically until the first manual choice, then stays put", () => {
     jest.useFakeTimers();
-    const { container } = render(<HeroProductPreview />);
-    const workflow = container.querySelector<HTMLElement>("[data-hero-workflow]");
-    expect(workflow).not.toBeNull();
+    render(<HeroProductPreview />);
 
-    fireEvent.pointerEnter(workflow!);
     act(() => jest.advanceTimersByTime(7_999));
     expect(screen.getByRole("tab", { name: /Ваш рынок/i })).toHaveAttribute("aria-selected", "true");
     act(() => jest.advanceTimersByTime(1));
     expect(screen.getByRole("tab", { name: /27 источников/i })).toHaveAttribute("aria-selected", "true");
 
+    // v3.1 §5.3: a manual tab click stops the cadence until reload; it never
+    // resumes spontaneously after the first interaction.
     fireEvent.click(screen.getByRole("tab", { name: /10 компаний/i }));
-    act(() => jest.advanceTimersByTime(8_000));
-    expect(screen.getByRole("tab", { name: /Готовый черновик/i })).toHaveAttribute("aria-selected", "true");
+    act(() => jest.advanceTimersByTime(200));
+    expect(screen.getByRole("tab", { name: /10 компаний/i })).toHaveAttribute("aria-selected", "true");
+    act(() => jest.advanceTimersByTime(24_000));
+    expect(screen.getByRole("tab", { name: /10 компаний/i })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("keeps the hero product shot fitted inside its column without a clipped edge", () => {
+  it("keeps the hero demo as the v3.1 peek window inside its clip area", () => {
     const css = source("app/landing/detection-scene.module.css");
 
-    expect(css).toMatch(/\.section\s*\{[\s\S]*?overflow:\s*hidden/);
+    // v3.1 R11: the hero section clips horizontally only; the dock slide is
+    // the single transform author for the peek↔full travel (exactly 50% of
+    // the frame plus the gutter waits behind the right clip edge).
+    expect(css).toMatch(/\.section\s*\{[\s\S]*?overflow-x:\s*clip/);
     expect(css).toMatch(/\.fieldFigure\s*\{[^}]*width:\s*100%/);
-    // Owner verdict 23.09: no Accio-style bleed/expansion — the mock is fully
-    // visible at every width, and the hero copy never dims on interaction.
-    expect(css).not.toMatch(/translateX/);
+    expect(css).toContain("--v31-peek-x: calc(50% + var(--v31-demo-gutter));");
+    expect(css).toMatch(/\.peekDock\[data-peek-state="peek"\] \.peekSlide,\s*\r?\n\.peekDock\[data-peek-state="closing"\] \.peekSlide \{ transform: translateX\(var\(--v31-peek-x\)\); \}/);
+    // Owner verdict 23.09 remnants that v3.1 keeps banned: no hover/focus
+    // expansion of the product shot itself, no :has() layout coupling, and
+    // no near-zero opacity literals.
     expect(css).not.toMatch(/\.fieldFigure:hover\s+\.productShot/);
     expect(css).not.toMatch(/\.fieldFigure:focus-within\s+\.productShot/);
     expect(css).not.toMatch(/\.section:has\(/);
@@ -90,5 +101,57 @@ describe("landing hero advertising workflow", () => {
     expect(responsive).toMatch(/window\.innerWidth > 900\s+&& Boolean\(element\.closest\('#scene-detection \[data-hero-visual\]'\)\)/);
     expect(responsive).toContain(".filter((element) => !insideHeroTeaser(element))");
     expect(responsive).toContain("!insideHorizontalScroller(element) && !insideHeroTeaser(element)");
+  });
+
+  it("expands the peek demo through the external handle (F-1 click path)", () => {
+    jest.useFakeTimers();
+    // jsdom lacks container-unit feature detection; the peek machine enhances
+    // in exactly when the browser supports the R11 geometry contract.
+    const cssNamespace = window as unknown as { CSS?: { supports?: unknown } };
+    const originalCss = cssNamespace.CSS;
+    cssNamespace.CSS = { ...originalCss, supports: () => true };
+    try {
+      const { container } = render(<HeroProductPreview />);
+      const dock = container.querySelector("[data-demo-peek]");
+      const handle = container.querySelector("[data-peek-handle]");
+      if (!dock || !handle) throw new Error("peek dock and handle must render");
+
+      // Hydration commits the settled peek; two frames later the instant
+      // entry is over and the dock waits as the plain 50% peek.
+      act(() => { jest.advanceTimersByTime(64); });
+      expect(dock).toHaveAttribute("data-peek-state", "peek");
+      expect(dock.hasAttribute("data-peek-instant")).toBe(false);
+      expect(handle).toHaveAttribute("aria-expanded", "false");
+
+      // The R11 click path: the handle pins the demo open (760ms ladder).
+      fireEvent.click(handle);
+      expect(dock).toHaveAttribute("data-peek-state", "opening");
+      act(() => { jest.advanceTimersByTime(760); });
+      expect(dock).toHaveAttribute("data-peek-state", "full");
+      expect(handle).toHaveAttribute("aria-expanded", "true");
+      expect(handle).toHaveAttribute("aria-label", "Свернуть демо");
+    } finally {
+      cssNamespace.CSS = originalCss;
+    }
+  });
+
+  it("keeps the transparent desktop header click-through over the peek handle (F-1)", () => {
+    const headerCss = source("app/landing/landing-header.module.css");
+    const heroCss = source("app/landing/detection-scene.module.css");
+
+    // jsdom cannot hit-test, so the desktop-only pointer-events pass-through
+    // is pinned here: at ≥1200px the handle (y16–60) lives under the fixed
+    // 72px header strip, and without the pass-through the unit gates would
+    // stay green while the button is dead for real pointer input.
+    expect(headerCss).toMatch(
+      /@media \(min-width: 1200px\) \{\s*\.header:not\(\[data-scrolled\]\):not\(\[data-menu-open\]\) \{\s*pointer-events: none;\s*\}/,
+    );
+    expect(headerCss).toMatch(
+      /\.header:not\(\[data-scrolled\]\):not\(\[data-menu-open\]\) \.brand,[\s\S]*?\.header:not\(\[data-scrolled\]\):not\(\[data-menu-open\]\) \.navLink,[\s\S]*?\.header:not\(\[data-scrolled\]\):not\(\[data-menu-open\]\) \.menuButton \{\s*pointer-events: auto;\s*\}/,
+    );
+    // The fix must not move the paint order or the R2/R11 layer contracts.
+    expect(headerCss).toMatch(/\.header \{\s*position: fixed;\s*z-index: 90;/);
+    expect(heroCss).toMatch(/\.peekHandle \{[^}]*top: -48px;[^}]*z-index: 5;/);
+    expect(heroCss).toMatch(/\.productShot::after \{[^}]*z-index: 5;[^}]*pointer-events: none;/);
   });
 });

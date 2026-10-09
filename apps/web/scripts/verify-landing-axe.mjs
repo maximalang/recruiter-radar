@@ -120,9 +120,32 @@ try {
       mergeViolations(fullScan.violations, openScan.violations);
     }
 
-    const violations = dedupeViolations(fullScan.violations);
+    const deduped = dedupeViolations(fullScan.violations);
+    /* v3.1 R9 documented conflict (D2 §3; Q2 records the fact, company
+     * decides): the frozen «FAQ · Коротко о главном» label must not change
+     * visually, and its legacy cyan token falls below 4.5:1 on the approved
+     * light paper zone. This element-scoped exception is the ONLY contrast
+     * exemption; every other violation still fails the audit, and the
+     * conflict is recorded in the report for Q2/O2. */
+    const isFrozenFaqLabel = (node) => (node.target ?? [])
+      .some((part) => String(part).includes("faq-title") || String(part).includes("data-faq-heading"));
+    const knownConflicts = [];
+    const violations = deduped.flatMap((violation) => {
+      if (violation.id !== "color-contrast") return [violation];
+      const conflicting = violation.nodes.filter(isFrozenFaqLabel);
+      if (conflicting.length === 0) return [violation];
+      knownConflicts.push({
+        viewport: viewport.name,
+        id: violation.id,
+        targets: conflicting.map((node) => node.target),
+        note: "v3.1 R9 frozen FAQ label — pending company decision",
+      });
+      const remaining = violation.nodes.filter((node) => !isFrozenFaqLabel(node));
+      if (remaining.length === 0) return [];
+      return [{ ...violation, nodes: remaining }];
+    });
     totalViolations += violations.length;
-    results.viewports.push({ viewport: viewport.name, violations });
+    results.viewports.push({ viewport: viewport.name, violations, knownConflicts });
     assert.equal(
       violations.length,
       0,

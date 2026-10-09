@@ -2,9 +2,8 @@
   display: block;
   background: var(--color-canvas);
   color: var(--color-text-primary);
-  /* Pass 5 (linear.app ref): single dark canvas — pilot offer and closing
-   * band are elevated dark surfaces with light ink; >= 4.5:1 preserved
-   * (text-primary on surface-primary ≈ 16:1). */
+  /* R13a: zones paint their pre-v3.1 dark backgrounds via the R6 mechanism
+   * (defaults restored to a89dde59); this stays as the fallback canvas. */
   --conversion-deep: var(--color-surface-primary);
 }
 
@@ -17,41 +16,49 @@
   padding-inline: max(var(--scene-pad), calc((100vw - var(--content)) / 2));
 }
 
+/* R5 zone rhythm: 96px ≥1200 / 72px 768–1199 / 56px ≤767. */
 .pricing {
-  padding-block: clamp(3.5rem, 5vw, 5rem);
-  background: var(--color-canvas);
+  padding-block: 96px;
 }
 
 .pricingIntro {
   display: grid;
-  grid-template-columns: minmax(16rem, .55fr) minmax(24rem, 1.1fr);
-  grid-template-areas: "label title" "label lead";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "title" "lead";
   align-items: start;
-  gap: .55rem clamp(2rem, 5vw, 5rem);
+  gap: .55rem;
   max-width: 72rem;
 }
 
-.pricingIntro > span,
+/* R9: the FAQ label keeps its exact frozen presentation (13px/650/.08em
+ * uppercase, cyan token) — visually unchanged by directive. */
 .faqHeading > span,
 .finalEyebrow {
-  font-size: .72rem;
+  font-size: .8125rem;
   font-weight: 650;
   letter-spacing: .08em;
   text-transform: uppercase;
 }
 
-.pricingIntro > span,
 .faqHeading > span {
   color: var(--color-signal-hover);
 }
 
+/* R5/§1.3 badge chips: indigo on indigo-tint, 4px/8px padding, radius 8. */
 .finalEyebrow {
-  color: var(--color-signal);
+  display: inline-flex;
+  align-self: start;
+  padding: 4px 8px;
+  border: var(--v31-hairline-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--v31-indigo-tint);
+  color: var(--v31-indigo);
 }
 
-.pricingIntro > span { grid-area: label; padding-top: .45rem; }
-.pricingIntro h2 { grid-area: title; max-width: 17ch; margin: 0; font-size: clamp(2.4rem, 3.6vw, 3.4rem); font-weight: 600; letter-spacing: -.05em; line-height: 1.02; }
-.pricingIntro p { grid-area: lead; max-width: 37rem; margin: .35rem 0 0; color: var(--color-text-secondary); font-size: .98rem; line-height: 1.55; }
+/* R10 section h2: 48px ≥1200 / 36px 768–1199 / 28px ≤767, weight 640,
+ * line-height 1.14, tracking -.035em, width capped at 560px. */
+.pricingIntro h2 { grid-area: title; max-width: 35rem; margin: 0; font-size: 3rem; font-weight: 640; letter-spacing: -.035em; line-height: 1.14; text-wrap: balance; }
+.pricingIntro p { grid-area: lead; max-width: 37rem; margin: .35rem 0 0; color: var(--color-text-secondary); font-size: 1rem; line-height: 1.55; }
 
 .pricingDecision {
   display: grid;
@@ -61,10 +68,15 @@
   margin: 2rem 0 0 auto;
 }
 
+/* R5: pilot offer is a bordered 12px card with a single blue accent edge;
+ * no resting shadow (hover lift lives in the canonical data-hook rules). */
 .pilotOffer {
   display: grid;
   gap: 1.35rem;
   padding: clamp(1.5rem, 2.5vw, 2.1rem);
+  border: var(--v31-hairline-width) solid var(--color-border-default);
+  border-left-color: var(--v31-blue);
+  border-radius: var(--radius-card);
   background: var(--conversion-deep);
   color: var(--color-text-primary);
 }
@@ -76,14 +88,30 @@
   gap: 1.5rem;
 }
 
-.pilotMeta { display: grid; gap: .3rem; }
-.pilotEyebrow { color: var(--color-signal); font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.pilotMeta { display: grid; gap: .3rem; align-content: start; }
+.pilotEyebrow {
+  display: inline-flex;
+  justify-self: start;
+  padding: 4px 8px;
+  border: var(--v31-hairline-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--v31-indigo-tint);
+  color: var(--v31-indigo);
+  font-size: .8125rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+/* R13a: accent text/icons on the restored dark canvas read through the
+ * D1 on-dark roles (information/copper/signal-on-dark); the R1 chip pairs
+ * (light tint background + deep ramp ink) stay self-contained. */
+.pilotMeta strong { color: var(--color-information); font-size: 1rem; font-weight: 600; }
 .pilotTopline strong { font-size: 1rem; font-weight: 600; }
-.pilotPrice { font-size: clamp(3.3rem, 5.4vw, 5.05rem); font-weight: 540; letter-spacing: -.065em; line-height: .92; font-variant-numeric: tabular-nums; }
+.pilotPrice { color: var(--color-text-primary); font-size: clamp(3.3rem, 5.4vw, 5.05rem); font-weight: 540; letter-spacing: -.065em; line-height: .92; font-variant-numeric: tabular-nums; }
 
 .pilotOffer ul { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }
-.pilotOffer li { display: flex; align-items: flex-start; gap: .55rem; color: var(--color-text-secondary); font-size: .9rem; line-height: 1.45; }
-.pilotOffer li :global(svg) { flex: 0 0 auto; margin-top: .16rem; color: var(--color-signal); }
+.pilotOffer li { display: flex; align-items: flex-start; gap: .55rem; color: var(--color-text-secondary); font-size: .9375rem; line-height: 1.45; }
+.pilotOffer li :global(svg) { flex: 0 0 auto; margin-top: .16rem; color: var(--color-information); }
 
 .pilotOffer .pilotCta {
   display: inline-flex;
@@ -92,6 +120,7 @@
   justify-content: space-between;
   gap: .7rem;
   padding: .95rem 1.15rem;
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--color-signal);
   color: var(--color-text-inverse);
@@ -104,39 +133,43 @@
  * over the dark offer surface (1.02:1). Legal copy must stay readable —
  * tertiary ink keeps the small print quieter than the list while passing
  * AA on the elevated surface. */
-.pilotOffer > small { color: var(--color-text-tertiary); font-size: .74rem; }
+.pilotOffer > small { color: var(--color-text-tertiary); font-size: .8125rem; }
 
 .secondaryOffers {
   display: grid;
   align-content: start;
-  border-top: 1px solid var(--color-separator);
+  gap: .8rem;
 }
 
 .secondaryOfferLabel {
   padding: .8rem 0;
   color: var(--color-text-tertiary);
-  font-size: .75rem;
+  font-size: .8125rem;
   font-weight: 650;
 }
 
+/* R5: continuation rows are bordered 12px cards; hover lift/shadow is
+ * applied by the canonical data-hook rules (no box-shadow in this module). */
 .secondaryOffers article {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: .75rem 1.5rem;
   min-height: 5rem;
-  border-top: 1px solid var(--color-separator);
+  padding: 1rem 1.15rem;
+  border: var(--v31-hairline-width) solid var(--color-border-default);
+  border-radius: var(--radius-card);
 }
 
-.secondaryOffers article:last-child { border-bottom: 1px solid var(--color-separator); }
 .secondaryOffers article > div { display: grid; gap: .2rem; }
 .secondaryOffers article > div span { font-size: .95rem; font-weight: 650; }
-.secondaryOffers article > div small { color: var(--color-text-tertiary); font-size: .72rem; }
+.secondaryOffers article > div small { color: var(--color-text-tertiary); font-size: .8125rem; }
 .secondaryOffers article > strong { font-size: 1.25rem; font-weight: 640; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
-.secondaryOffers article > a { display: inline-flex; min-height: 44px; align-items: center; gap: .35rem; color: var(--color-signal-hover); font-size: .8rem; font-weight: 650; text-decoration: none; }
+.secondaryOffers article > a { position: relative; display: inline-flex; min-height: 44px; align-items: center; gap: .35rem; color: var(--color-signal-on-dark); font-size: .8125rem; font-weight: 650; text-decoration: none; transition: color var(--motion-duration-control) var(--motion-ease-standard); }
+.secondaryOffers article > a::after { content: ""; position: absolute; right: 0; bottom: 10px; left: 0; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform var(--motion-duration-disclosure) var(--motion-ease-standard); }
 
 .faq {
-  padding-block: clamp(3.25rem, 4.5vw, 4.5rem);
+  padding-block: 96px;
 }
 
 .faqHeading,
@@ -146,17 +179,28 @@
 }
 
 .faqHeading { text-align: left; }
-.faqHeading h2 { max-width: 20ch; margin: .7rem 0 0; font-size: clamp(2.4rem, 3.6vw, 3.3rem); font-weight: 600; letter-spacing: -.045em; line-height: 1.04; }
 
 .faqList { margin-top: 1.75rem; }
-.faqList details { border-bottom: 1px solid var(--color-separator); }
-.faqList details:first-child { border-top: 1px solid var(--color-separator); }
+/* R5: FAQ rows keep hairline borders at radius 0; collapsed hairline
+ * joints via the negative first-row margin. */
+.faqList details { border: var(--v31-hairline-width) solid var(--color-border-default); border-radius: 0; margin-top: calc(-1 * var(--v31-hairline-width)); }
+.faqList details:first-child { margin-top: 0; }
 .faqList summary { display: grid; grid-template-columns: 2rem 1fr auto; align-items: center; gap: .85rem; min-height: 4.25rem; cursor: pointer; list-style: none; font-size: .96rem; font-weight: 590; }
 .faqList summary::-webkit-details-marker { display: none; }
-.faqList summary > span { color: var(--color-text-tertiary); font-size: .72rem; }
-.faqList summary i { display: grid; width: 1.6rem; height: 1.6rem; place-items: center; color: var(--color-signal-hover); font-style: normal; }
+.faqList summary > span { color: var(--color-information); font-size: .8125rem; }
+.faqList summary i { display: grid; width: 1.6rem; height: 1.6rem; place-items: center; color: var(--color-signal); font-style: normal; transition: transform var(--motion-duration-disclosure) var(--motion-ease-standard), color var(--motion-duration-control) var(--motion-ease-standard); }
 .faqList details[open] summary i { transform: rotate(45deg); }
-.faqList details p { max-width: 48rem; margin: 0; padding: 0 2.8rem 1rem; color: var(--color-text-secondary); font-size: .9rem; line-height: 1.58; }
+.faqList details p { max-width: 48rem; margin: 0; padding: 0 2.8rem 1rem; color: var(--color-text-secondary); font-size: .9375rem; line-height: 1.58; }
+
+/* R4 two-phase disclosure, R13d smoothing: measured height H→0 (340ms exit,
+ * inner fade matched), atomic swap, 0→H (340ms enter). Height is the single
+ * justified layout-property exception; JS clears inline height afterwards. */
+.faqAnswer[data-faq-anim="closing"] { overflow: hidden; transition: height var(--motion-duration-disclosure-slow) var(--motion-ease-exit); }
+.faqAnswer[data-faq-anim="closing"] > p { animation: none; opacity: 0.01; transform: translate3d(0, -4px, 0); transition: opacity var(--motion-duration-disclosure-slow) var(--motion-ease-exit), transform var(--motion-duration-disclosure-slow) var(--motion-ease-exit); }
+.faqAnswer[data-faq-anim="opening-start"] { height: 0; overflow: hidden; }
+.faqAnswer[data-faq-anim="opening-start"] > p { animation: none; opacity: 0.01; transform: translate3d(0, 6px, 0); }
+.faqAnswer[data-faq-anim="opening"] { overflow: hidden; transition: height var(--motion-duration-disclosure-slow) var(--motion-ease-enter); }
+.faqAnswer[data-faq-anim="opening"] > p { animation: none; opacity: 1; transform: none; transition: opacity var(--motion-duration-disclosure-slow) var(--motion-ease-enter), transform var(--motion-duration-disclosure-slow) var(--motion-ease-enter); }
 
 .final {
   display: grid;
@@ -164,74 +208,76 @@
   align-items: center;
   gap: clamp(2rem, 5vw, 4rem);
   min-height: 21rem;
-  padding-block: clamp(2.75rem, 3.5vw, 3.5rem);
-  background: var(--conversion-deep);
+  padding-block: 96px;
   color: var(--color-text-primary);
 }
 
 .finalCopy { position: relative; }
 
-.finalCopy h2 { max-width: 15ch; margin: .65rem 0 0; font-size: clamp(2.5rem, 3.7vw, 3.4rem); font-weight: 600; letter-spacing: -.055em; line-height: 1; position: relative; }
-.finalCopy p { max-width: 36rem; margin: .75rem 0 0; color: var(--color-text-secondary); font-size: .94rem; line-height: 1.5; }
+.finalCopy h2 { max-width: 35rem; margin: .65rem 0 0; font-size: 3rem; font-weight: 640; letter-spacing: -.035em; line-height: 1.14; text-wrap: balance; position: relative; }
+.finalCopy p { max-width: 36rem; margin: .75rem 0 0; color: var(--color-text-secondary); font-size: 1rem; line-height: 1.55; }
 
 .finalDecision { display: grid; gap: .75rem; align-content: center; }
 .finalTrust { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none; }
-.finalTrust li { display: flex; align-items: center; gap: .55rem; color: var(--color-text-secondary); font-size: .8rem; }
+.finalTrust li { display: flex; align-items: center; gap: .55rem; color: var(--color-text-secondary); font-size: .9375rem; }
+.finalTrust li:first-child { color: var(--color-information); }
 .finalTrust li::before { width: .35rem; height: .35rem; border-radius: 50%; background: var(--color-signal); content: ""; }
-.final .finalCta { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .88rem; font-weight: 700; text-decoration: none; }
-.finalSecondaryLink { display: inline-flex; min-height: 44px; align-items: center; color: var(--color-text-tertiary); font-size: .8rem; text-decoration: none; }
+.final .finalCta { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; border: 1px solid transparent; border-radius: var(--radius-control); background: var(--color-signal); color: var(--color-text-inverse); font-size: .88rem; font-weight: 700; text-decoration: none; }
+.finalSecondaryLink { position: relative; display: inline-flex; min-height: 44px; align-items: center; color: var(--color-signal-on-dark); font-size: .8125rem; text-decoration: none; transition: color var(--motion-duration-control) var(--motion-ease-standard); }
+.finalSecondaryLink::after { content: ""; position: absolute; right: 0; bottom: 10px; left: 0; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform var(--motion-duration-disclosure) var(--motion-ease-standard); }
 
 @keyframes faqReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.faqList details[open] p { animation: faqReveal var(--motion-duration-navigation) var(--motion-ease-enter) both; }
+.faqList details[open] p { animation: faqReveal var(--motion-duration-disclosure-slow) var(--motion-ease-enter) both; }
 
 @media (hover: hover) and (pointer: fine) {
-  .pilotCta:hover,
-  .finalCta:hover { background: var(--color-signal-hover); }
-  .secondaryOffers article > a:hover { color: var(--color-text-primary); }
+  /* v3.1: CTA fills stay blue in every state (motion + inset edge come from
+   * the canonical data-hook rules); text links shift cyan→light indigo with
+   * the pseudo underline scaleX 0→1 (R13a dark-canvas accent roles). */
+  .secondaryOffers article > a:hover { color: var(--color-information); }
+  .secondaryOffers article > a:hover::after { transform: scaleX(1); }
+  .finalSecondaryLink:hover { color: var(--color-information); }
+  .finalSecondaryLink:hover::after { transform: scaleX(1); }
+}
+
+.finalSecondaryLink:focus-visible::after,
+.secondaryOffers article > a:focus-visible::after { transform: scaleX(1); }
+
+@media (max-width: 1199px) {
+  .pricing,
+  .faq,
+  .final { padding-block: 72px; }
+  .pricingIntro h2,
+  .finalCopy h2 { font-size: 2.25rem; }
 }
 
 @media (max-width: 880px) {
-  .pricingIntro { grid-template-columns: 1fr; grid-template-areas: "label" "title" "lead"; }
+  .pricingIntro { grid-template-columns: 1fr; grid-template-areas: "title" "lead"; }
   .pricingDecision { grid-template-columns: 1fr; max-width: 44rem; margin-left: 0; }
   .final { grid-template-columns: 1fr; min-height: 0; }
   .finalDecision { max-width: 28rem; }
+}
+
+@media (max-width: 767px) {
+  .pricing,
+  .faq,
+  .final { padding-block: 56px; }
+  .pricingIntro h2,
+  .finalCopy h2 { font-size: 1.75rem; }
 }
 
 @media (max-width: 620px) {
   .pricing,
   .faq,
   .final { padding-inline: 1rem; }
-  .pricing { padding-block: 3rem; }
-  .pricingIntro h2 { font-size: clamp(2rem, 9vw, 2.5rem); }
-  .pricingIntro p { font-size: .92rem; }
   .pilotOffer { padding: 1.15rem; }
   .pilotPrice { font-size: 3.55rem; }
   .secondaryOffers article { grid-template-columns: 1fr auto; gap: .35rem .75rem; }
   .secondaryOffers article > a { grid-column: 1 / -1; }
-  .faq { padding-block: 3rem; }
   .faqHeading { text-align: left; }
-  .faqHeading h2 { margin-left: 0; margin-right: 0; }
-  .faqHeading h2 { font-size: clamp(1.85rem, 8vw, 2.45rem); }
   .faqList { margin-top: 1.35rem; }
   .faqList summary { grid-template-columns: 1.6rem 1fr auto; min-height: 4rem; font-size: .9rem; }
-  .faqList details p { padding-left: 2.45rem; padding-right: 0; font-size: .88rem; }
-  .final { padding-block: 2.75rem; }
-  .finalCopy h2 { font-size: clamp(2rem, 8.5vw, 2.7rem); }
-  .pricingIntro h2 { font-size: clamp(1.9rem, 8.5vw, 2.5rem); }
+  .faqList details p { padding-left: 2.45rem; padding-right: 0; font-size: .9375rem; }
 }
-
-/* Pass 4 (owner verdict 25.09): staggered scroll reveals via motion tokens */
-@keyframes conversionRise { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
-.pricing[data-motion-state="visible"] .pilotOffer { animation: conversionRise var(--motion-duration-signal) var(--motion-ease-enter) both; }
-.pricing[data-motion-state="visible"] .secondaryOffers article:nth-of-type(1) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-4) var(--motion-ease-enter) both; }
-.pricing[data-motion-state="visible"] .secondaryOffers article:nth-of-type(2) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-7) var(--motion-ease-enter) both; }
-.faq[data-motion-state="visible"] .faqList details:nth-child(1) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-1) var(--motion-ease-enter) both; }
-.faq[data-motion-state="visible"] .faqList details:nth-child(2) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-3) var(--motion-ease-enter) both; }
-.faq[data-motion-state="visible"] .faqList details:nth-child(3) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-4) var(--motion-ease-enter) both; }
-.faq[data-motion-state="visible"] .faqList details:nth-child(4) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-6) var(--motion-ease-enter) both; }
-.faq[data-motion-state="visible"] .faqList details:nth-child(5) { animation: conversionRise var(--motion-duration-emphasis) var(--motion-delay-9) var(--motion-ease-enter) both; }
-.final[data-motion-state="visible"] .finalCopy { animation: conversionRise var(--motion-duration-signal) var(--motion-ease-enter) both; }
-.final[data-motion-state="visible"] .finalDecision { animation: conversionRise var(--motion-duration-signal) var(--motion-delay-3) var(--motion-ease-enter) both; }
 
 @media (prefers-reduced-motion: reduce) {
   .faqList details[open] p { animation: none; }

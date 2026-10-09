@@ -61,7 +61,9 @@ describe("landing visual and login reliability polish", () => {
     expect(hero).toContain('data-header-tone="light"');
     expect(hero).not.toContain('data-header-tone="dark"');
     expect(header).toContain('useState<HeaderTone>("dark")');
-    expect(header).toContain('const logoTone = scrolled || menuOpen ? "light" : tone;');
+    // v3 (D1 D-7): the header wordmark presents light in every dark-canvas state;
+    // the header data-tone geometry contract is unchanged.
+    expect(header).toContain('const logoTone = "light" as const;');
     expect(header).toContain("if (!panel?.contains(active))");
     expect(header).toContain("(event.shiftKey ? last : first).focus();");
     expect(accessibilityAudit).toContain("Header BrandLogo");

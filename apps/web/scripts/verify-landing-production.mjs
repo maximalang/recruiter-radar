@@ -5,6 +5,16 @@ import path from "node:path";
 
 import { chromium } from "playwright";
 
+import {
+  MOTION_SETTLE_TIMEOUT_MS,
+  closeQuietly,
+  installScriptWatchdog,
+  settleLandingPage,
+} from "./landing-settle.mjs";
+
+// D-8: fail deterministically instead of hanging until the CI job timeout.
+installScriptWatchdog("landing production audit", 900_000);
+
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
 const screenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), `recruiter-radar-final-unified-landing-${process.pid}`);
@@ -112,6 +122,10 @@ async function waitForLanding(page) {
     { timeout: PAGE_SETTLE_TIMEOUT_MS },
   );
   await page.waitForTimeout(HYDRATION_SETTLE_DELAY_MS);
+  // D-8 (v3): bounded deterministic settle (fonts, finished CSS animations,
+  // two stable hero frames) before assertions — no fixed-sleep races with
+  // the hero entrance animation.
+  await settleLandingPage(page, { label: "production audit" });
 }
 
 async function resolveAnalyticsConsent(page) {
@@ -124,6 +138,13 @@ async function resolveAnalyticsConsent(page) {
   await dialog.getByRole("button", { name: "Разрешить", exact: true }).click();
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "Настройки cookies" }).waitFor({ state: "visible" });
+  // Determinism: on short desktop viewports (e.g. 1366×768, 1280×800) the
+  // fixed bottom-right consent dialog sits over the hero dock, so the
+  // resolving click would leave the pointer parked on the dock and hover-open
+  // the demo before the hero contracts run. Park the pointer at the neutral
+  // top-left corner (header strip / hero background — never the dock),
+  // mirroring capture-landing-review's movePointerToNeutral.
+  await page.mouse.move(1, 1);
 }
 
 async function preparePage(context, label, url = baseUrl) {
@@ -137,6 +158,15 @@ async function preparePage(context, label, url = baseUrl) {
   }));
   await page.goto(url, { waitUntil: "load", timeout: PAGE_SETTLE_TIMEOUT_MS });
   await waitForLanding(page);
+  // D-8: the "starts at stage 1 without user input" contract is asserted
+  // immediately after hydration, before the 8s auto-advance cadence can
+  // elapse on a slow runner (the re-selection inside
+  // assertHeroWorkflowContract is determinism, not the contract itself).
+  assert.equal(
+    await page.locator("#hero-workflow").getAttribute("data-active-stage"),
+    "1",
+    "hero workflow must start at stage 1 without user input",
+  );
   await resolveAnalyticsConsent(page);
   return { page, assertCleanConsole };
 }
@@ -163,7 +193,7 @@ async function assertRequiredSurface(page, label) {
   assert.match(pricingText, /2 990 ₽/);
   assert.match(pricingText, /6 990 ₽/);
   assert.match(await page.locator("#faq").innerText(), /Коротко о главном/i);
-  await page.getByRole("heading", { name: /Посмотрите, кому стоит написать сейчас/ }).waitFor();
+  await page.getByRole("heading", { name: /Найдите, кому написать сейчас/ }).waitFor();
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor();
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor();
 }
@@ -234,12 +264,14 @@ async function assertNoOverlapOrClipping(page, label) {
     return selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)).flatMap((element) => {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
-      const clipped = ["hidden", "clip"].includes(style.overflow)
-        && (element.scrollHeight > element.clientHeight + 2 || element.scrollWidth > element.clientWidth + 2);
-      // The hero product shot intentionally bleeds past the right viewport edge
-      // (Accio-style collapsed teaser); the section clips it, and the document-level
-      // scrollWidth assertion still guards against real horizontal overflow.
+      // The hero product shot is the v3.1 R11 peek window: it intentionally
+      // bleeds exactly half a frame past the right hero clip edge and keeps
+      // a fixed window height over taller demo content. The section clips
+      // it, and the document-level scrollWidth assertion still guards
+      // against real horizontal overflow.
       const heroTeaser = Boolean(element.closest("#scene-detection [data-hero-visual]"));
+      const clipped = !heroTeaser && ["hidden", "clip"].includes(style.overflow)
+        && (element.scrollHeight > element.clientHeight + 2 || element.scrollWidth > element.clientWidth + 2);
       const outside = !heroTeaser && (rect.left < -2 || rect.right > document.documentElement.clientWidth + 2);
       return clipped || outside ? [{ selector, clipped, outside, rect: rect.toJSON() }] : [];
     }));
@@ -351,7 +383,65 @@ async function assertHeroGeometry(page, label) {
 async function assertHeroWorkflowContract(page, label, viewport) {
   const workflow = page.locator("#hero-workflow");
   await workflow.waitFor({ state: "attached" });
-  assert.equal(await workflow.getAttribute("data-active-stage"), "1", `${label}: hero workflow must start at stage 1 without user input`);
+  // v3.1 R11: the demo waits as the 50% peek until explicit input. Open it
+  // through the external handle (the touch/keyboard parity path) so the
+  // stage controls receive real clicks, and wait for the settled full state.
+  const peekDock = page.locator("[data-demo-peek]");
+  if (await peekDock.getAttribute("data-peek-state")) {
+    const peekHandle = page.locator("[data-peek-handle]");
+    await peekHandle.waitFor({ state: "visible" });
+    // Never probe or click a slide that is still travelling the peek ladder;
+    // the settled state after the consent pointer park is "peek".
+    await page.waitForFunction(
+      () => ["peek", "full"].includes(document.querySelector("[data-demo-peek]")?.getAttribute("data-peek-state") ?? ""),
+      undefined,
+      { timeout: MOTION_SETTLE_TIMEOUT_MS },
+    );
+    // F-1 regression: at ≥1200px the peek-state handle (y16–60) sits under the
+    // fixed header strip, so a header that forgets its transparent-state
+    // pointer pass-through silently kills the click (bare 30s timeout). Assert
+    // the hit-test target for a diagnosable failure. Scoped to the settled
+    // peek state (the D2 start scenario); off-screen centers are skipped
+    // because click() would scroll them into view before dispatch.
+    if ((await peekDock.getAttribute("data-peek-state")) === "peek") {
+      const handleHit = await peekHandle.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        if (centerX < 0 || centerY < 0 || centerX >= window.innerWidth || centerY >= window.innerHeight) return null;
+        const hit = document.elementFromPoint(centerX, centerY);
+        return {
+          insideHandle: Boolean(hit && hit.closest('[data-peek-handle]')),
+          interceptor: hit ? `${hit.tagName.toLowerCase()}.${typeof hit.className === "string" ? hit.className : ""}` : null,
+        };
+      });
+      if (handleHit !== null) {
+        assert.equal(
+          handleHit.insideHandle,
+          true,
+          `${label}: [data-peek-handle] center is intercepted by ${handleHit.interceptor} — the transparent header strip must stay click-through over the peek handle`,
+        );
+      }
+    }
+    await peekHandle.click();
+    await page.waitForFunction(
+      () => document.querySelector("[data-demo-peek]")?.getAttribute("data-peek-state") === "full",
+      undefined,
+      { timeout: MOTION_SETTLE_TIMEOUT_MS },
+    );
+  }
+  // D-8: the auto-advance cadence (8s, unchanged) may legitimately have
+  // advanced the demo before this assert runs on a slow runner; the initial
+  // state contract ("starts at stage 1 without user input") is asserted in
+  // preparePage right after hydration. Here we deterministically re-select
+  // stage 1 through the existing manual control before the panel assertions.
+  await page.locator("#hero-workflow-tab-1").click();
+  await page.waitForFunction(
+    () => document.querySelector("#hero-workflow")?.getAttribute("data-active-stage") === "1",
+    undefined,
+    { timeout: MOTION_SETTLE_TIMEOUT_MS },
+  );
+  assert.equal(await workflow.getAttribute("data-active-stage"), "1", `${label}: hero workflow must return to stage 1 via its manual tab control`);
   for (const stageId of ["1", "2", "3", "4"]) {
     await page.locator(`#hero-workflow-tab-${stageId}`).waitFor({ state: "attached" });
   }
@@ -365,6 +455,356 @@ async function assertHeroWorkflowContract(page, label, viewport) {
     assert.equal(await workflow.getAttribute("data-active-stage"), "2", `${label}: mobile stage navigation must switch the workflow panel`);
     await page.locator("#hero-workflow-tab-1").click();
     assert.equal(await workflow.getAttribute("data-active-stage"), "1", `${label}: mobile stage navigation must return to the first stage`);
+  }
+}
+
+// R13c (owner verdict R2, defect F-1): effective demo palette contract.
+// The approved reference is the detection-scene palette of reference head
+// 9eaa919b (graphite + gold), while the landing-scope B table intentionally
+// re-values --color-demo-* onto the brand ramp for page chrome. Source
+// string checks cannot see which cascade layer wins, so this contract
+// measures the EFFECTIVE state on the live DOM: computed custom properties
+// on the demo root, computed colors of every painted element inside the
+// demo across all four stages, and the page-level brand tokens OUTSIDE the
+// demo (proving the scoped fix is not a global revert). Chrome normalizes
+// computed custom-property colors (rgba() → hex8), so every comparison is
+// tuple-normalized instead of string-literal.
+const COLOR_LITERAL_PATTERN = /#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g;
+
+function parseColorTuple(value) {
+  const text = String(value).trim();
+  const hex = /^#([0-9a-fA-F]{3,8})$/.exec(text);
+  if (hex) {
+    const digits = hex[1];
+    const byte = (pair) => Number.parseInt(pair, 16);
+    if (digits.length === 3 || digits.length === 4) {
+      const channels = [...digits].map((channel) => byte(channel + channel));
+      const alpha = channels.length === 4 ? channels.pop() / 255 : 1;
+      return [...channels, alpha];
+    }
+    if (digits.length === 6 || digits.length === 8) {
+      const channels = [byte(digits.slice(0, 2)), byte(digits.slice(2, 4)), byte(digits.slice(4, 6))];
+      const alpha = digits.length === 8 ? byte(digits.slice(6, 8)) / 255 : 1;
+      return [...channels, alpha];
+    }
+    return null;
+  }
+  const fn = /^rgba?\(([^)]+)\)$/.exec(text);
+  if (fn) {
+    const parts = fn[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    if (parts.length < 3 || parts.some(Number.isNaN)) return null;
+    return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
+  }
+  return null;
+}
+
+function requireColorTuple(value, context) {
+  const tuple = parseColorTuple(value);
+  assert.ok(tuple, `${context}: unparsable color ${JSON.stringify(value)}`);
+  return tuple;
+}
+
+function colorsInside(value) {
+  return [...String(value).matchAll(COLOR_LITERAL_PATTERN)].map((match) => match[0]);
+}
+
+function assertColorTuple(actualValue, expectedTuple, context) {
+  const actual = requireColorTuple(actualValue, context);
+  const alphaClose = Math.abs(actual[3] - expectedTuple[3]) <= 0.005;
+  assert.ok(
+    actual[0] === expectedTuple[0] && actual[1] === expectedTuple[1] && actual[2] === expectedTuple[2] && alphaClose,
+    `${context}: color ${JSON.stringify(actualValue)} → [${actual}] does not match reference [${expectedTuple}]`,
+  );
+}
+
+// Reference palette literals, verbatim from the approved detection-scene
+// reference head 9eaa919b (globals.css :root demo block + the .productShot
+// signal remaps in detection-scene.module.css).
+const DEMO_TOKEN_REFERENCE = {
+  "--color-demo-base-0": [11, 12, 15, 1],
+  "--color-demo-base-1": [19, 20, 25, 1],
+  "--color-demo-elevated": [30, 31, 33, 1],
+  "--color-demo-selected": [32, 33, 35, 1],
+  "--color-demo-separator": [42, 43, 46, 1],
+  "--color-demo-separator-subtle": [34, 35, 37, 1],
+  "--color-demo-panel-top": [36, 37, 44, 1],
+  "--color-demo-panel-mid": [26, 27, 32, 1],
+  "--color-demo-panel-end": [22, 23, 27, 1],
+  "--color-demo-panel-flat": [25, 26, 28, 1],
+  "--color-demo-panel-alt": [23, 24, 26, 1],
+  "--color-demo-card": [27, 28, 30, 1],
+  "--color-demo-indigo": [94, 106, 210, 1],
+  "--color-demo-indigo-bright": [123, 134, 232, 1],
+  "--color-demo-violet": [157, 123, 232, 1],
+  "--color-demo-green": [76, 183, 130, 1],
+  "--color-demo-gold": [240, 180, 41, 1],
+  "--color-demo-orange": [232, 147, 94, 1],
+  "--color-demo-avatar-you": [58, 59, 63, 1],
+  "--color-demo-stage-todo": [74, 75, 78, 1],
+  "--color-demo-white": [255, 255, 255, 1],
+  "--color-demo-text-bright": [220, 221, 223, 1],
+  "--color-demo-text-soft": [168, 169, 172, 1],
+  "--color-demo-text-muted": [137, 139, 142, 1],
+  "--color-demo-text-faint": [105, 107, 112, 1],
+  "--color-demo-clear": [255, 255, 255, 0],
+  "--color-demo-veil-015": [255, 255, 255, 0.015],
+  "--color-demo-veil-022": [255, 255, 255, 0.022],
+  "--color-demo-veil-03": [255, 255, 255, 0.03],
+  "--color-demo-veil-035": [255, 255, 255, 0.035],
+  "--color-demo-veil-05": [255, 255, 255, 0.05],
+  "--color-demo-veil-055": [255, 255, 255, 0.055],
+  "--color-demo-veil-06": [255, 255, 255, 0.06],
+  "--color-demo-veil-07": [255, 255, 255, 0.07],
+  "--color-demo-veil-08": [255, 255, 255, 0.08],
+  "--color-demo-veil-09": [255, 255, 255, 0.09],
+  "--color-demo-veil-10": [255, 255, 255, 0.1],
+  "--color-demo-veil-12": [255, 255, 255, 0.12],
+  "--color-demo-veil-16": [255, 255, 255, 0.16],
+  "--color-demo-glow-indigo": [94, 106, 210, 0.12],
+  "--color-demo-glow-indigo-strong": [94, 106, 210, 0.16],
+  "--color-demo-gold-ring": [240, 180, 41, 0.1],
+  "--color-demo-gold-fill": [240, 180, 41, 0.12],
+  "--color-demo-gold-soft": [240, 180, 41, 0.14],
+  // pass34 scrims: inherited from globals.css, never re-valued by the B table.
+  "--color-demo-shade": [0, 0, 0, 0.3],
+  "--color-demo-scrim-bottom": [5, 6, 8, 0.62],
+  "--color-demo-scrim-corner": [5, 6, 8, 0.55],
+  "--color-demo-scrim-side": [5, 6, 8, 0.28],
+  // .productShot remaps: inside the demo the signal roles are the demo gold.
+  "--color-signal": [240, 180, 41, 1],
+  "--color-signal-on-dark": [240, 180, 41, 1],
+  "--color-signal-soft": [240, 180, 41, 0.14],
+};
+
+// B-table brand ramp values that must never paint anything INSIDE the demo
+// (defect F-1 signature: #3725f3 / #087ff4 / #05c9ef and their tints).
+const DEMO_FORBIDDEN_TRIPLES = [
+  { triple: [55, 37, 243], name: "v31-indigo #3725f3" },
+  { triple: [8, 127, 244], name: "v31-blue #087ff4" },
+  { triple: [147, 168, 255], name: "indigo-tint #93a8ff" },
+  { triple: [184, 167, 255], name: "v31-violet #b8a7ff" },
+  { triple: [5, 201, 239], name: "v31-cyan #05c9ef" },
+  { triple: [119, 130, 151], name: "B stage-todo #778297" },
+  { triple: [184, 190, 201], name: "B text-soft #b8bec9" },
+  { triple: [164, 170, 182], name: "B text-muted #a4aab6" },
+  { triple: [146, 153, 165], name: "B text-faint #9299a5" },
+  { triple: [68, 75, 90], name: "B separator #444b5a" },
+  { triple: [48, 54, 64], name: "B separator-subtle #303640" },
+];
+
+// Every opaque/visible RGB triple painted inside the demo must belong to the
+// reference palette (accents + graphite surfaces + scrim/shadow neutrals).
+const DEMO_ALLOWED_TRIPLES = [
+  [94, 106, 210], [123, 134, 232], [157, 123, 232], [76, 183, 130],
+  [240, 180, 41], [232, 147, 94], [58, 59, 63], [74, 75, 78],
+  [255, 255, 255], [220, 221, 223], [168, 169, 172], [137, 139, 142], [105, 107, 112],
+  [11, 12, 15], [19, 20, 25], [30, 31, 33], [32, 33, 35],
+  [36, 37, 44], [26, 27, 32], [22, 23, 27], [25, 26, 28], [23, 24, 26], [27, 28, 30],
+  [42, 43, 46], [34, 35, 37],
+  [0, 0, 0], [5, 6, 8], [14, 16, 24], [12, 14, 22],
+];
+
+// Page-level brand tokens OUTSIDE the demo must keep the accepted v3.1
+// B-table values — the palette fix is demo-scoped, never a global revert.
+const PAGE_BRAND_REFERENCE = {
+  "--color-signal": [8, 127, 244, 1],
+  "--color-signal-on-dark": [5, 201, 239, 1],
+  "--color-demo-indigo": [55, 37, 243, 1],
+  "--color-demo-gold": [8, 127, 244, 1],
+};
+
+async function collectDemoPaletteState(page) {
+  return page.evaluate((tokenNames) => {
+    const demo = document.querySelector("[data-hero-workflow]");
+    if (!demo) return { error: "demo root [data-hero-workflow] is missing" };
+    const demoStyle = getComputedStyle(demo);
+    const tokens = {};
+    for (const name of tokenNames) tokens[name] = demoStyle.getPropertyValue(name).trim();
+
+    const painted = [];
+    for (const element of [demo, ...demo.querySelectorAll("*")]) {
+      const style = getComputedStyle(element);
+      const entry = {
+        id: element.id || null,
+        tag: element.tagName.toLowerCase(),
+        state: element.getAttribute("data-state"),
+        actor: element.getAttribute("data-actor"),
+        values: [style.color, style.backgroundColor, style.borderTopColor],
+      };
+      if (element.namespaceURI === "http://www.w3.org/2000/svg") {
+        entry.values.push(style.fill, style.stroke);
+      }
+      for (const composite of [style.backgroundImage, style.boxShadow]) {
+        if (composite && composite !== "none") entry.values.push(composite);
+      }
+      painted.push(entry);
+    }
+
+    const tupleSource = (element) => {
+      const style = getComputedStyle(element);
+      return { color: style.color, backgroundColor: style.backgroundColor, borderColor: style.borderTopColor, backgroundImage: style.backgroundImage, boxShadow: style.boxShadow };
+    };
+    const statusParagraph = [...demo.querySelectorAll("#hero-workflow-panel p, article p")]
+      .find((paragraph) => /Этап \d+ из 4/.test(paragraph.textContent ?? ""));
+    return {
+      tokens,
+      painted,
+      roles: {
+        active: [...demo.querySelectorAll('[data-state="active"]')].map(tupleSource),
+        todo: [...demo.querySelectorAll('[data-state="todo"]')].map(tupleSource),
+        done: [...demo.querySelectorAll('[data-state="done"]')].map(tupleSource),
+        you: [...demo.querySelectorAll('[data-actor="you"]')].map(tupleSource),
+        statusDot: statusParagraph ? [tupleSource(statusParagraph.querySelector('span[aria-hidden="true"]') ?? statusParagraph)] : [],
+        svgColors: [...demo.querySelectorAll("svg")].map((svg) => getComputedStyle(svg).color),
+      },
+    };
+  }, Object.keys(DEMO_TOKEN_REFERENCE));
+}
+
+function assertDemoPaletteState(state, stageLabel) {
+  assert.ok(!state.error, `${stageLabel}: ${state.error}`);
+
+  for (const [token, expected] of Object.entries(DEMO_TOKEN_REFERENCE)) {
+    assert.ok(state.tokens[token], `${stageLabel}: token ${token} resolved to an empty value`);
+    assertColorTuple(state.tokens[token], expected, `${stageLabel}: effective token ${token}`);
+  }
+
+  const forbiddenHits = [];
+  const unknownHits = [];
+  for (const element of state.painted) {
+    const where = `${element.tag}${element.id ? `#${element.id}` : ""}${element.state ? `[data-state=${element.state}]` : ""}`;
+    for (const value of element.values) {
+      for (const literal of colorsInside(value)) {
+        const tuple = parseColorTuple(literal);
+        if (!tuple) continue;
+        const triple = tuple.slice(0, 3);
+        const forbidden = DEMO_FORBIDDEN_TRIPLES.find((entry) => entry.triple.every((channel, index) => channel === triple[index]));
+        if (forbidden && tuple[3] > 0) {
+          forbiddenHits.push(`${where}: ${literal} (${forbidden.name})`);
+          continue;
+        }
+        if (tuple[3] > 0.01 && !DEMO_ALLOWED_TRIPLES.some((allowed) => allowed.every((channel, index) => channel === triple[index]))) {
+          unknownHits.push(`${where}: ${literal}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(forbiddenHits, [], `${stageLabel}: brand-ramp colors leaked into the demo (defect F-1 regression)`);
+  assert.deepEqual(unknownHits, [], `${stageLabel}: colors outside the approved reference demo palette`);
+
+  assert.ok(state.roles.active.length >= 1, `${stageLabel}: no active stage state rendered`);
+  for (const active of state.roles.active) {
+    assertColorTuple(active.borderColor, DEMO_TOKEN_REFERENCE["--color-demo-gold"], `${stageLabel}: active stage border`);
+    const backgroundTuples = colorsInside(active.backgroundImage).map((literal) => requireColorTuple(literal, stageLabel));
+    assert.ok(
+      backgroundTuples.some((tuple) => tuple.slice(0, 3).join() === "240,180,41" && tuple[3] === 1),
+      `${stageLabel}: active stage conic fill lost the reference gold`,
+    );
+    assert.ok(
+      colorsInside(active.boxShadow).every((literal) => {
+        const tuple = requireColorTuple(literal, stageLabel);
+        return tuple.slice(0, 3).join() === "240,180,41";
+      }),
+      `${stageLabel}: active stage glow is not the reference gold tint`,
+    );
+  }
+  for (const todo of state.roles.todo) {
+    assertColorTuple(todo.borderColor, DEMO_TOKEN_REFERENCE["--color-demo-stage-todo"], `${stageLabel}: todo stage border`);
+  }
+  for (const done of state.roles.done) {
+    assertColorTuple(done.backgroundColor, DEMO_TOKEN_REFERENCE["--color-demo-indigo"], `${stageLabel}: done stage fill`);
+  }
+  for (const you of state.roles.you) {
+    assertColorTuple(you.backgroundColor, DEMO_TOKEN_REFERENCE["--color-demo-avatar-you"], `${stageLabel}: visitor avatar fill`);
+  }
+  assert.ok(state.roles.statusDot.length >= 1, `${stageLabel}: stage summary status dot is missing`);
+  for (const dot of state.roles.statusDot) {
+    assertColorTuple(dot.backgroundColor, DEMO_TOKEN_REFERENCE["--color-demo-gold"], `${stageLabel}: status dot fill`);
+    assert.ok(
+      colorsInside(dot.boxShadow).every((literal) => requireColorTuple(literal, stageLabel).slice(0, 3).join() === "240,180,41"),
+      `${stageLabel}: status dot glow is not the reference gold tint`,
+    );
+  }
+  return state.roles.svgColors.map((color) => requireColorTuple(color, `${stageLabel}: demo svg icon`).slice(0, 3).join());
+}
+
+async function waitForDemoMotionRest(page, label) {
+  // Bounded motion rest for the demo subtree only: stage swaps run scene-exit
+  // animations and the tabs/stage states transition their colors
+  // (motion-duration-fast/disclosure). Sweeping computed colors
+  // mid-transition would observe blended values, so wait until every
+  // animation inside the demo has finished. Infinite decorative loops (none
+  // inside the demo today) are excluded instead of hanging the settle.
+  await page.waitForFunction(
+    () => {
+      const demo = document.querySelector("[data-hero-workflow]");
+      if (!demo || typeof document.getAnimations !== "function") return false;
+      return document.getAnimations().every((animation) => {
+        const effect = animation.effect;
+        const target = effect && effect.target;
+        if (!(target instanceof Element) || !demo.contains(target)) return true;
+        if (animation.playState === "finished" || animation.playState === "idle") return true;
+        try {
+          return effect.getTiming().iterations === Infinity;
+        } catch {
+          return true;
+        }
+      });
+    },
+    undefined,
+    { timeout: MOTION_SETTLE_TIMEOUT_MS },
+  ).catch((error) => {
+    throw new Error(`${label}: demo motion did not rest — ${error?.message ?? error}`);
+  });
+}
+
+async function assertHeroDemoPalette(page, label) {
+  const svgTriplesSeen = new Set();
+  for (const stage of [1, 2, 3, 4]) {
+    await page.locator(`#hero-workflow-tab-${stage}`).click();
+    await page.waitForFunction(
+      (expected) => document.querySelector("[data-hero-workflow]")?.getAttribute("data-active-stage") === expected,
+      String(stage),
+      { timeout: MOTION_SETTLE_TIMEOUT_MS },
+    );
+    await waitForDemoMotionRest(page, `${label} demo stage ${stage}`);
+    const state = await collectDemoPaletteState(page);
+    for (const triple of assertDemoPaletteState(state, `${label} demo stage ${stage}`)) {
+      svgTriplesSeen.add(triple);
+    }
+  }
+  // Reference icon roles that must actually appear in the demo DOM: the
+  // green/orange watch-nav glyphs painted by the detection-scene module.
+  assert.ok(svgTriplesSeen.has("76,183,130"), `${label}: reference green icon role (#4cb782) is missing from the demo`);
+  assert.ok(svgTriplesSeen.has("232,147,94"), `${label}: reference orange icon role (#e8935e) is missing from the demo`);
+
+  await page.locator("#hero-workflow-tab-1").click();
+  await page.waitForFunction(
+    () => document.querySelector("[data-hero-workflow]")?.getAttribute("data-active-stage") === "1",
+    undefined,
+    { timeout: MOTION_SETTLE_TIMEOUT_MS },
+  );
+
+  // Outside the demo the page keeps the accepted v3.1 brand ramp: the fix is
+  // scoped to [data-hero-workflow] and is not a global palette revert.
+  const pageTokens = await page.evaluate((tokenNames) => {
+    const landing = document.querySelector("[data-landing-experience]");
+    const footer = document.querySelector("footer");
+    const read = (element) => {
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      const values = {};
+      for (const name of tokenNames) values[name] = style.getPropertyValue(name).trim();
+      return values;
+    };
+    return { landing: read(landing), footer: read(footer) };
+  }, Object.keys(PAGE_BRAND_REFERENCE));
+  assert.ok(pageTokens.landing, `${label}: landing root [data-landing-experience] is missing`);
+  for (const [token, expected] of Object.entries(PAGE_BRAND_REFERENCE)) {
+    assertColorTuple(pageTokens.landing[token], expected, `${label}: page-level ${token} was globally reverted`);
+    if (pageTokens.footer) {
+      assertColorTuple(pageTokens.footer[token], expected, `${label}: frozen footer scope ${token} changed`);
+    }
   }
 }
 
@@ -429,6 +869,7 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertHeaderLayout(page, viewport);
   await assertHeroGeometry(page, viewport.name);
   await assertHeroWorkflowContract(page, viewport.name, viewport);
+  await assertHeroDemoPalette(page, viewport.name);
   await revealAllMotionSections(page, viewport.name);
 
   await assertNoHorizontalOverflow(page, viewport.name);
@@ -450,7 +891,7 @@ async function assertResponsiveSurface(browser, viewport) {
   }
 
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertHashNavigation(browser, spec) {
@@ -475,14 +916,24 @@ async function assertHashNavigation(browser, spec) {
     const header = document.querySelector("header");
     const rect = element.getBoundingClientRect();
     const headerBottom = header?.getBoundingClientRect().bottom ?? 0;
-    return { gap: rect.top - headerBottom, top: rect.top };
+    return {
+      gap: rect.top - headerBottom,
+      top: rect.top,
+      // v3.1 R11: the hero dock is anchored at top:64px, so #hero-workflow at
+      // the page top can never clear the 73px header band (negative scroll is
+      // clamped). The band is transparent and click-through there (F-1), so
+      // the documented 9px frame overlap is the approved resting state — but
+      // only while the header is genuinely transparent at the page top.
+      transparentTop: window.scrollY <= 12 && !(header?.hasAttribute("data-scrolled") ?? false),
+    };
   });
-  assert.ok(firstPosition.gap >= 8 && firstPosition.gap <= 48, `${spec.name}: invalid header gap ${firstPosition.gap}`);
+  const minimumGap = firstPosition.transparentTop ? -10 : 8;
+  assert.ok(firstPosition.gap >= minimumGap && firstPosition.gap <= 48, `${spec.name}: invalid header gap ${firstPosition.gap}`);
   await page.waitForTimeout(500);
   const secondTop = await target.evaluate((element) => element.getBoundingClientRect().top);
   assert.ok(Math.abs(secondTop - firstPosition.top) <= 3, `${spec.name}: position jumped ${firstPosition.top} -> ${secondTop}`);
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertHistoryNavigation(browser) {
@@ -503,7 +954,7 @@ async function assertHistoryNavigation(browser) {
   ]);
   assert.match(page.url(), /#scene-delivery$/);
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertMobileKeyboardNavigation(browser) {
@@ -538,7 +989,7 @@ async function assertMobileKeyboardNavigation(browser) {
   await dialog.waitFor({ state: "hidden" });
   assert.notEqual(await page.evaluate(() => document.body.style.overflow), "hidden");
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertKeyboardSkipLink(browser) {
@@ -559,7 +1010,7 @@ async function assertKeyboardSkipLink(browser) {
   await page.keyboard.press("Enter");
   assert.equal(new URL(page.url()).hash, "#main-content");
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertActiveNavigationAndTone(browser) {
@@ -614,7 +1065,7 @@ async function assertActiveNavigationAndTone(browser) {
   await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.getAttribute("data-tone") === "light");
   assert.equal(await brandHeader.getAttribute("data-tone"), "light");
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 function waitForLandingEvent(page, name, context) {
@@ -722,7 +1173,7 @@ async function assertInteractionContracts(browser) {
   }
 
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertNoJs(browser) {
@@ -746,7 +1197,7 @@ async function assertNoJs(browser) {
   assert.match(noJsPricingText, /Полноценная неделя работы/i);
   assert.match(noJsPricingText, /990 ₽/);
   assert.ok(await page.locator("#faq summary").count() >= 1, "no-JS FAQ question missing");
-  await page.getByRole("heading", { name: /Посмотрите, кому стоит написать сейчас/ }).waitFor({ state: "attached" });
+  await page.getByRole("heading", { name: /Найдите, кому написать сейчас/ }).waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor({ state: "attached" });
   const followsHero = await page.evaluate(() => {
@@ -757,7 +1208,7 @@ async function assertNoJs(browser) {
   assert.equal(followsHero, true, "no-JS page ended at the hero workflow skeleton");
   await assertNoHorizontalOverflow(page, "no-js-mobile-390x844");
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function assertReducedMotion(browser) {
@@ -777,7 +1228,7 @@ async function assertReducedMotion(browser) {
   });
   assert.deepEqual(violations, [], `reduced-motion effects remain: ${JSON.stringify(violations)}`);
   assertCleanConsole();
-  await context.close();
+  await closeQuietly(context, "production audit context");
 }
 
 async function verifyScreenshotArtifact() {
@@ -851,5 +1302,5 @@ try {
     },
   }, null, 2)}\n`);
 } finally {
-  await browser.close();
+  await closeQuietly(browser, "production audit browser");
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { BrandLogo } from "../ui/brand-logo";
+import { BrandLockup } from "./brand-lockup";
 import headerStyles from "./landing-header.module.css";
 import { LANDING_NAV_ITEMS } from "./landing-copy";
 import styles from "./landing.module.css";
@@ -192,7 +192,10 @@ export default function LandingHeader() {
     </a>
   );
 
-  const logoTone = scrolled || menuOpen ? "light" : tone;
+  // v3.1 R12: the header lockup (approved mark + outline «Radar») renders on
+  // the light paper canvas; data-tone on the header element remains the
+  // geometry contract.
+  const logoTone = "light" as const;
 
   return (
     <header
@@ -209,7 +212,7 @@ export default function LandingHeader() {
           className={`${styles.headerBrand} ${headerStyles.brand}`}
           aria-label="Recruiter Radar — на главную"
         >
-          <BrandLogo joined tone={logoTone} />
+          <BrandLockup variant="a" tone={logoTone} decorative />
         </Link>
 
         <nav className={headerStyles.desktopNav} aria-label="Разделы лендинга">

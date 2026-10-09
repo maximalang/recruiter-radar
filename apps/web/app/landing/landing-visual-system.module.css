@@ -1,21 +1,24 @@
 .visualSystem {
   --page-gutter: clamp(1rem, 2.35vw, 2rem);
-  --content-max: 76.25rem;
+  /* v3.1 R5: общая ширина контента 1280px. */
+  --content-max: 80rem;
   --scene-pad: var(--page-gutter);
   --content: var(--content-max);
   /* Pass 5 palette tokens (refs: linear.app + accio.com/work) live in the
    * canonical token source — product-visual-system.css, scoped to the
    * landing root via [data-theme="inverse"][data-landing-experience].
    * This module only maps them onto landing aliases and layout. */
-  /* Landing aliases map the canonical inverse theme onto light product objects. */
+  /* Landing aliases map the canonical v3 inverse theme onto landing roles
+   * (D1 table C). Aliases resolve unambiguously to the spec HEX values via
+   * the scoped canonical block in product-visual-system.css. */
   --landing-canvas: var(--color-canvas);
-  --landing-paper: var(--color-text-primary);
-  --landing-paper-raised: color-mix(in srgb, var(--landing-paper) 94%, var(--color-surface-elevated));
-  --landing-ink: var(--color-text-inverse);
-  --landing-muted: color-mix(in srgb, var(--landing-ink) 64%, var(--landing-paper));
-  --landing-line: color-mix(in srgb, var(--landing-ink) 18%, var(--landing-paper));
-  --landing-line-strong: color-mix(in srgb, var(--landing-ink) 36%, var(--landing-paper));
-  --landing-accent: color-mix(in srgb, var(--landing-ink) 78%, var(--color-signal));
+  --landing-paper: var(--color-surface-primary);
+  --landing-paper-raised: var(--color-surface-elevated);
+  --landing-ink: var(--color-text-primary);
+  --landing-muted: var(--color-text-secondary);
+  --landing-line: var(--color-separator);
+  --landing-line-strong: var(--color-separator-strong);
+  --landing-accent: var(--color-signal-on-dark);
   --color-surface-light: var(--landing-paper);
   --color-accent-on-light: var(--landing-accent);
   --color-focus-on-light: var(--landing-accent);
@@ -50,7 +53,34 @@
 .visualSystem :global(footer a) { color: var(--color-text-secondary); }
 
 @media (hover: hover) and (pointer: fine) {
-  .visualSystem :global(footer a:hover) { color: var(--color-signal-hover); }
+  .visualSystem :global(footer a:hover) { color: var(--color-text-primary); }
+}
+
+/* D-7 (v3): landing-scoped footer palette and rhythm without editing the
+ * shared site-footer module. Specificity: .visualSystem[data-landing-experience]
+ * + [data-landing-footer] beats the shared `.siteFooter[data-tone="light"] .x`
+ * and `.siteFooter[data-landing-footer="compact"] .x:hover` rules (equal class
+ * count, higher element count), and the explicit canvas-mix operator/copyright
+ * colors are overridden on the text descendants themselves, not via parent
+ * inheritance. */
+.visualSystem[data-landing-experience] :global([data-landing-footer="compact"] footer) { margin-top: 0; }
+.visualSystem[data-landing-experience] :global([data-landing-footer="compact"] footer > div) { padding-top: 40px; }
+.visualSystem[data-landing-experience] :global([data-landing-footer="compact"] footer p[data-consent-safe-copy]) { color: var(--color-text-secondary); }
+.visualSystem[data-landing-experience] :global([data-landing-footer="compact"] footer nav :is(a, button)) { color: var(--color-text-secondary); }
+.visualSystem[data-landing-experience] :global([data-landing-footer="compact"] footer nav strong) { color: var(--color-text-primary); }
+.visualSystem[data-landing-experience] :global([data-landing-footer="compact"] footer [role="img"]) { color: var(--color-text-primary); }
+.visualSystem[data-landing-experience] :global([data-landing-footer="compact"] footer > div > div:last-child) {
+  border-top-color: var(--color-separator);
+  color: var(--color-text-tertiary);
+}
+.visualSystem[data-landing-experience] :global([data-landing-footer="compact"] footer > div > div:last-child :is(p, span, small, a, button, time)) { color: var(--color-text-tertiary); }
+
+@media (hover: hover) and (pointer: fine) {
+  .visualSystem[data-landing-experience] :global([data-landing-footer="compact"] footer :is(a, button):hover) { color: var(--color-text-primary); }
+}
+
+@media (max-width: 820px) {
+  .visualSystem[data-landing-experience] :global([data-landing-footer="compact"] footer > div) { padding-top: 32px; }
 }
 
 @media (max-width: 820px) {

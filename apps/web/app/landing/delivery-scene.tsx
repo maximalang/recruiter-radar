@@ -40,15 +40,14 @@ function ChannelRoute({ channel }: { channel: DeliveryChannel }) {
 
 export default function DeliveryScene() {
   return (
-    <section id="scene-delivery" className={sceneStyles.section} style={{ scrollMarginTop: "calc(72px + 32px)" }} aria-labelledby="delivery-title" data-header-tone="light" data-motion-reveal="section" data-delivery-summary="telegram-workflow">
-      <div className={sceneStyles.layout}>
+    <section id="scene-delivery" className={sceneStyles.section} style={{ scrollMarginTop: "calc(72px + 32px)" }} aria-labelledby="delivery-title" data-header-tone="light" data-motion-reveal="section" data-delivery-summary="telegram-workflow" data-v31-zone="delivery" data-variant="v2">
+      <div className={sceneStyles.layout} data-v31-content>
         <div className={sceneStyles.intro}>
-          <p>Доставка</p>
-          <h2 id="delivery-title">Результаты приходят туда, где вы работаете</h2>
-          <p className={sceneStyles.introSub}>Короткий сигнал — чтобы решить. Полная карточка — чтобы написать.</p>
+          <h2 id="delivery-title" data-v31-reveal="h2">Результаты там, где вы работаете</h2>
+          <p className={sceneStyles.introSub} data-v31-reveal="desc">Короткий сигнал — чтобы решить. Полная карточка — чтобы написать.</p>
         </div>
 
-        <div className={sceneStyles.capabilityBand} aria-label="Демонстрация доставки сигнала">
+        <div className={sceneStyles.capabilityBand} aria-label="Демонстрация доставки сигнала" data-v31-reveal="band">
           <div className={sceneStyles.deliverySystem}>
             <article className={sceneStyles.cabinet} data-channel="cabinet" data-delivery-core="workspace">
               <span className={sceneStyles.channelIcon}><DeliveryChannelGlyph channel="cabinet" /></span>

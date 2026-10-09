@@ -1,0 +1,13 @@
+/* v3.1 R12 lockup sizing, R13b optical reduction: intrinsic 102×33 (A) /
+ * 102×30 (B) — ~17.7% smaller than the original 124×40 / 124×36, geometry
+ * unchanged; mobile ≤480 renders the .9 scale. Clear space around the
+ * lockup is kept by the header layout; the wordmark reads through
+ * currentColor from --v31-wordmark-ink. */
+.lockup { display: block; color: var(--v31-wordmark-ink); }
+
+.wordmarkPath { fill: currentColor; }
+
+@media (max-width: 480px) {
+  .lockup[data-brand-lockup="a"] { width: 91.8px; height: 29.7px; }
+  .lockup[data-brand-lockup="b"] { width: 91.8px; height: 27px; }
+}
