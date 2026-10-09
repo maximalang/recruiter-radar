@@ -1,0 +1,52 @@
+{
+  "domain": "hh.ru",
+  "url": "https://hh.ru/",
+  "http_status": 200,
+  "scanned_at": "2026-09-27T10:39:52+00:00",
+  "elapsed_ms": 2078,
+  "tool_count": 3,
+  "tools": [
+    {
+      "name": "DDoS-Guard",
+      "confidence": 100.0,
+      "version": null,
+      "sources": [
+        "headers"
+      ],
+      "categories": [
+        "Security"
+      ]
+    },
+    {
+      "name": "HSTS",
+      "confidence": 100.0,
+      "version": null,
+      "sources": [
+        "headers"
+      ],
+      "categories": [
+        "Security"
+      ]
+    },
+    {
+      "name": "Liveinternet",
+      "confidence": 100.0,
+      "version": null,
+      "sources": [
+        "html"
+      ],
+      "categories": [
+        "Analytics"
+      ]
+    }
+  ],
+  "fetch_error": null,
+  "engine": "enthec/webappanalyzer@local",
+  "unsupported_classes": [
+    "js",
+    "dom",
+    "dns"
+  ],
+  "db_load_s": 0.12,
+  "skipped_bad_patterns": 0
+}
