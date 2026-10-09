@@ -25,5 +25,21 @@
   "government-procurement": { "priority": "P3", "defaultConfidence": 0.66, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
   "cbr-registry": { "priority": "P3", "defaultConfidence": 0.9, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
   "rosstat-open-data": { "priority": "P3", "defaultConfidence": 0.66, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
-  "rospatent-open-data": { "priority": "P3", "defaultConfidence": 0.66, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" }
+  "rospatent-open-data": { "priority": "P3", "defaultConfidence": 0.66, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "themuse": { "priority": "P2", "defaultConfidence": 0.64, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "landingjobs": { "priority": "P2", "defaultConfidence": 0.6, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "arbeitnow": { "priority": "P2", "defaultConfidence": 0.6, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "remoteok": { "priority": "P2", "defaultConfidence": 0.62, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "jobicy": { "priority": "P2", "defaultConfidence": 0.6, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "himalayas": { "priority": "P2", "defaultConfidence": 0.6, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "remotive": { "priority": "P2", "defaultConfidence": 0.62, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "weworkremotely": { "priority": "P2", "defaultConfidence": 0.62, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "hackernews-jobs": { "priority": "P2", "defaultConfidence": 0.6, "leadEligibility": "confidence-gated-evidence", "promotionStatus": "blocked-from-digest-pending-confidence-tests" },
+  "hn-algolia": { "priority": "P3", "defaultConfidence": 0.45, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "devto": { "priority": "P3", "defaultConfidence": 0.42, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "gdelt-context": { "priority": "P3", "defaultConfidence": 0.5, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "openalex": { "priority": "P3", "defaultConfidence": 0.45, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "ror": { "priority": "P3", "defaultConfidence": 0.62, "leadEligibility": "enrichment-only", "promotionStatus": "never-lead-originating" },
+  "cbr-fx-daily": { "priority": "P3", "defaultConfidence": 0.6, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" },
+  "trudvsem-opendata-datasets": { "priority": "P3", "defaultConfidence": 0.6, "leadEligibility": "context-only", "promotionStatus": "never-lead-originating" }
 }

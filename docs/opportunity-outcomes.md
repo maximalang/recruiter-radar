@@ -400,7 +400,7 @@ event rows автоматически не переставляются и не 
 npm.cmd run web:check
 npm.cmd run web:build
 npm.cmd run db:validate
-npm.cmd run test --workspace @recruiter-radar/web -- --runInBand --testPathPattern=opportunit
+npm.cmd run test --workspace @recruiter-radar/web -- --runInBand --testPathPatterns=opportunit
 
 $env:DATABASE_URL='<isolated PostgreSQL admin URL>'
 npm.cmd run db:migrate

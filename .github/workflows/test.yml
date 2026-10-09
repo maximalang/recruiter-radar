@@ -468,7 +468,7 @@ jobs:
         if: matrix.gate == 'unit'
         run: |
           npm run test:types --workspace @recruiter-radar/web
-          npm test --workspace @recruiter-radar/web -- --runInBand --testPathPattern=auth-v2
+          npm test --workspace @recruiter-radar/web -- --runInBand --testPathPatterns=auth-v2
       - name: Auth PostgreSQL contracts
         if: matrix.gate == 'postgresql'
         run: |
