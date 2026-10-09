@@ -47,6 +47,11 @@ import {
 } from "./actions";
 import { BrowserPushCard } from "./browser-push-card";
 import { TelegramStepAutoRefresh } from "./telegram-step-auto-refresh";
+import { MarketProfilePresetPicker } from "./market-profile-preset-picker";
+import {
+  MARKET_PROFILE_PRESETS,
+  selectMarketProfilePresetId
+} from "../../../../lib/marketProfilePresets";
 import { formatVacanciesCount } from "../../../../lib/format/plural";
 import { getGatePresentation } from "../../../../lib/scoring/gate-labels";
 import {
@@ -292,6 +297,14 @@ export default async function PilotOnboardingPage({
                       className={ppStyles.input}
                     />
                   </label>
+
+                  <MarketProfilePresetPicker
+                    presets={MARKET_PROFILE_PRESETS}
+                    selectedPresetId={selectMarketProfilePresetId(
+                      order.payload.marketProfilePreset,
+                      profile?.specialization ?? order.payload.specialization
+                    )}
+                  />
 
                   <details className={ppStyles.disclosure} style={{ gridColumn: "1 / -1" }}>
                     <summary className={ppStyles.disclosureSummary}>Уточнить профиль</summary>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { IBM_Plex_Mono, Inter } from "next/font/google";
 
+import { OPERATOR_REQUISITES } from "@/lib/operatorRequisites";
 import { PushReadinessBoot } from "./push-readiness-boot";
 import { shouldRunAuthV2SessionRefresh } from "@/lib/auth-v2/config";
 import { AuthSessionRefresh } from "./auth-session-refresh";
@@ -31,7 +32,33 @@ const appleIcon = `/app-icons/app-icon-180.png?v=${brandVersion}`;
 
 export const metadata: Metadata = {
   title: "Recruiter Radar",
-  description: "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
+  description: "Радар компаний с активным наймом для рекрутеров и агентств.",
+  metadataBase: new URL(OPERATOR_REQUISITES.website),
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "Recruiter Radar",
+    locale: "ru_RU",
+    url: "/",
+    title: "Recruiter Radar — компании, которым стоит написать сегодня",
+    description:
+      "Радар компаний с активным наймом для рекрутинговых агентств: почему сейчас, доказательства и безопасный путь контакта.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Recruiter Radar — радар активного найма для рекрутинговых агентств",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Recruiter Radar — компании, которым стоит написать сегодня",
+    description:
+      "Радар компаний с активным наймом для рекрутинговых агентств: почему сейчас, доказательства и безопасный путь контакта.",
+    images: ["/twitter-image.png"],
+  },
   manifest: `/manifest.webmanifest?v=${brandVersion}`,
   applicationName: "Recruiter Radar",
   icons: {

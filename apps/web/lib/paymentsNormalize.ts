@@ -6,6 +6,7 @@ import {
   type ClientProfile
 } from "./clientProfiles";
 import { getPublicPlanByCode, isPublicPlanCode, normalizeLegacyPlanCode, type PublicPlan } from "./publicProduct";
+import { normalizeMarketProfilePresetChoice } from "./marketProfilePresets";
 import { CUSTOMER_CHECKOUT_COPY } from "./copy/customer";
 import {
   CHECKOUT_ORDER_ONBOARDING_STATUSES,
@@ -52,6 +53,11 @@ function normalizeCheckoutOrderPayload(
   return {
     planName: normalizeOptionalText(readString(payload.planName)) ?? plan.name,
     planCadence: normalizeOptionalText(readString(payload.planCadence)) ?? plan.cadence,
+    // Tri-state: canonical preset id | explicit "custom" sentinel | null
+    // (no choice recorded — legacy orders predating the D2 picker). Only a
+    // recorded choice may drive the onboarding picker; null keeps the
+    // specialization-label fallback for true legacy payloads.
+    marketProfilePreset: normalizeMarketProfilePresetChoice(readString(payload.marketProfilePreset)),
     specialization: normalizeOptionalText(readString(payload.specialization)),
     city: normalizeOptionalText(readString(payload.city)),
     includeKeywords: normalizeKeywordList(payload.includeKeywords),
@@ -103,6 +109,10 @@ export function mergeCheckoutOrderPayload(
   return {
     ...currentPayload,
     ...payloadPatch,
+    marketProfilePreset:
+      payloadPatch.marketProfilePreset === undefined
+        ? currentPayload.marketProfilePreset
+        : normalizeMarketProfilePresetChoice(payloadPatch.marketProfilePreset),
     clientProfileId:
       payloadPatch.clientProfileId === undefined
         ? currentPayload.clientProfileId
