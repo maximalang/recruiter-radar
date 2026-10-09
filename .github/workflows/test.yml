@@ -96,6 +96,11 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
           DAILY_RADAR_DB_TEST_ACK: isolated
         run: npm run test:daily-radar:db
+      - name: Verify lineage-anchored signal org contract
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+          LINEAGE_ANCHOR_DB_TEST_ACK: isolated
+        run: npm run test:lineage-org-anchor:db
       - name: Benchmark career-page set-based persistence
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test

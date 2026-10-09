@@ -23,6 +23,11 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
 const SOURCE_ID = 'rabota-rossii';
 const API_URL = 'https://opendata.trudvsem.ru/api/v1/vacancies';
+// trudvsem's open-data endpoint regularly answers in 10-15s; the shared 15s
+// fetchJson default turns that into intermittent retry exhaustion. Give the
+// source a per-request budget that matches its observed upstream latency
+// (operator-overridable via RABOTA_ROSSII_TIMEOUT_MS).
+const DEFAULT_REQUEST_TIMEOUT_MS = 45000;
 // trudvsem open-data caps a single response at 100 records but exposes the full
 // match count via meta.total (often thousands). One page therefore surfaces a
 // tiny slice of the available hiring signal, so we page through up to
@@ -157,6 +162,7 @@ async function fetchRegionRecords({ searchText, regionCode, offset, limit, pages
     const body = await fetchJson(url.toString(), {
       sourceName: SOURCE_ID,
       headers: { 'user-agent': userAgent },
+      timeoutMs: clampInteger(process.env.RABOTA_ROSSII_TIMEOUT_MS, DEFAULT_REQUEST_TIMEOUT_MS, 1000, 120000),
     });
 
     const pageRecords = extractRabotaRossiiRecords(body);
