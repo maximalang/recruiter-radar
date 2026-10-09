@@ -19,7 +19,7 @@ export default function ScrollDemo() {
     setArmed(true);
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) { reveal(); observer.disconnect(); }
-    }, { threshold: 0.05, rootMargin: "0px 0px -5% 0px" });
+    }, { threshold: 0.01, rootMargin: "0px 0px -5% 0px" });
     observer.observe(target);
     const onPreference = () => { if (reduced.matches) { reveal(); observer.disconnect(); } };
     reduced.addEventListener("change", onPreference);

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { chromium } from 'playwright';
 import ts from 'typescript';
+import { verifyStoryScroll } from './verify-story-scroll.mjs';
 
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -22,7 +23,8 @@ visit(source);
 assert.equal(Object.keys(copy).length, 49);
 const banned = /ежедневн|каждый день|дней назад|предсказыв|990|17×|пост основателя|соцсетях команды|раунде финансирования|горячий, тёплый|сигнал горячий|Они отвечают|Свежий сигнал — свежий ответ/iu;
 const normalize = (value) => value.replace(/\s+/g, ' ').trim();
-const sceneIds = ['hero', 'problem', 'signals', 'priority', 'contact', 'card', 'boundary', 'closing'];
+const sceneIds = ['hero', 'workflow', 'signals', 'priority', 'contact', 'card', 'boundary', 'closing'];
+const sceneRoles = ['hero', 'demo', 'signals', 'priority', 'contact', 'card', 'boundary', 'closing'];
 const report = [];
 const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined });
 
@@ -62,12 +64,20 @@ async function assertTruth(page) {
   assert.equal(banned.test(text), false, 'truth gate: banned phrase');
   for (const [key, value] of Object.entries(copy)) {
     if (key.startsWith('meta_')) continue;
+    if (key === 'problem_h2' || key === 'problem_body') {
+      assert.equal(text.includes(normalize(value)), false, `owner-rejected problem content remains: ${key}`);
+      continue;
+    }
     assert.ok(text.includes(normalize(value)), `copy missing: ${key}`);
   }
   assert.equal(await page.locator('[data-story-cta]').count(), 3);
   for (const link of await page.locator('[data-story-cta]').all()) assert.equal(await link.getAttribute('href'), 'https://recruiter-radar.ru');
   assert.equal(await page.locator('h1').count(), 1);
-  assert.deepEqual(await page.locator('[data-story-scene]').evaluateAll((els)=>els.map(e=>e.dataset.storyScene)), sceneIds);
+  assert.deepEqual(await page.locator('[data-story-scene]').evaluateAll((nodes) => nodes.map((node) => node.id)), sceneIds);
+  assert.deepEqual(await page.locator('[data-story-scene]').evaluateAll((nodes) => nodes.map((node) => node.dataset.storyScene)), sceneRoles);
+  assert.equal(await page.locator('[data-demo-appearance]').count(), 1, 'one native demo');
+  assert.equal(await page.locator('[data-story-scene="demo"] [data-demo-appearance]').count(), 1, 'demo directly after hero');
+  assert.equal(await page.locator('[data-story-scene="priority"] [data-demo-appearance]').count(), 0, 'no duplicate in priority');
 }
 
 async function contrast(page) {
@@ -88,7 +98,7 @@ async function auditMode(name, viewport, options={}) {
   await settle(page);
   await assertTruth(page);
   for (const id of sceneIds) {
-    await page.locator(`#${id}`).scrollIntoViewIfNeeded(); await settle(page);
+    await page.locator(`#${id}`).evaluate((node) => node.scrollIntoView({ block: 'start' })); await settle(page);
     await assertNoOverlapOrClipping(page, `${name}/${id}`);
   }
   assert.equal(await page.locator('[data-story-state=pending]').count(),0,`${name}: content hidden`);
@@ -104,7 +114,7 @@ async function auditMode(name, viewport, options={}) {
     await page.screenshot({path:path.join(out,`${name}-hero.png`)});
     for (const id of ['signals','card']) {await page.locator(`#${id}`).scrollIntoViewIfNeeded();await settle(page);await page.screenshot({path:path.join(out,`${name}-${id}.png`)});}
   }
-  report.push({name,viewport,contrast:ratio,scenes:sceneIds.length,truth:'49 copy entries; banned=0',geometry:'pass',errors});
+  report.push({name,viewport,contrast:ratio,scenes:sceneIds.length,truth:'49 unchanged catalogue entries; 2 owner-rejected strings absent; banned=0',geometry:'pass',errors});
   await context.close();
 }
 
@@ -138,6 +148,8 @@ try {
   assert.equal(await page.locator('#signals [data-story-state=pending]').count(),0,'cards reveal on scroll');
   report.push({name:'normal-motion',demo:'scroll-gated',interaction:'4 tabs + sidebar + Escape/focus preserved',cards:'scroll reveal'});
   await context.close();
+  const wheel = await verifyStoryScroll(browser, base, out);
+  report.push({name:'trusted-wheel-browser', viewports:wheel.map(result=>result.name), report:'wheel-report.json', motion:'3 recorded normal-motion sessions'});
   await fs.writeFile(path.join(out,'report.json'),JSON.stringify(report,null,2));
   console.log(JSON.stringify({status:'pass',report,out},null,2));
 } finally {await browser.close();}

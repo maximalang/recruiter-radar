@@ -21,7 +21,12 @@
 .story .cta:focus-visible { outline-offset: 6px; }
 .skip { position: absolute; z-index: 10; top: 8px; left: 16px; padding: 12px 16px; background: var(--story-paper); transform: translateY(-160%); }
 .skip:focus { transform: none; }
-.header { max-width: 1440px; margin: auto; display: flex; gap: 24px; align-items: center; padding: 26px clamp(20px, 4.5vw, 72px); border-bottom: 1px solid var(--story-line); }
+.storyHeader { position: relative; z-index: 10; }
+.headerTop { max-width: 1440px; margin: auto; padding: 18px clamp(20px, 4.5vw, 72px); border-bottom: 1px solid var(--story-line); }
+.header { max-width: 1440px; margin: auto; display: flex; gap: 24px; align-items: center; padding: 12px clamp(20px, 4.5vw, 72px); border-bottom: 1px solid var(--story-line); background: var(--story-paper); }
+.storyHeader[data-header-enhanced] .header { position: fixed; inset: 0 0 auto; visibility: hidden; opacity: 0; transform: translateY(-100%); transition: opacity var(--motion-duration-signal) var(--motion-ease-enter), transform var(--motion-duration-signal) var(--motion-ease-enter), visibility var(--motion-duration-signal); }
+.storyHeader[data-scrolled] .header, .storyHeader:focus-within .header { visibility: visible; opacity: 1; transform: none; }
+.storyHeader[data-scrolled] .headerTop { visibility: hidden; }
 .brand { display: inline-flex; gap: 10px; align-items: center; min-height: 44px; flex-shrink: 0; font-size: 17px; font-weight: 650; letter-spacing: -.025em; }
 .brandMark { color: var(--story-green); font-size: 30px; line-height: 1; }
 .desktopNav { display: flex; flex-wrap: wrap; gap: 12px 22px; margin-left: auto; font-size: 13px; font-weight: 500; }
@@ -48,10 +53,7 @@
 .constellation { display: block; width: 100%; height: auto; }
 .visualLegend { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 20px 0; border-top: 1px solid var(--story-line); font-size: 11px; font-weight: 550; }
 .story figcaption { margin-top: 14px; color: var(--story-muted); font-size: 11px; }
-.problem { background: color-mix(in srgb, var(--color-canvas) 85%, var(--color-signal)); padding-top: 70px; padding-bottom: 70px; }
-.problemPath { display: flex; align-items: center; justify-content: space-between; gap: 14px; color: var(--color-signal-hover); font-size: 14px; font-weight: 500; }
-.problemPath span { max-width: 120px; }
-.problemPath i { flex: 1; height: 1px; background: color-mix(in srgb, var(--color-signal) 40%, var(--color-canvas)); }
+.workflowScene { display: block; padding-top: 64px; padding-bottom: 48px; }
 .fieldMark { flex-shrink: 0; width: 64px; height: 64px; color: var(--story-green); }
 .signals, .fieldsScene { display: block; }
 .sectionTop { margin-bottom: 48px; }
@@ -93,7 +95,7 @@
 .responsibility h3 { margin-top: 20px; font-size: 16px; }
 .boundaryNote { margin-top: 36px !important; font-size: 18px; font-weight: 550; }
 .boundaryVisual > p:last-child { margin-top: 18px; color: var(--story-muted); font-size: 14px; }
-.closing { display: flex; flex-direction: column; gap: 0; align-items: center; text-align: center; padding-top: 84px; padding-bottom: 84px; }
+.closing { min-height: calc(100svh - 24px); display: flex; flex-direction: column; gap: 0; align-items: center; text-align: center; padding-top: 84px; padding-bottom: 84px; }
 .closingArt { display: flex; align-items: center; gap: 18px; margin-bottom: 32px; }
 .closingArt span { display: block; width: 80px; height: 1px; background: color-mix(in srgb, var(--color-signal) 40%, var(--color-canvas)); }
 .closing > p:not(.note) { margin-top: 24px; max-width: 510px; color: var(--story-muted); }
@@ -131,8 +133,6 @@
   .heroVisual { width: 100%; }
   .visualLegend { gap: 10px; font-size: 10px; }
   .visualLegend span { max-width: 85px; }
-  .problemPath { font-size: 12px; gap: 10px; }
-  .problemPath .fieldMark { width: 44px; height: 44px; }
   .sequence { grid-template-columns: minmax(0, 1fr); }
   .sequencePanel, .sequencePanel:first-child, .sequencePanel:last-child { padding: 24px 20px; }
   .sequencePanel .paperArt { max-width: 360px; margin: 14px auto 22px; }

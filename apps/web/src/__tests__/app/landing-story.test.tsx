@@ -9,8 +9,19 @@ describe("own scroll story server contract", () => {
   it("renders eight ordered scene roles and five field definitions", () => {
     const html = renderToStaticMarkup(<StoryPage />);
     const scenes = [...html.matchAll(/data-story-scene="([^"]+)"/g)].map((match) => match[1]);
-    expect(scenes).toEqual(["hero", "problem", "signals", "priority", "contact", "card", "boundary", "closing"]);
+    expect(scenes).toEqual(["hero", "demo", "signals", "priority", "contact", "card", "boundary", "closing"]);
     for (const value of [storyCopy.hero_body, storyCopy.contact_example, storyCopy.boundary_note, storyCopy.feature_1_body, storyCopy.feature_2_body, storyCopy.feature_3_body, storyCopy.feature_4_body, storyCopy.feature_5_body]) expect(html).toContain(value);
+    expect(html.match(/data-demo-placeholder/g)).toHaveLength(1);
+    const demo = html.indexOf('data-demo-placeholder');
+    expect(demo).toBeGreaterThan(html.indexOf('data-story-scene="demo"'));
+    expect(demo).toBeLessThan(html.indexOf('data-story-scene="signals"'));
+    expect(html).not.toContain('problemPath');
+    expect(html).not.toContain(storyCopy.problem_body);
+    expect(html).not.toContain(storyCopy.problem_h2.replace(/\n/g, "<br/>"));
+    expect(html).not.toContain('id="problem"');
+    expect(html).toContain('id="workflow"');
+    expect(html).toContain('data-test="header"');
+    expect(html).toContain('data-header-panel');
     expect(html.match(/data-story-cta=/g)).toHaveLength(3);
     expect(html.match(/<h1 /g)).toHaveLength(1);
     expect(html).toContain('href="https://recruiter-radar.ru"');
