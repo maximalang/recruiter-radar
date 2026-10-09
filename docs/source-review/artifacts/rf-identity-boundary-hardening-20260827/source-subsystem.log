@@ -1,0 +1,341 @@
+Connected to database.
+schema_migrations table ready.
+Applying migration: 0001_init.sql
+  ✓ 0001_init.sql applied.
+Applying migration: 0002_expand_lead_state.sql
+  ✓ 0002_expand_lead_state.sql applied.
+Applying migration: 0003_add_hh_vacancies.sql
+  ✓ 0003_add_hh_vacancies.sql applied.
+Applying migration: 0004_self_serve_mvp_foundations.sql
+  ✓ 0004_self_serve_mvp_foundations.sql applied.
+Applying migration: 20260502153000_add_org_source_refs_and_hh_signals.sql
+  ✓ 20260502153000_add_org_source_refs_and_hh_signals.sql applied.
+Applying migration: 20260504090000_add_client_digest_pipeline.sql
+  ✓ 20260504090000_add_client_digest_pipeline.sql applied.
+Applying migration: 20260510120000_webhook_processing_claim.sql
+  ✓ 20260510120000_webhook_processing_claim.sql applied.
+Applying migration: 20260511090000_webhook_claim_token.sql
+  ✓ 20260511090000_webhook_claim_token.sql applied.
+Applying migration: 20260511110000_digest_delivery_claim_token.sql
+  ✓ 20260511110000_digest_delivery_claim_token.sql applied.
+Applying migration: 20260511120000_billing_webhook_claim_token.sql
+  ✓ 20260511120000_billing_webhook_claim_token.sql applied.
+Applying migration: 20260517120000_drop_client_profiles_agency_name_scope_uidx.sql
+  ✓ 20260517120000_drop_client_profiles_agency_name_scope_uidx.sql applied.
+Applying migration: 20260521000000_add_owner_id_to_client_profiles.sql
+  ✓ 20260521000000_add_owner_id_to_client_profiles.sql applied.
+Applying migration: 20260521010000_add_rbac_tables.sql
+  ✓ 20260521010000_add_rbac_tables.sql applied.
+Applying migration: 20260524120000_add_evidence_bundle.sql
+  ✓ 20260524120000_add_evidence_bundle.sql applied.
+Applying migration: 20260525100000_add_signal_pattern_for_reweight.sql
+  ✓ 20260525100000_add_signal_pattern_for_reweight.sql applied.
+Applying migration: 20260528120000_add_digest_candidate_confidence_and_next_action.sql
+  ✓ 20260528120000_add_digest_candidate_confidence_and_next_action.sql applied.
+Applying migration: 20260604000000_add_icp_industries_company_sizes.sql
+  ✓ 20260604000000_add_icp_industries_company_sizes.sql applied.
+Applying migration: 20260605120000_add_orgs_inn_ogrn_career_page.sql
+  ✓ 20260605120000_add_orgs_inn_ogrn_career_page.sql applied.
+Applying migration: 20260605130000_add_review_status_to_digest_candidates.sql
+  ✓ 20260605130000_add_review_status_to_digest_candidates.sql applied.
+Applying migration: 20260605140000_add_contact_policy_to_client_profiles.sql
+  ✓ 20260605140000_add_contact_policy_to_client_profiles.sql applied.
+Applying migration: 20260608120000_add_user_search_preferences.sql
+  ✓ 20260608120000_add_user_search_preferences.sql applied.
+Applying migration: 20260612120000_add_icp_roles_and_exclusions.sql
+  ✓ 20260612120000_add_icp_roles_and_exclusions.sql applied.
+Applying migration: 20260615120000_deprecate_legacy_lead_tables.sql
+  ✓ 20260615120000_deprecate_legacy_lead_tables.sql applied.
+Applying migration: 20260618120000_repair_icp_columns.sql
+  ✓ 20260618120000_repair_icp_columns.sql applied.
+Applying migration: 20260619120000_repair_contact_policy_column.sql
+  ✓ 20260619120000_repair_contact_policy_column.sql applied.
+Applying migration: 20260620120000_backfill_orgs_domain_from_website.sql
+  ✓ 20260620120000_backfill_orgs_domain_from_website.sql applied.
+Applying migration: 20260621130000_repair_client_profiles_icp_columns.sql
+  ✓ 20260621130000_repair_client_profiles_icp_columns.sql applied.
+Applying migration: 20260627120000_add_delivery_channels_web_push_email.sql
+  ✓ 20260627120000_add_delivery_channels_web_push_email.sql applied.
+Applying migration: 20260629120000_add_digest_candidate_ai_enrichment.sql
+  ✓ 20260629120000_add_digest_candidate_ai_enrichment.sql applied.
+Applying migration: 20260629130000_add_client_profile_targeting_thresholds.sql
+  ✓ 20260629130000_add_client_profile_targeting_thresholds.sql applied.
+Applying migration: 20260701120000_add_delivery_time_preferences.sql
+  ✓ 20260701120000_add_delivery_time_preferences.sql applied.
+Applying migration: 20260703120000_add_orgs_country_industry_city.sql
+  ✓ 20260703120000_add_orgs_country_industry_city.sql applied.
+Applying migration: 20260706120000_add_client_profile_hiring_mode.sql
+  ✓ 20260706120000_add_client_profile_hiring_mode.sql applied.
+Applying migration: 20260708120000_add_org_source_refs_org_source_key_idx.sql
+  ✓ 20260708120000_add_org_source_refs_org_source_key_idx.sql applied.
+Applying migration: 20260712130000_drop_unused_rbac_schema.sql
+  ✓ 20260712130000_drop_unused_rbac_schema.sql applied.
+Applying migration: 20260715120000_add_account_magic_login.sql
+  ✓ 20260715120000_add_account_magic_login.sql applied.
+Applying migration: 20260716010000_add_notification_delivery_platform.sql
+  ✓ 20260716010000_add_notification_delivery_platform.sql applied.
+Applying migration: 20260716120000_add_operator_settings.sql
+  ✓ 20260716120000_add_operator_settings.sql applied.
+Applying migration: 20260716180000_harden_notification_provider_identity.sql
+  ✓ 20260716180000_harden_notification_provider_identity.sql applied.
+Applying migration: 20260716180500_allow_notification_provider_reconnect.sql
+  ✓ 20260716180500_allow_notification_provider_reconnect.sql applied.
+Applying migration: 20260720130000_add_product_telemetry.sql
+  ✓ 20260720130000_add_product_telemetry.sql applied.
+Applying migration: 20260723120000_add_landing_telemetry_contract.sql
+  ✓ 20260723120000_add_landing_telemetry_contract.sql applied.
+Applying migration: 20260725120000_fix_payment_succeeded_transition.sql
+  ✓ 20260725120000_fix_payment_succeeded_transition.sql applied.
+Applying migration: 20260725121000_update_landing_event_contract.sql
+  ✓ 20260725121000_update_landing_event_contract.sql applied.
+Applying migration: 20260726120000_isolate_payment_telemetry_failure.sql
+  ✓ 20260726120000_isolate_payment_telemetry_failure.sql applied.
+Applying migration: 20260726130000_add_opportunity_engine_v1.sql
+  ✓ 20260726130000_add_opportunity_engine_v1.sql applied.
+Applying migration: 20260727120000_add_opportunity_engine_hardening.sql
+  ✓ 20260727120000_add_opportunity_engine_hardening.sql applied.
+Applying migration: 20260727121000_add_opportunity_episode_state.sql
+  ✓ 20260727121000_add_opportunity_episode_state.sql applied.
+Applying migration: 20260727122000_add_opportunity_supersession.sql
+  ✓ 20260727122000_add_opportunity_supersession.sql applied.
+Applying migration: 20260727130000_fix_opportunity_hardening_edge_cases.sql
+  ✓ 20260727130000_fix_opportunity_hardening_edge_cases.sql applied.
+Applying migration: 20260727140000_repair_opportunity_authoritative_state.sql
+  ✓ 20260727140000_repair_opportunity_authoritative_state.sql applied.
+Applying migration: 20260727150000_add_opportunity_outcome_ledger.sql
+  ✓ 20260727150000_add_opportunity_outcome_ledger.sql applied.
+Applying migration: 20260727151000_add_opportunity_outcome_projection.sql
+  ✓ 20260727151000_add_opportunity_outcome_projection.sql applied.
+Applying migration: 20260727152000_add_opportunity_public_reference.sql
+  ✓ 20260727152000_add_opportunity_public_reference.sql applied.
+Applying migration: 20260728100000_harden_opportunity_outcome_ledger.sql
+  ✓ 20260728100000_harden_opportunity_outcome_ledger.sql applied.
+Applying migration: 20260728110000_complete_opportunity_meeting_lifecycle.sql
+  ✓ 20260728110000_complete_opportunity_meeting_lifecycle.sql applied.
+Applying migration: 20260728111000_enforce_opportunity_outcome_write_boundary.sql
+  ✓ 20260728111000_enforce_opportunity_outcome_write_boundary.sql applied.
+Applying migration: 20260728112000_enforce_outcome_correction_capability.sql
+  ✓ 20260728112000_enforce_outcome_correction_capability.sql applied.
+Applying migration: 20260728120000_add_auth_platform_v2_foundation.sql
+  ✓ 20260728120000_add_auth_platform_v2_foundation.sql applied.
+Applying migration: 20260728121000_add_auth_challenge_issuance.sql
+  ✓ 20260728121000_add_auth_challenge_issuance.sql applied.
+Applying migration: 20260728122000_add_auth_challenge_consumption.sql
+  ✓ 20260728122000_add_auth_challenge_consumption.sql applied.
+Applying migration: 20260729120000_add_auth_workspaces.sql
+  ✓ 20260729120000_add_auth_workspaces.sql applied.
+Applying migration: 20260729121000_add_auth_workspace_tenant_context.sql
+  ✓ 20260729121000_add_auth_workspace_tenant_context.sql applied.
+Applying migration: 20260729121100_add_auth_workspace_tenant_indexes.sql
+  ✓ 20260729121100_add_auth_workspace_tenant_indexes.sql applied.
+Applying migration: 20260729121200_add_auth_workspace_tenant_guards.sql
+  ✓ 20260729121200_add_auth_workspace_tenant_guards.sql applied.
+Applying migration: 20260729122000_add_auth_workspace_session_switch.sql
+  ✓ 20260729122000_add_auth_workspace_session_switch.sql applied.
+Applying migration: 20260729130000_add_auth_account_security_and_team.sql
+  ✓ 20260729130000_add_auth_account_security_and_team.sql applied.
+Applying migration: 20260729131000_guard_auth_active_owner_writes.sql
+  ✓ 20260729131000_guard_auth_active_owner_writes.sql applied.
+Applying migration: 20260729132000_add_auth_passkeys.sql
+  ✓ 20260729132000_add_auth_passkeys.sql applied.
+Applying migration: 20260730100000_harden_auth_email_identity.sql
+  ✓ 20260730100000_harden_auth_email_identity.sql applied.
+Applying migration: 20260730101000_add_legacy_session_revocation.sql
+  ✓ 20260730101000_add_legacy_session_revocation.sql applied.
+Applying migration: 20260731100000_add_opportunity_workspace_actor_context.sql
+  ✓ 20260731100000_add_opportunity_workspace_actor_context.sql applied.
+Applying migration: 20260801100000_add_agency_dna_v1.sql
+  ✓ 20260801100000_add_agency_dna_v1.sql applied.
+Applying migration: 20260801120000_add_opportunity_scoring_v2.sql
+  ✓ 20260801120000_add_opportunity_scoring_v2.sql applied.
+Applying migration: 20260801130000_add_opportunity_workflow_v1.sql
+  ✓ 20260801130000_add_opportunity_workflow_v1.sql applied.
+Applying migration: 20260801140000_add_opportunity_crm_bridge.sql
+  ✓ 20260801140000_add_opportunity_crm_bridge.sql applied.
+Applying migration: 20260801150000_add_opportunity_analytics_v2.sql
+  ✓ 20260801150000_add_opportunity_analytics_v2.sql applied.
+Applying migration: 20260801151000_enforce_opportunity_analytics_assignee_scope.sql
+  ✓ 20260801151000_enforce_opportunity_analytics_assignee_scope.sql applied.
+Applying migration: 20260802100000_add_opportunity_crm_delivery_claims.sql
+  ✓ 20260802100000_add_opportunity_crm_delivery_claims.sql applied.
+Applying migration: 20260803120000_add_company_events_v1.sql
+  ✓ 20260803120000_add_company_events_v1.sql applied.
+Applying migration: 20260804100000_add_company_state_v1.sql
+  ✓ 20260804100000_add_company_state_v1.sql applied.
+Applying migration: 20260804110000_add_signal_episodes_v2.sql
+  ✓ 20260804110000_add_signal_episodes_v2.sql applied.
+Applying migration: 20260804120000_add_commercial_theses_v1.sql
+  ✓ 20260804120000_add_commercial_theses_v1.sql applied.
+Applying migration: 20260804130000_add_external_agency_propensity_v1.sql
+  ✓ 20260804130000_add_external_agency_propensity_v1.sql applied.
+Applying migration: 20260804140000_add_agency_dna_match_v2.sql
+  ✓ 20260804140000_add_agency_dna_match_v2.sql applied.
+Applying migration: 20260804150000_add_opportunity_candidates_v3.sql
+  ✓ 20260804150000_add_opportunity_candidates_v3.sql applied.
+Applying migration: 20260804160000_add_query_planner_v2.sql
+  ✓ 20260804160000_add_query_planner_v2.sql applied.
+Applying migration: 20260804223000_robokassa_payment_integrity.sql
+  ✓ 20260804223000_robokassa_payment_integrity.sql applied.
+Applying migration: 20260804224500_checkout_order_entitlements.sql
+  ✓ 20260804224500_checkout_order_entitlements.sql applied.
+Applying migration: 20260804225000_robokassa_refunds.sql
+  ✓ 20260804225000_robokassa_refunds.sql applied.
+Applying migration: 20260807100000_add_evidence_source_registry_v1.sql
+  ✓ 20260807100000_add_evidence_source_registry_v1.sql applied.
+Applying migration: 20260807101000_add_evidence_organization_identity_v1.sql
+  ✓ 20260807101000_add_evidence_organization_identity_v1.sql applied.
+Applying migration: 20260807102000_add_evidence_events_signals_v1.sql
+  ✓ 20260807102000_add_evidence_events_signals_v1.sql applied.
+Applying migration: 20260807103000_add_evidence_lead_cards_v1.sql
+  ✓ 20260807103000_add_evidence_lead_cards_v1.sql applied.
+Applying migration: 20260807104000_harden_evidence_lead_qualification_v1.sql
+  ✓ 20260807104000_harden_evidence_lead_qualification_v1.sql applied.
+Applying migration: 20260807170000_add_commercial_signal_canary_runtime.sql
+  ✓ 20260807170000_add_commercial_signal_canary_runtime.sql applied.
+Applying migration: 20260807173000_harden_company_event_and_enrichment_lineage.sql
+  ✓ 20260807173000_harden_company_event_and_enrichment_lineage.sql applied.
+Applying migration: 20260807173500_restore_immutable_company_event_publications.sql
+  ✓ 20260807173500_restore_immutable_company_event_publications.sql applied.
+Applying migration: 20260807173600_enforce_company_event_publication_append_only.sql
+  ✓ 20260807173600_enforce_company_event_publication_append_only.sql applied.
+Applying migration: 20260807174500_extend_query_plan_yield_metrics.sql
+  ✓ 20260807174500_extend_query_plan_yield_metrics.sql applied.
+Applying migration: 20260807175500_extend_commercial_signal_annotation_taxonomy.sql
+  ✓ 20260807175500_extend_commercial_signal_annotation_taxonomy.sql applied.
+Applying migration: 20260807180500_complete_query_plan_supply_metrics.sql
+  ✓ 20260807180500_complete_query_plan_supply_metrics.sql applied.
+Applying migration: 20260809100000_add_canonical_entitlement_grants.sql
+  ✓ 20260809100000_add_canonical_entitlement_grants.sql applied.
+Applying migration: 20260809110000_add_workspace_checkout_ownership.sql
+  ✓ 20260809110000_add_workspace_checkout_ownership.sql applied.
+Applying migration: 20260809120000_add_email_delivery_health.sql
+  ✓ 20260809120000_add_email_delivery_health.sql applied.
+Applying migration: 20260809130000_add_commercial_signal_quality_v2.sql
+  ✓ 20260809130000_add_commercial_signal_quality_v2.sql applied.
+Applying migration: 20260809140000_add_query_plan_quality_feedback_v2.sql
+  ✓ 20260809140000_add_query_plan_quality_feedback_v2.sql applied.
+Applying migration: 20260810120000_isolate_user_search_preferences.sql
+  ✓ 20260810120000_isolate_user_search_preferences.sql applied.
+Applying migration: 20260811010000_add_aggregate_delivery_status.sql
+  ✓ 20260811010000_add_aggregate_delivery_status.sql applied.
+Applying migration: 20260812150000_add_source_signal_evidence_lineage.sql
+  ✓ 20260812150000_add_source_signal_evidence_lineage.sql applied.
+Applying migration: 20260814030000_add_source_temporal_health.sql
+  ✓ 20260814030000_add_source_temporal_health.sql applied.
+Applying migration: 20260814040000_add_canonical_vacancy_lifecycle.sql
+  ✓ 20260814040000_add_canonical_vacancy_lifecycle.sql applied.
+Applying migration: 20260814050000_add_source_scheduler_state.sql
+  ✓ 20260814050000_add_source_scheduler_state.sql applied.
+Applying migration: 20260814060000_add_source_target_run_scope.sql
+  ✓ 20260814060000_add_source_target_run_scope.sql applied.
+Applying migration: 20260814070000_add_daily_radar_run_lease.sql
+  ✓ 20260814070000_add_daily_radar_run_lease.sql applied.
+Applying migration: 20260814080000_harden_channel_delivery_state.sql
+  ✓ 20260814080000_harden_channel_delivery_state.sql applied.
+Applying migration: 20260814090000_harden_daily_radar_recovery.sql
+  ✓ 20260814090000_harden_daily_radar_recovery.sql applied.
+Applying migration: 20260816130000_add_timeweb_mcp_sessions.sql
+  ✓ 20260816130000_add_timeweb_mcp_sessions.sql applied.
+Applying migration: 20260817150000_timeweb_mcp_sessions_multi_session.sql
+  ✓ 20260817150000_timeweb_mcp_sessions_multi_session.sql applied.
+Applying migration: 20260826100000_add_rr_identity_validation_functions.sql
+  ✓ 20260826100000_add_rr_identity_validation_functions.sql applied.
+Applying migration: 20260826100100_quarantine_legacy_source_keys.sql
+  ✓ 20260826100100_quarantine_legacy_source_keys.sql applied.
+Applying migration: 20260827100000_harden_rr_multitenant_domain_suffixes.sql
+  ✓ 20260827100000_harden_rr_multitenant_domain_suffixes.sql applied.
+
+Migration summary: 122 applied, 0 skipped, 122 total.
+All new migrations applied successfully.
+{
+  "ok": true,
+  "mode": "isolated-source-subsystem-db",
+  "verifiers": [
+    {
+      "verifier": "verify-source-identity-lineage.mjs",
+      "output": [
+        "{\"event\":\"source_identity_lineage.verified\",\"organizations\":1,\"signals\":2,\"evidence\":2,\"lineage\":2,\"tiers\":[\"corroboration\"],\"replayEvidenceCreated\":0,\"replayLineageCreated\":0,\"weakNameOwners\":2,\"legalIdentityPersisted\":true,\"rejectedCanonicalRefs\":0,\"partialConflictRejects\":1,\"conflictMode\":\"fail-closed\"}"
+      ]
+    },
+    {
+      "verifier": "verify-source-identity-boundary-quarantine.mjs",
+      "output": [
+        "  \"ok\": true,",
+        "  \"smoke\": \"source-identity-boundary-quarantine\",",
+        "  \"verified\": {",
+        "    \"quarantinedRows\": 15,",
+        "    \"canonicalizedRows\": 2,",
+        "    \"invalidSharedKeyDidNotMerge\": true,",
+        "    \"multitenantDomainDidNotMerge\": true,",
+        "    \"trustedSharedKeyMerged\": true,",
+        "    \"platformDomainBridgeRejected\": true,",
+        "    \"runtimeGuardRemainsActive\": true",
+        "  }",
+        "}"
+      ]
+    },
+    {
+      "verifier": "verify-mixed-ranking-smoke.mjs",
+      "output": [
+        "mixed ranking smoke passed",
+        "┌─────────┬──────┬────────────────────┬────────────────────┬──────────────────────────────────┬─────────────┐",
+        "│ (index) │ rank │ source_external_id │ source_families    │ quality_code                     │ total_score │",
+        "├─────────┼──────┼────────────────────┼────────────────────┼──────────────────────────────────┼─────────────┤",
+        "│ 0       │ 1    │ 'career-1'         │ 'career-pages, hh' │ 'high_confidence_employer_match' │ 274         │",
+        "│ 1       │ 2    │ 'hh-agg-1'         │ 'hh'               │ 'aggregated_employer_match'      │ 185         │",
+        "└─────────┴──────┴────────────────────┴────────────────────┴──────────────────────────────────┴─────────────┘"
+      ]
+    },
+    {
+      "verifier": "verify-digest-selection-smoke.mjs",
+      "output": [
+        "  \"smoke\": \"digest-selection\",",
+        "  \"verified\": {",
+        "    \"tenantOwnerInvariant\": true,",
+        "    \"scopedBoostWinner\": \"Scoped Match digest-selection-1787818228207-e05fe48f\",",
+        "    \"careerPagesSelection\": [",
+        "      \"Scoped Match digest-selection-1787818228207-e05fe48f\"",
+        "    ],",
+        "    \"domainSelection\": [",
+        "      \"Unscoped Match digest-selection-1787818228207-e05fe48f\"",
+        "    ]",
+        "  }",
+        "}"
+      ]
+    },
+    {
+      "verifier": "verify-rf-context-corroboration-smoke.mjs",
+      "output": [
+        "    \"corroboratedGate\": \"B\",",
+        "    \"corroboratedSourceFamilies\": [",
+        "      \"funding-business-signals\",",
+        "      \"hh\"",
+        "    ],",
+        "    \"corroboratedVacanciesCount\": 1,",
+        "    \"corroboratedEvidenceTitles\": [",
+        "      \"Senior Recruiter\"",
+        "    ],",
+        "    \"crossSourceCorroborated\": true",
+        "  }",
+        "}"
+      ]
+    },
+    {
+      "verifier": "verify-career-pages-ingest.mjs",
+      "output": [
+        "    \"signalUpsertsCompleted\": 1",
+        "  },",
+        "  \"verified\": {",
+        "    \"orgRows\": 1,",
+        "    \"signalRows\": 1,",
+        "    \"canonicalSourceRefRows\": 1,",
+        "    \"lineageRows\": 1,",
+        "    \"weakCompanyNameAliasPreserved\": true,",
+        "    \"idempotent\": true",
+        "  },",
+        "  \"cleanup\": \"transaction-scoped-fixture-outer-wrapper-drops-disposable-database\"",
+        "}"
+      ]
+    }
+  ]
+}

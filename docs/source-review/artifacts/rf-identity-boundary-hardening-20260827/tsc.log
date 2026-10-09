@@ -1,0 +1,10 @@
+
+> recruiter-radar@1.0.0 web:check
+> npm run check --workspace @recruiter-radar/web
+
+
+> check
+> tsc --noEmit
+
+
+exit_code=0

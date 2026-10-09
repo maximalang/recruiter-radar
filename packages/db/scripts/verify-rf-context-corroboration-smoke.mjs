@@ -36,7 +36,7 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const SHARED_INN = '7701234567'; // 10-digit legal entity INN shared by both fragments
+const SHARED_INN = '7701234507'; // 10-digit legal entity INN shared by both fragments (checksum-valid; identity gate rejects invalid checksums)
 
 const client = new Client({ connectionString: databaseUrl });
 
