@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildCareerPagesHealth,
   detectCareerPagesHealthAnomalies,
+  resolveCareerPagesIngestZeroReason,
 } from './career-pages-health.mjs';
 
 test('aggregates bounded per-family transport, zero-reason, and latency metrics', () => {
@@ -141,4 +142,67 @@ test('distinguishes empty, blocked, duplicate-only, and filtered-all zero result
   assert.equal(health.totals.zeroReasons.browserNotRendered, 1);
   assert.equal(health.totals.zeroReasons.duplicatesOnly, 1);
   assert.equal(health.totals.zeroReasons.filteredAll, 1);
+});
+
+test('resolves a whole-run zeroReason from structural health taxonomy', () => {
+  const input = {
+    targetResults: [
+      {
+        id: 'empty', adapter: 'personio-xml', hostedAtsFamily: 'personio',
+        companyName: 'Empty', recordsFetched: 0, outcome: 'no-vacancies-present', durationMs: 1,
+      },
+      {
+        id: 'drift', adapter: 'hosted-career-page', hostedAtsFamily: 'workday',
+        companyName: 'Drift', recordsFetched: 0,
+        outcome: 'extraction-zero-unexpected', durationMs: 2,
+      },
+    ],
+    recordsReceived: 0,
+  };
+
+  assert.equal(
+    resolveCareerPagesIngestZeroReason(input, { signalUpsertCount: 0 }),
+    'noVacanciesPresent+parserOrLayoutDrift',
+  );
+});
+
+test('excludes environmental-only zeros so they stay fail-closed', () => {
+  const input = {
+    targetResults: [
+      {
+        id: 'throttled', adapter: 'hosted-career-page', hostedAtsFamily: 'workday',
+        companyName: 'Throttled', recordsFetched: 0,
+        errorCategory: 'http-429', durationMs: 1,
+      },
+      {
+        id: 'blocked', adapter: 'hosted-career-page', hostedAtsFamily: 'icims',
+        companyName: 'Blocked', recordsFetched: 0,
+        outcome: 'page-unreachable', errorCategory: 'access-policy:robots-disallowed',
+        stoppedByPolicy: true, durationMs: 2,
+      },
+    ],
+    recordsReceived: 0,
+  };
+
+  assert.equal(resolveCareerPagesIngestZeroReason(input, null), undefined);
+});
+
+test('keeps the direct no-new-signals reason ahead of the health aggregate', () => {
+  const input = {
+    targetResults: [
+      {
+        id: 'parsed', adapter: 'greenhouse-board',
+        companyName: 'A', recordsFetched: 3, outcome: 'parsed',
+        extractionMethod: 'greenhouse-api', durationMs: 10,
+      },
+    ],
+    recordsReceived: 3,
+    normalizedRecords: [{ signalExternalId: 'x' }],
+    zeroReason: 'no-new-signals',
+  };
+
+  assert.equal(
+    resolveCareerPagesIngestZeroReason(input, { signalUpsertCount: 0, organizationResolutionRejects: 0 }),
+    'no-new-signals',
+  );
 });
