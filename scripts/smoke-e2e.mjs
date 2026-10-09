@@ -104,7 +104,7 @@ async function main() {
   try {
     const { stdout } = await execFile('npx', [
       'jest',
-      '--testPathPattern=src/__tests__/scripts/lead-generate.smoke.test.ts',
+      '--testPathPatterns=src/__tests__/scripts/lead-generate.smoke.test.ts',
       '--no-coverage',
       '--verbose',
     ], {

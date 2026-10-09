@@ -39,6 +39,22 @@ export type SourceId =
   | 'cbr-registry'
   | 'rosstat-open-data'
   | 'rospatent-open-data'
+  | 'themuse'
+  | 'landingjobs'
+  | 'arbeitnow'
+  | 'remoteok'
+  | 'jobicy'
+  | 'himalayas'
+  | 'remotive'
+  | 'weworkremotely'
+  | 'hackernews-jobs'
+  | 'hn-algolia'
+  | 'devto'
+  | 'gdelt-context'
+  | 'openalex'
+  | 'ror'
+  | 'cbr-fx-daily'
+  | 'trudvsem-opendata-datasets'
 
 export interface SourceConfig {
   /** Unique identifier used in API calls, DB, and n8n workflows. */
@@ -481,6 +497,203 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     isPrimary: false,
     dailyStage: 'supporting',
     dailyActivationEnvVars: ['SOURCE_SNAPSHOT_ROOT', 'ROSPATENT_OPEN_DATA_INPUT_FILE'],
+    category: 'registry',
+  },
+  // --- 2026-10 public source expansion (16 Class A free-public sources) ---
+  // Job boards: live-public JSON/RSS APIs, no credentials. Kept out of the
+  // daily pipeline and blocked-from-digest pending confidence gates (same
+  // posture as habr-career / linkedin-company-pages).
+  {
+    id: 'themuse',
+    name: 'The Muse',
+    description: 'Free-public The Muse jobs API (company-attributed listings); confidence-gated, blocked from digest until gates pass',
+    script: 'source-themuse.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['THEMUSE_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'job-board',
+  },
+  {
+    id: 'landingjobs',
+    name: 'Landing Jobs',
+    description: 'Free-public Landing Jobs API (tech listings, org attribution from listing URL); confidence-gated, blocked from digest until gates pass',
+    script: 'source-landingjobs.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['LANDINGJOBS_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'job-board',
+  },
+  {
+    id: 'arbeitnow',
+    name: 'Arbeitnow',
+    description: 'Free-public Arbeitnow job board API (EU/remote listings); confidence-gated, blocked from digest until gates pass',
+    script: 'source-arbeitnow.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['ARBEITNOW_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'job-board',
+  },
+  {
+    id: 'remoteok',
+    name: 'RemoteOK',
+    description: 'Free-public RemoteOK API; terms require follow backlink to the listing URL and source credit — both preserved by the adapter; confidence-gated, blocked from digest until gates pass',
+    script: 'source-remoteok.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['REMOTEOK_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'job-board',
+  },
+  {
+    id: 'jobicy',
+    name: 'Jobicy',
+    description: 'Free-public Jobicy API v2; terms require credit and a link to the original listing — both preserved by the adapter; confidence-gated, blocked from digest until gates pass',
+    script: 'source-jobicy.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['JOBICY_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'job-board',
+  },
+  {
+    id: 'himalayas',
+    name: 'Himalayas',
+    description: 'Free-public Himalayas remote jobs API (company-attributed, cursor pagination); confidence-gated, blocked from digest until gates pass',
+    script: 'source-himalayas.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['HIMALAYAS_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'job-board',
+  },
+  {
+    id: 'remotive',
+    name: 'Remotive',
+    description: 'Free-public Remotive remote jobs API; confidence-gated, blocked from digest until gates pass',
+    script: 'source-remotive.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['REMOTIVE_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'job-board',
+  },
+  {
+    id: 'weworkremotely',
+    name: 'We Work Remotely',
+    description: 'Free-public WWR category RSS feeds (company parsed from item title); confidence-gated, blocked from digest until gates pass',
+    script: 'source-weworkremotely.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['WEWORKREMOTELY_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'job-board',
+  },
+  {
+    id: 'hackernews-jobs',
+    name: 'Hacker News job stories',
+    description: 'Free-public Hacker News Firebase job stories (YC direct-employer posts); posting URL kept as source_url only, never as org identity; confidence-gated, blocked from digest until gates pass',
+    script: 'source-hackernews-jobs.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['HACKERNEWS_JOBS_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'job-board',
+  },
+  // Context/registry sources: supporting daily stage behind explicit
+  // activation env vars (opt-in), context-only or enrichment-only, never
+  // lead-originating.
+  {
+    id: 'hn-algolia',
+    name: 'Hacker News (Algolia search)',
+    description: 'Org-name query stories from the free-public HN Algolia search API; attribution only on title/URL phrase match; context-only',
+    script: 'source-hn-algolia.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['HN_ALGOLIA_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['HN_ALGOLIA_QUERIES', 'HN_ALGOLIA_INPUT_FILE'],
+    category: 'business-signal',
+  },
+  {
+    id: 'devto',
+    name: 'DEV Community articles',
+    description: 'Organization-attributed articles from the free-public dev.to API (only items with an organization are kept); context-only',
+    script: 'source-devto.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['DEVTO_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['DEVTO_ARTICLE_TAGS', 'DEVTO_INPUT_FILE'],
+    category: 'business-signal',
+  },
+  {
+    id: 'gdelt-context',
+    name: 'GDELT context news',
+    description: 'Query-targeted hiring-context news through the shared throttled GDELT DOC client (separate cache from funding-business-signals); context-only',
+    script: 'source-gdelt-context.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['GDELT_CONTEXT_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['GDELT_CONTEXT_QUERIES', 'GDELT_CONTEXT_QUERIES_JSON', 'GDELT_CONTEXT_INPUT_FILE'],
+    category: 'business-signal',
+  },
+  {
+    id: 'openalex',
+    name: 'OpenAlex research works',
+    description: 'Research works attributed to author institutions from the free-public OpenAlex API; context-only',
+    script: 'source-openalex.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['OPENALEX_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['OPENALEX_SEARCH_TERMS', 'OPENALEX_INPUT_FILE'],
+    category: 'business-signal',
+  },
+  {
+    id: 'ror',
+    name: 'ROR organization registry',
+    description: 'Research Organization Registry (ror.org) identity references — canonical name, website domain, aliases, country; enrichment-only, never lead-originating',
+    script: 'source-ror.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['ROR_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['ROR_ORGANIZATIONS', 'ROR_INPUT_FILE'],
+    category: 'registry',
+  },
+  {
+    id: 'cbr-fx-daily',
+    name: 'CBR daily FX reference rates',
+    description: 'Official Bank of Russia daily FX snapshot (XML_daily.asp; documented public mirror allowed via CBR_FX_DAILY_API_URL); market context only, activation-gated',
+    script: 'source-cbr-fx-daily.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['CBR_FX_DAILY_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['CBR_FX_DAILY_API_URL', 'CBR_FX_DAILY_INPUT_FILE'],
+    category: 'business-signal',
+  },
+  {
+    id: 'trudvsem-opendata-datasets',
+    name: 'Rabota Rossii open data catalog',
+    description: 'Official opendata.trudvsem.ru list.xml dataset catalog (RF open data 3.0 standard, publisher Rostrud INN 7710538364); context-only',
+    script: 'source-trudvsem-opendata-datasets.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['TRUDVSEM_DATASETS_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    dailyStage: 'supporting',
+    dailyActivationEnvVars: ['TRUDVSEM_DATASETS_CATALOG_URL', 'TRUDVSEM_DATASETS_INPUT_FILE'],
     category: 'registry',
   },
 ]

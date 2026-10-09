@@ -44,6 +44,27 @@ export const SOURCE_SCHEDULES: Record<SourceId, SourceSchedule> = {
   'cbr-registry': { expectedRefreshIntervalMs: 7 * DAY, hostKey: 'cbr.ru', perHostConcurrency: 1 },
   'rosstat-open-data': { expectedRefreshIntervalMs: 7 * DAY, hostKey: 'snapshot:rosstat', perHostConcurrency: 1 },
   'rospatent-open-data': { expectedRefreshIntervalMs: 7 * DAY, hostKey: 'snapshot:rospatent', perHostConcurrency: 1 },
+  // 2026-10 public expansion. Job boards are not in the daily pipeline; the
+  // cadence documents the intended on-demand refresh interval and host
+  // serialization. gdelt-context intentionally shares the GDELT host key
+  // with funding-business-signals so the shared free quota is serialized;
+  // cbr-fx-daily shares the cbr.ru host key with cbr-registry.
+  themuse: { expectedRefreshIntervalMs: 12 * HOUR, hostKey: 'www.themuse.com', perHostConcurrency: 1 },
+  landingjobs: { expectedRefreshIntervalMs: 12 * HOUR, hostKey: 'landing.jobs', perHostConcurrency: 1 },
+  arbeitnow: { expectedRefreshIntervalMs: 12 * HOUR, hostKey: 'www.arbeitnow.com', perHostConcurrency: 1 },
+  remoteok: { expectedRefreshIntervalMs: 12 * HOUR, hostKey: 'remoteok.com', perHostConcurrency: 1 },
+  jobicy: { expectedRefreshIntervalMs: 12 * HOUR, hostKey: 'jobicy.com', perHostConcurrency: 1 },
+  himalayas: { expectedRefreshIntervalMs: 12 * HOUR, hostKey: 'himalayas.app', perHostConcurrency: 1 },
+  remotive: { expectedRefreshIntervalMs: 12 * HOUR, hostKey: 'remotive.com', perHostConcurrency: 1 },
+  weworkremotely: { expectedRefreshIntervalMs: 12 * HOUR, hostKey: 'weworkremotely.com', perHostConcurrency: 1 },
+  'hackernews-jobs': { expectedRefreshIntervalMs: 12 * HOUR, hostKey: 'hacker-news.firebaseio.com', perHostConcurrency: 1 },
+  'hn-algolia': { expectedRefreshIntervalMs: DAY, hostKey: 'hn.algolia.com', perHostConcurrency: 1 },
+  devto: { expectedRefreshIntervalMs: DAY, hostKey: 'dev.to', perHostConcurrency: 1 },
+  'gdelt-context': { expectedRefreshIntervalMs: DAY, hostKey: 'api.gdeltproject.org', perHostConcurrency: 1 },
+  openalex: { expectedRefreshIntervalMs: DAY, hostKey: 'api.openalex.org', perHostConcurrency: 1 },
+  ror: { expectedRefreshIntervalMs: DAY, hostKey: 'api.ror.org', perHostConcurrency: 1 },
+  'cbr-fx-daily': { expectedRefreshIntervalMs: DAY, hostKey: 'cbr.ru', perHostConcurrency: 1 },
+  'trudvsem-opendata-datasets': { expectedRefreshIntervalMs: 7 * DAY, hostKey: 'opendata.trudvsem.ru', perHostConcurrency: 1 },
 }
 
 export function getSourceSchedule(source: SourceId): SourceSchedule {
