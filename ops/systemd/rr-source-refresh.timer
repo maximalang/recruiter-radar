@@ -1,0 +1,18 @@
+[Unit]
+Description=Recruiter Radar: hourly source-refresh tick (sole authoritative tick generator)
+# Docs: docs/runbooks/source-refresh-vm-tick-authority.md §4.1
+
+[Timer]
+# Fire 15 minutes into each UTC hour. With slot_id=floor(observed_at - 15min),
+# this attributes a normal tick to its current canonical hour.
+OnCalendar=*:15:00 UTC
+# Start once after downtime/reboot. The script derives slot_id from the actual
+# observed time; it never backfills history, so missed slots remain RED.
+Persistent=true
+# No jitter: the start must stay at :15 to remain in the intended slot grace.
+RandomizedDelaySec=0
+AccuracySec=1s
+Unit=rr-source-refresh.service
+
+[Install]
+WantedBy=timers.target

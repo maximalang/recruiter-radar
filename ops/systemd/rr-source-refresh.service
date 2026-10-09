@@ -1,0 +1,16 @@
+[Unit]
+Description=Recruiter Radar: single source-refresh tick (sole VM authority)
+# Docs: docs/runbooks/source-refresh-vm-tick-authority.md §4.2
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/recruiter-radar
+ExecStart=/opt/recruiter-radar/source-refresh-tick.sh
+# Refresh budget is 20min in the GHA workflow; leave headroom for ledger writes.
+TimeoutStartSec=25min
+User=root
+Nice=5
+StandardOutput=journal
+StandardError=journal
