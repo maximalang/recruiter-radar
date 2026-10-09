@@ -530,6 +530,17 @@ async function assertMobileKeyboardNavigation(browser) {
   const dialog = page.getByRole("dialog", { name: "Навигация по продукту" });
   await dialog.waitFor({ state: "visible" });
   assert.equal(await page.evaluate(() => document.body.style.overflow), "hidden");
+  // next 16.3 shifted hydration/paint scheduling: the header menu moves focus
+  // into the dialog inside requestAnimationFrame (landing-header.tsx), which
+  // can land after the dialog becomes visible. Wait for the component's own
+  // on-open focus before simulating keyboard navigation; the focus-trap and
+  // focus-return assertions below are unchanged.
+  const dialogElement = await dialog.elementHandle();
+  await page.waitForFunction(
+    (element) => element.contains(document.activeElement),
+    dialogElement,
+    { timeout: PAGE_SETTLE_TIMEOUT_MS },
+  );
   await page.keyboard.press("Shift+Tab");
   assert.equal(await dialog.evaluate((element) => element.contains(document.activeElement)), true, "focus escaped mobile dialog");
   await page.keyboard.press("Escape");
