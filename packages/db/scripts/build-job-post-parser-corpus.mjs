@@ -449,6 +449,27 @@ function sha256File(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
+/* A date string that new Date() parses WITHOUT an explicit zone is interpreted
+ * in the host's local timezone, making occurredAt environment-dependent.
+ * The corpus must be TZ-independent, so such candidates are rejected here.
+ * Safe: strict ISO date-only (parses as UTC per spec), explicit Z/±offset,
+ * unparseable strings (deterministic null → fetchedAt fallback). */
+const STRICT_ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const EXPLICIT_TZ = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+function isTzUnsafeDateString(value) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (trimmed === '' || STRICT_ISO_DATE.test(trimmed)) return false;
+  if (Number.isNaN(new Date(trimmed).getTime())) return false;
+  return !EXPLICIT_TZ.test(trimmed);
+}
+
+function effectiveRawDate(record) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  return record.published_at ?? record.posted_at ?? record.created_at ?? record.date_published ?? null;
+}
+
 /* ---------------- main ---------------- */
 
 function main() {
@@ -482,6 +503,17 @@ function main() {
     if (seenDigests.has(digest)) {
       stats.duplicate_skipped += 1;
       skipLog.push({ index, reason: 'duplicate input digest', category: candidate.category });
+      return;
+    }
+    const rawDate = effectiveRawDate(candidate.record);
+    if (isTzUnsafeDateString(rawDate)) {
+      stats.schema_skipped += 1;
+      skipLog.push({
+        index,
+        reason: 'tz-unsafe date string (parses in host local time; corpus must be timezone-independent)',
+        category: candidate.category,
+        value: rawDate,
+      });
       return;
     }
     seenDigests.add(digest);

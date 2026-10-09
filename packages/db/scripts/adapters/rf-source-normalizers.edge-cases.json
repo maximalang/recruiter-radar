@@ -36,15 +36,15 @@
   },
   "oracle": {
     "script": "packages/db/scripts/build-job-post-parser-corpus.mjs",
-    "script_sha256": "2ddfd9ab2322c336c55abd0aa31a62eeaf9fe98e9c3206e3ebef810e961d3101",
+    "script_sha256": "ceb611c8c548cb6d838fdc93bfc3c97757f44ffc5a12e1f0809af3421e533a31",
     "arithmetic": "independent reimplementation of normalizeJobPostingRecord; platform primitives (URL, Date) shared per JS spec; no product imports"
   },
   "stats": {
     "received": 68,
-    "schema_skipped": 0,
+    "schema_skipped": 1,
     "duplicate_skipped": 0,
     "oracle_kind_mismatch": 2,
-    "written": 66
+    "written": 65
   },
   "fixtures": [
     {
@@ -2706,80 +2706,6 @@
       "category": "fuzz_dates",
       "input": {
         "record": {
-          "job_title": "Инженер поддержки",
-          "company_domain": "date1.example.com",
-          "published_at": "2026-9-5"
-        },
-        "fetchedAt": "2026-10-09T12:00:00.000Z",
-        "sourceId": "q2-corpus",
-        "lineNumber": 39
-      },
-      "expected": {
-        "normalized": {
-          "orgName": "date1.example.com",
-          "orgDisplayName": "date1.example.com",
-          "companyDomain": "date1.example.com",
-          "primarySourceKey": "domain:date1.example.com",
-          "innSourceKey": null,
-          "ogrnSourceKey": null,
-          "domainSourceKey": "domain:date1.example.com",
-          "companyNameSourceKey": null,
-          "russianLegalNameSourceKey": null,
-          "orgSourceKeys": [
-            "domain:date1.example.com"
-          ],
-          "orgSourceAliasKeys": [
-            "domain:date1.example.com"
-          ],
-          "fetchedAt": "2026-10-09T12:00:00.000Z",
-          "occurredAt": "2026-09-04T21:00:00.000Z",
-          "companyName": null,
-          "companyWebsiteUrl": null,
-          "inn": null,
-          "ogrn": null,
-          "orgExternalId": null,
-          "signalExternalId": "q2-corpus:derived:domain:date1.example.com:39",
-          "signalType": "job_posting",
-          "evidenceRole": "primary_platform",
-          "sourceRecordType": "job_posting",
-          "headline": "Инженер поддержки",
-          "recordTitle": "Инженер поддержки",
-          "sourceUrl": null,
-          "jobTitle": "Инженер поддержки",
-          "summary": "q2-corpus job posting",
-          "payload": {
-            "board": "q2-corpus",
-            "vacancy_id": null,
-            "job_title": "Инженер поддержки",
-            "job_posting_url": null,
-            "location": null,
-            "salary": null,
-            "employment_type": null,
-            "tags": [],
-            "region_raw": null,
-            "region_canonical": null,
-            "salary_rub_min": null,
-            "salary_rub_max": null,
-            "salary_currency": null,
-            "is_remote": false,
-            "is_hybrid": false,
-            "is_rotational": false,
-            "vacancy_freshness": "stale-30d-plus",
-            "quality_penalties": [
-              "stale_vacancy"
-            ]
-          }
-        }
-      },
-      "oracle_note": "не-ISO дата с однозначными месяцем и днём",
-      "input_digest": "6717b225206eff929e79c6c85c0250822bd09acbea7e23d063679d01ec713035"
-    },
-    {
-      "id": "fuzz_dates-38",
-      "kind": "record",
-      "category": "fuzz_dates",
-      "input": {
-        "record": {
           "job_title": "Аналитик данных",
           "company_name": "ООО Пример Дата",
           "published_at": "32.13.2026"
@@ -2847,7 +2773,7 @@
       "input_digest": "b770bc50675cf2d17c74fa64b020ab86966c69ce51a1f280e2d2ad4694950e29"
     },
     {
-      "id": "fuzz_dates-39",
+      "id": "fuzz_dates-38",
       "kind": "record",
       "category": "fuzz_dates",
       "input": {
@@ -2919,7 +2845,7 @@
       "input_digest": "cae7a660bb51faa23701f2fef36636b35b525e843a1f070f0939e91cf66d6292"
     },
     {
-      "id": "fuzz_dates-40",
+      "id": "fuzz_dates-39",
       "kind": "record",
       "category": "fuzz_dates",
       "input": {
@@ -2991,7 +2917,7 @@
       "input_digest": "d5d67f52e2e2fa642d906b92a7a14c80637c255d6cc71d2e64d2a0e6f973cc79"
     },
     {
-      "id": "fuzz_dates-41",
+      "id": "fuzz_dates-40",
       "kind": "record",
       "category": "fuzz_dates",
       "input": {
@@ -3063,7 +2989,7 @@
       "input_digest": "709e7e2162ab19eb638b3f875fc7aa95c793dce5882ba78deb1cc7377c2bd498"
     },
     {
-      "id": "fuzz_dates-42",
+      "id": "fuzz_dates-41",
       "kind": "record",
       "category": "fuzz_dates",
       "input": {
@@ -3135,7 +3061,7 @@
       "input_digest": "0329cec725bc6662927842e8090adb9592141058c49c4d4ac44a735f917140c5"
     },
     {
-      "id": "fuzz_dates-43",
+      "id": "fuzz_dates-42",
       "kind": "record",
       "category": "fuzz_dates",
       "input": {
@@ -3209,7 +3135,7 @@
       "input_digest": "6751d8047abd3f1b8e839fdf8cc520dfd3a02ad5418653342fef3328f64e45ca"
     },
     {
-      "id": "fuzz_inn_ogrn-44",
+      "id": "fuzz_inn_ogrn-43",
       "kind": "record",
       "category": "fuzz_inn_ogrn",
       "input": {
@@ -3281,7 +3207,7 @@
       "input_digest": "15e2334730a3fc0bfd2a6e6e52834387cf696f2674b0038d0cab4460039f9e64"
     },
     {
-      "id": "fuzz_inn_ogrn-45",
+      "id": "fuzz_inn_ogrn-44",
       "kind": "record",
       "category": "fuzz_inn_ogrn",
       "input": {
@@ -3353,7 +3279,7 @@
       "input_digest": "8a6499e20707d290864c28832013a9c76ba20a97439f14beb37b8a676f96ee17"
     },
     {
-      "id": "fuzz_inn_ogrn-46",
+      "id": "fuzz_inn_ogrn-45",
       "kind": "record",
       "category": "fuzz_inn_ogrn",
       "input": {
@@ -3427,7 +3353,7 @@
       "input_digest": "462be7b88111a8c1679b07d2e9e121a2eb5d942e0bec602c8ae39dabf64a9b92"
     },
     {
-      "id": "fuzz_inn_ogrn-47",
+      "id": "fuzz_inn_ogrn-46",
       "kind": "record",
       "category": "fuzz_inn_ogrn",
       "input": {
@@ -3501,7 +3427,7 @@
       "input_digest": "29759a0e4446f9541f70b91244b90cd2d6b73af56374c741c2cfa01f401777b2"
     },
     {
-      "id": "fuzz_inn_ogrn-48",
+      "id": "fuzz_inn_ogrn-47",
       "kind": "record",
       "category": "fuzz_inn_ogrn",
       "input": {
@@ -3575,7 +3501,7 @@
       "input_digest": "c6b820c5015b35e1bd1160c362c161ebaa18b0a93fbbe623e913ae425ecedebf"
     },
     {
-      "id": "fuzz_inn_ogrn-49",
+      "id": "fuzz_inn_ogrn-48",
       "kind": "record",
       "category": "fuzz_inn_ogrn",
       "input": {
@@ -3649,7 +3575,7 @@
       "input_digest": "140e34726d9ecb64a5caafd3c12b2f67b311ecad13ca966bdc9fba55a03467d5"
     },
     {
-      "id": "fuzz_inn_ogrn-50",
+      "id": "fuzz_inn_ogrn-49",
       "kind": "record",
       "category": "fuzz_inn_ogrn",
       "input": {
@@ -3721,7 +3647,7 @@
       "input_digest": "8ce2fcf75ec808b66e72ead6ae683416647426e68225a090318b8ca3690f5c57"
     },
     {
-      "id": "fuzz_inn_ogrn-51",
+      "id": "fuzz_inn_ogrn-50",
       "kind": "record",
       "category": "fuzz_inn_ogrn",
       "input": {
@@ -3793,7 +3719,7 @@
       "input_digest": "5114c9ebab8396beefe97b7ad0d7c165a05884c06e80dfd897027fbf36f1b3ec"
     },
     {
-      "id": "fuzz_legal_names-52",
+      "id": "fuzz_legal_names-51",
       "kind": "record",
       "category": "fuzz_legal_names",
       "input": {
@@ -3867,7 +3793,7 @@
       "input_digest": "045a7a1f2b5507ad95f7175a72e7a617eb0d46711c117bedb3de308d219b5002"
     },
     {
-      "id": "fuzz_legal_names-53",
+      "id": "fuzz_legal_names-52",
       "kind": "record",
       "category": "fuzz_legal_names",
       "input": {
@@ -3940,7 +3866,7 @@
       "input_digest": "84b8a5890f79adc2da6dbc688ada7c7b3ceab242e88f088c22a9506d7967ca22"
     },
     {
-      "id": "fuzz_legal_names-54",
+      "id": "fuzz_legal_names-53",
       "kind": "record",
       "category": "fuzz_legal_names",
       "input": {
@@ -4013,7 +3939,7 @@
       "input_digest": "b012c3234dbea02eae434d5618d03dfdf8e5b987c7057ca1c0104c142abdd0bb"
     },
     {
-      "id": "fuzz_legal_names-55",
+      "id": "fuzz_legal_names-54",
       "kind": "record",
       "category": "fuzz_legal_names",
       "input": {
@@ -4086,7 +4012,7 @@
       "input_digest": "fc34fef5b04625f7255eeadaf2e444cb3939ef307bb297742555756f34401573"
     },
     {
-      "id": "fuzz_legal_names-56",
+      "id": "fuzz_legal_names-55",
       "kind": "record",
       "category": "fuzz_legal_names",
       "input": {
@@ -4160,7 +4086,7 @@
       "input_digest": "eaaa48f94a3d90784ac7dbc05036f796a8618d299ce749ac1246b85431c66630"
     },
     {
-      "id": "fuzz_legal_names-57",
+      "id": "fuzz_legal_names-56",
       "kind": "record",
       "category": "fuzz_legal_names",
       "input": {
@@ -4233,7 +4159,7 @@
       "input_digest": "8f6299574f4043b4ddffba22a7427ab38cccf84673b6b03ca08ee8bbed499532"
     },
     {
-      "id": "fuzz_region_salary-58",
+      "id": "fuzz_region_salary-57",
       "kind": "record",
       "category": "fuzz_region_salary",
       "input": {
@@ -4305,7 +4231,7 @@
       "input_digest": "f243ba4e33d59d425770e897e07e49d03d87785df827c2076315396f9ef0f9d4"
     },
     {
-      "id": "fuzz_region_salary-59",
+      "id": "fuzz_region_salary-58",
       "kind": "record",
       "category": "fuzz_region_salary",
       "input": {
@@ -4377,7 +4303,7 @@
       "input_digest": "2a7e8c88aff1b1cfdbfb9999fedd43536fbb5d68645bcef7abf366a719e3da33"
     },
     {
-      "id": "fuzz_region_salary-60",
+      "id": "fuzz_region_salary-59",
       "kind": "record",
       "category": "fuzz_region_salary",
       "input": {
@@ -4449,7 +4375,7 @@
       "input_digest": "3fe33c7c497ced2e73ac8febb7898a256930b206bf449f4ae2bdfd9b80ddfda9"
     },
     {
-      "id": "fuzz_region_salary-61",
+      "id": "fuzz_region_salary-60",
       "kind": "record",
       "category": "fuzz_region_salary",
       "input": {
@@ -4521,7 +4447,7 @@
       "input_digest": "d5eb445c965a6ab16a496d76903973c3e878e7c3b4e7fcc14f8ffafcee26a3ca"
     },
     {
-      "id": "fuzz_region_salary-62",
+      "id": "fuzz_region_salary-61",
       "kind": "record",
       "category": "fuzz_region_salary",
       "input": {
@@ -4593,7 +4519,7 @@
       "input_digest": "0c794fdc47e8546c959d3a8d0aaef81437b02570df5b8f0514553d4a3c51a01c"
     },
     {
-      "id": "fuzz_region_salary-63",
+      "id": "fuzz_region_salary-62",
       "kind": "record",
       "category": "fuzz_region_salary",
       "input": {
@@ -4665,7 +4591,7 @@
       "input_digest": "35f16c1b1c0afe6ca5166c7d90bc275e1c2428e746f97d53c16c98a4c3ae3786"
     },
     {
-      "id": "fuzz_region_salary-64",
+      "id": "fuzz_region_salary-63",
       "kind": "record",
       "category": "fuzz_region_salary",
       "input": {
@@ -4737,7 +4663,7 @@
       "input_digest": "ea08c9659917fedf2af4ec314c9c81ec661735e1198f289e8d279aea60beb630"
     },
     {
-      "id": "fuzz_region_salary-65",
+      "id": "fuzz_region_salary-64",
       "kind": "record",
       "category": "fuzz_region_salary",
       "input": {
@@ -4809,7 +4735,7 @@
       "input_digest": "b4214a61edc3924f1bf082156ed30d21ae061f9adb2d0c7efb7ef15ef6ce6468"
     },
     {
-      "id": "fuzz_region_salary-66",
+      "id": "fuzz_region_salary-65",
       "kind": "record",
       "category": "fuzz_region_salary",
       "input": {
