@@ -1,5 +1,5 @@
 export const ANALYTICS_CONSENT_STORAGE_KEY = "rr_analytics_consent";
-export const ANALYTICS_CONSENT_POLICY_VERSION = 2;
+export const ANALYTICS_CONSENT_POLICY_VERSION = 3;
 export const ANALYTICS_CONSENT_CHANGED_EVENT = "rr:analytics-consent-changed";
 export const ANALYTICS_SETTINGS_OPEN_EVENT = "rr:open-analytics-settings";
 

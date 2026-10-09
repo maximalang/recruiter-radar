@@ -88,7 +88,7 @@ describe("polished unified landing visual contract", () => {
     const landingPage = source("app/landing/landing-page.tsx");
     const landingPageBody = landingPage.slice(landingPage.indexOf("export default function LandingPage"));
     const skipLinkIndex = home.indexOf("<LandingSkipLink />");
-    const analyticsIndex = home.indexOf("<LandingAnalytics />");
+    const analyticsIndex = home.indexOf("<LandingAnalytics");
     const landingIndex = home.indexOf("{landing}");
     const cookieSettingsIndex = home.indexOf("<YandexMetrika />");
 

@@ -107,6 +107,8 @@ export async function recordProductEvent(input: {
   ownerId?: string | number | null
   clientProfileId?: string | number | null
   checkoutOrderId?: string | number | null
+  /** Pseudonymous visit identifier (32 hex chars) for landing dedupe/linkage. */
+  visitId?: string | null
   provider?: string | null
   outcome?: string | null
   durationMs?: number | null
@@ -133,9 +135,9 @@ export async function recordProductEvent(input: {
     `
       INSERT INTO product_telemetry_events (
         event_name, event_key, owner_id, client_profile_id, checkout_order_id,
-        provider, outcome, duration_ms, metadata, occurred_at
+        visit_id, provider, outcome, duration_ms, metadata, occurred_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::timestamptz)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::timestamptz)
       ON CONFLICT (event_key) DO NOTHING
       RETURNING id
     `,
@@ -145,6 +147,7 @@ export async function recordProductEvent(input: {
       normalizeOptionalId(input.ownerId),
       normalizeOptionalId(input.clientProfileId),
       normalizeOptionalId(input.checkoutOrderId),
+      normalizeVisitId(input.visitId),
       provider,
       outcome,
       durationMs,
@@ -154,6 +157,20 @@ export async function recordProductEvent(input: {
   )
 
   return result.rowCount === 1
+}
+
+/**
+ * Visit ids are opaque server-derived tokens (32 hex chars). Anything else is
+ * rejected rather than truncated, so a spoofed or malformed identifier never
+ * silently lands in the dedupe dimension.
+ */
+function normalizeVisitId(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null
+  const normalized = value.trim().toLowerCase()
+  if (!/^[0-9a-f]{32}$/.test(normalized)) {
+    throw new Error('Telemetry visit id must be a 32-character hex token.')
+  }
+  return normalized
 }
 
 /**

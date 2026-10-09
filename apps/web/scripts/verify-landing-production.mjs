@@ -746,7 +746,10 @@ async function assertInteractionContracts(browser) {
   if (!analyticsEventsSkipped) {
     await page.waitForTimeout(30);
     for (const payload of analyticsEvents) {
-      const unexpectedKeys = Object.keys(payload).filter((key) => !["name", "context", "timestamp"].includes(key));
+      const unexpectedKeys = Object.keys(payload).filter(
+        (key) =>
+          !["name", "context", "timestamp", "referer_class", "utm_source_class", "ua_class", "internal_marker"].includes(key),
+      );
       assert.deepEqual(unexpectedKeys, [], `analytics payload has unexpected keys: ${JSON.stringify(payload)}`);
     }
     const serializedAnalytics = JSON.stringify(analyticsEvents);
