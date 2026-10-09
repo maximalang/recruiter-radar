@@ -10,6 +10,12 @@ export function PageFrame(props: {
   dataDeployAnchor?: string;
   layout?: "landing";
   as?: "main" | "div";
+  /**
+   * Marks an authenticated buyer surface (e.g. pilot onboarding) so the
+   * graphite workspace theme scopes to it exactly like the product shell.
+   * Marketing/legal/checkout surfaces must not set this.
+   */
+  productWorkspace?: boolean;
 }) {
   const Frame = props.as ?? "main";
 
@@ -18,6 +24,7 @@ export function PageFrame(props: {
       className={`${styles.pageFrame}${props.className ? ` ${props.className}` : ""}`}
       data-deploy-anchor={props.dataDeployAnchor}
       data-layout={props.layout}
+      data-product-workspace={props.productWorkspace ? "true" : undefined}
       data-ui-system="recruiter-radar"
     >
       <div
