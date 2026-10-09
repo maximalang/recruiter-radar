@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import { BrandLogo } from "../ui/brand-logo";
-import { ArrowGlyph } from "./brand-glyphs";
 import headerStyles from "./landing-header.module.css";
 import { LANDING_NAV_ITEMS } from "./landing-copy";
 import styles from "./landing.module.css";
@@ -22,13 +20,14 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
-export default function LandingHeader({ previewHref }: { previewHref: string }) {
+export default function LandingHeader() {
   const [activeId, setActiveId] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [tone, setTone] = useState<HeaderTone>("dark");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
 
   const closeMenu = useCallback((restoreFocus = true) => {
     if (restoreFocus) menuButtonRef.current?.focus({ preventScroll: true });
@@ -110,6 +109,24 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     document.body.style.overflow = "hidden";
     if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
 
+    // Review D3: an aria-modal dialog must own the page while open — mark
+    // everything outside the header subtree inert (no hit-testing, no tab
+    // stops, hidden from assistive tech) and restore it on close.
+    const backgroundRoots: HTMLElement[] = [];
+    for (
+      let node: HTMLElement | null = headerRef.current;
+      node && node !== document.body;
+      node = node.parentElement
+    ) {
+      const parent = node.parentElement;
+      if (!parent) break;
+      for (const sibling of Array.from(parent.children)) {
+        if (sibling === node || !(sibling instanceof HTMLElement)) continue;
+        sibling.inert = true;
+        backgroundRoots.push(sibling);
+      }
+    }
+
     const panel = menuPanelRef.current;
     const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [])
       .filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
@@ -131,7 +148,10 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
       const first = items[0];
       const last = items[items.length - 1];
       const active = document.activeElement;
-      if (event.shiftKey && active === first) {
+      if (!panel?.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && active === last) {
@@ -154,6 +174,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     return () => {
       document.body.style.overflow = previousOverflow;
       document.body.style.paddingRight = previousPaddingRight;
+      for (const element of backgroundRoots) element.inert = false;
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("pointerdown", handlePointerDown);
     };
@@ -176,6 +197,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
 
   return (
     <header
+      ref={headerRef}
       className={headerStyles.header}
       data-brand-header="recruiter-radar"
       data-scrolled={scrolled || undefined}
@@ -197,14 +219,6 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
 
         <div className={headerStyles.actions}>
           <Link href={LOGIN_HREF} className={headerStyles.login}>Войти</Link>
-          <a
-            href={previewHref}
-            className={headerStyles.cta}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
-            data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
-          >
-            Посмотреть пример <ArrowGlyph />
-          </a>
           <button
             ref={menuButtonRef}
             type="button"
@@ -234,14 +248,6 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
         </nav>
         <div className={headerStyles.mobileActions}>
           <Link href={LOGIN_HREF} onClick={() => closeMenu(false)}>Войти</Link>
-          <a
-            href={previewHref}
-            onClick={() => closeMenu(false)}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
-            data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
-          >
-            Посмотреть пример <ArrowGlyph />
-          </a>
         </div>
       </div>
     </header>

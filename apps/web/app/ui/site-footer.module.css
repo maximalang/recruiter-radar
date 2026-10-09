@@ -50,8 +50,6 @@
   height: 24px;
   flex: 0 0 24px;
   object-fit: contain;
-  filter: grayscale(.85) saturate(.45) brightness(1.08);
-  opacity: .88;
   user-select: none;
 }
 
@@ -184,9 +182,23 @@
   color: var(--color-text-tertiary);
 }
 
-.siteFooter[data-tone="light"] .footerMark {
-  filter: none;
-  opacity: 1;
+/* Landing scope (review D8 / owner direction 29.09): the blue-violet brand15
+ * mark is a cold foreign accent against the neutral graphite + champagne
+ * system. Echo the demo shotMark radar ring in canonical demo tokens so the
+ * footer logo, the header wordmark and the hero product shot read as one
+ * brand family. Scoped to the landing footer only — product surfaces keep
+ * the registered brand asset. */
+:global([data-landing-footer="compact"]) .footerMark {
+  display: none;
+}
+
+:global([data-landing-footer="compact"]) .footerBrand::before {
+  content: "";
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: conic-gradient(from 45deg, var(--color-demo-indigo), var(--color-demo-violet), var(--color-demo-green), var(--color-demo-gold), var(--color-demo-indigo));
 }
 
 /* Adapt to the footer's own inline size instead of assuming viewport width equals
@@ -207,6 +219,14 @@
   .footerLink:hover,
   .footerOperatorEmail:hover {
     color: var(--color-signal);
+  }
+
+  /* Landing links sit in quiet neutral gray; add an underline affordance so
+   * they read as links, not as body copy (review D8: link affordance). */
+  :global([data-landing-footer="compact"]) .footerLink:hover,
+  :global([data-landing-footer="compact"]) .footerOperatorEmail:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 }
 

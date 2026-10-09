@@ -1,8 +1,24 @@
 .visualSystem {
-  --page-gutter: clamp(1rem, 3.2vw, 4rem);
-  --content-max: 84rem;
+  --page-gutter: clamp(1rem, 2.35vw, 2rem);
+  --content-max: 76.25rem;
   --scene-pad: var(--page-gutter);
   --content: var(--content-max);
+  /* Pass 5 palette tokens (refs: linear.app + accio.com/work) live in the
+   * canonical token source — product-visual-system.css, scoped to the
+   * landing root via [data-theme="inverse"][data-landing-experience].
+   * This module only maps them onto landing aliases and layout. */
+  /* Landing aliases map the canonical inverse theme onto light product objects. */
+  --landing-canvas: var(--color-canvas);
+  --landing-paper: var(--color-text-primary);
+  --landing-paper-raised: color-mix(in srgb, var(--landing-paper) 94%, var(--color-surface-elevated));
+  --landing-ink: var(--color-text-inverse);
+  --landing-muted: color-mix(in srgb, var(--landing-ink) 64%, var(--landing-paper));
+  --landing-line: color-mix(in srgb, var(--landing-ink) 18%, var(--landing-paper));
+  --landing-line-strong: color-mix(in srgb, var(--landing-ink) 36%, var(--landing-paper));
+  --landing-accent: color-mix(in srgb, var(--landing-ink) 78%, var(--color-signal));
+  --color-surface-light: var(--landing-paper);
+  --color-accent-on-light: var(--landing-accent);
+  --color-focus-on-light: var(--landing-accent);
   background: var(--color-canvas);
   color: var(--color-text-primary);
 }
@@ -21,14 +37,10 @@
   border-radius: var(--radius-control);
 }
 
-.visualSystem :global([data-preview-configurator] button),
 .visualSystem :global([data-pricing-primary] > a) {
   min-height: 44px;
   border-radius: var(--radius-control);
 }
-
-.visualSystem :global([data-preview-results] article) { box-shadow: none; }
-.visualSystem :global([data-preview-results] [data-lead-score]) { font-variant-numeric: tabular-nums; }
 
 .visualSystem :global(footer) {
   border-top: 1px solid var(--color-separator);
