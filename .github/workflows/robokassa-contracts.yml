@@ -47,4 +47,4 @@ jobs:
       - name: Type check tests
         run: npm run test:types --workspace @recruiter-radar/web
       - name: Run Robokassa and privacy unit contracts
-        run: npm test --workspace @recruiter-radar/web -- --runInBand --testPathPattern='paymentsRobokassa|payment-readiness|readiness-routes|yandex-metrika'
+        run: npm test --workspace @recruiter-radar/web -- --runInBand --testPathPatterns='paymentsRobokassa|payment-readiness|readiness-routes|yandex-metrika'
