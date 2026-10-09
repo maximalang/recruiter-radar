@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import pg from 'pg';
 
+import { buildSourceRunMetrics, recordSourceRunObservation } from './lib/source-health-recorder.mjs';
+
 const { Client } = pg;
 const execFileAsync = promisify(execFile);
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -28,65 +30,97 @@ const SOURCE_BY_ADAPTER = new Map([
   ['smartrecruiters-public-careers', 'smartrecruiters'],
 ]);
 
-const argv = process.argv.slice(2);
-const action = argv[0]?.trim() || 'pipeline';
-const startedAt = new Date();
+export async function runCareerPagesRuntime(argv = process.argv.slice(2)) {
+  const action = argv[0]?.trim() || 'pipeline';
+  const startedAt = new Date();
 
-try {
-  const result = await execFileAsync(process.execPath, [coreScript, ...argv], {
-    env: process.env,
-    maxBuffer: 8 * 1024 * 1024,
-    windowsHide: true,
-  });
-  const completedAt = new Date();
-  const stdout = String(result.stdout ?? '');
-  const stderr = String(result.stderr ?? '');
+  try {
+    const result = await execFileAsync(process.execPath, [coreScript, ...argv], {
+      env: process.env,
+      maxBuffer: 8 * 1024 * 1024,
+      windowsHide: true,
+    });
+    const completedAt = new Date();
+    const stdout = String(result.stdout ?? '');
+    const stderr = String(result.stderr ?? '');
 
-  if (action === 'pipeline') {
-    const summary = parseFinalJsonObject(stdout);
-    if (!summary) {
-      throw new Error('career-pages runtime wrapper could not parse the final pipeline summary.');
+    if (action === 'pipeline') {
+      const summary = parseFinalJsonObject(stdout);
+      if (!summary) {
+        throw new Error('career-pages runtime wrapper could not parse the final pipeline summary.');
+      }
+      await persistTargetRunObservations({ summary, startedAt, completedAt });
     }
-    await persistTargetRunObservations({ summary, startedAt, completedAt });
-  }
 
-  if (stdout) process.stdout.write(stdout);
-  if (stderr) process.stderr.write(stderr);
-} catch (error) {
-  const stdout = typeof error?.stdout === 'string' ? error.stdout : '';
-  const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
-  if (stdout) process.stdout.write(stdout);
-  if (stderr) process.stderr.write(stderr);
-  const message = error instanceof Error ? error.message : String(error);
-  if (!stderr.includes(message)) {
-    process.stderr.write(`career-pages runtime wrapper failed: ${message}\n`);
+    if (stdout) process.stdout.write(stdout);
+    if (stderr) process.stderr.write(stderr);
+  } catch (error) {
+    const stdout = typeof error?.stdout === 'string' ? error.stdout : '';
+    const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
+    if (stdout) process.stdout.write(stdout);
+    if (stderr) process.stderr.write(stderr);
+    const message = error instanceof Error ? error.message : String(error);
+    if (!stderr.includes(message)) {
+      process.stderr.write(`career-pages runtime wrapper failed: ${message}\n`);
+    }
+    process.exitCode = Number.isInteger(error?.code) ? error.code : 1;
   }
-  process.exitCode = Number.isInteger(error?.code) ? error.code : 1;
 }
 
-async function persistTargetRunObservations({ summary, startedAt, completedAt }) {
+const invokedAsScript = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedAsScript) {
+  await runCareerPagesRuntime();
+}
+
+export async function persistTargetRunObservations(
+  { summary, startedAt, completedAt },
+  { databaseUrl = process.env.DATABASE_URL?.trim(), ClientConstructor = Client } = {},
+) {
   const targetResults = Array.isArray(summary.targetResults) ? summary.targetResults : [];
+  const recordsReceived = nonNegativeInteger(summary.recordsReceived);
+  const zeroTargetRun = targetResults.length === 0 && recordsReceived === 0;
+  if (targetResults.length === 0 && recordsReceived > 0) {
+    throw new Error('career-pages returned records without any target-scoped run results.');
+  }
+  if (zeroTargetRun && nonEmptyText(summary.zeroReason) !== 'no-eligible-company-targets') {
+    throw new Error('career-pages zero-target run must report zeroReason=no-eligible-company-targets.');
+  }
   const identityRejectedTargetKeys = new Set(
     Array.isArray(summary.organizationResolutionRejectedTargetKeys)
       ? summary.organizationResolutionRejectedTargetKeys.map(nonEmptyText).filter(Boolean)
       : [],
   );
-  if (targetResults.length === 0) return;
 
-  const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!databaseUrl) {
-    throw new Error('DATABASE_URL is required to persist target-scoped career-page observations.');
+    throw new Error('DATABASE_URL is required to persist career-page run observations.');
   }
 
-  const targetDefinitions = loadTargetDefinitions(summary.targetsFilePath);
-  if (targetDefinitions.size === 0) {
-    throw new Error('career-pages target observations require the exact targets file used by the run.');
-  }
-
-  const client = new Client({ connectionString: databaseUrl, connectionTimeoutMillis: 5_000 });
+  const client = new ClientConstructor({ connectionString: databaseUrl, connectionTimeoutMillis: 5_000 });
   await client.connect();
   try {
     await client.query('BEGIN');
+
+    if (zeroTargetRun) {
+      await recordSourceRunObservation(client, buildSourceRunMetrics({
+        sourceId: 'career-pages',
+        action: 'pipeline',
+        startedAt,
+        completedAt,
+        input: {
+          recordsReceived,
+          duplicateRecords: nonNegativeInteger(summary.duplicateRecords),
+          organizationResolutionRejects: nonNegativeInteger(summary.organizationResolutionRejects),
+          normalizedRecords: [],
+        },
+      }));
+      await client.query('COMMIT');
+      return;
+    }
+
+    const targetDefinitions = loadTargetDefinitions(summary.targetsFilePath);
+    if (targetDefinitions.size === 0) {
+      throw new Error('career-pages target observations require the exact targets file used by the run.');
+    }
 
     // The core career-page normalizer retains raw_target_id inside payload.raw.
     // Promote that already-observed provenance field to the payload root so the

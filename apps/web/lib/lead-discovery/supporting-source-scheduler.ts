@@ -63,7 +63,7 @@ function schedulerResult(
 
 function isRateLimited(result: IngestResult): boolean {
   const detail = `${result.error ?? ''}\n${result.log ?? ''}`
-  return /(?:\b429\b|rate[-_ ]?limit|retry-after)/i.test(detail)
+  return /(?:\bHTTP(?:\/\d(?:\.\d)?)?\s+429\b|\bRetry-After\b|["']?(?:rateLimit|rate_limit)["']?\s*:\s*true\b)/i.test(detail)
 }
 
 function asTimestamp(value: string | Date | null | undefined): number | null {

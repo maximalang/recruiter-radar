@@ -86,6 +86,18 @@ jobs:
           const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
           const isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0
           const isCriticality = (value) => value === 'required' || value === 'optional' || value === 'unknown'
+          const safeDiagnosticPreview = (result) => {
+            const candidate = typeof result?.error === 'string'
+              ? result?.error
+              : typeof result?.log === 'string' ? result?.log : null
+            if (!candidate) return null
+            return candidate
+              .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [REDACTED]')
+              .replace(/(\b(?:api[-_]?key|token|secret|password|authorization|cookie|set-cookie|session|database[_-]?url|connectionstring)\b\s*(?:[:=]\s*|:\s*["']))[^\s,;"'}\]]+/gi, '$1[REDACTED]')
+              .replace(/([a-z][a-z0-9+.-]*:\/\/)[^/\s@]+@/gi, '$1[REDACTED]@')
+              .replace(/([?&][^=\s&#]+)=([^&#\s]+)/g, '$1=[REDACTED]')
+              .slice(0, 500)
+          }
           // Same single effective-failure rule as the route (BLOCKER fix):
           // rate-limited results arrive with success:true but mean a missed
           // refresh window; deferred is an expected scheduler overlap.
@@ -97,6 +109,12 @@ jobs:
             source: typeof result?.source === 'string' && result.source.trim() !== '' ? result.source : 'unknown',
             outcome: typeof result?.outcome === 'string' && result.outcome.trim() !== '' ? result.outcome : 'failed',
             criticality: result?.criticality,
+          }))
+          const failedSourcePreviews = failedDetails.map((result) => ({
+            source: typeof result?.source === 'string' && result.source.trim() !== '' ? result.source : 'unknown',
+            outcome: typeof result?.outcome === 'string' && result.outcome.trim() !== '' ? result.outcome : 'failed',
+            criticality: result?.criticality,
+            preview: safeDiagnosticPreview(result),
           }))
           const counterNames = ['total', 'succeeded', 'failed', 'deferred', 'credentialGated', 'rateLimited', 'failedRequired', 'failedOptional']
           const typedCounters = data !== null && counterNames.every((name) => isNonNegativeInteger(data[name]))
@@ -155,6 +173,7 @@ jobs:
             failedOptional: body?.data?.failedOptional ?? null,
             deliveryImpactingFailure: body?.data?.deliveryImpactingFailure ?? null,
             failedSources,
+            failedSourcePreviews,
             rateLimitedSources: details
               .filter((result) => result?.outcome === 'rate-limited')
               .map((result) => result?.source ?? 'unknown'),
