@@ -24,6 +24,11 @@
  * - No source-specific scraping assumptions. Each source's param shape is
  *   encoded once in `SOURCE_SEARCH_PARAM`; adding a source = one entry here +
  *   one keyword map. The builder does not fetch anything.
+ * - Per-source text composition. The keyword list holds *alternatives*, but a
+ *   source's free-text param is not always parsed as a bag of words: HH reads
+ *   its own query language, where a bare word list is an implicit AND. Sources
+ *   declare how their text is composed (see `textComposition`); every other
+ *   source keeps the plain space-joined form.
  * - Does NOT change FIUR scoring, confidence contract, or source promotion
  *   policy. This is upstream of scoring: it changes which records get fetched,
  *   not how they are scored.
@@ -67,6 +72,25 @@ for (const key of Object.keys(ROLE_SEARCH_KEYWORDS)) {
 }
 
 /**
+ * Max length of one generated HH search query (characters).
+ *
+ * Safety budget fixed by the night-audit spec: each generated request must stay
+ * <= 512 characters. The audited worst case (a profile carrying all 11 roles =
+ * 21 keywords) renders to 357 characters in disjunctive form, so the real-world
+ * profile fits without truncation; anything longer fails closed rather than
+ * silently dropping roles from the ICP.
+ */
+export const HH_QUERY_MAX_LENGTH = 512
+
+/**
+ * HH query-language operator words. A keyword equal to one of these must be
+ * quoted, or an operator-supplied keyword could inject an extra query branch.
+ * Case-insensitive: the documented examples are uppercase, but the parser is
+ * not contractually case-sensitive.
+ */
+const HH_RESERVED_WORDS = new Set(['or', 'and', 'not'])
+
+/**
  * The search params each source's ingestion script consumes (see
  * packages/db/scripts/adapters/*.mjs). Kept in sync with the TS registry's
  * `searchEnvVars`. The builder emits exactly these keys for the sources it
@@ -88,10 +112,24 @@ interface SourceSearchParams {
   roleKeywords: string | null
   /** Region env var name, or null. */
   region: string | null
+  /**
+   * How the free-text param is composed from the keyword list.
+   *
+   * - absent / `'conjunction'`: space-joined. Correct for sources whose API
+   *   treats the text as a bag of words.
+   * - `'hh-disjunction'`: HH's documented query language, where a bare word
+   *   list is an implicit AND — see `buildHhDisjunctiveQuery`.
+   */
+  textComposition?: 'conjunction' | 'hh-disjunction'
 }
 
 const SOURCE_SEARCH_PARAM: Readonly<Record<string, SourceSearchParams>> = {
-  hh: { text: 'HH_SEARCH_TEXT', roleKeywords: null, region: null },
+  hh: {
+    text: 'HH_SEARCH_TEXT',
+    roleKeywords: null,
+    region: null,
+    textComposition: 'hh-disjunction',
+  },
   superjob: { text: 'SUPERJOB_KEYWORD', roleKeywords: 'SUPERJOB_KEYWORD', region: null },
   'rabota-rossii': { text: 'RABOTA_ROSSII_SEARCH_TEXT', roleKeywords: null, region: 'RABOTA_ROSSII_REGION' },
   'career-pages': { text: null, roleKeywords: null, region: null },
@@ -215,6 +253,84 @@ export function buildProfileKeywords(
 }
 
 /**
+ * Strip HH query-language syntax out of one keyword so the term is always an
+ * inert literal operand, never an injected operator.
+ *
+ * Removed: `"` (phrase delimiter), `(`/`)` (grouping), `:` (field selector),
+ * a leading `!`/`-`/`+` (exact-form and negation prefixes), and a trailing `*`
+ * (wildcard). Whitespace runs collapse to one space.
+ *
+ * Returns the cleaned text plus whether anything changed; the caller quotes any
+ * changed term, so an operator keyword like `директор OR "юрист"` becomes the
+ * single inert phrase `"директор OR юрист"` instead of adding an OR branch.
+ */
+function sanitizeHhQueryTerm(term: string): { text: string; changed: boolean } {
+  const cleaned = term
+    .replace(/["()]/g, ' ')
+    .replace(/:/g, ' ')
+    .replace(/^[!\-+]+/, '')
+    .replace(/\*+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return { text: cleaned, changed: cleaned !== term }
+}
+
+/**
+ * Render the ordered keyword list as an HH query-language disjunction.
+ *
+ * WHY this exists: HH parses `text` with its own query language, in which a
+ * bare word list is an **implicit AND** — "documents that contain all the words
+ * of your query". The profile-derived keyword list is a set of *alternatives*
+ * (any of these role/industry titles is an acceptable lead), so composing it
+ * with a space silently turned the query into a 21-term conjunction that
+ * matched nothing: the 2026-10-11 night audit measured the derived all-role
+ * query returning found=0 while the control query 'рекрутер' returned 7085.
+ *
+ * Official semantics used, retrieved 2026-10-13 from
+ * https://hh.ru/article/1175 ("Язык поисковых запросов"):
+ *   - OR → documents containing at least one of the operands; it applies to
+ *     word combinations as well as single words;
+ *   - `"..."` → the words must be adjacent and in that order (a phrase);
+ *   - AND / NOT / `!` (exact form) / `*` (wildcard) / `field:` / parentheses
+ *     are also syntax.
+ *
+ * Composition rules:
+ *   - Every keyword becomes exactly one OR operand; nothing is dropped and no
+ *     top-N truncation happens, so no role silently disappears from the query.
+ *   - A multi-word keyword becomes a quoted phrase, so one title stays ONE
+ *     alternative instead of degrading into its own implicit AND.
+ *   - Each term is sanitised first (see `sanitizeHhQueryTerm`); a term that
+ *     changed during sanitisation, or that collides with a reserved operator
+ *     word, is quoted. An operator-supplied keyword therefore cannot inject
+ *     OR / AND / NOT / parentheses into the derived query.
+ *
+ * Returns `null` when the rendered query would exceed `HH_QUERY_MAX_LENGTH`.
+ * The caller then emits nothing for that key and the source adapter falls back
+ * to its own built-in default. This is a deliberate fail-closed choice: emitting
+ * only the terms that happen to fit would silently drop roles from the ICP, and
+ * role loss is a kill criterion for this fix.
+ */
+export function buildHhDisjunctiveQuery(keywords: readonly string[]): string | null {
+  const operands: string[] = []
+  for (const keyword of keywords) {
+    if (typeof keyword !== 'string') continue
+    const trimmed = keyword.trim()
+    if (!trimmed) continue
+    const { text, changed } = sanitizeHhQueryTerm(trimmed)
+    // Nothing searchable survived sanitisation (the keyword was pure syntax).
+    if (!text) continue
+    const isReservedWord = HH_RESERVED_WORDS.has(text.toLowerCase())
+    const needsQuotes = changed || isReservedWord || /\s/.test(text)
+    operands.push(needsQuotes ? `"${text}"` : text)
+  }
+  if (operands.length === 0) return null
+
+  const query = operands.join(' OR ')
+  if (query.length > HH_QUERY_MAX_LENGTH) return null
+  return query
+}
+
+/**
  * Build the source-specific search env for one (profile, source) pair.
  *
  * `demoteTerms` (optional): a lowercase set of ICP terms the feedback loop
@@ -238,10 +354,18 @@ export function buildProfileSearchEnv(
   const env: Record<string, string> = {}
 
   if (params.text && keywords.length > 0) {
-    // Free-text query: join with a space for sources that take a single
-    // query string (HH, rabota-rossii). For multi-keyword sources the
-    // roleKeywords param (comma-joined) is the preferred shape.
-    env[params.text] = keywords.join(' ')
+    if (params.textComposition === 'hh-disjunction') {
+      // HH reads its free-text param with a query language in which a bare word
+      // list is an implicit AND — the keyword list must be rendered as a
+      // disjunction. See buildHhDisjunctiveQuery.
+      const query = buildHhDisjunctiveQuery(keywords)
+      if (query !== null) env[params.text] = query
+    } else {
+      // Space-joined conjunction: correct for sources whose API treats the text
+      // as a bag of words. Byte-identical to the previous behaviour, so every
+      // non-HH source keeps its prior query.
+      env[params.text] = keywords.join(' ')
+    }
   }
   if (params.roleKeywords && keywords.length > 0) {
     env[params.roleKeywords] = keywords.join(',')

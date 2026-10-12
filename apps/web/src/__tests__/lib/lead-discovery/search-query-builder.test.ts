@@ -187,14 +187,17 @@ describe('buildProfileKeywords — feedback-driven demote (bounded re-ordering)'
 })
 
 describe('buildProfileSearchEnv', () => {
-  it('emits HH_SEARCH_TEXT as space-joined keywords', () => {
-    const env = buildProfileSearchEnv('hh' as SourceId, makeInput({ roles: ['hr'] }))
-    expect(env.HH_SEARCH_TEXT).toBeDefined()
-    expect(env.HH_SEARCH_TEXT).toContain('рекрутер')
-    // free-text, not comma-joined
-    expect(env.HH_SEARCH_TEXT).toMatch(/\s/)
-    expect(env.HH_SEARCH_TEXT).not.toContain(',')
-  })
+  it('emits HH_SEARCH_TEXT as an OR-disjunction of the profile keywords', () => {
+      const env = buildProfileSearchEnv('hh' as SourceId, makeInput({ roles: ['hr'] }))
+      expect(env.HH_SEARCH_TEXT).toBeDefined()
+      expect(env.HH_SEARCH_TEXT).toContain('рекрутер')
+      // HH reads `text` with its own query language, where a bare word list is an
+      // implicit AND. The keyword list holds alternatives, so it must be rendered
+      // with explicit OR operators (see rr-hh-query-fix.contract.test.ts).
+      expect(env.HH_SEARCH_TEXT).toContain(' OR ')
+      // free-text, not comma-joined
+      expect(env.HH_SEARCH_TEXT).not.toContain(',')
+    })
 
   it('does not derive Habr search parameters while direct collection is disabled', () => {
     const env = buildProfileSearchEnv(
