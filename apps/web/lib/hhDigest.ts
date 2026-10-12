@@ -1,6 +1,7 @@
 import { getDigestPreviewItems, getDigestItemsForClientProfile } from "./digest"
 import type { DigestItem } from "./db-types"
 import { isDigestEligibleGate } from "./scoring/gate-pipeline"
+import { escapeTelegramHtml } from "./telegram/html"
 
 export type HhDigestItem = {
   rank: number
@@ -75,17 +76,28 @@ export async function getHhDigestItems(input?: {
 
 const TELEGRAM_MESSAGE_CHAR_LIMIT = 4096
 
+/**
+ * Telegram HTML rendering of the fallback digest.
+ *
+ * Sent with parse_mode=HTML (see lib/payments.ts), so every employer-derived
+ * string passes escapeTelegramHtml before it enters the message — a company
+ * name like "Romashka & Co <Group>" can never break the markup or inject tags.
+ * Structure is unchanged from the plain-text version: header, then per-item
+ * blocks (bold name, count/score line, bullet reasons, bold "Что делать:" label
+ * with the opener). Telegram's HTML mode has no list element, so bullets stay
+ * textual "• " lines with escaped content.
+ */
 export function buildHhDigestText(items: readonly HhDigestItem[]): string {
-  const header = "HH digest"
+  const header = "<b>HH digest</b>"
   const itemTexts = items.map((item) => {
     const reasonLines = item.reasons
       .filter((reason) => reason.trim() !== "")
-      .map((reason) => `• ${reason}`)
+      .map((reason) => `• ${escapeTelegramHtml(reason)}`)
     return [
-      `${item.rank}. ${item.employer_name}`,
+      `<b>${item.rank}. ${escapeTelegramHtml(item.employer_name)}</b>`,
       `${item.vacancies_count} вакансий · score ${item.total_score.toFixed(1)}`,
       ...reasonLines,
-      `Что делать: ${item.opener}`
+      `<b>Что делать:</b> ${escapeTelegramHtml(item.opener)}`
     ].join("\n")
   })
 
