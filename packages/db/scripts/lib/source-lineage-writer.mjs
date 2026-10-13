@@ -18,7 +18,20 @@ export async function upsertSignalEvidenceLineage(client, input) {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (source, external_id) DO UPDATE
      SET
-       org_id = EXCLUDED.org_id,
+       -- A signal with append-only lineage keeps its original organization:
+       -- lineage rows reference (signal_id, organization_id) with
+       -- ON DELETE RESTRICT, so moving org_id here violates the FK and aborts
+       -- the whole ingest batch. Org reassignment is an explicit ops/migration
+       -- act, not an ingest side effect. Signals without lineage (pre-v1 rows)
+       -- may still move freely.
+       org_id = CASE
+         WHEN EXISTS (
+           SELECT 1
+           FROM source_signal_evidence_lineage_v1 existing_lineage
+           WHERE existing_lineage.signal_id = signals.id
+         ) THEN signals.org_id
+         ELSE EXCLUDED.org_id
+       END,
        headline = EXCLUDED.headline,
        summary = EXCLUDED.summary,
        source_url = EXCLUDED.source_url,
@@ -38,6 +51,9 @@ export async function upsertSignalEvidenceLineage(client, input) {
     ],
   );
   const signalRow = signal.rows[0];
+  // Count re-ingests whose freshly resolved organization differs from the
+  // anchored one; the signal (and its lineage) stays at the original org.
+  const orgAnchorKeeps = Number(signalRow.org_id) !== Number(input.orgId) ? 1 : 0;
 
   const evidence = await writeEvidence(client, {
     source: input.source,
@@ -88,6 +104,7 @@ export async function upsertSignalEvidenceLineage(client, input) {
     evidenceUpsertCount: 1,
     evidenceCreatedCount: evidence.inserted ? 1 : 0,
     lineageCreatedCount: lineage.rowCount ?? 0,
+    orgAnchorKeeps,
   };
 }
 
@@ -103,6 +120,7 @@ export async function upsertSignalEvidenceLineageBatch(client, inputs) {
       evidenceUpsertCount: 0,
       evidenceCreatedCount: 0,
       lineageCreatedCount: 0,
+      orgAnchorKeeps: 0,
     };
   }
 
@@ -186,7 +204,17 @@ export async function upsertSignalEvidenceLineageBatch(client, inputs) {
       FROM input_rows
       ORDER BY ordinal
       ON CONFLICT (source, external_id) DO UPDATE SET
-        org_id = EXCLUDED.org_id,
+        -- Same lineage anchor as upsertSignalEvidenceLineage: a signal with
+        -- append-only lineage keeps its original org (the composite lineage FK
+        -- is ON DELETE RESTRICT, so moving org_id aborts the whole batch).
+        org_id = CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM source_signal_evidence_lineage_v1 existing_lineage
+            WHERE existing_lineage.signal_id = signals.id
+          ) THEN signals.org_id
+          ELSE EXCLUDED.org_id
+        END,
         headline = EXCLUDED.headline,
         summary = EXCLUDED.summary,
         source_url = EXCLUDED.source_url,
@@ -195,18 +223,23 @@ export async function upsertSignalEvidenceLineageBatch(client, inputs) {
       RETURNING id, org_id, source, external_id, source_url, occurred_at, payload
     ),
     signal_rows AS MATERIALIZED (
+      -- Join on the signal identity only: the anchored org_id may legitimately
+      -- differ from the freshly resolved input org_id when lineage holds the
+      -- original organization. Downstream CTEs must use the RETURNED (anchored)
+      -- org so signal, evidence, and lineage stay on one organization.
       SELECT input_rows.*, signals.id AS signal_id,
+        signals.org_id AS signal_org_id,
         signals.source_url AS persisted_source_url,
         signals.occurred_at AS persisted_occurred_at,
         signals.payload AS persisted_payload
       FROM input_rows
-      JOIN upserted_signals signals USING (org_id, source, external_id)
+      JOIN upserted_signals signals USING (source, external_id)
     ),
     inserted_evidence AS (
       INSERT INTO evidence_items (
         org_id, lead_id, source, url, fetched_at, content_hash, tier, payload_ref
       )
-      SELECT org_id, NULL, source, persisted_source_url,
+      SELECT signal_org_id, NULL, source, persisted_source_url,
         persisted_occurred_at, evidence_hash, evidence_tier,
         JSONB_BUILD_OBJECT(
           'signal_id', signal_id,
@@ -225,7 +258,7 @@ export async function upsertSignalEvidenceLineageBatch(client, inputs) {
       SELECT DISTINCT evidence.id, evidence.org_id, evidence.content_hash
       FROM evidence_items evidence
       JOIN signal_rows input
-        ON input.org_id = evidence.org_id
+        ON input.signal_org_id = evidence.org_id
         AND input.evidence_hash = evidence.content_hash
       WHERE NOT EXISTS (
         SELECT 1 FROM inserted_evidence inserted
@@ -240,14 +273,14 @@ export async function upsertSignalEvidenceLineageBatch(client, inputs) {
         evidence_tier, confidence, extraction_method,
         organization_resolution_reason, signal_payload_snapshot
       )
-      SELECT input.signal_id, evidence.id, input.org_id, input.source,
+      SELECT input.signal_id, evidence.id, input.signal_org_id, input.source,
         input.source_family, input.external_id, input.persisted_source_url,
         input.normalized_at, input.persisted_occurred_at, input.normalized_at,
         input.evidence_tier, input.confidence, input.extraction_method,
         input.organization_resolution_reason, input.persisted_payload
       FROM signal_rows input
       JOIN evidence_rows evidence
-        ON evidence.org_id = input.org_id
+        ON evidence.org_id = input.signal_org_id
         AND evidence.content_hash = input.evidence_hash
       ON CONFLICT (signal_id, evidence_id) DO NOTHING
       RETURNING id
@@ -258,7 +291,7 @@ export async function upsertSignalEvidenceLineageBatch(client, inputs) {
         COUNT(inserted.id)::INTEGER AS evidence_created_count
       FROM signal_rows input
       LEFT JOIN inserted_evidence inserted
-        ON inserted.org_id = input.org_id
+        ON inserted.org_id = input.signal_org_id
         AND inserted.content_hash = input.evidence_hash
       GROUP BY input.health_family
     )
@@ -267,6 +300,8 @@ export async function upsertSignalEvidenceLineageBatch(client, inputs) {
       (SELECT COUNT(*)::INTEGER FROM input_rows) AS "evidenceUpsertCount",
       (SELECT COUNT(*)::INTEGER FROM inserted_evidence) AS "evidenceCreatedCount",
       (SELECT COUNT(*)::INTEGER FROM inserted_lineage) AS "lineageCreatedCount",
+      (SELECT COUNT(*)::INTEGER FROM signal_rows
+        WHERE signal_org_id IS DISTINCT FROM org_id) AS "orgAnchorKeeps",
       COALESCE((
         SELECT JSONB_OBJECT_AGG(health_family, JSONB_BUILD_OBJECT(
           'signalUpsertCount', signal_upsert_count,

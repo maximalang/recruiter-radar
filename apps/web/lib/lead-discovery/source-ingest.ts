@@ -118,6 +118,8 @@ export interface IngestDiagnostics {
   organizationCount?: number
   evidenceCount?: number
   organizationResolutionRejects?: number
+  /** Re-ingests whose freshly resolved org differed from the lineage-anchored one. */
+  orgAnchorKeeps?: number
   zeroReason?: string
 }
 
@@ -986,6 +988,7 @@ function parseJsonMetrics(output: string): ParsedSourceMetrics | undefined {
               organizationCount: numberValue(parsed.orgsCreated),
               evidenceCount: numberValue(parsed.evidenceUpsertsCompleted),
               organizationResolutionRejects: numberValue(parsed.organizationResolutionRejects),
+              orgAnchorKeeps: numberValue(parsed.orgAnchorKeeps),
               zeroReason: stringValue(parsed.zeroReason),
             },
           }
