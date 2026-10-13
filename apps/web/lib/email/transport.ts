@@ -4,11 +4,19 @@
  * Provider-agnostic (any SMTP works from Russia). Config comes from env; when
  * absent the module degrades gracefully (`isEmailConfigured()` is false and
  * sends are a typed no-op) so the rest of the product keeps working.
+ *
+ * Message boundary: every caller passes one plain `user@domain` address plus
+ * branded HTML/text rendered in-process. Structured recipient arrays, display
+ * names, RFC 5322 comments/groups, quoted local parts, file/URL content and
+ * attachments are refused before the transport sees them (see
+ * `validateEmailMessage`). The SMTP transport additionally disables file and
+ * URL access and states its TLS identity explicitly.
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
 import { createHash, createHmac } from "node:crypto";
+import { isIP } from "node:net";
 
 import nodemailer, { type Transporter } from "nodemailer";
 
@@ -23,9 +31,16 @@ export type EmailMessage = {
   text: string;
 };
 
+/**
+ * Why a message was refused before it reached a provider. Kept distinct from
+ * `send_failed` so a caller can tell "we refused to send this" apart from "the
+ * provider refused the send".
+ */
+export type EmailMessageRejection = "invalid_recipient" | "invalid_message";
+
 export type SendEmailResult =
   | { ok: true }
-  | { ok: false; reason: "not_configured" | "send_failed" };
+  | { ok: false; reason: "not_configured" | "send_failed" | EmailMessageRejection };
 
 export type TestEmailOutboxEntry = EmailMessage & {
   sequence: number;
@@ -52,6 +67,128 @@ type PostboxConfig = {
   replyTo: string | null;
   timeoutMs: number;
 };
+
+/**
+ * Message boundary ceilings. The auth and digest senders only ever emit one
+ * plain address and a small branded body, so anything beyond these limits is a
+ * bug or an injection attempt and is refused before reaching the transport.
+ */
+const MAX_RECIPIENTS = 20;
+const MAX_RECIPIENT_LENGTH = 254;
+const MAX_RECIPIENT_LIST_LENGTH = 1000;
+const MAX_SUBJECT_LENGTH = 300;
+const MAX_BODY_LENGTH = 512 * 1024;
+
+/**
+ * SMTP timeouts. Without them a stalled peer holds the send open until a
+ * platform-level timeout, and the resulting failure category is ambiguous.
+ */
+const SMTP_CONNECTION_TIMEOUT_MS = 15_000;
+const SMTP_GREETING_TIMEOUT_MS = 15_000;
+const SMTP_SOCKET_TIMEOUT_MS = 30_000;
+
+const RECIPIENT_LOCAL_PART = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+$/;
+const RECIPIENT_DOMAIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
+const HOSTNAME_LABEL = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$/;
+
+/** CR, LF, NUL and friends: the classic header-injection vector. */
+function hasControlCharacters(value: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  return /[\u0000-\u001f\u007f]/.test(value);
+}
+
+/**
+ * Parses one or more plain `user@domain` addresses out of the caller's `to`.
+ *
+ * Deliberately strict: display names, RFC 5322 comments, groups, quoted local
+ * parts and structured recipient arrays are refused instead of being handed to
+ * the address parser. Those are exactly the forms the parser advisories abuse
+ * (quadratic parsing, depth-limit bypass, comment mis-parsing, IDN allow-list
+ * bypass), and every caller in this codebase passes one plain address.
+ */
+function parseRecipientList(to: unknown): string[] | null {
+  if (typeof to !== "string") return null;
+  const raw = to.trim();
+  if (raw.length === 0 || raw.length > MAX_RECIPIENT_LIST_LENGTH) return null;
+  const parts = raw.split(",");
+  if (parts.length === 0 || parts.length > MAX_RECIPIENTS) return null;
+
+  const addresses: string[] = [];
+  for (const part of parts) {
+    const address = part.trim();
+    if (
+      address.length === 0
+      || address.length > MAX_RECIPIENT_LENGTH
+      || hasControlCharacters(address)
+      || /\s/.test(address)
+    ) {
+      return null;
+    }
+    const at = address.lastIndexOf("@");
+    if (at <= 0 || at === address.length - 1) return null;
+    const local = address.slice(0, at);
+    const domain = address.slice(at + 1);
+    if (
+      !RECIPIENT_LOCAL_PART.test(local)
+      || local.startsWith(".")
+      || local.endsWith(".")
+      || local.includes("..")
+      || !RECIPIENT_DOMAIN.test(domain)
+    ) {
+      return null;
+    }
+    addresses.push(address);
+  }
+  return addresses;
+}
+
+/**
+ * Fail-closed validation of everything the transport accepts from callers.
+ *
+ * Returns the canonical recipient list, or the rejection reason that is safe to
+ * log (no address, subject or body content is included).
+ */
+export function validateEmailMessage(
+  message: EmailMessage,
+): { recipients: string[] } | { rejection: EmailMessageRejection } {
+  if (!message || typeof message !== "object") {
+    return { rejection: "invalid_message" };
+  }
+  const recipients = parseRecipientList(message.to);
+  if (!recipients) return { rejection: "invalid_recipient" };
+  if (
+    typeof message.subject !== "string"
+    || message.subject.length > MAX_SUBJECT_LENGTH
+    || hasControlCharacters(message.subject)
+  ) {
+    return { rejection: "invalid_message" };
+  }
+  if (typeof message.html !== "string" || typeof message.text !== "string") {
+    return { rejection: "invalid_message" };
+  }
+  if (message.html.length + message.text.length > MAX_BODY_LENGTH) {
+    return { rejection: "invalid_message" };
+  }
+  return { recipients };
+}
+
+/**
+ * Explicit TLS identity used for SNI and peer-certificate verification.
+ *
+ * Nodemailer keeps a process-global DNS cache keyed only by host while the
+ * cached entry also stores the caller's `servername`, so a later transport on
+ * the same host could verify the peer against another transport's name
+ * (GHSA-6vj9-mwq6-2f5v). Stating `tls.servername` explicitly keeps the value
+ * independent of that cache. IP hosts and malformed values are skipped, which
+ * leaves Node verifying against the host itself.
+ */
+function resolveSmtpTlsServername(host: string): string | null {
+  const candidate = (process.env.SMTP_TLS_SERVERNAME?.trim() || host).trim();
+  if (candidate.length === 0 || candidate.length > 253) return null;
+  if (isIP(candidate) !== 0) return null;
+  if (hasControlCharacters(candidate) || /\s/.test(candidate)) return null;
+  return HOSTNAME_LABEL.test(candidate) ? candidate : null;
+}
 
 function readPostboxConfig(): PostboxConfig | null {
   const accessKeyId = process.env.POSTBOX_ACCESS_KEY_ID?.trim();
@@ -137,16 +274,34 @@ let testOutboxWriteQueue: Promise<void> = Promise.resolve();
 
 function getTransporter(config: SmtpConfig): Transporter {
   if (cachedTransporter) return cachedTransporter;
+  const servername = resolveSmtpTlsServername(config.host);
   cachedTransporter = nodemailer.createTransport({
     host: config.host,
     port: config.port,
     secure: config.secure,
     auth: { user: config.user, pass: config.pass },
+    // Never resolve a file path or URL out of message data, and keep the TLS
+    // identity explicit instead of inheriting it from the shared DNS cache.
+    disableFileAccess: true,
+    disableUrlAccess: true,
+    ...(servername ? { tls: { servername } } : {}),
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
   });
   return cachedTransporter;
 }
 
 export async function sendEmail(message: EmailMessage): Promise<SendEmailResult> {
+  const validation = validateEmailMessage(message);
+  if ("rejection" in validation) {
+    logEvent("email.message_rejected", {
+      failureCategory: "message_boundary",
+      rejection: validation.rejection,
+    });
+    return { ok: false, reason: validation.rejection };
+  }
+  const recipients = validation.recipients;
   const testOutboxPath = resolveTestEmailOutboxPath();
   if (
     process.env.AUTH_EMAIL_TRANSPORT === "test"
@@ -156,7 +311,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
   }
   if (testOutboxPath) {
     try {
-      await enqueueTestEmail(testOutboxPath, message);
+      await enqueueTestEmail(testOutboxPath, { ...message, to: recipients.join(",") });
       logEvent("email.test_outbox_recorded", {});
       return { ok: true };
     } catch (error) {
@@ -172,7 +327,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
   const postboxConfig = readPostboxConfig();
   if (postboxConfig) {
     try {
-      await sendViaPostbox(postboxConfig, message);
+      await sendViaPostbox(postboxConfig, message, recipients);
       await recordSuccessfulEmailDelivery("postbox");
       logEvent("email.sent", { provider: "postbox" });
       return { ok: true };
@@ -193,10 +348,14 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
 
   try {
     const transporter = getTransporter(config);
+    // Explicit field list: message data is never spread into the transport
+    // options, so no attachment and no `raw` value can be introduced even if a
+    // caller starts passing extra keys (that is the legacy `resolveContent`
+    // surface which bypasses the file/URL access flags).
     await transporter.sendMail({
       from: config.from,
       replyTo: config.replyTo ?? undefined,
-      to: message.to,
+      to: recipients.join(","),
       subject: message.subject,
       html: message.html,
       text: message.text,
@@ -217,12 +376,13 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
 async function sendViaPostbox(
   config: PostboxConfig,
   message: EmailMessage,
+  recipients: string[],
 ): Promise<void> {
   const endpoint = new URL("/v2/email/outbound-emails", config.endpoint);
   const body = JSON.stringify({
     FromEmailAddress: config.from,
     ...(config.replyTo ? { ReplyToAddresses: [config.replyTo] } : {}),
-    Destination: { ToAddresses: [message.to] },
+    Destination: { ToAddresses: recipients },
     Content: {
       Simple: {
         Subject: { Data: message.subject, Charset: "UTF-8" },
