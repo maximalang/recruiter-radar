@@ -131,15 +131,14 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: .38rem .55rem;
+  gap: .28rem .5rem;
   color: color-mix(in srgb, var(--color-canvas) 56%, transparent);
   font-size: .7rem;
-  line-height: 1.55;
+  line-height: 1.4;
 }
 
 .footerOperatorName {
-  color: color-mix(in srgb, var(--color-canvas) 72%, transparent);
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .footerOperatorSep {
@@ -169,15 +168,25 @@
 }
 
 .siteFooter[data-tone="light"] .footerLine,
-.siteFooter[data-tone="light"] .footerLink,
-.siteFooter[data-tone="light"] .footerOperator,
-.siteFooter[data-tone="light"] .footerOperatorEmail {
+.siteFooter[data-tone="light"] .footerLink {
   color: var(--color-text-secondary);
 }
 
-.siteFooter[data-tone="light"] .footerNav strong,
-.siteFooter[data-tone="light"] .footerOperatorName {
+.siteFooter[data-tone="light"] .footerNav strong {
   color: var(--color-text-primary);
+}
+
+.siteFooter[data-tone="light"] .footerOperator,
+.siteFooter[data-tone="light"] .footerOperatorEmail,
+.siteFooter[data-tone="light"] .footerOperatorName {
+  color: var(--color-text-tertiary);
+}
+
+/* The landing's .visualSystem footer a rule has higher specificity than
+ * .footerOperatorEmail's plain inherit; restate it under the tone attribute so the
+ * dark operator-line email keeps the line color (>= 4.5:1) on landing pages too. */
+.siteFooter[data-tone="dark"] .footerOperatorEmail {
+  color: inherit;
 }
 
 .siteFooter[data-tone="light"] .footerCopy {
@@ -206,6 +215,12 @@
   .footerBrand:hover,
   .footerLink:hover,
   .footerOperatorEmail:hover {
+    color: var(--color-signal);
+  }
+
+  /* Match the dark base rule's specificity so hover still wins over the landing's
+   * .visualSystem footer a:hover. */
+  .siteFooter[data-tone="dark"] .footerOperatorEmail:hover {
     color: var(--color-signal);
   }
 }

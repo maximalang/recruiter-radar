@@ -72,7 +72,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark"; showCookieSet
             <span className={s.footerOperatorSep} aria-hidden="true">·</span>
             <a href={`mailto:${OPERATOR_REQUISITES.email}`} className={s.footerOperatorEmail}>{OPERATOR_REQUISITES.email}</a>
           </div>
-          <div className={s.footerCopy}>© {year} Recruiter Radar</div>
+          <div className={s.footerCopy}>© {year} Recruiter Radar. Все права защищены.</div>
         </div>
       </div>
     </footer>
