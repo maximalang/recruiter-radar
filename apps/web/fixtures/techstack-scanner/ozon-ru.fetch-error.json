@@ -1,0 +1,18 @@
+{
+  "domain": "ozon.ru",
+  "url": "https://ozon.ru",
+  "http_status": null,
+  "scanned_at": "2026-09-27T10:39:59+00:00",
+  "elapsed_ms": 6065,
+  "tool_count": 0,
+  "tools": [],
+  "fetch_error": "curl_cffi: SSLError: Failed to perform, curl: (35) BoringSSL SSL_connect: Connection closed abruptly (SSL_ERROR_SYSCALL; error queue empty) in connection to ozon.ru:443. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.",
+  "engine": "enthec/webappanalyzer@local",
+  "unsupported_classes": [
+    "js",
+    "dom",
+    "dns"
+  ],
+  "db_load_s": 0.12,
+  "skipped_bad_patterns": 0
+}

@@ -1,0 +1,42 @@
+# Techstack enrichment pilot — demo batch (SPEC-enrichment-pilot.md, ≤20 domains).
+#
+# Composition:
+# (a) company domains from existing RR data (read-only):
+#     packages/db/scripts/live-career-pages-targets.json and
+#     packages/db/scripts/.cache/career-pages-fetch.json — non-fortress subset;
+# (b) public RU mid-market / official domains documented in the repo
+#     (docs and source configs: job platforms, HR SaaS, gov open-data portals).
+#
+# Fortress-class domains (TLS-rupture, ozon/avito/tbank class per
+# webstack-scanner ACCESS.md) are NOT scanned; they are recorded in
+# techstack-pilot-skipped.txt and land in the summary.
+#
+# Scans are strictly sequential, delay >= 1 s, one polite homepage GET per
+# domain (capability rule: <= 500 domains/day).
+#
+# RUN FINDING (27.09.2026): yandex.ru, vk.com, cbr.ru, nalog.gov.ru,
+# zakupki.gov.ru and rosstat.gov.ru ruptured TLS from our IP (curl 35,
+# BoringSSL abrupt close) — the same fortress-class behaviour as ozon/avito.
+# Each was attempted exactly once (fetch_error is never retried), recorded as
+# error-evidence in results.jsonl, and should be moved to
+# techstack-pilot-skipped.txt in any future run.
+hh.ru
+yandex.ru
+vk.com
+kaspersky.ru
+mts.ru
+discord.com
+dnb.com
+recruiter-radar.ru
+zarplata.ru
+rabota.ru
+superjob.ru
+talantix.ru
+skillaz.ru
+amocrm.ru
+lamoda.ru
+trudvsem.ru
+cbr.ru
+nalog.gov.ru
+zakupki.gov.ru
+rosstat.gov.ru

@@ -1,0 +1,11 @@
+# Fortress-class domains present in RR data (live-career-pages-targets.json /
+# career-pages cache) — deliberately NOT scanned in the pilot demo batch.
+# webstack-scanner ACCESS.md: these rupture the TLS handshake from our IP
+# (ozon/avito/tbank class); SPEC-enrichment-pilot.md forbids scanning them —
+# skip + record in summary.
+ozon.ru # fortress-class: TLS rupture recorded in capability test_results (curl 35)
+avito.ru # fortress-class: TLS rupture recorded in capability test_results (curl 35)
+tbank.ru # fortress-class: TLS rupture recorded in capability test_results (curl 35)
+tinkoff.ru # tbank.ru alias — same fortress-class infrastructure
+sber.ru # fortress-class: top-RU anti-bot perimeter, same class as ozon/avito
+wildberries.ru # fortress-class: top-RU e-commerce anti-bot perimeter
