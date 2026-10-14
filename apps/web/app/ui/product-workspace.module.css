@@ -15,7 +15,7 @@
   align-items: center;
   padding: 0 12px;
   border-radius: var(--radius-control);
-  background: var(--color-text-primary);
+  background: var(--color-signal);
   color: var(--color-text-inverse);
   font-size: var(--type-metadata-size);
   font-weight: 600;
@@ -184,6 +184,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--color-signal);
+  box-shadow: var(--shadow-halo-signal);
   content: "";
 }
 

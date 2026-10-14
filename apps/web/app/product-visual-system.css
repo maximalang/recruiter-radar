@@ -229,3 +229,208 @@ body {
     scroll-behavior: auto;
   }
 }
+
+/* ============================================================================
+ * Cabinet graphite theme — Linear-grade dark palette for the authenticated
+ * buyer workspace (leads list/detail, settings/delivery, onboarding pilot,
+ * dashboard, admin). Design language matches the landing product demo canon
+ * (detection-scene passes 18–21): neutral graphite base, lifted panels with
+ * hairline borders and a top sheen, tone-first separation, indigo/violet/green
+ * functional accents, gold reserved for status.
+ * Scope: [data-product-workspace="true"] only — marketing, legal, checkout and
+ * auth surfaces keep the light Calm Intelligence theme untouched.
+ * ========================================================================= */
+
+/* Light-surface defaults so shared modules can reference the new tokens
+ * without any visual drift outside the graphite scope. */
+:root {
+  --color-surface-raised: var(--color-surface-primary);
+  --color-hairline: var(--color-separator);
+  --color-hairline-soft: var(--color-separator-subtle);
+  --gradient-panel: none;
+  --gradient-sheen: none;
+  --gradient-canvas-glow: none;
+  --shadow-panel: none;
+  --shadow-halo-signal: none;
+  --shadow-halo-positive: none;
+  --shadow-halo-warning: none;
+  --shadow-halo-destructive: none;
+  --shadow-halo-information: none;
+  --shadow-halo-neutral: none;
+  --radius-panel: var(--radius-surface);
+}
+
+[data-product-workspace="true"] {
+  color-scheme: dark;
+
+  /* Graphite base + lifted surfaces (canon: #0a0b0c canvas, panel #1b1c1f→#191a1c) */
+  --color-canvas: #0a0b0c;
+  --color-surface-primary: #1b1c1f;
+  --color-surface-secondary: #202124;
+  --color-surface-selected: #232428;
+  --color-surface-elevated: #26272b;
+  --color-surface-raised: #1e1f22;
+
+  /* Linear grayscale text ramp */
+  --color-text-primary: #dcdddf;
+  --color-text-secondary: #a8a9ac;
+  --color-text-tertiary: #898b8e;
+  --color-text-disabled: #696b70;
+  --color-text-inverse: #f7f8f8;
+
+  --color-separator-subtle: #222325;
+  --color-separator: #2a2b2e;
+  --color-separator-strong: #343538;
+  --color-hairline: rgba(255, 255, 255, .07);
+  --color-hairline-soft: rgba(255, 255, 255, .045);
+
+  /* Functional accents: indigo primary, violet AI/context, green positive,
+   * orange copper; gold is status-only. */
+  --color-signal: #5e6ad2;
+  --color-signal-hover: #6e79d6;
+  --color-signal-soft: rgba(94, 106, 210, .14);
+  --color-signal-on-dark: #9d7be8;
+  --color-copper: #e8935e;
+  --color-positive: #4cb782;
+  --color-warning: #f0b429;
+  --color-destructive: #eb5757;
+  --color-information: #9d7be8;
+  --color-confidence-high: #4cb782;
+  --color-confidence-medium: #f0b429;
+  --color-confidence-low: #8f9196;
+  --color-focus: #7b86e8;
+  --color-selection: rgba(94, 106, 210, .32);
+  --color-overlay: rgba(5, 6, 8, .72);
+
+  /* Panel treatment + status halos (canon values) */
+  --gradient-panel: linear-gradient(180deg, #1b1c1f 0%, #191a1c 100%);
+  --gradient-sheen: linear-gradient(90deg, transparent, rgba(255, 255, 255, .16), transparent);
+  --gradient-canvas-glow: radial-gradient(120% 90% at 50% -10%, rgba(94, 106, 210, .07), transparent 55%);
+  --shadow-panel: 0 24px 56px rgba(0, 0, 0, .45), 0 2px 10px rgba(0, 0, 0, .3);
+  --shadow-float: 0 12px 32px rgba(0, 0, 0, .5), 0 2px 8px rgba(0, 0, 0, .35);
+  --shadow-overlay: 0 24px 64px rgba(0, 0, 0, .6), 0 6px 18px rgba(0, 0, 0, .4);
+  --shadow-halo-signal: 0 0 0 3px rgba(94, 106, 210, .14);
+  --shadow-halo-positive: 0 0 0 3px rgba(76, 183, 130, .14);
+  --shadow-halo-warning: 0 0 0 3px rgba(240, 180, 41, .14);
+  --shadow-halo-destructive: 0 0 0 3px rgba(235, 87, 87, .14);
+  --shadow-halo-information: 0 0 0 3px rgba(157, 123, 232, .14);
+  --shadow-halo-neutral: 0 0 0 3px rgba(255, 255, 255, .06);
+  --radius-panel: 12px;
+  --radius-surface: 12px;
+  --radius-overlay: 12px;
+}
+
+/* Tone-first separation: the shell base stays graphite with a faint indigo
+ * glow; content sits on a lifted panel. */
+[data-product-workspace="true"][data-ui-system="recruiter-radar"] {
+  background-image: var(--gradient-canvas-glow);
+  background-repeat: no-repeat;
+}
+
+@media (min-width: 768px) {
+  [data-product-workspace="true"] main {
+    position: relative;
+    width: min(100% - 40px, 1536px);
+    margin: 20px auto 24px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-panel);
+    background: var(--gradient-panel);
+    box-shadow: var(--shadow-panel);
+  }
+
+  /* Static top sheen (canonical hairline highlight; no motion by design). */
+  [data-product-workspace="true"] main::before {
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: 3;
+    height: 1px;
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    background: var(--gradient-sheen);
+    content: "";
+    pointer-events: none;
+  }
+}
+
+/* Standalone surface cards (pilot onboarding) get the same lifted panel. */
+[data-product-workspace="true"] [data-surface="standalone"] {
+  position: relative;
+  border-color: var(--color-hairline);
+  border-radius: var(--radius-panel);
+  background: var(--gradient-panel), var(--color-surface-primary);
+  box-shadow: var(--shadow-panel);
+}
+
+[data-product-workspace="true"] [data-surface="standalone"]::before {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 3;
+  height: 1px;
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  background: var(--gradient-sheen);
+  content: "";
+  pointer-events: none;
+}
+
+/* Status dots with halo: radar signal = gold (status-only), confidence keeps
+ * its level color, evidence timeline nodes stay indigo. */
+[data-product-workspace="true"] [data-ui="signal-indicator"]::before {
+  background: var(--color-warning);
+  box-shadow: var(--shadow-halo-warning);
+}
+
+[data-product-workspace="true"] [data-ui="confidence-indicator"]::before {
+  box-shadow: var(--shadow-halo-neutral);
+}
+
+[data-product-workspace="true"] [data-ui="confidence-indicator"][data-level="high"]::before {
+  box-shadow: var(--shadow-halo-positive);
+}
+
+[data-product-workspace="true"] [data-ui="confidence-indicator"][data-level="medium"]::before {
+  box-shadow: var(--shadow-halo-warning);
+}
+
+[data-product-workspace="true"] [data-ui="confidence-indicator"][data-level="low"]::before {
+  box-shadow: var(--shadow-halo-neutral);
+}
+
+[data-product-workspace="true"] [data-ui="evidence-timeline"] > li::before {
+  box-shadow: var(--shadow-halo-signal);
+}
+
+/* Micro-label treatment for decision brief titles (canonical property stack). */
+[data-product-workspace="true"] [data-ui="decision-brief"] > h2:first-of-type {
+  color: var(--color-text-tertiary);
+  font-size: var(--type-label-size);
+  font-weight: 650;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+/* The operator footer strip melts into a darker base instead of the legacy
+ * green-tinted inverse theme. */
+[data-product-workspace="true"] footer[aria-label*="Оператор"] {
+  --color-canvas: #08090a;
+  --color-surface-primary: #08090a;
+  --color-surface-secondary: #101112;
+  --color-surface-elevated: #16171a;
+  --color-text-primary: #dcdddf;
+  --color-text-secondary: #a8a9ac;
+  --color-text-tertiary: #898b8e;
+  --color-text-disabled: #696b70;
+  --color-text-inverse: #08090a;
+  --color-separator-subtle: rgba(247, 248, 248, .06);
+  --color-separator: rgba(247, 248, 248, .1);
+  --color-separator-strong: rgba(247, 248, 248, .18);
+  --color-signal: #5e6ad2;
+  --color-signal-hover: #6e79d6;
+  --color-signal-soft: rgba(94, 106, 210, .12);
+  --color-copper: #e8935e;
+  --color-positive: #4cb782;
+  --color-warning: #f0b429;
+  --color-destructive: #eb5757;
+  --color-information: #9d7be8;
+  --color-focus: #7b86e8;
+  --color-selection: rgba(94, 106, 210, .28);
+  --color-overlay: rgba(5, 6, 8, .72);
+}
