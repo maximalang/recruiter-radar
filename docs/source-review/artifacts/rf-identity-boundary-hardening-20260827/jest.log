@@ -1,0 +1,19 @@
+
+> test
+> jest
+
+No tests found, exiting with code 1
+Run with `--passWithNoTests` to exit with code 0
+In C:\Users\max\Desktop\all\recruiter-radar\.worktrees\t_935b4dcc\apps\web
+  3719 files checked.
+  testMatch: C:/Users/max/Desktop/all/recruiter-radar\.worktrees/t_935b4dcc/apps/web/src/**/__tests__/**/*.{js,jsx,ts,tsx}, C:/Users/max/Desktop/all/recruiter-radar\.worktrees/t_935b4dcc/apps/web/src/**/*.{test,spec}.{js,jsx,ts,tsx} - 0 matches
+  testPathIgnorePatterns: \\node_modules\\, \\.next\\, C:\\Users\\max\\Desktop\\all\\recruiter-radar\.worktrees\\t_935b4dcc\\apps\\web\\src\\__tests__\\components\\DashboardOverview.test.tsx, C:\\Users\\max\\Desktop\\all\\recruiter-radar\.worktrees\\t_935b4dcc\\apps\\web\\src\\__tests__\\middleware\\validation-middleware.test.ts, C:\\Users\\max\\Desktop\\all\\recruiter-radar\.worktrees\\t_935b4dcc\\apps\\web\\src\\__tests__\\lib\\lead-discovery\\hh-mock.ts, C:\\Users\\max\\Desktop\\all\\recruiter-radar\.worktrees\\t_935b4dcc\\apps\\web\\src\\__tests__\\db-integration\\workspace-billing-entitlement-db.test.ts - 985 matches
+  testRegex:  - 0 matches
+Pattern:  - 0 matches
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path C:\Users\max\Desktop\all\recruiter-radar\.worktrees\t_935b4dcc\apps\web
+npm error workspace @recruiter-radar/web
+npm error location C:\Users\max\Desktop\all\recruiter-radar\.worktrees\t_935b4dcc\apps\web
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c jest

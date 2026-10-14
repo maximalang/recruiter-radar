@@ -1,0 +1,5 @@
+
+> sync:digest-evidence:check
+> node scripts/sync-digest-evidence-query.mjs --check
+
+Mirror already in sync (33361 chars of SQL).

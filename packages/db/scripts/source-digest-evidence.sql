@@ -142,94 +142,89 @@ WITH source_signal_rows AS (
 ),
 -- org_corroboration_keys: map each org_id to a canonical cross-source
 -- corroboration key derived from the STRONGEST shared strong key. This lets
--- signals from legacy fragmented orgs corroborate into one evidence package at
--- digest-assembly time. Current writers resolve validated strong identity keys
--- globally before upsert; this read-side bridge remains for historical rows and
--- is reversible because it never rewrites ownership.
+-- signals from fragmented orgs corroborate into one evidence package at
+-- digest-assembly time.
+--
+-- rf-identity-boundary-hardening (t_935b4dcc): the read side no longer
+-- re-classifies persisted identity strings with its own weaker inline rules —
+-- that duplicate made the strict write boundary silently weaker right here.
+-- Every strong-key candidate must now pass the canonical trust gates installed
+-- by migration 20260826100000_add_rr_identity_validation_functions.sql, which
+-- mirror classifyStrongIdentityKey (adapters/organization-resolution.mjs):
+-- checksum-valid INN/OGRN digits and canonicalized company domains. Keys that
+-- fail are ignored at this boundary (and quarantined on the write table by
+-- migration 20260826100100); verification lives in
+-- verify-source-identity-boundary-quarantine.mjs and the subsystem battery.
 --
 -- Key precedence (strongest first): inn: > ogrn: > domain:
---   - inn:/ogrn: are legally unique → a perfect merge signal.
---   - domain: is unique to one employer's corporate surface, but a PLATFORM
---     host domain (hh.ru, trudvsem.ru, superjob.ru, career.habr.com,
---     greenhouse.io, lever.co) must NEVER be used — 'domain:hh.ru' would
---     falsely merge every HH employer. Platform domains are excluded below.
+--   - inn:/ogrn: are legally unique → a perfect merge signal (checksum enforced).
+--   - domain: is unique to one employer's corporate surface. Platform hosts and
+--     their subdomains (hh.ru, boards.greenhouse.io, jobs.lever.co, …), public
+--     suffixes, punycode hosts and IP literals are rejected inside
+--     rr_is_trusted_domain_key — 'domain:hh.ru' would falsely merge every HH
+--     employer. The former inline PLATFORM_HOST_DOMAINS list is superseded by
+--     the shared function (kept in sync with organization-resolution.mjs).
 --   - company-name:/employer-name:/employer: are EXCLUDED — RU company names
 --     drift (ООО/АО/ПАО suffixes, transliteration, short vs full) → false
 --     merges. Corroboration is earned by a strong key, not by name similarity.
 --
--- An org with NO strong key (only company-name:) falls back to its own org_id
--- as the corroboration_key → today's behavior, no forced merge, no regression.
---
--- PLATFORM_HOST_DOMAINS: domains that are job-board/ATS hosts, NOT employer
--- corporate surfaces. A corroboration_key must never be 'domain:<these>' or
--- the platform's many employers would falsely merge into one lead. Kept in
--- sync with the foreign-employer + source-priority policy lists.
+-- An org with NO trusted strong key falls back to its own org_id as the
+-- corroboration_key → single-org grouping, no forced merge, no regression.
 org_corroboration_keys AS (
-  WITH platform_host_domains AS (
-    SELECT unnest(ARRAY[
-      'hh.ru', 'hhcdn.com', 'trudvsem.ru', 'superjob.ru', 'superjob.com',
-      'career.habr.com', 'habr.com', 'boards.greenhouse.io', 'greenhouse.io',
-      'jobs.lever.co', 'lever.co', 'api.lever.co', 'boards-api.greenhouse.io',
-      'linkedin.com', 'hh.kz', 'hh.ua', 'rabota.ru', 'zarplata.ru'
-    ]) AS host_domain
-  )
   SELECT
     org.id AS org_id,
     COALESCE(
       -- Strongest: INN (10-digit legal entity). Globally namespaced across sources.
-      (SELECT ('inn:' || LOWER(REPLACE(ref.source_key, 'inn:', '')))
+      -- Only checksum-valid canonical keys qualify.
+      (SELECT ref.source_key
        FROM org_source_refs AS ref
        WHERE ref.org_id = org.id
-         AND ref.source_key LIKE 'inn:%'
+         AND rr_is_trusted_inn_key(ref.source_key)
        ORDER BY ref.source_key ASC
        LIMIT 1),
       -- OGRN (13-digit). Same namespace across sources.
-      (SELECT ('ogrn:' || LOWER(REPLACE(ref.source_key, 'ogrn:', '')))
+      (SELECT ref.source_key
        FROM org_source_refs AS ref
        WHERE ref.org_id = org.id
-         AND ref.source_key LIKE 'ogrn:%'
+         AND rr_is_trusted_ogrn_key(ref.source_key)
        ORDER BY ref.source_key ASC
        LIMIT 1),
       -- domain: from org_source_refs (career-pages/rabota-rossii store it).
-      -- Excludes platform hosts — a domain key that would falsely merge
-      -- platform-aggregated employers is rejected.
-      (SELECT ('domain:' || LOWER(REPLACE(ref.source_key, 'domain:', '')))
+      -- Only canonical, company-owned domains pass; the platform-host /
+      -- subdomain / public-suffix / IP rejections live inside the shared gate.
+      (SELECT ref.source_key
        FROM org_source_refs AS ref
        WHERE ref.org_id = org.id
-         AND ref.source_key LIKE 'domain:%'
-         AND LOWER(REPLACE(ref.source_key, 'domain:', '')) NOT IN (SELECT host_domain FROM platform_host_domains)
+         AND rr_is_trusted_domain_key(ref.source_key)
        ORDER BY ref.source_key ASC
        LIMIT 1),
-      -- orgs.domain column (HH stores its corporate domain here, not as a
-      -- source_key). Same platform-host exclusion. This is the bridge that
-      -- lets an HH employer corroborate with a career-pages org on the same
-      -- corporate domain even though HH never wrote a domain: source_key.
+      -- orgs.domain bridge (HH stores its corporate domain here, not as a
+      -- source_key). The raw column value is UNTRUSTED free text at this
+      -- boundary: it corroborates only after passing the same canonicalizer,
+      -- producing the exact form a validated writer would persist.
       CASE
-        WHEN NULLIF(BTRIM(org.domain), '') IS NOT NULL
-          AND LOWER(BTRIM(org.domain)) NOT IN (SELECT host_domain FROM platform_host_domains)
-        THEN 'domain:' || LOWER(BTRIM(org.domain))
+        WHEN rr_canonical_company_domain(NULLIF(BTRIM(org.domain), '')) IS NOT NULL
+          THEN 'domain:' || rr_canonical_company_domain(NULLIF(BTRIM(org.domain), ''))
         ELSE NULL
       END,
-      -- Fallback: no strong key → group by org_id (today's behavior).
+      -- Fallback: no trusted strong key → group by org_id (today's behavior).
       ('org:' || org.id::TEXT)
     ) AS corroboration_key,
     CASE
       WHEN EXISTS (
         SELECT 1 FROM org_source_refs AS ref
-        WHERE ref.org_id = org.id AND ref.source_key LIKE 'inn:%'
+        WHERE ref.org_id = org.id AND rr_is_trusted_inn_key(ref.source_key)
       ) THEN 'inn'
       WHEN EXISTS (
         SELECT 1 FROM org_source_refs AS ref
-        WHERE ref.org_id = org.id AND ref.source_key LIKE 'ogrn:%'
+        WHERE ref.org_id = org.id AND rr_is_trusted_ogrn_key(ref.source_key)
       ) THEN 'ogrn'
       WHEN EXISTS (
         SELECT 1 FROM org_source_refs AS ref
-        WHERE ref.org_id = org.id
-          AND ref.source_key LIKE 'domain:%'
-          AND LOWER(REPLACE(ref.source_key, 'domain:', '')) NOT IN (SELECT host_domain FROM platform_host_domains)
+        WHERE ref.org_id = org.id AND rr_is_trusted_domain_key(ref.source_key)
       ) THEN 'domain'
-      WHEN NULLIF(BTRIM(org.domain), '') IS NOT NULL
-        AND LOWER(BTRIM(org.domain)) NOT IN (SELECT host_domain FROM platform_host_domains) THEN 'domain'
+      WHEN rr_canonical_company_domain(NULLIF(BTRIM(org.domain), '')) IS NOT NULL
+        THEN 'domain'
       ELSE 'org_id'
     END AS corroboration_key_type
   FROM orgs AS org

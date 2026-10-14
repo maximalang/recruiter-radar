@@ -19,3 +19,7 @@ apps/web/lib/digest-evidence-query.ts text eol=lf
 *.ico binary
 *.pdf binary
 *.zip binary
+
+# Immutable evidence logs and checksum manifest must retain their captured bytes
+# so SHA-256 verification is stable across Windows checkouts.
+docs/source-review/artifacts/rf-identity-boundary-hardening-20260827/* binary

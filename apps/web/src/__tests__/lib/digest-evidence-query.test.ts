@@ -31,11 +31,27 @@ describe('digest evidence query mirror', () => {
     )
   })
 
-  it('canonicalizes already-prefixed legal identity keys without duplicating the namespace', () => {
-    expect(DIGEST_EVIDENCE_QUERY).toContain("'inn:' || LOWER(REPLACE(ref.source_key, 'inn:', ''))")
-    expect(DIGEST_EVIDENCE_QUERY).toContain("'ogrn:' || LOWER(REPLACE(ref.source_key, 'ogrn:', ''))")
-    expect(DIGEST_EVIDENCE_QUERY).not.toContain("'inn:' || ref.source_key")
-    expect(DIGEST_EVIDENCE_QUERY).not.toContain("'ogrn:' || ref.source_key")
+  // rf-identity-boundary-hardening: the digest corroboration CTE no longer
+  // re-classifies persisted identity strings with its own weaker inline rules.
+  // Every strong-key candidate must pass the canonical trust gates installed by
+  // migration 20260826100000_add_rr_identity_validation_functions.sql, which
+  // mirror classifyStrongIdentityKey in adapters/organization-resolution.mjs;
+  // legacy weak forms are quarantined by migration 20260826100100 and never
+  // reach a corroboration key. Verified on disposable DBs by
+  // packages/db/scripts/verify-source-identity-boundary-quarantine.mjs.
+  it('trusts only gate-passing strong keys (canonical SQL functions, no inline reclassification)', () => {
+    expect(DIGEST_EVIDENCE_QUERY).toContain('rr_is_trusted_inn_key(ref.source_key)')
+    expect(DIGEST_EVIDENCE_QUERY).toContain('rr_is_trusted_ogrn_key(ref.source_key)')
+    expect(DIGEST_EVIDENCE_QUERY).toContain('rr_is_trusted_domain_key(ref.source_key)')
+    expect(DIGEST_EVIDENCE_QUERY).not.toContain("'inn:' || LOWER(REPLACE(ref.source_key")
+    expect(DIGEST_EVIDENCE_QUERY).not.toContain("'ogrn:' || LOWER(REPLACE(ref.source_key")
+    expect(DIGEST_EVIDENCE_QUERY).not.toContain("'domain:' || LOWER(REPLACE(ref.source_key")
+  })
+
+  it('bridges the untrusted orgs.domain column through the same canonicalizer', () => {
+    expect(DIGEST_EVIDENCE_QUERY).toContain(
+      "rr_canonical_company_domain(NULLIF(BTRIM(org.domain), ''))",
+    )
   })
 
   // Regression guard for a prod-only HTTP 500 (PostgreSQL 42601 "syntax error at
