@@ -173,6 +173,33 @@ async function setupFixture(client) {
       evidence_id BIGINT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     ) ON COMMIT DROP;
+
+    -- Shadow the production BIGINT-backed view with the fixture's TEXT ids.
+    -- Keep the INN-first precedence this smoke exists to exercise.
+    CREATE TEMP VIEW org_corroboration_keys_v1 AS
+    SELECT
+      org.id AS org_id,
+      COALESCE(
+        (SELECT 'inn:' || LOWER(REPLACE(ref.source_key, 'inn:', ''))
+         FROM org_source_refs AS ref
+         WHERE ref.org_id = org.id AND ref.source_key LIKE 'inn:%'
+         ORDER BY ref.source_key ASC LIMIT 1),
+        CASE
+          WHEN NULLIF(BTRIM(org.domain), '') IS NOT NULL
+            THEN 'domain:' || LOWER(BTRIM(org.domain))
+          ELSE NULL
+        END,
+        'org:' || org.id
+      ) AS corroboration_key,
+      CASE
+        WHEN EXISTS (
+          SELECT 1 FROM org_source_refs AS ref
+          WHERE ref.org_id = org.id AND ref.source_key LIKE 'inn:%'
+        ) THEN 'inn'
+        WHEN NULLIF(BTRIM(org.domain), '') IS NOT NULL THEN 'domain'
+        ELSE 'org_id'
+      END AS corroboration_key_type
+    FROM orgs AS org;
   `);
 
   // Two HH fragments + two funding fragments, sharing an INN pairwise so the

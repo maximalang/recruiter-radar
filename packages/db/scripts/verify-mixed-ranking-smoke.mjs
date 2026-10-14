@@ -111,6 +111,24 @@ async function setupFixture(client) {
       evidence_id BIGINT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     ) ON COMMIT DROP;
+
+    -- The ranking fixture intentionally uses readable TEXT organization ids.
+    -- Shadow the production BIGINT-backed canonical view with an equivalent
+    -- fixture-local projection so this smoke keeps testing ranking semantics,
+    -- while PostgreSQL migration jobs test the real production view types.
+    CREATE TEMP VIEW org_corroboration_keys_v1 AS
+    SELECT
+      id AS org_id,
+      CASE
+        WHEN NULLIF(BTRIM(domain), '') IS NOT NULL
+          THEN 'domain:' || LOWER(BTRIM(domain))
+        ELSE 'org:' || id
+      END AS corroboration_key,
+      CASE
+        WHEN NULLIF(BTRIM(domain), '') IS NOT NULL THEN 'domain'
+        ELSE 'org_id'
+      END AS corroboration_key_type
+    FROM orgs;
   `);
 
   await client.query(`

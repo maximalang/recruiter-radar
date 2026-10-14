@@ -1,4 +1,4 @@
-import { Pool, type PoolClient } from "pg";
+import { Pool } from "pg";
 import { getPool as getSharedPool } from "./db-pool";
 import { logError, logWarn } from "./runtime";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
@@ -6,6 +6,7 @@ import { deriveReviewStatus } from "./scoring/gates";
 import { getClientProfileById, INDUSTRY_KEYWORDS, resolveHiringMode, type ClientProfile } from "./clientProfiles";
 import { ROLE_HABR_KEYWORDS } from "./lead-discovery/habr-keywords";
 import { DIGEST_EVIDENCE_QUERY } from "./digest-evidence-query";
+import { DIGEST_SUPPRESSION_EXCLUSION_SQL } from "./orgSuppression";
 import { toSignalStrength } from "./scoring/score-display";
 import { detectForeignEmployer, applyForeignEmployerPenalty } from "./scoring/foreign-employer";
 import { deriveRoleNames, passesMinimumSignalGate } from "./leads/lead-quality";
@@ -19,7 +20,6 @@ import type {
   DigestCandidateInsertRow
 } from "./db-types";
 
-type DigestDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
 // WHY inlined: the digest SQL is imported as a TS constant rather than read from
 // disk at runtime. Next.js's standalone tracer cannot follow a dynamic
@@ -127,6 +127,7 @@ export async function getDigestItemsForClientProfile(input: {
           AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'meeting', 'won')
         )
       )
+      AND ${DIGEST_SUPPRESSION_EXCLUSION_SQL}
       AND (
         $2 = 'default'
         OR $2 = ANY(ranked_candidates.source_families)
@@ -134,7 +135,7 @@ export async function getDigestItemsForClientProfile(input: {
       )
     ORDER BY ranked_candidates.rank ASC
     LIMIT $3
-  `, [clientProfile.id, sourceKey, requestedLimit * 5]);
+    `, [clientProfile.id, sourceKey, requestedLimit * 5]);
 
   return evidenceResult.rows
     .map(mapDigestEvidenceRow)
@@ -286,9 +287,10 @@ export async function runDigestForClientProfile(input: {
             COALESCE(state.suppressed_until, '-infinity'::timestamptz) <= NOW()
             AND COALESCE(state.cooldown_until, '-infinity'::timestamptz) <= NOW()
             AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'meeting', 'won')
-          )
-        )
-        AND (
+            )
+            )
+            AND ${DIGEST_SUPPRESSION_EXCLUSION_SQL}
+            AND (
           $2 = 'default'
           OR $2 = ANY(ranked_candidates.source_families)
           OR $2 = ANY(COALESCE(ranked_candidates.candidate_source_keys, ARRAY[]::text[]))
