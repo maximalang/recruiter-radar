@@ -6,8 +6,7 @@ import { BrandLogo } from "./brand-logo";
 import { CookieSettingsButton } from "./cookie-settings-button";
 
 const PRODUCT_LINKS = [
-  { href: "/#scene-workspace", label: "Пример" },
-  { href: "/#scene-evidence", label: "Как работает" },
+  { href: "/#scene-evidence", label: "Разбор" },
   { href: "/#pricing", label: "Тарифы" },
   { href: "/#faq", label: "FAQ" },
 ] as const;

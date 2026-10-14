@@ -228,7 +228,7 @@ async function auditHeader(browser, viewport) {
   const heroBackground = "#scene-detection";
 
   await page.evaluate(() => window.scrollTo(0, 0));
-  await assertHeaderTone(page, `${viewport.name} Hero top`, "dark");
+  await assertHeaderTone(page, `${viewport.name} Hero top`, "light");
   await page.waitForFunction(() => !document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
   assert.equal(await header.getAttribute("data-scrolled"), null, `${viewport.name}: header must stay transparent at page top`);
 
@@ -236,13 +236,14 @@ async function auditHeader(browser, viewport) {
   await assertContrast(brand, `${viewport.name} Header BrandLogo`, 4.5, heroBackground);
 
   if (viewport.width >= 960) {
-    const nav = header.getByRole("navigation", { name: "Разделы лендинга" }).getByRole("link", { name: "Пример", exact: true });
+    // The retired workspace scene took its "Пример" nav link with it; the
+    // first remaining section link keeps the Header nav contrast contract.
+    // The duplicated header preview CTA is retired (owner verdict 23.09):
+    // the hero workflow CTA is the single path to the example.
+    const nav = header.getByRole("navigation", { name: "Разделы лендинга" }).getByRole("link", { name: "Разбор", exact: true });
     const login = header.getByRole("link", { name: "Войти", exact: true });
-    const cta = header.locator('[data-analytics-context="header"]:visible');
     await assertContrast(nav, `${viewport.name} Header nav`, 4.5, heroBackground);
     await assertContrast(login, `${viewport.name} Header login`, 4.5, heroBackground);
-    await assertContrast(cta, `${viewport.name} Header preview CTA`, 4.5, heroBackground);
-    await assertFocus(page, cta, `${viewport.name} Header preview CTA focus`, heroBackground);
   } else {
     const menu = header.getByRole("button", { name: "Открыть меню" });
     const target = await menu.boundingBox();
@@ -251,11 +252,11 @@ async function auditHeader(browser, viewport) {
     await assertFocus(page, menu, `${viewport.name} Header menu focus`, heroBackground);
   }
 
-  await scrollSectionUnderHeader(page, "#scene-workspace");
+  await scrollSectionUnderHeader(page, "#hero-workflow");
   await page.waitForFunction(() => document.querySelector('header[data-brand-header="recruiter-radar"]')?.hasAttribute("data-scrolled"));
   await assertContrast(brand, `${viewport.name} Scrolled header BrandLogo`);
   if (viewport.width >= 960) {
-    await assertContrast(header.locator('[data-analytics-context="header"]:visible'), `${viewport.name} Scrolled header preview CTA`);
+    await assertContrast(header.getByRole("link", { name: "Войти", exact: true }), `${viewport.name} Scrolled header login`);
   } else {
     await assertContrast(header.getByRole("button", { name: "Открыть меню" }), `${viewport.name} Scrolled header menu glyph`, 3);
   }
@@ -267,7 +268,7 @@ async function auditHeader(browser, viewport) {
   await scrollSectionUnderHeader(page, "#pricing");
   await assertHeaderTone(page, `${viewport.name} light Pricing`, "light");
   await page.evaluate(() => window.scrollTo(0, 0));
-  await assertHeaderTone(page, `${viewport.name} Hero restored`, "dark");
+  await assertHeaderTone(page, `${viewport.name} Hero restored`, "light");
 
   assertCleanConsole();
   await context.close();

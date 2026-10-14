@@ -33,7 +33,11 @@ export default function LandingMotion() {
       },
       {
         rootMargin: "0px 0px -10% 0px",
-        threshold: 0.12,
+        // A single positive numeric threshold never fires for sections taller
+        // than that fraction of the viewport (mobile: a near-full-height scene
+        // stays pending → a huge empty gap). Threshold 0 + isIntersecting guard
+        // reveals any section as soon as it enters the trimmed viewport.
+        threshold: 0,
       },
     );
 

@@ -19,16 +19,14 @@ export default function EvidenceScene() {
       aria-label="Почему эта компания сейчас"
       data-header-tone="dark"
       data-proof-story="why-now"
+      data-motion-reveal="section"
     >
       <div className={styles.layout}>
         <header className={styles.intro}>
           <div>
-            <p className={styles.introLabel}>Почему эта компания сейчас · {DEMO_COMPANY.name}</p>
-            <h2>Сначала факты — потом решение.</h2>
+            <p className={styles.introLabel}>Разбор карточки · {DEMO_COMPANY.name}</p>
+            <h2>Одна рекомендация — цепочка проверяемых фактов.</h2>
           </div>
-          <p>
-            По каждому пункту видно, что произошло, какой источник это опубликовал и когда сигнал зафиксирован. Уверенность помогает отсортировать очередь, а не заменяет ваше решение.
-          </p>
         </header>
 
         <div className={styles.evidenceChain} data-proof-chain="source-fact-conclusion">
@@ -38,10 +36,11 @@ export default function EvidenceScene() {
                 <span className={styles.sourceCell}>
                   {String(index + 1).padStart(2, "0")} · {event.source}
                 </span>
-                <strong className={styles.factCell}>{event.fact}</strong>
-                <span className={styles.statusCell}>
-                  {event.eventDate} · {event.confidence}
+                <span className={styles.dateCell}>
+                  <time>{event.eventDate}</time>
+                  <small>{event.confidence}</small>
                 </span>
+                <strong className={styles.factCell}>{event.fact}</strong>
               </li>
             ))}
           </ol>
