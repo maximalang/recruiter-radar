@@ -10,7 +10,7 @@ async function dispatch(request: Request): Promise<Response> {
 
   try {
     const { auth } = await import("../../../../lib/better-auth/auth");
-    return auth.handler(request);
+    return await auth.handler(request);
   } catch {
     return new Response(null, {
       status: 503,
