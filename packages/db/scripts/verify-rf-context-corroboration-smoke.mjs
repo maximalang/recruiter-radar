@@ -173,6 +173,74 @@ async function setupFixture(client) {
       evidence_id BIGINT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     ) ON COMMIT DROP;
+
+    -- Shadow the persistent ER-key view (migration 20260828100000) with a temp
+    -- view over the fixture tables. The real view is bound to the real orgs /
+    -- org_source_refs relations (bigint ids), which both hides fixture rows and
+    -- type-errors (bigint = text) against the text-id fixture below.
+    -- Keep in sync with packages/db/migrations/20260828100000_add_client_org_suppressions.sql.
+    CREATE TEMP VIEW org_corroboration_keys_v1 AS
+    WITH platform_host_domains AS (
+      SELECT unnest(ARRAY[
+        'hh.ru', 'hhcdn.com', 'trudvsem.ru', 'superjob.ru', 'superjob.com',
+        'career.habr.com', 'habr.com', 'boards.greenhouse.io', 'greenhouse.io',
+        'jobs.lever.co', 'lever.co', 'api.lever.co', 'boards-api.greenhouse.io',
+        'linkedin.com', 'hh.kz', 'hh.ua', 'rabota.ru', 'zarplata.ru'
+      ]) AS host_domain
+    )
+    SELECT
+      org.id AS org_id,
+      COALESCE(
+        (SELECT 'inn:' || LOWER(REPLACE(ref.source_key, 'inn:', ''))
+         FROM org_source_refs AS ref
+         WHERE ref.org_id = org.id AND ref.source_key LIKE 'inn:%'
+         ORDER BY ref.source_key ASC LIMIT 1),
+        (SELECT 'ogrn:' || LOWER(REPLACE(ref.source_key, 'ogrn:', ''))
+         FROM org_source_refs AS ref
+         WHERE ref.org_id = org.id AND ref.source_key LIKE 'ogrn:%'
+         ORDER BY ref.source_key ASC LIMIT 1),
+        (SELECT 'domain:' || LOWER(REPLACE(ref.source_key, 'domain:', ''))
+         FROM org_source_refs AS ref
+         WHERE ref.org_id = org.id
+           AND ref.source_key LIKE 'domain:%'
+           AND LOWER(REPLACE(ref.source_key, 'domain:', '')) NOT IN (
+             SELECT host_domain FROM platform_host_domains
+           )
+         ORDER BY ref.source_key ASC LIMIT 1),
+        CASE
+          WHEN NULLIF(BTRIM(org.domain), '') IS NOT NULL
+            AND LOWER(BTRIM(org.domain)) NOT IN (
+              SELECT host_domain FROM platform_host_domains
+            )
+          THEN 'domain:' || LOWER(BTRIM(org.domain))
+          ELSE NULL
+        END,
+        'org:' || org.id::TEXT
+      ) AS corroboration_key,
+      CASE
+        WHEN EXISTS (
+          SELECT 1 FROM org_source_refs AS ref
+          WHERE ref.org_id = org.id AND ref.source_key LIKE 'inn:%'
+        ) THEN 'inn'
+        WHEN EXISTS (
+          SELECT 1 FROM org_source_refs AS ref
+          WHERE ref.org_id = org.id AND ref.source_key LIKE 'ogrn:%'
+        ) THEN 'ogrn'
+        WHEN EXISTS (
+          SELECT 1 FROM org_source_refs AS ref
+          WHERE ref.org_id = org.id
+            AND ref.source_key LIKE 'domain:%'
+            AND LOWER(REPLACE(ref.source_key, 'domain:', '')) NOT IN (
+              SELECT host_domain FROM platform_host_domains
+            )
+        ) THEN 'domain'
+        WHEN NULLIF(BTRIM(org.domain), '') IS NOT NULL
+          AND LOWER(BTRIM(org.domain)) NOT IN (
+            SELECT host_domain FROM platform_host_domains
+          ) THEN 'domain'
+        ELSE 'org_id'
+      END AS corroboration_key_type
+    FROM orgs AS org;
   `);
 
   // Two HH fragments + two funding fragments, sharing an INN pairwise so the

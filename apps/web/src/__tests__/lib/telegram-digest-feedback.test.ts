@@ -82,7 +82,7 @@ describe('native Telegram digest feedback controls', () => {
       .slice(1)
       .flat()
       .find((button) => button.text === 'Созвон')!.callback_data
-    const tamperedCallback = `${meetingCallback.slice(0, -1)}x`
+    const tamperedCallback = `${meetingCallback.slice(0, -1)}${meetingCallback.endsWith('x') ? 'y' : 'x'}`;
 
     expect(verifyDigestFeedbackCallback(meetingCallback)?.action).toBe('meeting')
     expect(verifyDigestFeedbackCallback(tamperedCallback)).toBeNull()

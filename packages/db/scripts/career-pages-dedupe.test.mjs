@@ -40,3 +40,18 @@ test('provider-local external IDs cannot suppress a different ATS provenance edg
     lever: 0,
   });
 });
+
+test('emits an explicit expected-zero reason when no eligible career-page targets produce records', () => {
+  const input = buildNormalizedInput({
+    records: [],
+    inputMode: 'live-crawl',
+    inputFilePath: null,
+    targetsFilePath: null,
+    fetchOutputPath: null,
+    targetResults: [],
+    discoverySummary: null,
+    targetsTotal: 0,
+  });
+
+  assert.equal(input.zeroReason, 'no-eligible-company-targets');
+});
