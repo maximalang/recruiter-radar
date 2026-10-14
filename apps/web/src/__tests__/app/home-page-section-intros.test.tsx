@@ -28,6 +28,17 @@ jest.mock("@/lib/payments", () => ({
   getPaymentProviderSetupState: () => ({ configured: false }),
 }));
 
+jest.mock("next/headers", () => ({
+  headers: async () =>
+    new Headers({
+      "x-forwarded-url": "https://recruiter-radar.ru/",
+      "x-real-ip": "203.0.113.10",
+      referer: "https://hh.ru/search",
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126 Safari/537.36",
+    }),
+}));
+
 jest.mock("@/lib/publicProduct", () => {
   const actual = jest.requireActual("@/lib/publicProduct");
   return { ...actual, getPublicSampleDigestState: jest.fn() };

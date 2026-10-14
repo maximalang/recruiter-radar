@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 import { getPaymentProviderSetupState } from "../lib/payments";
 import {
@@ -7,6 +8,10 @@ import {
   readPublicPreviewInput,
   type PublicPreviewInput,
 } from "../lib/publicProduct";
+import {
+  extractLandingRequestDimensions,
+  type LandingRequestDimensions,
+} from "../lib/telemetry-ingress";
 import LandingAnalytics from "./landing-analytics";
 import { buildLandingFaqItems } from "./landing/landing-faq";
 import LandingPage, { LandingSkipLink } from "./landing/landing-page";
@@ -37,6 +42,13 @@ type HomePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
+function normalizeHeader(
+  value: string | null | undefined,
+): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const previewInput = readPublicPreviewInput(resolvedSearchParams);
@@ -45,6 +57,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const paymentSetup = getPaymentProviderSetupState();
   const faqItems = buildLandingFaqItems(paymentSetup.configured);
   const landingJsonLd = buildLandingJsonLd(paymentSetup.configured);
+  const requestHeaders = await headers();
+  const requestUrl = normalizeHeader(requestHeaders.get("x-forwarded-url"))
+    ?? (normalizeHeader(requestHeaders.get("host"))
+      ? `https://${normalizeHeader(requestHeaders.get("host"))}/`
+      : "https://localhost/");
+  const dimensions = extractLandingRequestDimensions({
+    rawClientIp: normalizeHeader(requestHeaders.get("x-real-ip")),
+    referer: normalizeHeader(requestHeaders.get("referer")),
+    userAgent: normalizeHeader(requestHeaders.get("user-agent")),
+    requestUrl,
+  });
   const landing = LandingPage({
     previewInput,
     hasPreview,
@@ -61,7 +84,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       dataDeployAnchor="recruiter-radar-landing-v3"
     >
       <LandingSkipLink />
-      <LandingAnalytics />
+      <LandingAnalytics
+        refererClass={dimensions.refererClass}
+        utmSourceClass={dimensions.utmSourceClass}
+        uaClass={dimensions.uaClass}
+        internalMarker={dimensions.internalMarker}
+      />
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger -- статический JSON-LD из серверных констант, без пользовательского ввода

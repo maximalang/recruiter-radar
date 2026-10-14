@@ -4,6 +4,7 @@ import {
   LANDING_ANALYTICS_CONTEXT,
   LANDING_ANALYTICS_EVENT,
 } from "../../lib/landing-analytics-contract";
+import { INTERNAL_MARKER } from "../../lib/telemetry-dimensions";
 import {
   PUBLIC_PLANS,
   buildCheckoutHref,
@@ -25,6 +26,10 @@ export default function ConversionPanel(props: {
 }) {
   const pilotPlan = PUBLIC_PLANS.find((plan) => plan.code === "pilot") ?? PUBLIC_PLANS[0];
   const secondaryPlans = PUBLIC_PLANS.filter((plan) => plan.code !== "pilot");
+  // Outcome linkage (work item 4): the continuation CTA reports which
+  // viewing context produced the click. The value joins into the fixed
+  // internal-marker vocabulary and is re-validated by the analytics layer.
+  const continuationAttachment = INTERNAL_MARKER.preview;
 
   return (
     <section className={panelStyles.panel} aria-label="Тарифы и ответы" data-conversion-scenes="continuous" data-conversion-panel>
@@ -88,6 +93,7 @@ export default function ConversionPanel(props: {
                     href={buildCheckoutHref({ ...props.previewInput, planCode: plan.code })}
                     data-analytics-event={LANDING_ANALYTICS_EVENT.continuationCtaClicked}
                     data-analytics-context={quarterly ? LANDING_ANALYTICS_CONTEXT.quarterly : LANDING_ANALYTICS_CONTEXT.monthly}
+                    data-analytics-attachment={continuationAttachment}
                   >
                     {quarterly ? "Квартал" : "Месяц"} <ArrowGlyph />
                   </Link>

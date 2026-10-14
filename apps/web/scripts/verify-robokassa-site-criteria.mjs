@@ -157,7 +157,7 @@ for (const token of [
 
 for (const token of [
   'ANALYTICS_CONSENT_STORAGE_KEY = "rr_analytics_consent"',
-  "ANALYTICS_CONSENT_POLICY_VERSION = 2",
+  "ANALYTICS_CONSENT_POLICY_VERSION = 3",
 ]) requireText("analyticsConsent", token, `versioned analytics consent requirement ${token}`);
 
 if (process.argv.includes("--network")) await verifyDeployedOrigin();
