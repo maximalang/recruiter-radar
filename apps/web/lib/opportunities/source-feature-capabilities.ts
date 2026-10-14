@@ -117,6 +117,25 @@ export const SOURCE_FEATURE_CAPABILITIES: Record<SourceId, CapabilitySet> = {
   'cbr-registry': nonVacancySource(),
   'rosstat-open-data': nonVacancySource(),
   'rospatent-open-data': nonVacancySource(),
+  // 2026-10 public source expansion: international job boards produce vacancy
+  // observations without a normalized RUB salary contract; context and registry
+  // sources are non-vacancy producers.
+  themuse: vacancySource({ salary: false }),
+  landingjobs: vacancySource({ salary: false }),
+  arbeitnow: vacancySource({ salary: false }),
+  remoteok: vacancySource({ salary: false }),
+  jobicy: vacancySource({ salary: false }),
+  himalayas: vacancySource({ salary: false }),
+  remotive: vacancySource({ salary: false }),
+  weworkremotely: vacancySource({ salary: false }),
+  'hackernews-jobs': vacancySource({ salary: false }),
+  'hn-algolia': nonVacancySource(),
+  devto: nonVacancySource(),
+  'gdelt-context': nonVacancySource(),
+  openalex: nonVacancySource(),
+  ror: nonVacancySource(),
+  'cbr-fx-daily': nonVacancySource(),
+  'trudvsem-opendata-datasets': nonVacancySource(),
 }
 
 // Records ingested before the concrete ATS source IDs were introduced remain

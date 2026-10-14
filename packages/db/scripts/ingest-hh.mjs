@@ -66,6 +66,7 @@ try {
           evidenceUpsertCount: 0,
           evidenceCreatedCount: 0,
           lineageCreatedCount: 0,
+          orgAnchorKeeps: 0,
           skippedSignalCount: 0,
         }
       : await upsertVacancies(databaseUrl, normalizedVacancies);
@@ -91,6 +92,7 @@ try {
     evidenceUpsertsCompleted: stats.evidenceUpsertCount,
     evidenceCreated: stats.evidenceCreatedCount,
     lineageCreated: stats.lineageCreatedCount,
+    orgAnchorKeeps: stats.orgAnchorKeeps ?? 0,
   }));
 
   if (stats.skippedSignalCount > 0) {
@@ -236,6 +238,7 @@ async function upsertVacancies(connectionString, vacancies) {
   let evidenceUpsertCount = 0;
   let evidenceCreatedCount = 0;
   let lineageCreatedCount = 0;
+  let orgAnchorKeeps = 0;
   let skippedSignalCount = 0;
 
   await client.connect();
@@ -286,6 +289,7 @@ async function upsertVacancies(connectionString, vacancies) {
       evidenceUpsertCount += lineage.evidenceUpsertCount;
       evidenceCreatedCount += lineage.evidenceCreatedCount;
       lineageCreatedCount += lineage.lineageCreatedCount;
+      orgAnchorKeeps += lineage.orgAnchorKeeps ?? 0;
     }
 
     await client.query('COMMIT');
@@ -296,6 +300,7 @@ async function upsertVacancies(connectionString, vacancies) {
       evidenceUpsertCount,
       evidenceCreatedCount,
       lineageCreatedCount,
+      orgAnchorKeeps,
       skippedSignalCount,
     };
   } catch (error) {

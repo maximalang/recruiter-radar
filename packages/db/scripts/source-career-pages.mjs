@@ -50,7 +50,7 @@ import {
   extractCareerPageContactPaths,
   toPersistableContactPaths,
 } from './lib/career-page-contacts.mjs';
-import { resolveSuccessfulIngestZeroReason } from './adapters/rf-source-runtime.mjs';
+import { resolveCareerPagesIngestZeroReason } from './adapters/career-pages-health.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -142,7 +142,7 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
           lineageCreated: stats.lineageCreatedCount,
           organizationResolutionRejects: stats.organizationResolutionRejects,
           organizationResolutionRejectedTargetKeys: stats.organizationResolutionRejectedTargetKeys,
-          zeroReason: resolveSuccessfulIngestZeroReason(input, stats),
+          zeroReason: resolveCareerPagesIngestZeroReason(input, stats),
           health,
         },
         null,
@@ -3456,7 +3456,7 @@ function buildIngestSummary(input, stats) {
     lineageCreated: stats.lineageCreatedCount,
     organizationResolutionRejects: stats.organizationResolutionRejects,
     organizationResolutionRejectedTargetKeys: stats.organizationResolutionRejectedTargetKeys,
-    zeroReason: resolveSuccessfulIngestZeroReason(input, stats),
+    zeroReason: resolveCareerPagesIngestZeroReason(input, stats),
     health: buildHealthForInput(input, stats),
   };
 }

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { DeliveryPreferences } from "../../lib/deliveryPreferences";
+import { WebPushOptIn } from "../ui/web-push-opt-in";
 import { computeNextDeliveryHint } from "../../lib/delivery/nextDeliveryHint";
 import { FormSubmitButton } from "../ui/form-submit-button";
 import { NoticeBox } from "../ui/page-primitives";
@@ -34,7 +35,11 @@ const FREQUENCIES: ReadonlyArray<{ value: "daily" | "weekly"; label: string }> =
  * Schedule and additive browser/email preferences. Provider accounts and concrete
  * Telegram, VK and webhook destinations are managed by NotificationChannels.
  */
-export function DeliveryForm(props: { preferences: DeliveryPreferences }) {
+export function DeliveryForm(props: {
+  preferences: DeliveryPreferences;
+  /** Server-resolved Web Push state; when present the browser opt-in is rendered. */
+  webPush?: { configured: boolean; publicKey: string | null };
+}) {
   const { preferences } = props;
   const [state, formAction] = useActionState<SaveDeliveryResult | null, FormData>(
     saveDeliveryPreferencesAction,
@@ -148,6 +153,9 @@ export function DeliveryForm(props: { preferences: DeliveryPreferences }) {
           <input type="checkbox" name="webPushEnabled" defaultChecked={preferences.webPushEnabled} />
           Присылать браузерные уведомления о сильных лидах
         </label>
+        {props.webPush ? (
+          <WebPushOptIn configured={props.webPush.configured} publicKey={props.webPush.publicKey} />
+        ) : null}
       </fieldset>
 
       <fieldset className={styles.group}>

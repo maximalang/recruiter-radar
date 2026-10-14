@@ -602,6 +602,555 @@
         "contract": ["npm run verify:source:readiness"]
       },
       "blockers": []
+    },
+    "themuse": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=themuse): input mode live-public, provider themuse-public-jobs-api, received 5, normalized 5, skipped 0; samples: Relationship Banker - Sarasota Market — Bank of America | HLW Piping Field Engineer — Bechtel.",
+          "Bounded adapter fetch (THEMUSE_MAX_RECORDS=5, page=1 of the public jobs API) normalized every received listing with company attribution."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "landingjobs": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=landingjobs): input mode live-public, provider landing-jobs-public-api, received 5, normalized 5, skipped 0; samples: Senior Java Software Developer — inscale | (Senior) Data Engineer — ki performance.",
+          "Organization identity is derived from the listing URL path (/at/<org>/...); no credentials are used."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "arbeitnow": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=arbeitnow): input mode live-public, provider arbeitnow-job-board-api, received 5, normalized 5, skipped 0; samples: Software Engineer — Preiswecker | Florist:in — farnifleur - FLORAL SHOP & EVENT FLORISTRY.",
+          "Single bounded page of the public job-board API; company_name taken from the listing payload."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "remoteok": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=remoteok): input mode live-public, provider remoteok-public-api, received 5, normalized 5, skipped 0; samples: Enterprise Sales Development Representative — Toptal | Client Advisor — Toptal.",
+          "RemoteOK API terms require a follow backlink to the RemoteOK listing URL and source credit; the adapter keeps the listing URL as source_url and records board attribution, and skips the leading legal-notice array element."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "jobicy": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=jobicy): input mode live-public, provider jobicy-api-v2, received 5, normalized 5, skipped 0; samples: Software Engineer I, Agentic Platform EMEA (Poland, Remote, B2B) — Samsara | Developer Advocate - Service Management EMEA — Datadog.",
+          "Jobicy API terms require credit and a link to the original listing; both are preserved (board tag + source_url)."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "himalayas": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=himalayas): input mode live-public, provider himalayas-jobs-api, received 5, normalized 5, skipped 0; samples: INDEPENDENT DIRECTOR — iQualex Financial Group Limited | AI Infrastructure Full-Stack Developer (100 % remote) (m/f/d) — EWOR GmbH.",
+          "Cursor-paginated public API; bounded to the first page (HIMALAYAS_LIMIT=5) with guid as external id and applicationLink as source_url."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "remotive": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=remotive): input mode live-public, provider remotive-public-api, received 5, normalized 5, skipped 0; samples: Content Reviewer - United States — TELUS Digital | Frontend Web Application Developer — KoboToolbox.",
+          "Bounded public API fetch (REMOTIVE_LIMIT=5); salary text is intentionally NOT mapped into the RUB salary-quality fields to avoid currency mislabeling."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "weworkremotely": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:56:52Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=weworkremotely): input mode live-public, provider weworkremotely-category-rss, received 5, normalized 5, skipped 0; samples: Staff Software Engineer — Samsara | AI agent engineer — Sticker Mule.",
+          "Category RSS parsed with the shared feed parser; company is parsed from the \"Company: Position\" item title; items without a company prefix are skipped."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "hackernews-jobs": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=hackernews-jobs): input mode live-public, provider hacker-news-firebase-jobstories, received 3, normalized 3, skipped 0; samples: a GTM Founder's Associate — Truemetrics | a Founding Product Engineer — Bild AI.",
+          "Firebase jobstories list plus bounded per-item fetches (HACKERNEWS_JOBS_MAX_ITEMS=3); YC company parsed from the title; the posting URL (often ycombinator.com) is kept as source_url only and never used for org domain identity."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "pending",
+      "eligibility": "supporting-evidence-only",
+      "legalReview": "approved",
+      "pipelineProfile": "hiring-gated-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "hn-algolia": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=hn-algolia): input mode live-public, provider hn-algolia-search-api, received 3, normalized 3, skipped 0; samples: GitLab sees huge spike in project imports — GitLab | Founder of GitLab battles cancer by founding companies — GitLab.",
+          "Query-driven: HN_ALGOLIA_QUERIES=GitLab for this verification; stories are attributed to the query organization only when the phrase matches title or URL; without configured queries the live run is an expected-zero no-op."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "devto": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=devto): input mode live-public, provider devto-articles-api, received 1, normalized 1, skipped 0; samples: Timber is Hiring a Developer Advocate — Timber.",
+          "Only articles carrying a dev.to organization attribution are kept; unattributed articles are skipped so publisher-domain identities are never polluted."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "gdelt-context": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "reachable",
+        "verifiedAt": "",
+        "evidence": [
+          "Uses the shared throttled GDELT DOC client with a dedicated cache file and backoff, separate from funding-business-signals; query convention mirrors FUNDING_SIGNALS_GDELT_QUERIES.",
+          "Registration-window verification on 2026-10-01 hit the GDELT free-tier limit: the shared DOC client recorded HTTP 429 and deferred further attempts through its persisted cooldown (GDELT DOC API returned HTTP 429). Transport, query building and normalization are exercised by the fixture smoke; a successful production live fetch must be recorded before daily activation."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": [
+        "GDELT DOC API free tier returned HTTP 429 during the 2026-10-01 registration verification; record a successful production live fetch before daily activation."
+      ]
+    },
+    "openalex": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=openalex): input mode live-public, provider openalex-works-api, received 2, normalized 2, skipped 0; samples: Artificial intelligence: a modern approach — University of California, Berkeley | High-performance medicine: the convergence of human and artificial intelligence — Scripps Research Institute.",
+          "OPENALEX_SEARCH_TERMS drives the works search; records are attributed to author institutions (preferring an institution whose name matches the term); without terms the live run is an expected-zero no-op."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "ror": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:54:32Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=ror): input mode live-public, provider ror-organizations-api-v2, received 3, normalized 3, skipped 0; samples: Microsoft (Germany) — Microsoft (Germany) | Microsoft (Belgium) — Microsoft (Belgium).",
+          "ROR v2 organizations API (v1 returns HTTP 410 Gone); identity uses the canonical ror_display name plus the website link domain; ror_id is preserved in the payload and signal key."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "not-applicable",
+      "eligibility": "enrichment-only",
+      "legalReview": "approved",
+      "pipelineProfile": "enrichment-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
+    },
+    "cbr-fx-daily": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "reachable",
+        "verifiedAt": "",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=cbr-fx-daily): input mode live-public, provider https://www.cbr-xml-daily.ru/daily_json.js, received 1, normalized 1, skipped 0; samples: CBR daily FX snapshot 2026-10-02 — Bank of Russia.",
+          "One market-snapshot context record per fetch (all currency rates in payload); attribution is the publisher (Bank of Russia, cbr.ru domain identity).",
+          "Mirror verification on 2026-10-01: GET https://www.cbr-xml-daily.ru/daily_json.js returned HTTP 200 and the adapter normalized 1 daily snapshot record (34+ currency rates, base RUB) with publisher attribution. The official endpoint https://www.cbr.ru/scripts/XML_daily.asp reset TLS from the 2026-10-01 verification network for both node-https and curl (ECONNRESET before handshake); the official endpoint or an explicitly configured mirror must be re-verified from the production runtime before activation."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": [
+        "Official cbr.ru endpoint reset TLS from the 2026-10-01 verification network; re-verify the official endpoint (or an explicitly approved mirror configuration) from the production runtime before activation."
+      ]
+    },
+    "trudvsem-opendata-datasets": {
+      "implementation": "implemented",
+      "fixture": "tested",
+      "contract": "tested",
+      "configuration": {
+        "mode": "not-required",
+        "acceptedEnvSets": []
+      },
+      "live": {
+        "state": "verified",
+        "verifiedAt": "2026-10-01T18:56:52Z",
+        "evidence": [
+          "Live-public fetch on 2026-10-01 through the production adapter path (node packages/db/scripts/verify-public-source-expansion-live.mjs --only=trudvsem-opendata-datasets): input mode live-public, provider https://opendata.trudvsem.ru/list.xml, received 20, normalized 20, skipped 0; samples: Приглашения работодателей из ЕЦП «Работа в России» — Федеральная служба по труду и занятости (Роструд) | Организации из ЕЦП «Работа в России» — Федеральная служба по труду и занятости (Роструд).",
+          "Official RF open data 3.0 catalog (list.xml); each dataset entry is a context record attributed to the publisher Rostrud via the identifier INN prefix 7710538364 (checksum-valid)."
+        ]
+      },
+      "requiresLiveVerification": true,
+      "confidence": "not-applicable",
+      "eligibility": "context-only",
+      "legalReview": "approved",
+      "pipelineProfile": "context-standard",
+      "verification": {
+        "fixture": [
+          "npm run verify:public-source-expansion:smoke"
+        ],
+        "live": [
+          "npm run verify:public-source-expansion:live"
+        ],
+        "contract": [
+          "npm run verify:sources:readiness"
+        ]
+      },
+      "blockers": []
     }
   }
 }

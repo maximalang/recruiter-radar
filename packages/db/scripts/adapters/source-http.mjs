@@ -5,6 +5,12 @@ const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 250;
 const DEFAULT_RETRY_STATUSES = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
+// Retry-After is an explicit upstream instruction to back off; honour it up to
+// this cap so a hostile/large header cannot stall a source beyond its execFile
+// budget (default 120s). Sources like hh.ru throttle with Retry-After measured
+// in seconds — retrying after 250ms/500ms burns every attempt while the
+// throttle window is still open.
+const MAX_RETRY_AFTER_DELAY_MS = 30_000;
 
 export class SourceHttpError extends Error {
   constructor(message, { url, status, statusText, retryAfter, attempt, cause } = {}) {
@@ -108,6 +114,9 @@ export async function fetchWithSourcePolicy(url, options = {}) {
     }, timeoutMs);
 
     const combinedSignal = combineSignals(signal, controller.signal);
+    // Try-block scoped (see below); captured here so the retry back-off after
+    // the finally block can still read the throttled response's Retry-After.
+    let latestResponse = null;
 
     try {
       const response = await fetchImpl(url, {
@@ -118,6 +127,7 @@ export async function fetchWithSourcePolicy(url, options = {}) {
         signal: combinedSignal,
         ...(dispatcher ? { dispatcher } : {}),
       });
+      latestResponse = response;
 
       if (!retryStatuses.has(response.status) || attempt === maxAttempts) {
         return response;
@@ -153,10 +163,55 @@ export async function fetchWithSourcePolicy(url, options = {}) {
       clearTimeout(timeout);
     }
 
-    await delay(retryDelayMs * attempt);
+    await delay(
+      retryDelayMs * attempt
+        + retryAfterDelayMs(getResponseRetryAfter(latestResponse, lastError)),
+    );
   }
 
   throw lastError ?? new SourceHttpError(`${sourceName} request failed for ${safeUrl}`, { url: safeUrl });
+}
+
+/**
+ * Retry-After of the throttled response that is about to be retried. The
+ * response header wins; the already-parsed status error is the fallback for
+ * paths where the response object is not in scope (transport-error retries).
+ */
+function getResponseRetryAfter(response, lastError) {
+  const headerValue = response?.headers?.get?.('retry-after');
+  if (typeof headerValue === 'string' && headerValue.trim() !== '') {
+    return headerValue.trim();
+  }
+  return typeof lastError?.retryAfter === 'string' && lastError.retryAfter.trim() !== ''
+    ? lastError.retryAfter.trim()
+    : null;
+}
+
+/**
+ * Convert a Retry-After value (delta-seconds or HTTP-date) into a bounded
+ * back-off delay. Unparseable or absent values contribute nothing, and the
+ * result is capped so a single retry can never exceed the source's runtime
+ * budget.
+ */
+function retryAfterDelayMs(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return 0;
+  }
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(Math.round(seconds * 1000), MAX_RETRY_AFTER_DELAY_MS);
+  }
+
+  const dateMs = Date.parse(value);
+  if (Number.isFinite(dateMs)) {
+    const waitMs = dateMs - Date.now();
+    if (waitMs > 0) {
+      return Math.min(waitMs, MAX_RETRY_AFTER_DELAY_MS);
+    }
+  }
+
+  return 0;
 }
 
 async function buildStatusError(response, sourceName = 'source', attempt) {
@@ -199,7 +254,10 @@ async function fetchJsonWithNodeHttpFallback(url, options, originalError) {
         throw error;
       }
 
-      await delay((options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS) * attempt);
+      await delay(
+        (options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS) * attempt
+          + retryAfterDelayMs(error.retryAfter),
+      );
     }
   }
 

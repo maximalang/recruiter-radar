@@ -44,6 +44,22 @@ const SOURCE_IDS = [
   'cbr-registry',
   'rosstat-open-data',
   'rospatent-open-data',
+  'themuse',
+  'landingjobs',
+  'arbeitnow',
+  'remoteok',
+  'jobicy',
+  'himalayas',
+  'remotive',
+  'weworkremotely',
+  'hackernews-jobs',
+  'hn-algolia',
+  'devto',
+  'gdelt-context',
+  'openalex',
+  'ror',
+  'cbr-fx-daily',
+  'trudvsem-opendata-datasets',
 ] as const
 
 const SOURCE_ENV_PREFIXES = [

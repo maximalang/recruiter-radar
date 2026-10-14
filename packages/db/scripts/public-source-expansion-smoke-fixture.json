@@ -1,0 +1,998 @@
+{
+  "themuse": [
+    {
+      "external_id": "themuse-fixture-1",
+      "title": "Fixture themuse role 1",
+      "company_name": "Fixture themuse employer 1",
+      "location": "Remote",
+      "published_at": "2026-09-21T10:00:00Z",
+      "url": "https://fixture.invalid/themuse/job-1",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "themuse"
+    },
+    {
+      "external_id": "themuse-fixture-2",
+      "title": "Fixture themuse role 2",
+      "company_name": "Fixture themuse employer 2",
+      "location": "Remote",
+      "published_at": "2026-09-22T10:00:00Z",
+      "url": "https://fixture.invalid/themuse/job-2",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "themuse"
+    },
+    {
+      "external_id": "themuse-fixture-3",
+      "title": "Fixture themuse role 3",
+      "company_name": "Fixture themuse employer 3",
+      "location": "Remote",
+      "published_at": "2026-09-23T10:00:00Z",
+      "url": "https://fixture.invalid/themuse/job-3",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "themuse"
+    },
+    {
+      "external_id": "themuse-fixture-4",
+      "title": "Fixture themuse role 4",
+      "company_name": "Fixture themuse employer 4",
+      "location": "Remote",
+      "published_at": "2026-09-24T10:00:00Z",
+      "url": "https://fixture.invalid/themuse/job-4",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "themuse"
+    },
+    {
+      "external_id": "themuse-fixture-bad-1",
+      "title": "Missing company record",
+      "url": "https://fixture.invalid/themuse/bad-1",
+      "board": "themuse"
+    },
+    {
+      "external_id": "themuse-fixture-bad-2",
+      "company_name": "Missing url company",
+      "title": "Missing url record",
+      "board": "themuse"
+    }
+  ],
+  "landingjobs": [
+    {
+      "external_id": "landingjobs-fixture-1",
+      "title": "Fixture landingjobs role 1",
+      "company_name": "Fixture landingjobs employer 1",
+      "location": "Remote",
+      "published_at": "2026-09-21T10:00:00Z",
+      "url": "https://fixture.invalid/landingjobs/job-1",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "landingjobs"
+    },
+    {
+      "external_id": "landingjobs-fixture-2",
+      "title": "Fixture landingjobs role 2",
+      "company_name": "Fixture landingjobs employer 2",
+      "location": "Remote",
+      "published_at": "2026-09-22T10:00:00Z",
+      "url": "https://fixture.invalid/landingjobs/job-2",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "landingjobs"
+    },
+    {
+      "external_id": "landingjobs-fixture-3",
+      "title": "Fixture landingjobs role 3",
+      "company_name": "Fixture landingjobs employer 3",
+      "location": "Remote",
+      "published_at": "2026-09-23T10:00:00Z",
+      "url": "https://fixture.invalid/landingjobs/job-3",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "landingjobs"
+    },
+    {
+      "external_id": "landingjobs-fixture-4",
+      "title": "Fixture landingjobs role 4",
+      "company_name": "Fixture landingjobs employer 4",
+      "location": "Remote",
+      "published_at": "2026-09-24T10:00:00Z",
+      "url": "https://fixture.invalid/landingjobs/job-4",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "landingjobs"
+    },
+    {
+      "external_id": "landingjobs-fixture-bad-1",
+      "title": "Missing company record",
+      "url": "https://fixture.invalid/landingjobs/bad-1",
+      "board": "landingjobs"
+    },
+    {
+      "external_id": "landingjobs-fixture-bad-2",
+      "company_name": "Missing url company",
+      "title": "Missing url record",
+      "board": "landingjobs"
+    }
+  ],
+  "arbeitnow": [
+    {
+      "external_id": "arbeitnow-fixture-1",
+      "title": "Fixture arbeitnow role 1",
+      "company_name": "Fixture arbeitnow employer 1",
+      "location": "Remote",
+      "published_at": "2026-09-21T10:00:00Z",
+      "url": "https://fixture.invalid/arbeitnow/job-1",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "arbeitnow"
+    },
+    {
+      "external_id": "arbeitnow-fixture-2",
+      "title": "Fixture arbeitnow role 2",
+      "company_name": "Fixture arbeitnow employer 2",
+      "location": "Remote",
+      "published_at": "2026-09-22T10:00:00Z",
+      "url": "https://fixture.invalid/arbeitnow/job-2",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "arbeitnow"
+    },
+    {
+      "external_id": "arbeitnow-fixture-3",
+      "title": "Fixture arbeitnow role 3",
+      "company_name": "Fixture arbeitnow employer 3",
+      "location": "Remote",
+      "published_at": "2026-09-23T10:00:00Z",
+      "url": "https://fixture.invalid/arbeitnow/job-3",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "arbeitnow"
+    },
+    {
+      "external_id": "arbeitnow-fixture-4",
+      "title": "Fixture arbeitnow role 4",
+      "company_name": "Fixture arbeitnow employer 4",
+      "location": "Remote",
+      "published_at": "2026-09-24T10:00:00Z",
+      "url": "https://fixture.invalid/arbeitnow/job-4",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "arbeitnow"
+    },
+    {
+      "external_id": "arbeitnow-fixture-bad-1",
+      "title": "Missing company record",
+      "url": "https://fixture.invalid/arbeitnow/bad-1",
+      "board": "arbeitnow"
+    },
+    {
+      "external_id": "arbeitnow-fixture-bad-2",
+      "company_name": "Missing url company",
+      "title": "Missing url record",
+      "board": "arbeitnow"
+    }
+  ],
+  "remoteok": [
+    {
+      "external_id": "remoteok-fixture-1",
+      "title": "Fixture remoteok role 1",
+      "company_name": "Fixture remoteok employer 1",
+      "location": "Remote",
+      "published_at": "2026-09-21T10:00:00Z",
+      "url": "https://fixture.invalid/remoteok/job-1",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "remoteok"
+    },
+    {
+      "external_id": "remoteok-fixture-2",
+      "title": "Fixture remoteok role 2",
+      "company_name": "Fixture remoteok employer 2",
+      "location": "Remote",
+      "published_at": "2026-09-22T10:00:00Z",
+      "url": "https://fixture.invalid/remoteok/job-2",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "remoteok"
+    },
+    {
+      "external_id": "remoteok-fixture-3",
+      "title": "Fixture remoteok role 3",
+      "company_name": "Fixture remoteok employer 3",
+      "location": "Remote",
+      "published_at": "2026-09-23T10:00:00Z",
+      "url": "https://fixture.invalid/remoteok/job-3",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "remoteok"
+    },
+    {
+      "external_id": "remoteok-fixture-4",
+      "title": "Fixture remoteok role 4",
+      "company_name": "Fixture remoteok employer 4",
+      "location": "Remote",
+      "published_at": "2026-09-24T10:00:00Z",
+      "url": "https://fixture.invalid/remoteok/job-4",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "remoteok"
+    },
+    {
+      "external_id": "remoteok-fixture-bad-1",
+      "title": "Missing company record",
+      "url": "https://fixture.invalid/remoteok/bad-1",
+      "board": "remoteok"
+    },
+    {
+      "external_id": "remoteok-fixture-bad-2",
+      "company_name": "Missing url company",
+      "title": "Missing url record",
+      "board": "remoteok"
+    }
+  ],
+  "jobicy": [
+    {
+      "external_id": "jobicy-fixture-1",
+      "title": "Fixture jobicy role 1",
+      "company_name": "Fixture jobicy employer 1",
+      "location": "Remote",
+      "published_at": "2026-09-21T10:00:00Z",
+      "url": "https://fixture.invalid/jobicy/job-1",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "jobicy"
+    },
+    {
+      "external_id": "jobicy-fixture-2",
+      "title": "Fixture jobicy role 2",
+      "company_name": "Fixture jobicy employer 2",
+      "location": "Remote",
+      "published_at": "2026-09-22T10:00:00Z",
+      "url": "https://fixture.invalid/jobicy/job-2",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "jobicy"
+    },
+    {
+      "external_id": "jobicy-fixture-3",
+      "title": "Fixture jobicy role 3",
+      "company_name": "Fixture jobicy employer 3",
+      "location": "Remote",
+      "published_at": "2026-09-23T10:00:00Z",
+      "url": "https://fixture.invalid/jobicy/job-3",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "jobicy"
+    },
+    {
+      "external_id": "jobicy-fixture-4",
+      "title": "Fixture jobicy role 4",
+      "company_name": "Fixture jobicy employer 4",
+      "location": "Remote",
+      "published_at": "2026-09-24T10:00:00Z",
+      "url": "https://fixture.invalid/jobicy/job-4",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "jobicy"
+    },
+    {
+      "external_id": "jobicy-fixture-bad-1",
+      "title": "Missing company record",
+      "url": "https://fixture.invalid/jobicy/bad-1",
+      "board": "jobicy"
+    },
+    {
+      "external_id": "jobicy-fixture-bad-2",
+      "company_name": "Missing url company",
+      "title": "Missing url record",
+      "board": "jobicy"
+    }
+  ],
+  "himalayas": [
+    {
+      "external_id": "himalayas-fixture-1",
+      "title": "Fixture himalayas role 1",
+      "company_name": "Fixture himalayas employer 1",
+      "location": "Remote",
+      "published_at": "2026-09-21T10:00:00Z",
+      "url": "https://fixture.invalid/himalayas/job-1",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "himalayas"
+    },
+    {
+      "external_id": "himalayas-fixture-2",
+      "title": "Fixture himalayas role 2",
+      "company_name": "Fixture himalayas employer 2",
+      "location": "Remote",
+      "published_at": "2026-09-22T10:00:00Z",
+      "url": "https://fixture.invalid/himalayas/job-2",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "himalayas"
+    },
+    {
+      "external_id": "himalayas-fixture-3",
+      "title": "Fixture himalayas role 3",
+      "company_name": "Fixture himalayas employer 3",
+      "location": "Remote",
+      "published_at": "2026-09-23T10:00:00Z",
+      "url": "https://fixture.invalid/himalayas/job-3",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "himalayas"
+    },
+    {
+      "external_id": "himalayas-fixture-4",
+      "title": "Fixture himalayas role 4",
+      "company_name": "Fixture himalayas employer 4",
+      "location": "Remote",
+      "published_at": "2026-09-24T10:00:00Z",
+      "url": "https://fixture.invalid/himalayas/job-4",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "himalayas"
+    },
+    {
+      "external_id": "himalayas-fixture-bad-1",
+      "title": "Missing company record",
+      "url": "https://fixture.invalid/himalayas/bad-1",
+      "board": "himalayas"
+    },
+    {
+      "external_id": "himalayas-fixture-bad-2",
+      "company_name": "Missing url company",
+      "title": "Missing url record",
+      "board": "himalayas"
+    }
+  ],
+  "remotive": [
+    {
+      "external_id": "remotive-fixture-1",
+      "title": "Fixture remotive role 1",
+      "company_name": "Fixture remotive employer 1",
+      "location": "Remote",
+      "published_at": "2026-09-21T10:00:00Z",
+      "url": "https://fixture.invalid/remotive/job-1",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "remotive"
+    },
+    {
+      "external_id": "remotive-fixture-2",
+      "title": "Fixture remotive role 2",
+      "company_name": "Fixture remotive employer 2",
+      "location": "Remote",
+      "published_at": "2026-09-22T10:00:00Z",
+      "url": "https://fixture.invalid/remotive/job-2",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "remotive"
+    },
+    {
+      "external_id": "remotive-fixture-3",
+      "title": "Fixture remotive role 3",
+      "company_name": "Fixture remotive employer 3",
+      "location": "Remote",
+      "published_at": "2026-09-23T10:00:00Z",
+      "url": "https://fixture.invalid/remotive/job-3",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "remotive"
+    },
+    {
+      "external_id": "remotive-fixture-4",
+      "title": "Fixture remotive role 4",
+      "company_name": "Fixture remotive employer 4",
+      "location": "Remote",
+      "published_at": "2026-09-24T10:00:00Z",
+      "url": "https://fixture.invalid/remotive/job-4",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "remotive"
+    },
+    {
+      "external_id": "remotive-fixture-bad-1",
+      "title": "Missing company record",
+      "url": "https://fixture.invalid/remotive/bad-1",
+      "board": "remotive"
+    },
+    {
+      "external_id": "remotive-fixture-bad-2",
+      "company_name": "Missing url company",
+      "title": "Missing url record",
+      "board": "remotive"
+    }
+  ],
+  "weworkremotely": [
+    {
+      "external_id": "weworkremotely-fixture-1",
+      "title": "Fixture weworkremotely role 1",
+      "company_name": "Fixture weworkremotely employer 1",
+      "location": "Remote",
+      "published_at": "2026-09-21T10:00:00Z",
+      "url": "https://fixture.invalid/weworkremotely/job-1",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "weworkremotely"
+    },
+    {
+      "external_id": "weworkremotely-fixture-2",
+      "title": "Fixture weworkremotely role 2",
+      "company_name": "Fixture weworkremotely employer 2",
+      "location": "Remote",
+      "published_at": "2026-09-22T10:00:00Z",
+      "url": "https://fixture.invalid/weworkremotely/job-2",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "weworkremotely"
+    },
+    {
+      "external_id": "weworkremotely-fixture-3",
+      "title": "Fixture weworkremotely role 3",
+      "company_name": "Fixture weworkremotely employer 3",
+      "location": "Remote",
+      "published_at": "2026-09-23T10:00:00Z",
+      "url": "https://fixture.invalid/weworkremotely/job-3",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "weworkremotely"
+    },
+    {
+      "external_id": "weworkremotely-fixture-4",
+      "title": "Fixture weworkremotely role 4",
+      "company_name": "Fixture weworkremotely employer 4",
+      "location": "Remote",
+      "published_at": "2026-09-24T10:00:00Z",
+      "url": "https://fixture.invalid/weworkremotely/job-4",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "weworkremotely"
+    },
+    {
+      "external_id": "weworkremotely-fixture-bad-1",
+      "title": "Missing company record",
+      "url": "https://fixture.invalid/weworkremotely/bad-1",
+      "board": "weworkremotely"
+    },
+    {
+      "external_id": "weworkremotely-fixture-bad-2",
+      "company_name": "Missing url company",
+      "title": "Missing url record",
+      "board": "weworkremotely"
+    }
+  ],
+  "hackernews-jobs": [
+    {
+      "external_id": "hackernews-jobs-fixture-1",
+      "title": "Fixture hackernews-jobs role 1",
+      "company_name": "Fixture hackernews-jobs employer 1",
+      "location": "Remote",
+      "published_at": "2026-09-21T10:00:00Z",
+      "url": "https://fixture.invalid/hackernews-jobs/job-1",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "hackernews-jobs"
+    },
+    {
+      "external_id": "hackernews-jobs-fixture-2",
+      "title": "Fixture hackernews-jobs role 2",
+      "company_name": "Fixture hackernews-jobs employer 2",
+      "location": "Remote",
+      "published_at": "2026-09-22T10:00:00Z",
+      "url": "https://fixture.invalid/hackernews-jobs/job-2",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "hackernews-jobs"
+    },
+    {
+      "external_id": "hackernews-jobs-fixture-3",
+      "title": "Fixture hackernews-jobs role 3",
+      "company_name": "Fixture hackernews-jobs employer 3",
+      "location": "Remote",
+      "published_at": "2026-09-23T10:00:00Z",
+      "url": "https://fixture.invalid/hackernews-jobs/job-3",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "hackernews-jobs"
+    },
+    {
+      "external_id": "hackernews-jobs-fixture-4",
+      "title": "Fixture hackernews-jobs role 4",
+      "company_name": "Fixture hackernews-jobs employer 4",
+      "location": "Remote",
+      "published_at": "2026-09-24T10:00:00Z",
+      "url": "https://fixture.invalid/hackernews-jobs/job-4",
+      "tags": [
+        "fixture",
+        "remote"
+      ],
+      "board": "hackernews-jobs"
+    },
+    {
+      "external_id": "hackernews-jobs-fixture-bad-1",
+      "title": "Missing company record",
+      "url": "https://fixture.invalid/hackernews-jobs/bad-1",
+      "board": "hackernews-jobs"
+    },
+    {
+      "external_id": "hackernews-jobs-fixture-bad-2",
+      "company_name": "Missing url company",
+      "title": "Missing url record",
+      "board": "hackernews-jobs"
+    }
+  ],
+  "hn-algolia": [
+    {
+      "company_name": "Fixture hn-algolia org 1",
+      "external_id": "hn-algolia-fixture-1",
+      "headline": "Fixture hn-algolia hiring context headline 1",
+      "source_url": "https://fixture.invalid/hn-algolia/story-1",
+      "published_at": "2026-09-21T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture hn-algolia org 2",
+      "external_id": "hn-algolia-fixture-2",
+      "headline": "Fixture hn-algolia hiring context headline 2",
+      "source_url": "https://fixture.invalid/hn-algolia/story-2",
+      "published_at": "2026-09-22T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture hn-algolia org 3",
+      "external_id": "hn-algolia-fixture-3",
+      "headline": "Fixture hn-algolia hiring context headline 3",
+      "source_url": "https://fixture.invalid/hn-algolia/story-3",
+      "published_at": "2026-09-23T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture hn-algolia org 4",
+      "external_id": "hn-algolia-fixture-4",
+      "headline": "Fixture hn-algolia hiring context headline 4",
+      "source_url": "https://fixture.invalid/hn-algolia/story-4",
+      "published_at": "2026-09-24T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "external_id": "hn-algolia-fixture-bad-1",
+      "headline": "Missing company headline",
+      "source_url": "https://fixture.invalid/hn-algolia/bad-1"
+    },
+    null
+  ],
+  "devto": [
+    {
+      "company_name": "Fixture devto org 1",
+      "external_id": "devto-fixture-1",
+      "headline": "Fixture devto hiring context headline 1",
+      "source_url": "https://fixture.invalid/devto/story-1",
+      "published_at": "2026-09-21T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture devto org 2",
+      "external_id": "devto-fixture-2",
+      "headline": "Fixture devto hiring context headline 2",
+      "source_url": "https://fixture.invalid/devto/story-2",
+      "published_at": "2026-09-22T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture devto org 3",
+      "external_id": "devto-fixture-3",
+      "headline": "Fixture devto hiring context headline 3",
+      "source_url": "https://fixture.invalid/devto/story-3",
+      "published_at": "2026-09-23T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture devto org 4",
+      "external_id": "devto-fixture-4",
+      "headline": "Fixture devto hiring context headline 4",
+      "source_url": "https://fixture.invalid/devto/story-4",
+      "published_at": "2026-09-24T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "external_id": "devto-fixture-bad-1",
+      "headline": "Missing company headline",
+      "source_url": "https://fixture.invalid/devto/bad-1"
+    },
+    null
+  ],
+  "gdelt-context": [
+    {
+      "company_name": "Fixture gdelt-context org 1",
+      "external_id": "gdelt-context-fixture-1",
+      "headline": "Fixture gdelt-context hiring context headline 1",
+      "source_url": "https://fixture.invalid/gdelt-context/story-1",
+      "published_at": "2026-09-21T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture gdelt-context org 2",
+      "external_id": "gdelt-context-fixture-2",
+      "headline": "Fixture gdelt-context hiring context headline 2",
+      "source_url": "https://fixture.invalid/gdelt-context/story-2",
+      "published_at": "2026-09-22T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture gdelt-context org 3",
+      "external_id": "gdelt-context-fixture-3",
+      "headline": "Fixture gdelt-context hiring context headline 3",
+      "source_url": "https://fixture.invalid/gdelt-context/story-3",
+      "published_at": "2026-09-23T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture gdelt-context org 4",
+      "external_id": "gdelt-context-fixture-4",
+      "headline": "Fixture gdelt-context hiring context headline 4",
+      "source_url": "https://fixture.invalid/gdelt-context/story-4",
+      "published_at": "2026-09-24T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "external_id": "gdelt-context-fixture-bad-1",
+      "headline": "Missing company headline",
+      "source_url": "https://fixture.invalid/gdelt-context/bad-1"
+    },
+    null
+  ],
+  "openalex": [
+    {
+      "company_name": "Fixture openalex org 1",
+      "external_id": "openalex-fixture-1",
+      "headline": "Fixture openalex hiring context headline 1",
+      "source_url": "https://fixture.invalid/openalex/story-1",
+      "published_at": "2026-09-21T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture openalex org 2",
+      "external_id": "openalex-fixture-2",
+      "headline": "Fixture openalex hiring context headline 2",
+      "source_url": "https://fixture.invalid/openalex/story-2",
+      "published_at": "2026-09-22T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture openalex org 3",
+      "external_id": "openalex-fixture-3",
+      "headline": "Fixture openalex hiring context headline 3",
+      "source_url": "https://fixture.invalid/openalex/story-3",
+      "published_at": "2026-09-23T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "company_name": "Fixture openalex org 4",
+      "external_id": "openalex-fixture-4",
+      "headline": "Fixture openalex hiring context headline 4",
+      "source_url": "https://fixture.invalid/openalex/story-4",
+      "published_at": "2026-09-24T09:00:00Z",
+      "publisher": "fixture.invalid",
+      "event_type": "hiring_context",
+      "extraction_method": "fixture"
+    },
+    {
+      "external_id": "openalex-fixture-bad-1",
+      "headline": "Missing company headline",
+      "source_url": "https://fixture.invalid/openalex/bad-1"
+    },
+    null
+  ],
+  "ror": [
+    {
+      "company_name": "Fixture research organization 1",
+      "company_website_url": "https://fixture-research-1.invalid",
+      "ror_id": "https://ror.org/fixture0001",
+      "country_code": "US",
+      "established": "1981",
+      "status": "active",
+      "types": [
+        "Education"
+      ],
+      "aliases": [
+        "Fixture research org 1",
+        "FRO1"
+      ],
+      "source_url": "https://ror.org/fixture0001",
+      "updated_at": "2026-01-01"
+    },
+    {
+      "company_name": "Fixture research organization 2",
+      "company_website_url": "https://fixture-research-2.invalid",
+      "ror_id": "https://ror.org/fixture0002",
+      "country_code": "US",
+      "established": "1982",
+      "status": "active",
+      "types": [
+        "Education"
+      ],
+      "aliases": [
+        "Fixture research org 2",
+        "FRO2"
+      ],
+      "source_url": "https://ror.org/fixture0002",
+      "updated_at": "2026-01-01"
+    },
+    {
+      "company_name": "Fixture research organization 3",
+      "company_website_url": "https://fixture-research-3.invalid",
+      "ror_id": "https://ror.org/fixture0003",
+      "country_code": "US",
+      "established": "1983",
+      "status": "active",
+      "types": [
+        "Education"
+      ],
+      "aliases": [
+        "Fixture research org 3",
+        "FRO3"
+      ],
+      "source_url": "https://ror.org/fixture0003",
+      "updated_at": "2026-01-01"
+    },
+    {
+      "company_name": "Fixture research organization 4",
+      "company_website_url": "https://fixture-research-4.invalid",
+      "ror_id": "https://ror.org/fixture0004",
+      "country_code": "US",
+      "established": "1984",
+      "status": "active",
+      "types": [
+        "Education"
+      ],
+      "aliases": [
+        "Fixture research org 4",
+        "FRO4"
+      ],
+      "source_url": "https://ror.org/fixture0004",
+      "updated_at": "2026-01-01"
+    },
+    {
+      "company_name": "Missing ror id org",
+      "company_website_url": "https://fixture-research-bad.invalid",
+      "source_url": "https://fixture.invalid/ror/bad-1"
+    },
+    {
+      "ror_id": "https://ror.org/fixturebad02",
+      "company_website_url": "https://fixture-research-bad2.invalid",
+      "source_url": "https://fixture.invalid/ror/bad-2"
+    }
+  ],
+  "cbr-fx-daily": [
+    {
+      "snapshot_date": "2026-09-21",
+      "snapshot_date_iso": "2026-09-21T11:30:00+03:00",
+      "base_currency": "RUB",
+      "rates": {
+        "USD": {
+          "nominal": 1,
+          "value": 81
+        },
+        "EUR": {
+          "nominal": 1,
+          "value": 91
+        }
+      },
+      "endpoint": "https://fixture.invalid/daily_json.js",
+      "mirror": true
+    },
+    {
+      "snapshot_date": "2026-09-22",
+      "snapshot_date_iso": "2026-09-22T11:30:00+03:00",
+      "base_currency": "RUB",
+      "rates": {
+        "USD": {
+          "nominal": 1,
+          "value": 82
+        },
+        "EUR": {
+          "nominal": 1,
+          "value": 92
+        }
+      },
+      "endpoint": "https://fixture.invalid/daily_json.js",
+      "mirror": true
+    },
+    {
+      "snapshot_date": "2026-09-23",
+      "snapshot_date_iso": "2026-09-23T11:30:00+03:00",
+      "base_currency": "RUB",
+      "rates": {
+        "USD": {
+          "nominal": 1,
+          "value": 83
+        },
+        "EUR": {
+          "nominal": 1,
+          "value": 93
+        }
+      },
+      "endpoint": "https://fixture.invalid/daily_json.js",
+      "mirror": true
+    },
+    {
+      "snapshot_date": "2026-09-24",
+      "snapshot_date_iso": "2026-09-24T11:30:00+03:00",
+      "base_currency": "RUB",
+      "rates": {
+        "USD": {
+          "nominal": 1,
+          "value": 84
+        },
+        "EUR": {
+          "nominal": 1,
+          "value": 94
+        }
+      },
+      "endpoint": "https://fixture.invalid/daily_json.js",
+      "mirror": true
+    },
+    {
+      "snapshot_date": "2026-09-25",
+      "base_currency": "RUB",
+      "rates": {},
+      "endpoint": "https://fixture.invalid/empty"
+    },
+    {
+      "base_currency": "RUB",
+      "rates": {
+        "USD": {
+          "nominal": 1,
+          "value": 1
+        }
+      },
+      "endpoint": "https://fixture.invalid/no-date"
+    }
+  ],
+  "trudvsem-opendata-datasets": [
+    {
+      "identifier": "7710538364-fixture_1",
+      "title": "Fixture open data set 1",
+      "link": "https://opendata.trudvsem.ru/7710538364-fixture_1",
+      "format": "xml",
+      "publisher_inn": "7710538364",
+      "catalog": "https://opendata.trudvsem.ru/list.xml"
+    },
+    {
+      "identifier": "7710538364-fixture_2",
+      "title": "Fixture open data set 2",
+      "link": "https://opendata.trudvsem.ru/7710538364-fixture_2",
+      "format": "xml",
+      "publisher_inn": "7710538364",
+      "catalog": "https://opendata.trudvsem.ru/list.xml"
+    },
+    {
+      "identifier": "7710538364-fixture_3",
+      "title": "Fixture open data set 3",
+      "link": "https://opendata.trudvsem.ru/7710538364-fixture_3",
+      "format": "xml",
+      "publisher_inn": "7710538364",
+      "catalog": "https://opendata.trudvsem.ru/list.xml"
+    },
+    {
+      "identifier": "7710538364-fixture_4",
+      "title": "Fixture open data set 4",
+      "link": "https://opendata.trudvsem.ru/7710538364-fixture_4",
+      "format": "xml",
+      "publisher_inn": "7710538364",
+      "catalog": "https://opendata.trudvsem.ru/list.xml"
+    },
+    {
+      "title": "Missing identifier dataset",
+      "link": "https://opendata.trudvsem.ru/bad-1",
+      "format": "xml"
+    },
+    {
+      "identifier": "7710538364-fixture_bad2",
+      "link": "https://opendata.trudvsem.ru/bad-2",
+      "format": "xml"
+    }
+  ]
+}

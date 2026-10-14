@@ -39,6 +39,32 @@ export const EVIDENCE_RUNTIME_SOURCE_BINDINGS = {
   // closest governed Evidence Radar policy family for official regional context.
   'rosstat-open-data': 'government-regional-news',
   'rospatent-open-data': 'official-address-license-registers',
+  // 2026-10 public source expansion (Class A): international job boards bind to
+  // the professional-job-boards hiring family; community/news context binds to
+  // industry-media corroboration; registries bind to the closest governed
+  // identity or official open-data family.
+  themuse: 'professional-job-boards',
+  landingjobs: 'professional-job-boards',
+  arbeitnow: 'professional-job-boards',
+  remoteok: 'professional-job-boards',
+  jobicy: 'professional-job-boards',
+  himalayas: 'professional-job-boards',
+  remotive: 'professional-job-boards',
+  weworkremotely: 'professional-job-boards',
+  'hackernews-jobs': 'professional-job-boards',
+  'hn-algolia': 'industry-media',
+  devto: 'industry-media',
+  'gdelt-context': 'industry-media',
+  // OpenAlex research works are publication-grade corroboration of R&D activity;
+  // industry-media is the closest governed secondary-corroboration family.
+  openalex: 'industry-media',
+  // ROR provides canonical organization identity references (name, website,
+  // aliases, country); egrul-egrip is the canonical-identity policy family.
+  ror: 'egrul-egrip',
+  // CBR daily FX is official macro context; government-regional-news is the
+  // closest governed family for official non-company context (rosstat precedent).
+  'cbr-fx-daily': 'government-regional-news',
+  'trudvsem-opendata-datasets': 'rabota-rossii-open-data',
 } as const satisfies Record<SourceId, string>
 
 export type EvidenceRuntimeSourceBinding = {

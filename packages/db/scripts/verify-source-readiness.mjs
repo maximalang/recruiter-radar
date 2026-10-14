@@ -40,6 +40,23 @@ const expectedSources = [
   'cbr-registry',
   'rosstat-open-data',
   'rospatent-open-data',
+  // 2026-10 public source expansion (Class A, credential-free):
+  'themuse',
+  'landingjobs',
+  'arbeitnow',
+  'remoteok',
+  'jobicy',
+  'himalayas',
+  'remotive',
+  'weworkremotely',
+  'hackernews-jobs',
+  'hn-algolia',
+  'devto',
+  'gdelt-context',
+  'openalex',
+  'ror',
+  'cbr-fx-daily',
+  'trudvsem-opendata-datasets',
 ];
 // Sources whose signals are eligible to ORIGINATE a digest lead. The digest SQL
 // (source-digest-evidence.sql) admits only signal_type = 'job_posting', so this set

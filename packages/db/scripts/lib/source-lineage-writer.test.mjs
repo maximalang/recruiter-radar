@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { upsertSignalEvidenceLineageBatch } from './source-lineage-writer.mjs';
+import { upsertSignalEvidenceLineage, upsertSignalEvidenceLineageBatch } from './source-lineage-writer.mjs';
 
 function input(externalId) {
   return {
@@ -58,4 +58,67 @@ test('rejects duplicate signal identities before opening a database round trip',
     upsertSignalEvidenceLineageBatch(client, [input('same'), input('same')]),
     /appears more than once/,
   );
+});
+
+test('single upsert anchors a lineaged signal to its original organization', async () => {
+  // Regression: re-ingesting a vacancy whose employer re-resolved to another
+  // org must NOT move signals.org_id — lineage rows reference
+  // (signal_id, organization_id) with ON DELETE RESTRICT, so the move aborts
+  // the whole ingest batch via FK violation.
+  const calls = [];
+  const client = { query: async (sql, params) => {
+    calls.push({ sql, params });
+    if (/INSERT INTO signals/.test(sql)) {
+      // CASE arm taken: lineage exists, the returned row keeps the original org
+      // 731 even though the fresh resolution proposed 999.
+      return { rows: [{ id: 73385, org_id: 731, source_url: 'https://example.test/jobs/x', occurred_at: '2026-08-14T00:00:00.000Z', payload: {} }], rowCount: 1 };
+    }
+    if (/INSERT INTO evidence_items/.test(sql)) {
+      return { rows: [{ id: 555 }], rowCount: 1 };
+    }
+    if (/INSERT INTO source_signal_evidence_lineage_v1/.test(sql)) {
+      return { rows: [], rowCount: 1 };
+    }
+    return { rows: [], rowCount: 0 };
+  } };
+
+  const result = await upsertSignalEvidenceLineage(client, { ...input('x'), orgId: 999 });
+
+  assert.match(calls[0].sql, /existing_lineage\.signal_id = signals\.id/);
+  assert.equal(calls[1].params[0], 731, 'evidence must be written against the anchored org');
+  assert.equal(calls[2].params[2], 731, 'lineage must reference the anchored org');
+  assert.equal(result.orgAnchorKeeps, 1);
+});
+
+test('batch upsert applies the same lineage org anchor and reports keeps', async () => {
+  const calls = [];
+  const client = { query: async (sql, params) => {
+    calls.push({ sql, params });
+    return { rows: [{
+      signalUpsertCount: 1,
+      evidenceUpsertCount: 1,
+      evidenceCreatedCount: 1,
+      lineageCreatedCount: 1,
+      orgAnchorKeeps: 1,
+      familyIngestionStats: {},
+    }] };
+  } };
+
+  const result = await upsertSignalEvidenceLineageBatch(client, [input('one')]);
+
+  assert.match(calls[0].sql, /existing_lineage\.signal_id = signals\.id/);
+  assert.match(calls[0].sql, /USING \(source, external_id\)/);
+  assert.doesNotMatch(calls[0].sql, /USING \(org_id, source, external_id\)/);
+  assert.equal(result.orgAnchorKeeps, 1);
+});
+
+test('empty batch reports a stable zeroed shape', async () => {
+  const client = { query: async () => assert.fail('query must not run') };
+  assert.deepEqual(await upsertSignalEvidenceLineageBatch(client, []), {
+    signalUpsertCount: 0,
+    evidenceUpsertCount: 0,
+    evidenceCreatedCount: 0,
+    lineageCreatedCount: 0,
+    orgAnchorKeeps: 0,
+  });
 });

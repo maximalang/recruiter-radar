@@ -39,6 +39,8 @@ jobs:
           node --test packages/db/scripts/sync-fedresurs-snapshot.test.mjs
           node packages/db/scripts/verify-funding-business-signals-smoke.mjs
           node packages/db/scripts/verify-rf-source-expansion-smoke.mjs
+          node --test packages/db/scripts/public-source-expansion.test.mjs
+          node packages/db/scripts/verify-public-source-expansion-smoke.mjs
       - name: Verify source activation contracts
         run: npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath src/__tests__/lib/sources/source-activation.test.ts
       - name: Verify readiness metadata contracts
