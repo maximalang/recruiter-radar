@@ -1,0 +1,4810 @@
+{
+  "corpus_version": "jobpost-edge-2026-10-09-v1",
+  "scope": "synthetic edge cases for the RF job-post parser (packages/db/scripts/adapters/rf-source-normalizers.mjs)",
+  "generated_by": {
+    "method": "model proposes candidate raw records only; all expected normalizations are computed by the deterministic oracle script",
+    "rail": "qwen3.8-max via DashScope compatible-mode (provider=custom, hermes -z one-shot, ordinary paid rail, no free pool)",
+    "kanban_task": "t_d081e2c7",
+    "sessions": [
+      "20261009_165325_7fa3f6",
+      "20261009_171714_c1e097",
+      "20261009_172701_df17b0"
+    ],
+    "usage": [
+      {
+        "model": "qwen3.8-max",
+        "provider": "custom",
+        "input_tokens": 2781,
+        "output_tokens": 12405,
+        "total_tokens": 33618
+      },
+      {
+        "model": "qwen3.8-max",
+        "provider": "custom",
+        "input_tokens": 21374,
+        "output_tokens": 20498,
+        "total_tokens": 122768
+      },
+      {
+        "model": "qwen3.8-max",
+        "provider": "custom",
+        "input_tokens": 2816,
+        "output_tokens": 5134,
+        "total_tokens": 26382
+      }
+    ]
+  },
+  "oracle": {
+    "script": "packages/db/scripts/build-job-post-parser-corpus.mjs",
+    "script_sha256": "ceb611c8c548cb6d838fdc93bfc3c97757f44ffc5a12e1f0809af3421e533a31",
+    "arithmetic": "independent reimplementation of normalizeJobPostingRecord; platform primitives (URL, Date) shared per JS spec; no product imports"
+  },
+  "stats": {
+    "received": 68,
+    "schema_skipped": 1,
+    "duplicate_skipped": 0,
+    "oracle_kind_mismatch": 2,
+    "written": 65
+  },
+  "fixtures": [
+    {
+      "id": "realistic_shape-01",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "name": "Backend-разработчик (Python)",
+          "employer": {
+            "name": "ООО Синтез Групп"
+          },
+          "town": {
+            "title": "Москва"
+          },
+          "salary": "от 250000",
+          "published_at": "2026-10-08T09:00:00Z",
+          "employment_type": "полная занятость",
+          "sourceId": "hh"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 1
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Синтез Групп",
+          "orgDisplayName": "ООО Синтез Групп",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо синтез групп",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо синтез групп",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо синтез групп"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо синтез групп"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-08T09:00:00.000Z",
+          "companyName": "ООО Синтез Групп",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо синтез групп:1",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Backend-разработчик (Python)",
+          "recordTitle": "Backend-разработчик (Python)",
+          "sourceUrl": null,
+          "jobTitle": "Backend-разработчик (Python)",
+          "summary": "ООО Синтез Групп; Москва; от 250000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Backend-разработчик (Python)",
+            "job_posting_url": null,
+            "location": "Москва",
+            "salary": "от 250000",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "region_raw": "Москва",
+            "region_canonical": "moscow",
+            "salary_rub_min": 250000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "hh-like шейп: name+employer.name+town.title, 'от X', fresh-3d",
+      "input_digest": "2b8b60ff672280814439d54eaa72dd904c122590c75ba26565b6141d9b80e68a"
+    },
+    {
+      "id": "realistic_shape-02",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "name": "Менеджер по работе с клиентами",
+          "employer": {
+            "name": "ИП Морозов ТехноСервис"
+          },
+          "town": {
+            "title": "Санкт-Петербург"
+          },
+          "salary": "до 120000",
+          "posted_at": "2026-10-04T15:00:00Z",
+          "type_of_work": {
+            "title": "гибрид"
+          },
+          "sourceId": "hh"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 2
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ИП Морозов ТехноСервис",
+          "orgDisplayName": "ИП Морозов ТехноСервис",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ип морозов техносервис",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ип морозов техносервис",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ип морозов техносервис"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ип морозов техносервис"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-04T15:00:00.000Z",
+          "companyName": "ИП Морозов ТехноСервис",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ип морозов техносервис:2",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Менеджер по работе с клиентами",
+          "recordTitle": "Менеджер по работе с клиентами",
+          "sourceUrl": null,
+          "jobTitle": "Менеджер по работе с клиентами",
+          "summary": "ИП Морозов ТехноСервис; Санкт-Петербург; до 120000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Менеджер по работе с клиентами",
+            "job_posting_url": null,
+            "location": "Санкт-Петербург",
+            "salary": "до 120000",
+            "employment_type": "гибрид",
+            "tags": [],
+            "region_raw": "Санкт-Петербург",
+            "region_canonical": "saint-petersburg",
+            "salary_rub_min": 120000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": true,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-7d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "ИП в имени работодателя, 'до Y', занятость через type_of_work.title, fresh-7d",
+      "input_digest": "855881ff912850982cd533b4fb967458cd2c4b142054f056cb71c262d19b2792"
+    },
+    {
+      "id": "realistic_shape-03",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Ведущий бухгалтер",
+          "company_name": "ПАО Камский Торговый Банк",
+          "inn": "7701234567",
+          "ogrn": "1027700123456",
+          "location": "Казань",
+          "salary": "180000 - 220000 руб",
+          "created_at": "2026-10-08T10:00:00Z",
+          "employment_type": "полная занятость",
+          "board": "registry"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 3
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ПАО Камский Торговый Банк",
+          "orgDisplayName": "ПАО Камский Торговый Банк",
+          "companyDomain": null,
+          "primarySourceKey": "inn:7701234567",
+          "innSourceKey": "inn:7701234567",
+          "ogrnSourceKey": "ogrn:1027700123456",
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:пао камский торговый банк",
+          "russianLegalNameSourceKey": "ru-legal-name:камский торговый банк",
+          "orgSourceKeys": [
+            "inn:7701234567",
+            "ogrn:1027700123456"
+          ],
+          "orgSourceAliasKeys": [
+            "inn:7701234567",
+            "ogrn:1027700123456",
+            "company-name:пао камский торговый банк",
+            "ru-legal-name:камский торговый банк"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-08T10:00:00.000Z",
+          "companyName": "ПАО Камский Торговый Банк",
+          "companyWebsiteUrl": null,
+          "inn": "7701234567",
+          "ogrn": "1027700123456",
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:inn:7701234567:3",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Ведущий бухгалтер",
+          "recordTitle": "Ведущий бухгалтер",
+          "sourceUrl": null,
+          "jobTitle": "Ведущий бухгалтер",
+          "summary": "ПАО Камский Торговый Банк; Казань; 180000 - 220000 руб",
+          "payload": {
+            "board": "registry",
+            "vacancy_id": null,
+            "job_title": "Ведущий бухгалтер",
+            "job_posting_url": null,
+            "location": "Казань",
+            "salary": "180000 - 220000 руб",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "region_raw": "Казань",
+            "region_canonical": "kazan",
+            "salary_rub_min": 180000,
+            "salary_rub_max": 220000,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "registry-like: ПАО + чистые ИНН(10)/ОГРН(13), вилка 'X - Y руб', created_at",
+      "input_digest": "4e7687a3314b027d544ec4d97b128c989cb666e8a6fc5cdf7daebaba74ba7a3f"
+    },
+    {
+      "id": "realistic_shape-04",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "DevOps-инженер",
+          "job_posting_url": "https://jobs.example.ru/vacancy/9001",
+          "company_domain": "example.ru",
+          "location": "Новосибирск",
+          "salary": "250000 – 350000",
+          "published_at": "2026-11-01T06:00:00Z",
+          "employment_type": "полная занятость",
+          "board": "career-hub"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 4
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "example.ru",
+          "orgDisplayName": "example.ru",
+          "companyDomain": "example.ru",
+          "primarySourceKey": "domain:example.ru",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:example.ru",
+          "companyNameSourceKey": null,
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "domain:example.ru"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:example.ru"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-11-01T06:00:00.000Z",
+          "companyName": null,
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:url:https://jobs.example.ru/vacancy/9001",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "DevOps-инженер",
+          "recordTitle": "DevOps-инженер",
+          "sourceUrl": "https://jobs.example.ru/vacancy/9001",
+          "jobTitle": "DevOps-инженер",
+          "summary": "Новосибирск; 250000 – 350000",
+          "payload": {
+            "board": "career-hub",
+            "vacancy_id": null,
+            "job_title": "DevOps-инженер",
+            "job_posting_url": "https://jobs.example.ru/vacancy/9001",
+            "location": "Новосибирск",
+            "salary": "250000 – 350000",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "region_raw": "Новосибирск",
+            "region_canonical": "novosibirsk",
+            "salary_rub_min": 250000,
+            "salary_rub_max": 350000,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "board-like, компания только по домену, вилка с en-dash, будущая дата → fresh-3d",
+      "input_digest": "c3c42b8b6d497c35a0e65ea9309f44bbc8b8923e817aa19a67b42a07e51f3cbb"
+    },
+    {
+      "id": "realistic_shape-05",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Frontend-разработчик (React)",
+          "company": {
+            "name": "ООО Облачные Решения",
+            "url": "https://oblako.example.com"
+          },
+          "location": "удалённо",
+          "salary": "з/п не указана",
+          "date_published": "2026-10-08T12:30:00Z",
+          "employment_type": "удалённая работа",
+          "tags": [
+            "remote"
+          ]
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 5
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Облачные Решения",
+          "orgDisplayName": "ООО Облачные Решения",
+          "companyDomain": "oblako.example.com",
+          "primarySourceKey": "domain:oblako.example.com",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:oblako.example.com",
+          "companyNameSourceKey": "company-name:ооо облачные решения",
+          "russianLegalNameSourceKey": "ru-legal-name:облачные решения",
+          "orgSourceKeys": [
+            "domain:oblako.example.com"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:oblako.example.com",
+            "company-name:ооо облачные решения",
+            "ru-legal-name:облачные решения"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-08T12:30:00.000Z",
+          "companyName": "ООО Облачные Решения",
+          "companyWebsiteUrl": "https://oblako.example.com/",
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:oblako.example.com:5",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Frontend-разработчик (React)",
+          "recordTitle": "Frontend-разработчик (React)",
+          "sourceUrl": null,
+          "jobTitle": "Frontend-разработчик (React)",
+          "summary": "ООО Облачные Решения; удалённо; з/п не указана",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Frontend-разработчик (React)",
+            "job_posting_url": null,
+            "location": "удалённо",
+            "salary": "з/п не указана",
+            "employment_type": "удалённая работа",
+            "tags": [
+              "remote"
+            ],
+            "region_raw": "удалённо",
+            "region_canonical": "remote",
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": true,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "company.url, 'з/п не указана', remote-локация, date_published",
+      "input_digest": "7c1bf5357f323a0b7f83984eab6abd7f80e4a2f99a096d320ea86e654a987bac"
+    },
+    {
+      "id": "realistic_shape-06",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Специалист поддержки клиентов",
+          "company_name": "ООО Вектор Сервис",
+          "location": "Россия",
+          "salary": "от 60000",
+          "posted_at": "2026-09-01T09:00:00Z",
+          "employment_type": "удалённая работа",
+          "source_board": "support-jobs"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 6
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Вектор Сервис",
+          "orgDisplayName": "ООО Вектор Сервис",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо вектор сервис",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо вектор сервис",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо вектор сервис"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо вектор сервис"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-09-01T09:00:00.000Z",
+          "companyName": "ООО Вектор Сервис",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо вектор сервис:6",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Специалист поддержки клиентов",
+          "recordTitle": "Специалист поддержки клиентов",
+          "sourceUrl": null,
+          "jobTitle": "Специалист поддержки клиентов",
+          "summary": "ООО Вектор Сервис; Россия; от 60000",
+          "payload": {
+            "board": "support-jobs",
+            "vacancy_id": null,
+            "job_title": "Специалист поддержки клиентов",
+            "job_posting_url": null,
+            "location": "Россия",
+            "salary": "от 60000",
+            "employment_type": "удалённая работа",
+            "tags": [],
+            "region_raw": "Россия",
+            "region_canonical": "russia-unspecified",
+            "salary_rub_min": 60000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": true,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "stale-30d-plus",
+            "quality_penalties": [
+              "stale_vacancy"
+            ]
+          }
+        }
+      },
+      "oracle_note": "Россия без города, дата 2026-09-01 → stale-30d-plus",
+      "input_digest": "a52a41642a1de89b078bd168e169211512075963837a7322099178d6af8cd740"
+    },
+    {
+      "id": "realistic_shape-07",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "name": "Повар-универсал",
+          "employer": {
+            "name": "ООО ВкусТрейд"
+          },
+          "town": {
+            "title": "Казань"
+          },
+          "salary": 55000,
+          "published_at": "2026-09-25T09:00:00Z",
+          "type_of_work": {
+            "title": "вахта"
+          },
+          "sourceId": "hh"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 7
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО ВкусТрейд",
+          "orgDisplayName": "ООО ВкусТрейд",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо вкустрейд",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо вкустрейд",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо вкустрейд"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо вкустрейд"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-09-25T09:00:00.000Z",
+          "companyName": "ООО ВкусТрейд",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо вкустрейд:7",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Повар-универсал",
+          "recordTitle": "Повар-универсал",
+          "sourceUrl": null,
+          "jobTitle": "Повар-универсал",
+          "summary": "ООО ВкусТрейд; Казань; 55000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Повар-универсал",
+            "job_posting_url": null,
+            "location": "Казань",
+            "salary": "55000",
+            "employment_type": "вахта",
+            "tags": [],
+            "region_raw": "Казань",
+            "region_canonical": "kazan",
+            "salary_rub_min": 55000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": true,
+            "vacancy_freshness": "active-30d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "зарплата числом, вахта через type_of_work.title, active-30d",
+      "input_digest": "3906b47f626b04e9b33623d5ee71c900bd24c352485f5c7484f824c8849e1b81"
+    },
+    {
+      "id": "realistic_shape-08",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Водитель-экспедитор",
+          "job_posting_url": "https://board.example.com/rostov/4412",
+          "employer": {
+            "name": "ООО ЮгТрансЛогистик"
+          },
+          "town": {
+            "title": "Ростов-на-Дону"
+          },
+          "salary": "90000 - 130000 руб",
+          "tags": [
+            "вахта",
+            "полная занятость"
+          ],
+          "source_board": "logistics-board"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 8
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО ЮгТрансЛогистик",
+          "orgDisplayName": "ООО ЮгТрансЛогистик",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо югтранслогистик",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо югтранслогистик",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо югтранслогистик"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо югтранслогистик"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО ЮгТрансЛогистик",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:url:https://board.example.com/rostov/4412",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Водитель-экспедитор",
+          "recordTitle": "Водитель-экспедитор",
+          "sourceUrl": "https://board.example.com/rostov/4412",
+          "jobTitle": "Водитель-экспедитор",
+          "summary": "ООО ЮгТрансЛогистик; Ростов-на-Дону; 90000 - 130000 руб",
+          "payload": {
+            "board": "logistics-board",
+            "vacancy_id": null,
+            "job_title": "Водитель-экспедитор",
+            "job_posting_url": "https://board.example.com/rostov/4412",
+            "location": "Ростов-на-Дону",
+            "salary": "90000 - 130000 руб",
+            "employment_type": null,
+            "tags": [
+              "вахта",
+              "полная занятость"
+            ],
+            "region_raw": "Ростов-на-Дону",
+            "region_canonical": null,
+            "salary_rub_min": 90000,
+            "salary_rub_max": 130000,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": true,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "без даты → fallback fetchedAt fresh-3d; занятость только в tags",
+      "input_digest": "40c5d7400ff93d956b63aac3abe1c9bd8722b1b7a9f147d9073d31c8fe0b8806"
+    },
+    {
+      "id": "realistic_shape-09",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Инженер-конструктор",
+          "company_name": "АО ТверьСтанкоПром",
+          "inn": "6901234567",
+          "ogrn": "1066901234567",
+          "location": "Тверь",
+          "salary": "от 85000",
+          "created_at": "2026-10-04T18:30:00Z",
+          "employment_type": "полная занятость",
+          "board": "registry"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 9
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "АО ТверьСтанкоПром",
+          "orgDisplayName": "АО ТверьСтанкоПром",
+          "companyDomain": null,
+          "primarySourceKey": "inn:6901234567",
+          "innSourceKey": "inn:6901234567",
+          "ogrnSourceKey": "ogrn:1066901234567",
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ао тверьстанкопром",
+          "russianLegalNameSourceKey": "ru-legal-name:тверьстанкопром",
+          "orgSourceKeys": [
+            "inn:6901234567",
+            "ogrn:1066901234567"
+          ],
+          "orgSourceAliasKeys": [
+            "inn:6901234567",
+            "ogrn:1066901234567",
+            "company-name:ао тверьстанкопром",
+            "ru-legal-name:тверьстанкопром"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-04T18:30:00.000Z",
+          "companyName": "АО ТверьСтанкоПром",
+          "companyWebsiteUrl": null,
+          "inn": "6901234567",
+          "ogrn": "1066901234567",
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:inn:6901234567:9",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Инженер-конструктор",
+          "recordTitle": "Инженер-конструктор",
+          "sourceUrl": null,
+          "jobTitle": "Инженер-конструктор",
+          "summary": "АО ТверьСтанкоПром; Тверь; от 85000",
+          "payload": {
+            "board": "registry",
+            "vacancy_id": null,
+            "job_title": "Инженер-конструктор",
+            "job_posting_url": null,
+            "location": "Тверь",
+            "salary": "от 85000",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "region_raw": "Тверь",
+            "region_canonical": null,
+            "salary_rub_min": 85000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-7d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "малый город Тверь без ключевых слов, registry-like с ИНН/ОГРН",
+      "input_digest": "78f94576051cead201a48e75c911c447929c62af4eea73a86e2a5b099733f029"
+    },
+    {
+      "id": "realistic_shape-10",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Оператор ЧПУ",
+          "company_name": "ООО УралМеталлОбработка",
+          "location": "Екатеринбург",
+          "salary": "до 70000",
+          "published_at": "2025-09-15T08:00:00Z",
+          "employment_type": "полная занятость",
+          "sourceId": "ural-board"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 10
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО УралМеталлОбработка",
+          "orgDisplayName": "ООО УралМеталлОбработка",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо уралметаллобработка",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо уралметаллобработка",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо уралметаллобработка"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо уралметаллобработка"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2025-09-15T08:00:00.000Z",
+          "companyName": "ООО УралМеталлОбработка",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо уралметаллобработка:10",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Оператор ЧПУ",
+          "recordTitle": "Оператор ЧПУ",
+          "sourceUrl": null,
+          "jobTitle": "Оператор ЧПУ",
+          "summary": "ООО УралМеталлОбработка; Екатеринбург; до 70000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Оператор ЧПУ",
+            "job_posting_url": null,
+            "location": "Екатеринбург",
+            "salary": "до 70000",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "region_raw": "Екатеринбург",
+            "region_canonical": null,
+            "salary_rub_min": 70000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "stale-30d-plus",
+            "quality_penalties": [
+              "stale_vacancy"
+            ]
+          }
+        }
+      },
+      "oracle_note": "Екатеринбург, очень старая дата 2025-09-15 → stale-30d-plus",
+      "input_digest": "e07bddad1d219c3e0e8a8b729074bf8849819bf6a5cdfc574159580cf8936fec"
+    },
+    {
+      "id": "realistic_shape-11",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Java-разработчик",
+          "client": {
+            "name": "ООО Финтех Лаб"
+          },
+          "publisher_type": "agency",
+          "publisher_type_id": 7,
+          "publisher_type_label": "Кадровое агентство",
+          "candidate_eligible": false,
+          "job_posting_url": "https://agency.example.ru/vacancies/777",
+          "location": "Москва",
+          "salary": "300000 – 400000",
+          "published_at": "2026-10-08T07:30:00Z",
+          "employment_type": "полная занятость",
+          "board": "agency-feed"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 11
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Финтех Лаб",
+          "orgDisplayName": "ООО Финтех Лаб",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо финтех лаб",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо финтех лаб",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо финтех лаб"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо финтех лаб"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-08T07:30:00.000Z",
+          "companyName": "ООО Финтех Лаб",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:url:https://agency.example.ru/vacancies/777",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Java-разработчик",
+          "recordTitle": "Java-разработчик",
+          "sourceUrl": "https://agency.example.ru/vacancies/777",
+          "jobTitle": "Java-разработчик",
+          "summary": "ООО Финтех Лаб; Москва; 300000 – 400000",
+          "payload": {
+            "board": "agency-feed",
+            "vacancy_id": null,
+            "job_title": "Java-разработчик",
+            "job_posting_url": "https://agency.example.ru/vacancies/777",
+            "location": "Москва",
+            "salary": "300000 – 400000",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "publisher_type": "agency",
+            "publisher_type_id": 7,
+            "publisher_type_label": "Кадровое агентство",
+            "candidate_eligible": false,
+            "region_raw": "Москва",
+            "region_canonical": "moscow",
+            "salary_rub_min": 300000,
+            "salary_rub_max": 400000,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": [
+              "agency_or_staffing_noise",
+              "non_direct_employer_posting"
+            ]
+          }
+        }
+      },
+      "oracle_note": "кадровое агентство: client.name, publisher_type='agency', candidate_eligible=false",
+      "input_digest": "fdedce709cc81c1859e5260f0946aa6186bf9aaeaeaa3f72e89dc7c0cfa03e6e"
+    },
+    {
+      "id": "realistic_shape-12",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Директор по маркетингу",
+          "publisher_type": "anonymous",
+          "publisher_type_label": "Конфиденциальный работодатель",
+          "website_url": "https://hr-partner.example.ru/anon-42",
+          "location": "Санкт-Петербург",
+          "salary": "з/п не указана",
+          "published_at": "2026-10-06T12:00:00Z",
+          "employment_type": "полная занятость"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 12
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "hr-partner.example.ru",
+          "orgDisplayName": "hr-partner.example.ru",
+          "companyDomain": "hr-partner.example.ru",
+          "primarySourceKey": "domain:hr-partner.example.ru",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:hr-partner.example.ru",
+          "companyNameSourceKey": null,
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "domain:hr-partner.example.ru"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:hr-partner.example.ru"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-06T12:00:00.000Z",
+          "companyName": null,
+          "companyWebsiteUrl": "https://hr-partner.example.ru/anon-42",
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:hr-partner.example.ru:12",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Директор по маркетингу",
+          "recordTitle": "Директор по маркетингу",
+          "sourceUrl": null,
+          "jobTitle": "Директор по маркетингу",
+          "summary": "Санкт-Петербург; з/п не указана",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Директор по маркетингу",
+            "job_posting_url": null,
+            "location": "Санкт-Петербург",
+            "salary": "з/п не указана",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "publisher_type": "anonymous",
+            "publisher_type_id": null,
+            "publisher_type_label": "Конфиденциальный работодатель",
+            "candidate_eligible": false,
+            "region_raw": "Санкт-Петербург",
+            "region_canonical": "saint-petersburg",
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": [
+              "non_direct_employer_posting"
+            ]
+          }
+        }
+      },
+      "oracle_note": "анонимный работодатель, идентификатор только website_url; ровно 3д → граница fresh-3d",
+      "input_digest": "e6817f815ea1aa40ced975beed220d91e96277a057bcf377fd3d79043d3a028f"
+    },
+    {
+      "id": "realistic_shape-13",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Data Analyst",
+          "company_domain": "analytics.example.ru",
+          "location": "remote",
+          "salary": 200000,
+          "posted_at": "2026-10-04T12:00:00Z",
+          "employment_type": "удалённая работа",
+          "sourceId": "datalab"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 13
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "analytics.example.ru",
+          "orgDisplayName": "analytics.example.ru",
+          "companyDomain": "analytics.example.ru",
+          "primarySourceKey": "domain:analytics.example.ru",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:analytics.example.ru",
+          "companyNameSourceKey": null,
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "domain:analytics.example.ru"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:analytics.example.ru"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-04T12:00:00.000Z",
+          "companyName": null,
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:analytics.example.ru:13",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Data Analyst",
+          "recordTitle": "Data Analyst",
+          "sourceUrl": null,
+          "jobTitle": "Data Analyst",
+          "summary": "remote; 200000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Data Analyst",
+            "job_posting_url": null,
+            "location": "remote",
+            "salary": "200000",
+            "employment_type": "удалённая работа",
+            "tags": [],
+            "region_raw": "remote",
+            "region_canonical": "remote",
+            "salary_rub_min": 200000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": true,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-7d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "только домен, локация 'remote' (en), зарплата числом",
+      "input_digest": "6e42e77f45dc9bce641b85e491d20fa7cb19de56105905cd0a21bc21e62e1d3f"
+    },
+    {
+      "id": "realistic_shape-14",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Продавец-кассир",
+          "company_name": "ООО Ромашка Маркет",
+          "city": "Новосибирск",
+          "salary": "от 45000",
+          "created_at": "2026-09-28T10:00:00Z",
+          "employment_type": "полная занятость",
+          "board": "retail-jobs"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 14
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Ромашка Маркет",
+          "orgDisplayName": "ООО Ромашка Маркет",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо ромашка маркет",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо ромашка маркет",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо ромашка маркет"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо ромашка маркет"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-09-28T10:00:00.000Z",
+          "companyName": "ООО Ромашка Маркет",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо ромашка маркет:14",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Продавец-кассир",
+          "recordTitle": "Продавец-кассир",
+          "sourceUrl": null,
+          "jobTitle": "Продавец-кассир",
+          "summary": "ООО Ромашка Маркет; Новосибирск; от 45000",
+          "payload": {
+            "board": "retail-jobs",
+            "vacancy_id": null,
+            "job_title": "Продавец-кассир",
+            "job_posting_url": null,
+            "location": "Новосибирск",
+            "salary": "от 45000",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "region_raw": "Новосибирск",
+            "region_canonical": "novosibirsk",
+            "salary_rub_min": 45000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "active-30d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "компания только по имени, локация через city, active-30d",
+      "input_digest": "abb1158ea2392d4cbf89a476f7ab0f8f622903fa07889d5dfb4f0409b822da12"
+    },
+    {
+      "id": "realistic_shape-15",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Прораб (отделочные работы)",
+          "company": {
+            "name": "ООО СтройМонтаж",
+            "site": "https://stroymontazh.example.ru",
+            "inn": "7712345678",
+            "ogrn": "1157712345678"
+          },
+          "location": "Ростов-на-Дону",
+          "salary": "120000 - 150000 руб",
+          "published_at": "2026-10-08T11:00:00Z",
+          "employment_type": "полная занятость",
+          "tags": [
+            "строительство"
+          ]
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 15
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО СтройМонтаж",
+          "orgDisplayName": "ООО СтройМонтаж",
+          "companyDomain": "stroymontazh.example.ru",
+          "primarySourceKey": "inn:7712345678",
+          "innSourceKey": "inn:7712345678",
+          "ogrnSourceKey": "ogrn:1157712345678",
+          "domainSourceKey": "domain:stroymontazh.example.ru",
+          "companyNameSourceKey": "company-name:ооо строймонтаж",
+          "russianLegalNameSourceKey": "ru-legal-name:строймонтаж",
+          "orgSourceKeys": [
+            "inn:7712345678",
+            "ogrn:1157712345678",
+            "domain:stroymontazh.example.ru"
+          ],
+          "orgSourceAliasKeys": [
+            "inn:7712345678",
+            "ogrn:1157712345678",
+            "domain:stroymontazh.example.ru",
+            "company-name:ооо строймонтаж",
+            "ru-legal-name:строймонтаж"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-08T11:00:00.000Z",
+          "companyName": "ООО СтройМонтаж",
+          "companyWebsiteUrl": "https://stroymontazh.example.ru/",
+          "inn": "7712345678",
+          "ogrn": "1157712345678",
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:inn:7712345678:15",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Прораб (отделочные работы)",
+          "recordTitle": "Прораб (отделочные работы)",
+          "sourceUrl": null,
+          "jobTitle": "Прораб (отделочные работы)",
+          "summary": "ООО СтройМонтаж; Ростов-на-Дону; 120000 - 150000 руб",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Прораб (отделочные работы)",
+            "job_posting_url": null,
+            "location": "Ростов-на-Дону",
+            "salary": "120000 - 150000 руб",
+            "employment_type": "полная занятость",
+            "tags": [
+              "строительство"
+            ],
+            "region_raw": "Ростов-на-Дону",
+            "region_canonical": null,
+            "salary_rub_min": 120000,
+            "salary_rub_max": 150000,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "вложенный company: name/site/inn/ogrn — проверка company.* путей",
+      "input_digest": "403a25bcb248ccc5111e2001a351eb3133c1cd4bd1bc4776e7ad9d31c9600516"
+    },
+    {
+      "id": "realistic_shape-16",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "role": "Product Owner",
+          "org_name": "ООО Продукт Про",
+          "website_url": "https://produktpro.example.com",
+          "location": "удалённо",
+          "compensation": "от 300000",
+          "date_published": "2026-11-01T08:00:00Z",
+          "employment_type": "полная занятость"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 16
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Продукт Про",
+          "orgDisplayName": "ООО Продукт Про",
+          "companyDomain": "produktpro.example.com",
+          "primarySourceKey": "domain:produktpro.example.com",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:produktpro.example.com",
+          "companyNameSourceKey": "company-name:ооо продукт про",
+          "russianLegalNameSourceKey": "ru-legal-name:продукт про",
+          "orgSourceKeys": [
+            "domain:produktpro.example.com"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:produktpro.example.com",
+            "company-name:ооо продукт про",
+            "ru-legal-name:продукт про"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-11-01T08:00:00.000Z",
+          "companyName": "ООО Продукт Про",
+          "companyWebsiteUrl": "https://produktpro.example.com/",
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:produktpro.example.com:16",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Product Owner",
+          "recordTitle": "Product Owner",
+          "sourceUrl": null,
+          "jobTitle": "Product Owner",
+          "summary": "ООО Продукт Про; удалённо; от 300000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Product Owner",
+            "job_posting_url": null,
+            "location": "удалённо",
+            "salary": "от 300000",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "region_raw": "удалённо",
+            "region_canonical": "remote",
+            "salary_rub_min": 300000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": true,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "альтернативные ключи role/org_name/compensation/date_published, будущая дата",
+      "input_digest": "2c975b1b390e771d597d6289a52c5799d60a2fdbd04072093a5cab6d46dac86f"
+    },
+    {
+      "id": "realistic_shape-17",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "text": "Курьер (пеший)",
+          "company_name": "ООО Быстрая Доставка",
+          "link": "https://dostavka.example.ru/jobs/courier-88",
+          "city": "Москва",
+          "salary": "до 90000",
+          "published_at": "2026-10-07T20:00:00Z",
+          "type_of_work": {
+            "title": "сменный график"
+          }
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 17
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Быстрая Доставка",
+          "orgDisplayName": "ООО Быстрая Доставка",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо быстрая доставка",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо быстрая доставка",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо быстрая доставка"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо быстрая доставка"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-07T20:00:00.000Z",
+          "companyName": "ООО Быстрая Доставка",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:url:https://dostavka.example.ru/jobs/courier-88",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Курьер (пеший)",
+          "recordTitle": "Курьер (пеший)",
+          "sourceUrl": "https://dostavka.example.ru/jobs/courier-88",
+          "jobTitle": "Курьер (пеший)",
+          "summary": "ООО Быстрая Доставка; Москва; до 90000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Курьер (пеший)",
+            "job_posting_url": "https://dostavka.example.ru/jobs/courier-88",
+            "location": "Москва",
+            "salary": "до 90000",
+            "employment_type": "сменный график",
+            "tags": [],
+            "region_raw": "Москва",
+            "region_canonical": "moscow",
+            "salary_rub_min": 90000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "заголовок из text, URL из link (абсолютный), занятость через type_of_work.title",
+      "input_digest": "fe151b4bbd9475ea10409f5c3e29f57d27963d6926f1a4362cfcb3df83eefe3e"
+    },
+    {
+      "id": "realistic_shape-18",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Электромонтёр",
+          "job_url": "/vacancies/5512",
+          "employer": {
+            "name": "ПАО ВолгаЭнерго"
+          },
+          "town": {
+            "title": "Екатеринбург"
+          },
+          "salary": "75000 - 95000",
+          "published_at": "2026-10-08T05:00:00Z",
+          "employment_type": "полная занятость",
+          "sourceId": "power-board"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 18
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ПАО ВолгаЭнерго",
+          "orgDisplayName": "ПАО ВолгаЭнерго",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:пао волгаэнерго",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:пао волгаэнерго",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:пао волгаэнерго"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:пао волгаэнерго"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-08T05:00:00.000Z",
+          "companyName": "ПАО ВолгаЭнерго",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:пао волгаэнерго:18",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Электромонтёр",
+          "recordTitle": "Электромонтёр",
+          "sourceUrl": null,
+          "jobTitle": "Электромонтёр",
+          "summary": "ПАО ВолгаЭнерго; Екатеринбург; 75000 - 95000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Электромонтёр",
+            "job_posting_url": null,
+            "location": "Екатеринбург",
+            "salary": "75000 - 95000",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "region_raw": "Екатеринбург",
+            "region_canonical": null,
+            "salary_rub_min": 75000,
+            "salary_rub_max": 95000,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "ПАО в имени; job_url относительный → URL должен стать null",
+      "input_digest": "f6f351391022e5e1a607ca8bdd674a1f68ab56393a5d3c30fa3cba3bcb31fc19"
+    },
+    {
+      "id": "realistic_shape-19",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Юрисконсульт",
+          "company_name": "ООО Правовой Альянс",
+          "inn": "77-01-23-45-67",
+          "ogrn": "102 7700 9876 54",
+          "location": "Санкт-Петербург",
+          "compensation": 150000,
+          "created_at": "2026-09-30T14:00:00Z",
+          "employment_type": "гибридная занятость",
+          "board": "legal-registry"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 19
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Правовой Альянс",
+          "orgDisplayName": "ООО Правовой Альянс",
+          "companyDomain": null,
+          "primarySourceKey": "inn:7701234567",
+          "innSourceKey": "inn:7701234567",
+          "ogrnSourceKey": "ogrn:1027700987654",
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо правовой альянс",
+          "russianLegalNameSourceKey": "ru-legal-name:правовой альянс",
+          "orgSourceKeys": [
+            "inn:7701234567",
+            "ogrn:1027700987654"
+          ],
+          "orgSourceAliasKeys": [
+            "inn:7701234567",
+            "ogrn:1027700987654",
+            "company-name:ооо правовой альянс",
+            "ru-legal-name:правовой альянс"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-09-30T14:00:00.000Z",
+          "companyName": "ООО Правовой Альянс",
+          "companyWebsiteUrl": null,
+          "inn": "7701234567",
+          "ogrn": "1027700987654",
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:inn:7701234567:19",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Юрисконсульт",
+          "recordTitle": "Юрисконсульт",
+          "sourceUrl": null,
+          "jobTitle": "Юрисконсульт",
+          "summary": "ООО Правовой Альянс; Санкт-Петербург; 150000",
+          "payload": {
+            "board": "legal-registry",
+            "vacancy_id": null,
+            "job_title": "Юрисконсульт",
+            "job_posting_url": null,
+            "location": "Санкт-Петербург",
+            "salary": "150000",
+            "employment_type": "гибридная занятость",
+            "tags": [],
+            "region_raw": "Санкт-Петербург",
+            "region_canonical": "saint-petersburg",
+            "salary_rub_min": 150000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": true,
+            "is_rotational": false,
+            "vacancy_freshness": "active-30d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "ИНН/ОГРН с разделителями → очистка до 10/13 цифр; compensation числом; гибрид",
+      "input_digest": "93454997e433495d4b4f055347ff16d37d7d924e1329e25d71b879f0f50d7217"
+    },
+    {
+      "id": "realistic_shape-20",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Сварщик НАКС",
+          "company_name": "ООО СеверСтройМонтаж",
+          "location": "Ямало-Ненецкий АО",
+          "salary": "от 180000",
+          "published_at": "2026-10-04T06:00:00Z",
+          "tags": [
+            "вахта",
+            "полная занятость",
+            "север"
+          ],
+          "source_board": "vagon"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 20
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО СеверСтройМонтаж",
+          "orgDisplayName": "ООО СеверСтройМонтаж",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо северстроймонтаж",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо северстроймонтаж",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо северстроймонтаж"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо северстроймонтаж"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-04T06:00:00.000Z",
+          "companyName": "ООО СеверСтройМонтаж",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо северстроймонтаж:20",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Сварщик НАКС",
+          "recordTitle": "Сварщик НАКС",
+          "sourceUrl": null,
+          "jobTitle": "Сварщик НАКС",
+          "summary": "ООО СеверСтройМонтаж; Ямало-Ненецкий АО; от 180000",
+          "payload": {
+            "board": "vagon",
+            "vacancy_id": null,
+            "job_title": "Сварщик НАКС",
+            "job_posting_url": null,
+            "location": "Ямало-Ненецкий АО",
+            "salary": "от 180000",
+            "employment_type": null,
+            "tags": [
+              "вахта",
+              "полная занятость",
+              "север"
+            ],
+            "region_raw": "Ямало-Ненецкий АО",
+            "region_canonical": null,
+            "salary_rub_min": 180000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": true,
+            "vacancy_freshness": "fresh-7d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "вахта только в tags (employment_type отсутствует), регион без города-ключа",
+      "input_digest": "49ee4fc2a72701446ac040bf031a8d422025eb703700721f2abfa6752884d3ef"
+    },
+    {
+      "id": "realistic_shape-21",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "title": "Агроном-семеновод",
+          "org_name": "ООО АгроДон",
+          "region": "Ростовская область",
+          "salary": "80000 - 110000",
+          "published_at": "2026-10-08T06:00:00Z",
+          "employment_type": "полная занятость",
+          "sourceId": "agro-portal"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 21
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО АгроДон",
+          "orgDisplayName": "ООО АгроДон",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо агродон",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо агродон",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо агродон"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо агродон"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-08T06:00:00.000Z",
+          "companyName": "ООО АгроДон",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо агродон:21",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Агроном-семеновод",
+          "recordTitle": "Агроном-семеновод",
+          "sourceUrl": null,
+          "jobTitle": "Агроном-семеновод",
+          "summary": "ООО АгроДон; Ростовская область; 80000 - 110000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Агроном-семеновод",
+            "job_posting_url": null,
+            "location": "Ростовская область",
+            "salary": "80000 - 110000",
+            "employment_type": "полная занятость",
+            "tags": [],
+            "region_raw": "Ростовская область",
+            "region_canonical": null,
+            "salary_rub_min": 80000,
+            "salary_rub_max": 110000,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "локация через region (не location/city), заголовок через title",
+      "input_digest": "a142051bdf2f3a6fff9257746c81903afa30e682571562784afbe00dcc4ae243"
+    },
+    {
+      "id": "realistic_shape-22",
+      "kind": "record",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "QA Automation Engineer",
+          "employer": {
+            "name": "ООО ТестЛаб"
+          },
+          "town": {
+            "title": "Москва"
+          },
+          "compensation": {
+            "from": 200000,
+            "to": 300000,
+            "currency": "RUR"
+          },
+          "published_at": "2026-10-05T10:00:00Z",
+          "employment_type": "удалённая работа",
+          "url": "https://testlab.example.ru/jobs/42"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 22
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО ТестЛаб",
+          "orgDisplayName": "ООО ТестЛаб",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо тестлаб",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо тестлаб",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо тестлаб"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо тестлаб"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-05T10:00:00.000Z",
+          "companyName": "ООО ТестЛаб",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:url:https://testlab.example.ru/jobs/42",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "QA Automation Engineer",
+          "recordTitle": "QA Automation Engineer",
+          "sourceUrl": "https://testlab.example.ru/jobs/42",
+          "jobTitle": "QA Automation Engineer",
+          "summary": "ООО ТестЛаб; Москва",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "QA Automation Engineer",
+            "job_posting_url": "https://testlab.example.ru/jobs/42",
+            "location": "Москва",
+            "salary": null,
+            "employment_type": "удалённая работа",
+            "tags": [],
+            "region_raw": "Москва",
+            "region_canonical": "moscow",
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": true,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-7d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "зарплата объектом {from,to,currency} → по контракту null, запись остаётся валидной",
+      "input_digest": "f4bf59f2e904df3727af58d91a21662bb4ecc82378eef86923119bbf53b77a13"
+    },
+    {
+      "id": "realistic_shape-23",
+      "kind": "null",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "name": "",
+          "employer": {
+            "name": "ООО Тихий Дон"
+          },
+          "town": {
+            "title": "Ростов-на-Дону"
+          },
+          "salary": "от 40000",
+          "published_at": "2026-10-08T09:00:00Z",
+          "sourceId": "hh"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 23
+      },
+      "expected": {
+        "normalized": null
+      },
+      "oracle_note": "пустой заголовок (name='') при полном hh-шейпе → запись отбрасывается",
+      "input_digest": "b93c60c8bb7047c788fd85c88d94fa3ba8f84c3e75ddbf13cb7cb7d28f8b674b"
+    },
+    {
+      "id": "realistic_shape-24",
+      "kind": "null",
+      "category": "realistic_shape",
+      "input": {
+        "record": {
+          "job_title": "Копирайтер (удалённо)",
+          "location": "удалённо",
+          "salary": "з/п не указана",
+          "published_at": "2026-10-04T10:00:00Z",
+          "tags": [
+            "фриланс"
+          ]
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 24
+      },
+      "expected": {
+        "normalized": null
+      },
+      "oracle_note": "нет ни одного идентификатора компании (имя/домен/сайт/ИНН/ОГРН) → отбрасывается",
+      "input_digest": "301b276d1d950d99bcb629fdcea2485b942bad4f933247489bdf5078104059d0"
+    },
+    {
+      "id": "realistic_shape-25",
+      "kind": "null",
+      "category": "realistic_shape",
+      "input": {
+        "record": null,
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 25
+      },
+      "expected": {
+        "normalized": null
+      },
+      "oracle_note": "record=null → отбрасывание без падения парсера",
+      "input_digest": "7f865fa6bcd80ac4337abf923401cba34210571e519fd95922bc274ed04022f4"
+    },
+    {
+      "id": "fuzz_types-26",
+      "kind": "record",
+      "category": "fuzz_types",
+      "input": {
+        "record": {
+          "id": 12345,
+          "title": 42,
+          "salary": 100000,
+          "company_name": "ООО Синтетика"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 26
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Синтетика",
+          "orgDisplayName": "ООО Синтетика",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо синтетика",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо синтетика",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо синтетика"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо синтетика"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Синтетика",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:12345",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "42",
+          "recordTitle": "42",
+          "sourceUrl": null,
+          "jobTitle": "42",
+          "summary": "ООО Синтетика; 100000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": "12345",
+            "job_title": "42",
+            "job_posting_url": null,
+            "location": null,
+            "salary": "100000",
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": 100000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "id, title и salary числами 12345/42/100000 вместо строк",
+      "input_digest": "8a36c277abf33a9679f6621a99e02388bd0b486f1b67bcccc13786b6ca206609"
+    },
+    {
+      "id": "fuzz_types-27",
+      "kind": "record",
+      "category": "fuzz_types",
+      "input": {
+        "record": {
+          "title": "Менеджер по продажам",
+          "tags": "remote",
+          "company": "ООО Строка",
+          "inn": 7707083893
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 27
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "Source org 27",
+          "orgDisplayName": null,
+          "companyDomain": null,
+          "primarySourceKey": "inn:7707083893",
+          "innSourceKey": "inn:7707083893",
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": null,
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "inn:7707083893"
+          ],
+          "orgSourceAliasKeys": [
+            "inn:7707083893"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": null,
+          "companyWebsiteUrl": null,
+          "inn": "7707083893",
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:inn:7707083893:27",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Менеджер по продажам",
+          "recordTitle": "Менеджер по продажам",
+          "sourceUrl": null,
+          "jobTitle": "Менеджер по продажам",
+          "summary": "q2-corpus job posting",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Менеджер по продажам",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "tags строкой 'remote' вместо массива; company строкой вместо объекта; inn числом",
+      "input_digest": "4803bf482e23d962e529fce11ffa08b810411455de9fd37520e78a9209d0aada"
+    },
+    {
+      "id": "fuzz_unicode-28",
+      "kind": "record",
+      "category": "fuzz_unicode",
+      "input": {
+        "record": {
+          "title": "🚀 Ведущий инженер",
+          "company_name": "Ёлки Тех"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 30
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "Ёлки Тех",
+          "orgDisplayName": "Ёлки Тех",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ёлки тех",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ёлки тех",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ёлки тех"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ёлки тех"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "Ёлки Тех",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ёлки тех:30",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "🚀 Ведущий инженер",
+          "recordTitle": "🚀 Ведущий инженер",
+          "sourceUrl": null,
+          "jobTitle": "🚀 Ведущий инженер",
+          "summary": "Ёлки Тех",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "🚀 Ведущий инженер",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "эмодзи U+1F680 в заголовке и кириллическая Ё в company_name 'Ёлки Тех'",
+      "input_digest": "de2ffe3a6bfdd5fec4456753bb1a38f5db70633ab61328ef04b6f012164b719d"
+    },
+    {
+      "id": "fuzz_unicode-29",
+      "kind": "record",
+      "category": "fuzz_unicode",
+      "input": {
+        "record": {
+          "title": "Менеджер «Каскад»",
+          "company_name": "﻿ООО „Каскад“",
+          "company_domain": "еxample.ru"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 31
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО „Каскад“",
+          "orgDisplayName": "ООО „Каскад“",
+          "companyDomain": "еxample.ru",
+          "primarySourceKey": "domain:еxample.ru",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:еxample.ru",
+          "companyNameSourceKey": "company-name:ооо „каскад“",
+          "russianLegalNameSourceKey": "ru-legal-name:каскад",
+          "orgSourceKeys": [
+            "domain:еxample.ru"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:еxample.ru",
+            "company-name:ооо „каскад“",
+            "ru-legal-name:каскад"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО „Каскад“",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:еxample.ru:31",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Менеджер «Каскад»",
+          "recordTitle": "Менеджер «Каскад»",
+          "sourceUrl": null,
+          "jobTitle": "Менеджер «Каскад»",
+          "summary": "ООО „Каскад“",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Менеджер «Каскад»",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "BOM U+FEFF-префикс и лапки „“ в имени, ёлочки «» в заголовке, домен с кириллической е U+0435 + латиницей",
+      "input_digest": "cd30200ccbda6cc899f724883e8aeee2e2aa996dc0f6167b11c51381f4277409"
+    },
+    {
+      "id": "fuzz_url-30",
+      "kind": "record",
+      "category": "fuzz_url",
+      "input": {
+        "record": {
+          "title": "Курьер",
+          "company_name": "ООО Ромашка Синт",
+          "job_posting_url": "/vac/1"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 32
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Ромашка Синт",
+          "orgDisplayName": "ООО Ромашка Синт",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо ромашка синт",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо ромашка синт",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Ромашка Синт",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо ромашка синт:32",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Курьер",
+          "recordTitle": "Курьер",
+          "sourceUrl": null,
+          "jobTitle": "Курьер",
+          "summary": "ООО Ромашка Синт",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Курьер",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "относительный url '/vac/1' без схемы и хоста",
+      "input_digest": "5e23ad33a787cd5c7b2a110834bc119a0e4204f074e8bbdd4fe1c1e0590a3602"
+    },
+    {
+      "id": "fuzz_url-31",
+      "kind": "record",
+      "category": "fuzz_url",
+      "input": {
+        "record": {
+          "title": "Кладовщик",
+          "company_name": "ООО Ромашка Синт",
+          "job_url": "vacancy 123"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 33
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Ромашка Синт",
+          "orgDisplayName": "ООО Ромашка Синт",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо ромашка синт",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо ромашка синт",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Ромашка Синт",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо ромашка синт:33",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Кладовщик",
+          "recordTitle": "Кладовщик",
+          "sourceUrl": null,
+          "jobTitle": "Кладовщик",
+          "summary": "ООО Ромашка Синт",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Кладовщик",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "url 'vacancy 123' с пробелом и без схемы",
+      "input_digest": "0e12f5e6875ce736eb8d2a904b45e00476dd7be70af777dbdb1857de48a4b15f"
+    },
+    {
+      "id": "fuzz_url-32",
+      "kind": "record",
+      "category": "fuzz_url",
+      "input": {
+        "record": {
+          "title": "Водитель",
+          "company_name": "ООО Ромашка Синт",
+          "url": "ftp://x.example/v"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 34
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Ромашка Синт",
+          "orgDisplayName": "ООО Ромашка Синт",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо ромашка синт",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо ромашка синт",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Ромашка Синт",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:url:ftp://x.example/v",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Водитель",
+          "recordTitle": "Водитель",
+          "sourceUrl": "ftp://x.example/v",
+          "jobTitle": "Водитель",
+          "summary": "ООО Ромашка Синт",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Водитель",
+            "job_posting_url": "ftp://x.example/v",
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "не-http схема ftp://",
+      "input_digest": "5011d0d4ac6a1740f932cfb71e75f6b72d64999da4111fca046f64af46ccdd34"
+    },
+    {
+      "id": "fuzz_url-33",
+      "kind": "record",
+      "category": "fuzz_url",
+      "input": {
+        "record": {
+          "title": "Бухгалтер",
+          "company_name": "ООО Ромашка Синт",
+          "link": "https://user:pass@host.example/v"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 35
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Ромашка Синт",
+          "orgDisplayName": "ООО Ромашка Синт",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо ромашка синт",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо ромашка синт",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Ромашка Синт",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:url:https://user:pass@host.example/v",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Бухгалтер",
+          "recordTitle": "Бухгалтер",
+          "sourceUrl": "https://user:pass@host.example/v",
+          "jobTitle": "Бухгалтер",
+          "summary": "ООО Ромашка Синт",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Бухгалтер",
+            "job_posting_url": "https://user:pass@host.example/v",
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "url со встроенными учётными данными user:pass@host.example",
+      "input_digest": "292683645195eb2926cea2e1e5763884bf12e350ef18cf439f7322c8a1f20090"
+    },
+    {
+      "id": "fuzz_url-34",
+      "kind": "record",
+      "category": "fuzz_url",
+      "input": {
+        "record": {
+          "title": "Аудитор",
+          "company_name": "ООО Ромашка Синт",
+          "job_posting_url": "HTTPS://EXAMPLE.COM/Job"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 36
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Ромашка Синт",
+          "orgDisplayName": "ООО Ромашка Синт",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо ромашка синт",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо ромашка синт",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Ромашка Синт",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:url:https://example.com/Job",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Аудитор",
+          "recordTitle": "Аудитор",
+          "sourceUrl": "https://example.com/Job",
+          "jobTitle": "Аудитор",
+          "summary": "ООО Ромашка Синт",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Аудитор",
+            "job_posting_url": "https://example.com/Job",
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "верхний регистр схемы и хоста HTTPS://EXAMPLE.COM",
+      "input_digest": "27a61ca40d91f8a632d9915456e5f8984199c2d94e4082a30efe8a45b521a51f"
+    },
+    {
+      "id": "fuzz_url-35",
+      "kind": "record",
+      "category": "fuzz_url",
+      "input": {
+        "record": {
+          "title": "Программист",
+          "company_name": "ООО Ромашка Синт",
+          "url": "https://example.ru/вакансия/1"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 37
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Ромашка Синт",
+          "orgDisplayName": "ООО Ромашка Синт",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо ромашка синт",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо ромашка синт",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Ромашка Синт",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:url:https://example.ru/%D0%B2%D0%B0%D0%BA%D0%B0%D0%BD%D1%81%D0%B8%D1%8F/1",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Программист",
+          "recordTitle": "Программист",
+          "sourceUrl": "https://example.ru/%D0%B2%D0%B0%D0%BA%D0%B0%D0%BD%D1%81%D0%B8%D1%8F/1",
+          "jobTitle": "Программист",
+          "summary": "ООО Ромашка Синт",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Программист",
+            "job_posting_url": "https://example.ru/%D0%B2%D0%B0%D0%BA%D0%B0%D0%BD%D1%81%D0%B8%D1%8F/1",
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "кириллический путь URL /вакансия/1",
+      "input_digest": "a948a67f57ea7a2d5a5fca35a36816fe8e27924f33df44fc3934a744d1fa9d55"
+    },
+    {
+      "id": "fuzz_url-36",
+      "kind": "record",
+      "category": "fuzz_url",
+      "input": {
+        "record": {
+          "title": "Дизайнер",
+          "company_name": "ООО Ромашка Синт",
+          "url": ""
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 38
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Ромашка Синт",
+          "orgDisplayName": "ООО Ромашка Синт",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо ромашка синт",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо ромашка синт",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо ромашка синт"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Ромашка Синт",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо ромашка синт:38",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Дизайнер",
+          "recordTitle": "Дизайнер",
+          "sourceUrl": null,
+          "jobTitle": "Дизайнер",
+          "summary": "ООО Ромашка Синт",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Дизайнер",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "пустая строка url: не nullish, резолвится в '' и не проходит проверку абсолютности",
+      "input_digest": "b803c2a62ffd7233371afb0d2d473df2bb00d20a1a40381f9a305e6f217e25b3"
+    },
+    {
+      "id": "fuzz_dates-37",
+      "kind": "record",
+      "category": "fuzz_dates",
+      "input": {
+        "record": {
+          "job_title": "Аналитик данных",
+          "company_name": "ООО Пример Дата",
+          "published_at": "32.13.2026"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 40
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Пример Дата",
+          "orgDisplayName": "ООО Пример Дата",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо пример дата",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо пример дата",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо пример дата"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо пример дата"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Пример Дата",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо пример дата:40",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Аналитик данных",
+          "recordTitle": "Аналитик данных",
+          "sourceUrl": null,
+          "jobTitle": "Аналитик данных",
+          "summary": "ООО Пример Дата",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Аналитик данных",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "невозможная дата, NaN → fallback fetchedAt",
+      "input_digest": "b770bc50675cf2d17c74fa64b020ab86966c69ce51a1f280e2d2ad4694950e29"
+    },
+    {
+      "id": "fuzz_dates-38",
+      "kind": "record",
+      "category": "fuzz_dates",
+      "input": {
+        "record": {
+          "job_title": "Менеджер проектов",
+          "company_domain": "date3.example.com",
+          "posted_at": "позавчера"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 41
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "date3.example.com",
+          "orgDisplayName": "date3.example.com",
+          "companyDomain": "date3.example.com",
+          "primarySourceKey": "domain:date3.example.com",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:date3.example.com",
+          "companyNameSourceKey": null,
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "domain:date3.example.com"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:date3.example.com"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": null,
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:date3.example.com:41",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Менеджер проектов",
+          "recordTitle": "Менеджер проектов",
+          "sourceUrl": null,
+          "jobTitle": "Менеджер проектов",
+          "summary": "q2-corpus job posting",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Менеджер проектов",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "нечисловая человекочитаемая строка в posted_at",
+      "input_digest": "cae7a660bb51faa23701f2fef36636b35b525e843a1f070f0939e91cf66d6292"
+    },
+    {
+      "id": "fuzz_dates-39",
+      "kind": "record",
+      "category": "fuzz_dates",
+      "input": {
+        "record": {
+          "job_title": "Разработчик",
+          "company_name": "АО Тест",
+          "published_at": 1759900000000
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 42
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "АО Тест",
+          "orgDisplayName": "АО Тест",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ао тест",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ао тест",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ао тест"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ао тест"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "АО Тест",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ао тест:42",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Разработчик",
+          "recordTitle": "Разработчик",
+          "sourceUrl": null,
+          "jobTitle": "Разработчик",
+          "summary": "АО Тест",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Разработчик",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "published_at числом (epoch-миллисекунды)",
+      "input_digest": "d5d67f52e2e2fa642d906b92a7a14c80637c255d6cc71d2e64d2a0e6f973cc79"
+    },
+    {
+      "id": "fuzz_dates-40",
+      "kind": "record",
+      "category": "fuzz_dates",
+      "input": {
+        "record": {
+          "job_title": "Дизайнер",
+          "company_domain": "date5.example.com",
+          "published_at": ""
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 43
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "date5.example.com",
+          "orgDisplayName": "date5.example.com",
+          "companyDomain": "date5.example.com",
+          "primarySourceKey": "domain:date5.example.com",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:date5.example.com",
+          "companyNameSourceKey": null,
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "domain:date5.example.com"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:date5.example.com"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": null,
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:date5.example.com:43",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Дизайнер",
+          "recordTitle": "Дизайнер",
+          "sourceUrl": null,
+          "jobTitle": "Дизайнер",
+          "summary": "q2-corpus job posting",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Дизайнер",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "пустая строка даты",
+      "input_digest": "709e7e2162ab19eb638b3f875fc7aa95c793dce5882ba78deb1cc7377c2bd498"
+    },
+    {
+      "id": "fuzz_dates-41",
+      "kind": "record",
+      "category": "fuzz_dates",
+      "input": {
+        "record": {
+          "job_title": "DevOps-инженер",
+          "company_name": "ООО Свежесть",
+          "published_at": "2026-10-09T11:59:59Z"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 44
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Свежесть",
+          "orgDisplayName": "ООО Свежесть",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо свежесть",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо свежесть",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо свежесть"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо свежесть"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T11:59:59.000Z",
+          "companyName": "ООО Свежесть",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо свежесть:44",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "DevOps-инженер",
+          "recordTitle": "DevOps-инженер",
+          "sourceUrl": null,
+          "jobTitle": "DevOps-инженер",
+          "summary": "ООО Свежесть",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "DevOps-инженер",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "за секунду до fetchedAt, граница fresh-3d",
+      "input_digest": "0329cec725bc6662927842e8090adb9592141058c49c4d4ac44a735f917140c5"
+    },
+    {
+      "id": "fuzz_dates-42",
+      "kind": "record",
+      "category": "fuzz_dates",
+      "input": {
+        "record": {
+          "job_title": "Бухгалтер",
+          "company_domain": "date7.example.com",
+          "date_published": "1999-01-01"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 45
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "date7.example.com",
+          "orgDisplayName": "date7.example.com",
+          "companyDomain": "date7.example.com",
+          "primarySourceKey": "domain:date7.example.com",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:date7.example.com",
+          "companyNameSourceKey": null,
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "domain:date7.example.com"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:date7.example.com"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "1999-01-01T00:00:00.000Z",
+          "companyName": null,
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:date7.example.com:45",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Бухгалтер",
+          "recordTitle": "Бухгалтер",
+          "sourceUrl": null,
+          "jobTitle": "Бухгалтер",
+          "summary": "q2-corpus job posting",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Бухгалтер",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "stale-30d-plus",
+            "quality_penalties": [
+              "stale_vacancy"
+            ]
+          }
+        }
+      },
+      "oracle_note": "очень старая дата в последнем поле цепочки",
+      "input_digest": "6751d8047abd3f1b8e839fdf8cc520dfd3a02ad5418653342fef3328f64e45ca"
+    },
+    {
+      "id": "fuzz_inn_ogrn-43",
+      "kind": "record",
+      "category": "fuzz_inn_ogrn",
+      "input": {
+        "record": {
+          "job_title": "Юрист",
+          "company_name": "ООО Девять",
+          "inn": "123456789"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 46
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Девять",
+          "orgDisplayName": "ООО Девять",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо девять",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо девять",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо девять"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо девять"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Девять",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо девять:46",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Юрист",
+          "recordTitle": "Юрист",
+          "sourceUrl": null,
+          "jobTitle": "Юрист",
+          "summary": "ООО Девять",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Юрист",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "inn из 9 цифр — невалидная длина",
+      "input_digest": "15e2334730a3fc0bfd2a6e6e52834387cf696f2674b0038d0cab4460039f9e64"
+    },
+    {
+      "id": "fuzz_inn_ogrn-44",
+      "kind": "record",
+      "category": "fuzz_inn_ogrn",
+      "input": {
+        "record": {
+          "job_title": "Курьер",
+          "company_name": "ООО Одиннадцать",
+          "inn": "12345678901"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 47
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Одиннадцать",
+          "orgDisplayName": "ООО Одиннадцать",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо одиннадцать",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо одиннадцать",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо одиннадцать"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо одиннадцать"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Одиннадцать",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо одиннадцать:47",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Курьер",
+          "recordTitle": "Курьер",
+          "sourceUrl": null,
+          "jobTitle": "Курьер",
+          "summary": "ООО Одиннадцать",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Курьер",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "inn из 11 цифр — невалидная длина",
+      "input_digest": "8a6499e20707d290864c28832013a9c76ba20a97439f14beb37b8a676f96ee17"
+    },
+    {
+      "id": "fuzz_inn_ogrn-45",
+      "kind": "record",
+      "category": "fuzz_inn_ogrn",
+      "input": {
+        "record": {
+          "job_title": "Сварщик",
+          "company_name": "ООО Пробел",
+          "inn": "7707 083 893"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 48
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Пробел",
+          "orgDisplayName": "ООО Пробел",
+          "companyDomain": null,
+          "primarySourceKey": "inn:7707083893",
+          "innSourceKey": "inn:7707083893",
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо пробел",
+          "russianLegalNameSourceKey": "ru-legal-name:пробел",
+          "orgSourceKeys": [
+            "inn:7707083893"
+          ],
+          "orgSourceAliasKeys": [
+            "inn:7707083893",
+            "company-name:ооо пробел",
+            "ru-legal-name:пробел"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Пробел",
+          "companyWebsiteUrl": null,
+          "inn": "7707083893",
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:inn:7707083893:48",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Сварщик",
+          "recordTitle": "Сварщик",
+          "sourceUrl": null,
+          "jobTitle": "Сварщик",
+          "summary": "ООО Пробел",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Сварщик",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "inn с пробелами, после очистки 10 цифр",
+      "input_digest": "462be7b88111a8c1679b07d2e9e121a2eb5d942e0bec602c8ae39dabf64a9b92"
+    },
+    {
+      "id": "fuzz_inn_ogrn-46",
+      "kind": "record",
+      "category": "fuzz_inn_ogrn",
+      "input": {
+        "record": {
+          "job_title": "Токарь",
+          "company_name": "ООО Дефис",
+          "inn": "77-07-083893"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 49
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Дефис",
+          "orgDisplayName": "ООО Дефис",
+          "companyDomain": null,
+          "primarySourceKey": "inn:7707083893",
+          "innSourceKey": "inn:7707083893",
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо дефис",
+          "russianLegalNameSourceKey": "ru-legal-name:дефис",
+          "orgSourceKeys": [
+            "inn:7707083893"
+          ],
+          "orgSourceAliasKeys": [
+            "inn:7707083893",
+            "company-name:ооо дефис",
+            "ru-legal-name:дефис"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Дефис",
+          "companyWebsiteUrl": null,
+          "inn": "7707083893",
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:inn:7707083893:49",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Токарь",
+          "recordTitle": "Токарь",
+          "sourceUrl": null,
+          "jobTitle": "Токарь",
+          "summary": "ООО Дефис",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Токарь",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "inn с дефисами, после очистки 10 цифр",
+      "input_digest": "29759a0e4446f9541f70b91244b90cd2d6b73af56374c741c2cfa01f401777b2"
+    },
+    {
+      "id": "fuzz_inn_ogrn-47",
+      "kind": "record",
+      "category": "fuzz_inn_ogrn",
+      "input": {
+        "record": {
+          "job_title": "Охранник",
+          "company_name": "ООО Нули",
+          "inn": "0000000000"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 50
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Нули",
+          "orgDisplayName": "ООО Нули",
+          "companyDomain": null,
+          "primarySourceKey": "inn:0000000000",
+          "innSourceKey": "inn:0000000000",
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо нули",
+          "russianLegalNameSourceKey": "ru-legal-name:нули",
+          "orgSourceKeys": [
+            "inn:0000000000"
+          ],
+          "orgSourceAliasKeys": [
+            "inn:0000000000",
+            "company-name:ооо нули",
+            "ru-legal-name:нули"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Нули",
+          "companyWebsiteUrl": null,
+          "inn": "0000000000",
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:inn:0000000000:50",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Охранник",
+          "recordTitle": "Охранник",
+          "sourceUrl": null,
+          "jobTitle": "Охранник",
+          "summary": "ООО Нули",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Охранник",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "inn из десяти нулей — формально 10 цифр",
+      "input_digest": "c6b820c5015b35e1bd1160c362c161ebaa18b0a93fbbe623e913ae425ecedebf"
+    },
+    {
+      "id": "fuzz_inn_ogrn-48",
+      "kind": "record",
+      "category": "fuzz_inn_ogrn",
+      "input": {
+        "record": {
+          "job_title": "Экономист",
+          "company_name": "АО ОГРН",
+          "ogrn": "1234567890123"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 51
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "АО ОГРН",
+          "orgDisplayName": "АО ОГРН",
+          "companyDomain": null,
+          "primarySourceKey": "ogrn:1234567890123",
+          "innSourceKey": null,
+          "ogrnSourceKey": "ogrn:1234567890123",
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ао огрн",
+          "russianLegalNameSourceKey": "ru-legal-name:огрн",
+          "orgSourceKeys": [
+            "ogrn:1234567890123"
+          ],
+          "orgSourceAliasKeys": [
+            "ogrn:1234567890123",
+            "company-name:ао огрн",
+            "ru-legal-name:огрн"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "АО ОГРН",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": "1234567890123",
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:ogrn:1234567890123:51",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Экономист",
+          "recordTitle": "Экономист",
+          "sourceUrl": null,
+          "jobTitle": "Экономист",
+          "summary": "АО ОГРН",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Экономист",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "ogrn ровно 13 цифр — валидная длина",
+      "input_digest": "140e34726d9ecb64a5caafd3c12b2f67b311ecad13ca966bdc9fba55a03467d5"
+    },
+    {
+      "id": "fuzz_inn_ogrn-49",
+      "kind": "record",
+      "category": "fuzz_inn_ogrn",
+      "input": {
+        "record": {
+          "job_title": "Кассир",
+          "company_name": "АО Короткий",
+          "ogrn": "123456789012"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 52
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "АО Короткий",
+          "orgDisplayName": "АО Короткий",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ао короткий",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ао короткий",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ао короткий"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ао короткий"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "АО Короткий",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ао короткий:52",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Кассир",
+          "recordTitle": "Кассир",
+          "sourceUrl": null,
+          "jobTitle": "Кассир",
+          "summary": "АО Короткий",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Кассир",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "ogrn из 12 цифр — невалидная длина",
+      "input_digest": "8ce2fcf75ec808b66e72ead6ae683416647426e68225a090318b8ca3690f5c57"
+    },
+    {
+      "id": "fuzz_inn_ogrn-50",
+      "kind": "record",
+      "category": "fuzz_inn_ogrn",
+      "input": {
+        "record": {
+          "job_title": "Маркетолог",
+          "company_name": "ООО Буквы",
+          "inn": "7707ab3893"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 53
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Буквы",
+          "orgDisplayName": "ООО Буквы",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо буквы",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо буквы",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо буквы"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо буквы"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Буквы",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо буквы:53",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Маркетолог",
+          "recordTitle": "Маркетолог",
+          "sourceUrl": null,
+          "jobTitle": "Маркетолог",
+          "summary": "ООО Буквы",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Маркетолог",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "inn с латинскими буквами внутри",
+      "input_digest": "5114c9ebab8396beefe97b7ad0d7c165a05884c06e80dfd897027fbf36f1b3ec"
+    },
+    {
+      "id": "fuzz_legal_names-51",
+      "kind": "record",
+      "category": "fuzz_legal_names",
+      "input": {
+        "record": {
+          "job_title": "Секретарь",
+          "company_name": "ООО «Ромашка»",
+          "company_domain": "romashka.example.com"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 54
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО «Ромашка»",
+          "orgDisplayName": "ООО «Ромашка»",
+          "companyDomain": "romashka.example.com",
+          "primarySourceKey": "domain:romashka.example.com",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:romashka.example.com",
+          "companyNameSourceKey": "company-name:ооо «ромашка»",
+          "russianLegalNameSourceKey": "ru-legal-name:ромашка",
+          "orgSourceKeys": [
+            "domain:romashka.example.com"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:romashka.example.com",
+            "company-name:ооо «ромашка»",
+            "ru-legal-name:ромашка"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО «Ромашка»",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:romashka.example.com:54",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Секретарь",
+          "recordTitle": "Секретарь",
+          "sourceUrl": null,
+          "jobTitle": "Секретарь",
+          "summary": "ООО «Ромашка»",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Секретарь",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "юр-имя с кавычками-ёлочками + домен",
+      "input_digest": "045a7a1f2b5507ad95f7175a72e7a617eb0d46711c117bedb3de308d219b5002"
+    },
+    {
+      "id": "fuzz_legal_names-52",
+      "kind": "record",
+      "category": "fuzz_legal_names",
+      "input": {
+        "record": {
+          "job_title": "Продавец",
+          "company_name": "ИП Васильев П.П.",
+          "company_domain": "ip-vasilyev.example.com"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 55
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ИП Васильев П.П.",
+          "orgDisplayName": "ИП Васильев П.П.",
+          "companyDomain": "ip-vasilyev.example.com",
+          "primarySourceKey": "domain:ip-vasilyev.example.com",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:ip-vasilyev.example.com",
+          "companyNameSourceKey": "company-name:ип васильев п.п.",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "domain:ip-vasilyev.example.com"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:ip-vasilyev.example.com",
+            "company-name:ип васильев п.п."
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ИП Васильев П.П.",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:ip-vasilyev.example.com:55",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Продавец",
+          "recordTitle": "Продавец",
+          "sourceUrl": null,
+          "jobTitle": "Продавец",
+          "summary": "ИП Васильев П.П.",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Продавец",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "форма ИП с инициалами + домен",
+      "input_digest": "84b8a5890f79adc2da6dbc688ada7c7b3ceab242e88f088c22a9506d7967ca22"
+    },
+    {
+      "id": "fuzz_legal_names-53",
+      "kind": "record",
+      "category": "fuzz_legal_names",
+      "input": {
+        "record": {
+          "job_title": "Методист",
+          "company_name": "АНО «Центр»",
+          "inn": "7707083893"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 56
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "АНО «Центр»",
+          "orgDisplayName": "АНО «Центр»",
+          "companyDomain": null,
+          "primarySourceKey": "inn:7707083893",
+          "innSourceKey": "inn:7707083893",
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ано «центр»",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "inn:7707083893"
+          ],
+          "orgSourceAliasKeys": [
+            "inn:7707083893",
+            "company-name:ано «центр»"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "АНО «Центр»",
+          "companyWebsiteUrl": null,
+          "inn": "7707083893",
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:inn:7707083893:56",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Методист",
+          "recordTitle": "Методист",
+          "sourceUrl": null,
+          "jobTitle": "Методист",
+          "summary": "АНО «Центр»",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Методист",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "форма АНО с ёлочками + валидный inn",
+      "input_digest": "b012c3234dbea02eae434d5618d03dfdf8e5b987c7057ca1c0104c142abdd0bb"
+    },
+    {
+      "id": "fuzz_legal_names-54",
+      "kind": "record",
+      "category": "fuzz_legal_names",
+      "input": {
+        "record": {
+          "job_title": "Консультант",
+          "company_name": "ООО",
+          "company_domain": "only-form.example.com"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 57
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО",
+          "orgDisplayName": "ООО",
+          "companyDomain": "only-form.example.com",
+          "primarySourceKey": "domain:only-form.example.com",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:only-form.example.com",
+          "companyNameSourceKey": "company-name:ооо",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "domain:only-form.example.com"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:only-form.example.com",
+            "company-name:ооо"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:only-form.example.com:57",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Консультант",
+          "recordTitle": "Консультант",
+          "sourceUrl": null,
+          "jobTitle": "Консультант",
+          "summary": "ООО",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Консультант",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "только правовая форма без имени + домен",
+      "input_digest": "fc34fef5b04625f7255eeadaf2e444cb3939ef307bb297742555756f34401573"
+    },
+    {
+      "id": "fuzz_legal_names-55",
+      "kind": "record",
+      "category": "fuzz_legal_names",
+      "input": {
+        "record": {
+          "job_title": "Редактор",
+          "company_name": "О О О Ромашка",
+          "company_domain": "space-ooo.example.com"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 58
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "О О О Ромашка",
+          "orgDisplayName": "О О О Ромашка",
+          "companyDomain": "space-ooo.example.com",
+          "primarySourceKey": "domain:space-ooo.example.com",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": "domain:space-ooo.example.com",
+          "companyNameSourceKey": "company-name:о о о ромашка",
+          "russianLegalNameSourceKey": "ru-legal-name:ромашка",
+          "orgSourceKeys": [
+            "domain:space-ooo.example.com"
+          ],
+          "orgSourceAliasKeys": [
+            "domain:space-ooo.example.com",
+            "company-name:о о о ромашка",
+            "ru-legal-name:ромашка"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "О О О Ромашка",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:domain:space-ooo.example.com:58",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Редактор",
+          "recordTitle": "Редактор",
+          "sourceUrl": null,
+          "jobTitle": "Редактор",
+          "summary": "О О О Ромашка",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Редактор",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "раздельные буквы правовой формы + домен",
+      "input_digest": "eaaa48f94a3d90784ac7dbc05036f796a8618d299ce749ac1246b85431c66630"
+    },
+    {
+      "id": "fuzz_legal_names-56",
+      "kind": "record",
+      "category": "fuzz_legal_names",
+      "input": {
+        "record": {
+          "job_title": "Инженер-конструктор",
+          "company_name": "ZAO Test",
+          "inn": "7707083894"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 59
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ZAO Test",
+          "orgDisplayName": "ZAO Test",
+          "companyDomain": null,
+          "primarySourceKey": "inn:7707083894",
+          "innSourceKey": "inn:7707083894",
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:zao test",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "inn:7707083894"
+          ],
+          "orgSourceAliasKeys": [
+            "inn:7707083894",
+            "company-name:zao test"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ZAO Test",
+          "companyWebsiteUrl": null,
+          "inn": "7707083894",
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:inn:7707083894:59",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Инженер-конструктор",
+          "recordTitle": "Инженер-конструктор",
+          "sourceUrl": null,
+          "jobTitle": "Инженер-конструктор",
+          "summary": "ZAO Test",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Инженер-конструктор",
+            "job_posting_url": null,
+            "location": null,
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "латинская транслитерация формы + валидный inn",
+      "input_digest": "8f6299574f4043b4ddffba22a7427ab38cccf84673b6b03ca08ee8bbed499532"
+    },
+    {
+      "id": "fuzz_region_salary-57",
+      "kind": "record",
+      "category": "fuzz_region_salary",
+      "input": {
+        "record": {
+          "job_title": "Бариста",
+          "company_name": "ООО Регион",
+          "location": "Kurfürstendamm"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 60
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Регион",
+          "orgDisplayName": "ООО Регион",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо регион",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо регион",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо регион"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо регион"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Регион",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо регион:60",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Бариста",
+          "recordTitle": "Бариста",
+          "sourceUrl": null,
+          "jobTitle": "Бариста",
+          "summary": "ООО Регион; Kurfürstendamm",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Бариста",
+            "job_posting_url": null,
+            "location": "Kurfürstendamm",
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": "Kurfürstendamm",
+            "region_canonical": "russia-unspecified",
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "локация, содержащая 'rf' после нормализации",
+      "input_digest": "f243ba4e33d59d425770e897e07e49d03d87785df827c2076315396f9ef0f9d4"
+    },
+    {
+      "id": "fuzz_region_salary-58",
+      "kind": "record",
+      "category": "fuzz_region_salary",
+      "input": {
+        "record": {
+          "job_title": "Оператор колл-центра",
+          "company_name": "ООО Москва",
+          "location": "Москва, удалённо"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 61
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Москва",
+          "orgDisplayName": "ООО Москва",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо москва",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо москва",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо москва"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо москва"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Москва",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо москва:61",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Оператор колл-центра",
+          "recordTitle": "Оператор колл-центра",
+          "sourceUrl": null,
+          "jobTitle": "Оператор колл-центра",
+          "summary": "ООО Москва; Москва, удалённо",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Оператор колл-центра",
+            "job_posting_url": null,
+            "location": "Москва, удалённо",
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": "Москва, удалённо",
+            "region_canonical": "remote",
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": true,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "город и признак удалёнки в одной строке",
+      "input_digest": "2a7e8c88aff1b1cfdbfb9999fedd43536fbb5d68645bcef7abf366a719e3da33"
+    },
+    {
+      "id": "fuzz_region_salary-59",
+      "kind": "record",
+      "category": "fuzz_region_salary",
+      "input": {
+        "record": {
+          "job_title": "Тестировщик",
+          "company_name": "ООО Питер",
+          "city": "SPB"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 62
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Питер",
+          "orgDisplayName": "ООО Питер",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо питер",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо питер",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо питер"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо питер"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Питер",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо питер:62",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Тестировщик",
+          "recordTitle": "Тестировщик",
+          "sourceUrl": null,
+          "jobTitle": "Тестировщик",
+          "summary": "ООО Питер; SPB",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Тестировщик",
+            "job_posting_url": null,
+            "location": "SPB",
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": "SPB",
+            "region_canonical": "saint-petersburg",
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "аббревиатура города в поле city",
+      "input_digest": "3fe33c7c497ced2e73ac8febb7898a256930b206bf449f4ae2bdfd9b80ddfda9"
+    },
+    {
+      "id": "fuzz_region_salary-60",
+      "kind": "record",
+      "category": "fuzz_region_salary",
+      "input": {
+        "record": {
+          "job_title": "Архитектор",
+          "company_name": "ООО Удалённое",
+          "region": "remote-first"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 63
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Удалённое",
+          "orgDisplayName": "ООО Удалённое",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо удалённое",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо удалённое",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо удалённое"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо удалённое"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Удалённое",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо удалённое:63",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Архитектор",
+          "recordTitle": "Архитектор",
+          "sourceUrl": null,
+          "jobTitle": "Архитектор",
+          "summary": "ООО Удалённое; remote-first",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Архитектор",
+            "job_posting_url": null,
+            "location": "remote-first",
+            "salary": null,
+            "employment_type": null,
+            "tags": [],
+            "region_raw": "remote-first",
+            "region_canonical": "remote",
+            "salary_rub_min": null,
+            "salary_rub_max": null,
+            "salary_currency": null,
+            "is_remote": true,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "region со словом remote и дефисом",
+      "input_digest": "d5eb445c965a6ab16a496d76903973c3e878e7c3b4e7fcc14f8ffafcee26a3ca"
+    },
+    {
+      "id": "fuzz_region_salary-61",
+      "kind": "record",
+      "category": "fuzz_region_salary",
+      "input": {
+        "record": {
+          "job_title": "Стажёр-программист",
+          "company_name": "ООО Зарплата",
+          "salary": "50.000"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 64
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Зарплата",
+          "orgDisplayName": "ООО Зарплата",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо зарплата",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо зарплата",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо зарплата"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо зарплата"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Зарплата",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо зарплата:64",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Стажёр-программист",
+          "recordTitle": "Стажёр-программист",
+          "sourceUrl": null,
+          "jobTitle": "Стажёр-программист",
+          "summary": "ООО Зарплата; 50.000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Стажёр-программист",
+            "job_posting_url": null,
+            "location": null,
+            "salary": "50.000",
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": 50000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "точка как разделитель тысяч в зарплате",
+      "input_digest": "0c794fdc47e8546c959d3a8d0aaef81437b02570df5b8f0514553d4a3c51a01c"
+    },
+    {
+      "id": "fuzz_region_salary-62",
+      "kind": "record",
+      "category": "fuzz_region_salary",
+      "input": {
+        "record": {
+          "job_title": "Врач",
+          "company_name": "ООО Диапазон",
+          "compensation": "100 000 - 150 000 ₽"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 65
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Диапазон",
+          "orgDisplayName": "ООО Диапазон",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо диапазон",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо диапазон",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо диапазон"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо диапазон"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Диапазон",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо диапазон:65",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Врач",
+          "recordTitle": "Врач",
+          "sourceUrl": null,
+          "jobTitle": "Врач",
+          "summary": "ООО Диапазон; 100 000 - 150 000 ₽",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Врач",
+            "job_posting_url": null,
+            "location": null,
+            "salary": "100 000 - 150 000 ₽",
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": 100000,
+            "salary_rub_max": 150000,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "диапазон с пробелами и символом рубля",
+      "input_digest": "35f16c1b1c0afe6ca5166c7d90bc275e1c2428e746f97d53c16c98a4c3ae3786"
+    },
+    {
+      "id": "fuzz_region_salary-63",
+      "kind": "record",
+      "category": "fuzz_region_salary",
+      "input": {
+        "record": {
+          "job_title": "Учитель",
+          "company_name": "ООО Миллион",
+          "salary": "1 000 000 руб"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 66
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Миллион",
+          "orgDisplayName": "ООО Миллион",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо миллион",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо миллион",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо миллион"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо миллион"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Миллион",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо миллион:66",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Учитель",
+          "recordTitle": "Учитель",
+          "sourceUrl": null,
+          "jobTitle": "Учитель",
+          "summary": "ООО Миллион; 1 000 000 руб",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Учитель",
+            "job_posting_url": null,
+            "location": null,
+            "salary": "1 000 000 руб",
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": 1000000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "большая сумма с пробелами и словом руб",
+      "input_digest": "ea08c9659917fedf2af4ec314c9c81ec661735e1198f289e8d279aea60beb630"
+    },
+    {
+      "id": "fuzz_region_salary-64",
+      "kind": "record",
+      "category": "fuzz_region_salary",
+      "input": {
+        "record": {
+          "job_title": "Support Specialist",
+          "company_name": "ООО Валюта",
+          "salary": "3000 USD"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 67
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Валюта",
+          "orgDisplayName": "ООО Валюта",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо валюта",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо валюта",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо валюта"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо валюта"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Валюта",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо валюта:67",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Support Specialist",
+          "recordTitle": "Support Specialist",
+          "sourceUrl": null,
+          "jobTitle": "Support Specialist",
+          "summary": "ООО Валюта; 3000 USD",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Support Specialist",
+            "job_posting_url": null,
+            "location": null,
+            "salary": "3000 USD",
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": 3000,
+            "salary_rub_max": null,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "зарплата в иностранной валюте",
+      "input_digest": "b4214a61edc3924f1bf082156ed30d21ae061f9adb2d0c7efb7ef15ef6ce6468"
+    },
+    {
+      "id": "fuzz_region_salary-65",
+      "kind": "record",
+      "category": "fuzz_region_salary",
+      "input": {
+        "record": {
+          "job_title": "Логист",
+          "company_name": "ООО Два Числа",
+          "salary": "до 200 000 от 100 000"
+        },
+        "fetchedAt": "2026-10-09T12:00:00.000Z",
+        "sourceId": "q2-corpus",
+        "lineNumber": 68
+      },
+      "expected": {
+        "normalized": {
+          "orgName": "ООО Два Числа",
+          "orgDisplayName": "ООО Два Числа",
+          "companyDomain": null,
+          "primarySourceKey": "company-name:ооо два числа",
+          "innSourceKey": null,
+          "ogrnSourceKey": null,
+          "domainSourceKey": null,
+          "companyNameSourceKey": "company-name:ооо два числа",
+          "russianLegalNameSourceKey": null,
+          "orgSourceKeys": [
+            "company-name:ооо два числа"
+          ],
+          "orgSourceAliasKeys": [
+            "company-name:ооо два числа"
+          ],
+          "fetchedAt": "2026-10-09T12:00:00.000Z",
+          "occurredAt": "2026-10-09T12:00:00.000Z",
+          "companyName": "ООО Два Числа",
+          "companyWebsiteUrl": null,
+          "inn": null,
+          "ogrn": null,
+          "orgExternalId": null,
+          "signalExternalId": "q2-corpus:derived:company-name:ооо два числа:68",
+          "signalType": "job_posting",
+          "evidenceRole": "primary_platform",
+          "sourceRecordType": "job_posting",
+          "headline": "Логист",
+          "recordTitle": "Логист",
+          "sourceUrl": null,
+          "jobTitle": "Логист",
+          "summary": "ООО Два Числа; до 200 000 от 100 000",
+          "payload": {
+            "board": "q2-corpus",
+            "vacancy_id": null,
+            "job_title": "Логист",
+            "job_posting_url": null,
+            "location": null,
+            "salary": "до 200 000 от 100 000",
+            "employment_type": null,
+            "tags": [],
+            "region_raw": null,
+            "region_canonical": null,
+            "salary_rub_min": 100000,
+            "salary_rub_max": 200000,
+            "salary_currency": "RUB",
+            "is_remote": false,
+            "is_hybrid": false,
+            "is_rotational": false,
+            "vacancy_freshness": "fresh-3d",
+            "quality_penalties": []
+          }
+        }
+      },
+      "oracle_note": "два числовых токена с предлогами в одной строке",
+      "input_digest": "fa734f82c88d4a2dca2d765b4b962da1c1b5c13bc53cf549ab061bc32c010967"
+    }
+  ]
+}
